@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="login-screen">
+      <div class="login-visual" aria-hidden="true"></div>
+
+      <div class="login-details">
+        <div class="login-brand">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 4L5 8v8l7 4 7-4V8l-7-4zm0 3.1l3.9 2.2L12 11.5 8.1 9.3 12 7.1zm-5 3.9l4 2.3v4.6l-4-2.3V11zm6 6.9v-4.6l4-2.3v4.6l-4 2.3z"
+              />
+            </svg>
+          </div>
+          <h1>HRMS</h1>
+        </div>
+
+        <div class="login-head">
+          <h2>Welcome back, Fabiana</h2>
+          <p>Login to continue managing your team.</p>
+        </div>
+
+        <form class="login-form" id="login-form">
+          <label class="login-input">
+            <span class="login-label">Email address</span>
+            <input
+              type="email"
+              name="email"
+              placeholder="your.email@hrms.com"
+              required
+            />
+          </label>
+
+          <label class="login-input">
+            <span class="login-label">Password</span>
+            <input
+              type="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+          </label>
+
+          <div class="login-actions">
+            <label class="login-checkbox">
+              <input type="checkbox" name="remember" checked /> Remember me
+            </label>
+            <a class="login-forgot" href="forgot-password.html"
+              >Forgot password?</a
+            >
+          </div>
+
+          <button class="login-submit" type="submit">Sign in</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+      const loginForm = document.getElementById("login-form");
+      if (loginForm) {
+        loginForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          alert("Signed in successfully. (Demo)");
+        });
+      }
+    </script>
+    <script src="store.js"></script>
+  </body>
+</html>

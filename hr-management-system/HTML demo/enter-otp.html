@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enter OTP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="otp-screen">
+      <div class="otp-visual" aria-hidden="true"></div>
+
+      <div class="otp-details">
+        <div class="otp-back">
+          <button
+            class="otp-back-btn"
+            id="otp-back-btn"
+            type="button"
+            aria-label="Back"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="#16151C"
+                d="M10 19l-7-7 7-7 1.41 1.41L6.83 11H22v2H6.83l4.58 4.59z"
+              />
+            </svg>
+          </button>
+          <span>Back</span>
+        </div>
+
+        <div class="otp-head">
+          <h2>Enter OTP</h2>
+          <p>Enter the 4-digit code sent to your email address.</p>
+        </div>
+
+        <form class="otp-form" id="otp-form">
+          <div class="otp-codes">
+            <label class="otp-code">
+              <input type="text" inputmode="numeric" maxlength="1" required />
+            </label>
+            <label class="otp-code">
+              <input type="text" inputmode="numeric" maxlength="1" required />
+            </label>
+            <label class="otp-code">
+              <input type="text" inputmode="numeric" maxlength="1" required />
+            </label>
+            <label class="otp-code">
+              <input type="text" inputmode="numeric" maxlength="1" required />
+            </label>
+          </div>
+
+          <button class="otp-submit" type="submit">Verify code</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+      const otpBackBtn = document.getElementById("otp-back-btn");
+      const otpForm = document.getElementById("otp-form");
+
+      if (otpBackBtn) {
+        otpBackBtn.addEventListener("click", () => {
+          window.location.href = "forgot-password.html";
+        });
+      }
+
+      if (otpForm) {
+        otpForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          alert("OTP verified. (Demo)");
+          window.location.href = "login-successful.html";
+        });
+      }
+    </script>
+    <script src="store.js"></script>
+  </body>
+</html>

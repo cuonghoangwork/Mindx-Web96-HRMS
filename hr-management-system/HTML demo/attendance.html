@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="attendance-screen">
+      <aside class="side-menu">
+        <div class="brand">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 4L5 8v8l7 4 7-4V8l-7-4zm0 3.1l3.9 2.2L12 11.5 8.1 9.3 12 7.1zm-5 3.9l4 2.3v4.6l-4-2.3V11zm6 6.9v-4.6l4-2.3v4.6l-4 2.3z"
+              />
+            </svg>
+          </div>
+          <h1>HRMS</h1>
+        </div>
+
+        <nav class="menu-list" aria-label="Sidebar">
+          <button
+            class="menu-item"
+            data-title="Dashboard"
+            data-link="dashboard.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">Dashboard</span>
+          </button>
+
+          <button
+            class="menu-item"
+            data-title="All Employees"
+            data-link="index.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M16 11a4 4 0 1 0-3.999-4A4 4 0 0 0 16 11zM8 12a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM8 14c-2.33 0-7 1.17-7 3.5V20h5v-2c0-1.2.62-2.27 1.7-3.14A8.2 8.2 0 0 0 8 14z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">All Employees</span>
+          </button>
+
+          <button
+            class="menu-item"
+            data-title="All Departments"
+            data-link="all-departments.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2zm0 4a2 2 0 1 1-2 2 2 2 0 0 1 2-2zm0 12c-2.67 0-5.03-1.34-6.47-3.38A7.98 7.98 0 0 1 12 11a7.98 7.98 0 0 1 6.47 3.62A7.98 7.98 0 0 1 12 18z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">All Departments</span>
+          </button>
+
+          <button
+            class="menu-item active"
+            data-title="Attendance"
+            data-link="attendance.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M19 3h-4.18A3 3 0 0 0 12 1a3 3 0 0 0-2.82 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm7 16H5V7h14v12z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">Attendance</span>
+          </button>
+        </nav>
+
+        <div
+          class="theme-switch"
+          id="theme-switch"
+          role="tablist"
+          aria-label="Theme switcher"
+        >
+          <button
+            class="theme-option active"
+            data-theme-option="light"
+            type="button"
+          >
+            <span class="theme-icon">☀</span>
+            <span>Light</span>
+          </button>
+          <button class="theme-option" data-theme-option="dark" type="button">
+            <span class="theme-icon">◐</span>
+            <span>Dark</span>
+          </button>
+        </div>
+      </aside>
+
+      <header class="dash-header">
+        <div class="dash-title">
+          <div class="dash-title-main" id="page-title">Attendance</div>
+          <div class="dash-title-sub">Track attendance and daily status</div>
+        </div>
+
+        <div class="dash-search" aria-hidden="true">
+          <span>Daily attendance report</span>
+        </div>
+
+        <button class="dash-notif" type="button" aria-label="Notifications">
+          <span class="dash-notif-icon">🔔</span>
+        </button>
+
+        <button class="dash-profile" type="button" aria-label="My Profile">
+          <span class="dash-avatar" aria-hidden="true"></span>
+          <span class="dash-profile-text">
+            <span class="dash-profile-name">My Profile</span>
+            <span class="dash-profile-role">Admin</span>
+          </span>
+          <span class="dash-profile-caret">⌄</span>
+        </button>
+      </header>
+
+      <main class="attendance-content" role="main">
+        <div class="attendance-search-bar">
+          <div class="attendance-input" aria-label="Search attendance">
+            <span class="attendance-input-icon">🔍</span>
+            <span class="attendance-input-placeholder"
+              >Search employee, project, or anything</span
+            >
+            <span class="attendance-input-caret">⌄</span>
+          </div>
+        </div>
+
+        <section class="attendance-summary-cards">
+          <article class="stat-card">
+            <div class="stat-header">
+              <div class="stat-icon-btn" aria-hidden="true">👨‍💼</div>
+              <div>
+                <div class="stat-title">Present Today</div>
+                <div class="stat-value">124</div>
+              </div>
+            </div>
+            <p class="stat-caption">8.2% increase from yesterday</p>
+          </article>
+          <article class="stat-card">
+            <div class="stat-header">
+              <div class="stat-icon-btn purple" aria-hidden="true">⏱</div>
+              <div>
+                <div class="stat-title">Late Arrivals</div>
+                <div class="stat-value">12</div>
+              </div>
+            </div>
+            <p class="stat-caption">Monitored across teams</p>
+          </article>
+          <article class="stat-card">
+            <div class="stat-header">
+              <div class="stat-icon-btn" aria-hidden="true">🏠</div>
+              <div>
+                <div class="stat-title">Remote</div>
+                <div class="stat-value">18</div>
+              </div>
+            </div>
+            <p class="stat-caption">Employees working from home</p>
+          </article>
+          <article class="stat-card">
+            <div class="stat-header">
+              <div class="stat-icon-btn" aria-hidden="true">❌</div>
+              <div>
+                <div class="stat-title">Absent</div>
+                <div class="stat-value">5</div>
+              </div>
+            </div>
+            <p class="stat-caption">Awaiting approvals</p>
+          </article>
+        </section>
+
+        <section class="attendance-table-section">
+          <div class="attendance-table-head">
+            <div>
+              <h2>Attendance log</h2>
+              <p class="stat-caption">
+                Latest employee check-ins and current status.
+              </p>
+            </div>
+            <button type="button" class="primary-btn">Export report</button>
+          </div>
+
+          <div class="attendance-table-wrapper">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Designation</th>
+                  <th>Office</th>
+                  <th>Check-in</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Leanne Graham</td>
+                  <td>Team Lead - Design</td>
+                  <td>New York</td>
+                  <td>09:27 AM</td>
+                  <td>
+                    <span class="attendance-status status-present"
+                      >Present</span
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td>Darlene Robertson</td>
+                  <td>Web Designer</td>
+                  <td>London</td>
+                  <td>10:15 AM</td>
+                  <td>
+                    <span class="attendance-status status-late">Late</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Jacob Jones</td>
+                  <td>Medical Assistant</td>
+                  <td>Remote</td>
+                  <td>10:24 AM</td>
+                  <td>
+                    <span class="attendance-status status-remote">Remote</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Kathryn Murphy</td>
+                  <td>Marketing Coordinator</td>
+                  <td>Paris</td>
+                  <td>09:10 AM</td>
+                  <td>
+                    <span class="attendance-status status-present"
+                      >Present</span
+                    >
+                  </td>
+                </tr>
+                <tr>
+                  <td>Ronald Richards</td>
+                  <td>Python Developer</td>
+                  <td>Remote</td>
+                  <td>09:29 AM</td>
+                  <td>
+                    <span class="attendance-status status-remote">Remote</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="attendance-pagination">
+          <div class="pagination-info">Showing 1 to 10 out of 60 records</div>
+          <div class="pagination-controls" aria-label="Pagination">
+            <button
+              type="button"
+              class="pagination-btn pagination-prev"
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            <button type="button" class="pagination-btn active">1</button>
+            <button type="button" class="pagination-btn">2</button>
+            <button type="button" class="pagination-btn">3</button>
+            <button
+              type="button"
+              class="pagination-btn pagination-next"
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="store.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

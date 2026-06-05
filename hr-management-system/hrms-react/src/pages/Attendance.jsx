@@ -1,0 +1,110 @@
+import { useStore } from "../context/StoreContext";
+
+function formatTime(value) {
+  if (!value) return "—";
+  const [hours, minutes] = value.split(":").map(Number);
+  const period = hours >= 12 ? "PM" : "AM";
+  const h = hours % 12 || 12;
+  return `${h}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
+function statusTagClass(status) {
+  if (status === "Present") return "tag-green";
+  if (status === "On Leave") return "tag-purple";
+  if (status === "Late") return "tag-orange";
+  return "tag-red";
+}
+
+function Attendance() {
+  const { attendance, employees } = useStore();
+
+  const rows = attendance.map((record) => {
+    const employee = employees.find((e) => e.id === record.employeeId);
+
+    // Determine if employee is late (check-in after 9:00 AM)
+    let status = record.status;
+    if (record.checkIn && status === "Present") {
+      const [hours] = record.checkIn.split(":").map(Number);
+      if (hours >= 9) {
+        status = "Late";
+      }
+    }
+
+    return {
+      ...record,
+      name: employee?.name ?? `Employee #${record.employeeId}`,
+      status,
+    };
+  });
+
+  const presentCount = rows.filter((r) => r.status === "Present").length;
+  const lateCount = rows.filter((r) => r.status === "Late").length;
+  const leaveCount = rows.filter((r) => r.status === "On Leave").length;
+  const absentCount = rows.length - presentCount - lateCount - leaveCount;
+
+  return (
+    <div className="content-card">
+      <div className="page-intro">
+        <div>
+          <h2>Attendance</h2>
+          <p className="text-muted">
+            Track check-in, check-out, and status for today&apos;s roster.
+          </p>
+        </div>
+        <div className="attendance-summary">
+          <span className="tag tag-green">{presentCount} present</span>
+          {lateCount > 0 && (
+            <span className="tag tag-orange">{lateCount} late</span>
+          )}
+          {leaveCount > 0 && (
+            <span className="tag tag-purple">{leaveCount} on leave</span>
+          )}
+          {absentCount > 0 && (
+            <span className="tag tag-red">{absentCount} absent</span>
+          )}
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">📋</div>
+          <h3 className="empty-state-title">No attendance records</h3>
+          <p className="empty-state-description">
+            Attendance records will appear here as employees check in and out.
+          </p>
+        </div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={`${row.employeeId}-${row.date}`}>
+                  <td>{row.name}</td>
+                  <td>{row.date}</td>
+                  <td>{formatTime(row.checkIn)}</td>
+                  <td>{formatTime(row.checkOut)}</td>
+                  <td>
+                    <span className={`tag ${statusTagClass(row.status)}`}>
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Attendance;
