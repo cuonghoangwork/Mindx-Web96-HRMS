@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import FilterModal from "../components/FilterModal";
 import SearchBar from "../components/SearchBar";
+import Avatar from "../components/Avatar";
+import { StatusBadge } from "../components/Badge";
 
 const EMPLOYEES_PER_PAGE = 10;
 
@@ -155,24 +157,7 @@ function AllEmployees() {
                 <div
                   style={{ display: "flex", alignItems: "center", gap: "12px" }}
                 >
-                  <div
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, #7152f3, #9b7bff)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "14px",
-                      fontWeight: "500",
-                      color: "white",
-                    }}
-                  >
-                    {employee.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
+                  <Avatar name={employee.name} size="sm" />
                   <span className="employee-row-name">{employee.name}</span>
                 </div>
               </td>
@@ -181,9 +166,7 @@ function AllEmployees() {
               <td>{employee.designation}</td>
               <td>{employee.type}</td>
               <td>
-                <span className={`tag tag-${getStatusColor(employee.status)}`}>
-                  {employee.status}
-                </span>
+                <StatusBadge status={employee.status} dot />
               </td>
               <td onClick={(e) => e.stopPropagation()}>
                 <Link
@@ -300,19 +283,6 @@ function SortableHeader({ label, field, sortField, sortOrder, onSort }) {
       )}
     </th>
   );
-}
-
-function getStatusColor(status) {
-  switch (status) {
-    case "Active":
-      return "green";
-    case "On Leave":
-      return "purple";
-    case "Terminated":
-      return "red";
-    default:
-      return "green";
-  }
 }
 
 export default AllEmployees;

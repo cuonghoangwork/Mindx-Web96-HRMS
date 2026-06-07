@@ -1,4 +1,7 @@
 import { useStore } from "../context/StoreContext";
+const attendanceVariant = (s) =>
+  ({ Present: "success", Late: "warning", "On Leave": "info" })[s] ?? "danger";
+import Badge from "../components/Badge";
 
 function formatTime(value) {
   if (!value) return "—";
@@ -6,13 +9,6 @@ function formatTime(value) {
   const period = hours >= 12 ? "PM" : "AM";
   const h = hours % 12 || 12;
   return `${h}:${String(minutes).padStart(2, "0")} ${period}`;
-}
-
-function statusTagClass(status) {
-  if (status === "Present") return "tag-green";
-  if (status === "On Leave") return "tag-purple";
-  if (status === "Late") return "tag-orange";
-  return "tag-red";
 }
 
 function Attendance() {
@@ -52,15 +48,23 @@ function Attendance() {
           </p>
         </div>
         <div className="attendance-summary">
-          <span className="tag tag-green">{presentCount} present</span>
+          <Badge variant="success" dot>
+            {presentCount} present
+          </Badge>
           {lateCount > 0 && (
-            <span className="tag tag-orange">{lateCount} late</span>
+            <Badge variant="warning" dot>
+              {lateCount} late
+            </Badge>
           )}
           {leaveCount > 0 && (
-            <span className="tag tag-purple">{leaveCount} on leave</span>
+            <Badge variant="info" dot>
+              {leaveCount} on leave
+            </Badge>
           )}
           {absentCount > 0 && (
-            <span className="tag tag-red">{absentCount} absent</span>
+            <Badge variant="danger" dot>
+              {absentCount} absent
+            </Badge>
           )}
         </div>
       </div>
@@ -93,9 +97,9 @@ function Attendance() {
                   <td>{formatTime(row.checkIn)}</td>
                   <td>{formatTime(row.checkOut)}</td>
                   <td>
-                    <span className={`tag ${statusTagClass(row.status)}`}>
+                    <Badge variant={attendanceVariant(row.status)}>
                       {row.status}
-                    </span>
+                    </Badge>
                   </td>
                 </tr>
               ))}
