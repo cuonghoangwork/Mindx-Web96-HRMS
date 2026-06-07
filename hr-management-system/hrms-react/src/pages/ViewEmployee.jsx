@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import Avatar from "../components/Avatar";
+import { StatusBadge, TypeBadge } from "../components/Badge";
 
 const EMPLOYEE_TYPES = ["Full-time", "Part-time", "Contract", "Intern"];
 
@@ -52,12 +54,16 @@ function ViewEmployee() {
     <>
       <div className="content-card">
         <div className="employee-detail-header">
-          <div className="employee-avatar">
-            {employee.name
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
+          <Avatar
+            name={employee.name}
+            size="xl"
+            status={
+              employee.status === "On Leave" ? "leave"
+              : employee.status === "Active" ? "active"
+              : employee.status === "Terminated" ? "terminated"
+              : undefined
+            }
+          />
 
           <div style={{ flex: 1 }}>
             <h2>{employee.name}</h2>
@@ -66,10 +72,8 @@ function ViewEmployee() {
             </p>
 
             <div className="employee-detail-tags">
-              <span className={`tag tag-${getStatusColor(employee.status)}`}>
-                {employee.status}
-              </span>
-              <span className="tag tag-purple">{employee.type}</span>
+              <StatusBadge status={employee.status} size="lg" dot />
+              <TypeBadge type={employee.type} size="lg" />
             </div>
           </div>
 
@@ -212,19 +216,6 @@ function ConfirmChangeModal({ change, employeeName, onConfirm, onCancel }) {
       </div>
     </div>
   );
-}
-
-function getStatusColor(status) {
-  switch (status) {
-    case "Active":
-      return "green";
-    case "On Leave":
-      return "purple";
-    case "Terminated":
-      return "red";
-    default:
-      return "green";
-  }
 }
 
 export default ViewEmployee;

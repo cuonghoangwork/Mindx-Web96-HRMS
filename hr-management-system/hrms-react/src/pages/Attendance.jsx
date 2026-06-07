@@ -1,7 +1,8 @@
 import { useStore } from "../context/StoreContext";
+import Badge from "../components/Badge";
+
 const attendanceVariant = (s) =>
   ({ Present: "success", Late: "warning", "On Leave": "info" })[s] ?? "danger";
-import Badge from "../components/Badge";
 
 function formatTime(value) {
   if (!value) return "—";
