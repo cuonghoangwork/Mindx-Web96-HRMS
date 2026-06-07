@@ -36,7 +36,7 @@ function Holidays() {
               <td>{holiday.name}</td>
               <td>{holiday.date}</td>
               <td>
-                <Badge variant="primary">{candidate.stage}</Badge>
+                <Badge variant="success">{holiday.type}</Badge>
               </td>
               <td>
                 <button
