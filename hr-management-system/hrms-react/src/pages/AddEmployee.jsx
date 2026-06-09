@@ -8,24 +8,24 @@ import { StatusBadge, TypeBadge } from "../components/Badge";
    Step config
 ───────────────────────────────── */
 const STEPS = [
-  { id: 1, label: "Cá nhân",   icon: "👤", desc: "Thông tin cơ bản" },
-  { id: 2, label: "Công việc", icon: "💼", desc: "Vị trí & hợp đồng" },
-  { id: 3, label: "Tài chính", icon: "💰", desc: "Lương & phúc lợi" },
-  { id: 4, label: "Xác nhận",  icon: "✅", desc: "Kiểm tra & lưu" },
+  { id: 1, label: "Personal",  icon: "👤", desc: "Basic information" },
+  { id: 2, label: "Job",       icon: "💼", desc: "Position & contract" },
+  { id: 3, label: "Finance",   icon: "💰", desc: "Salary & benefits" },
+  { id: 4, label: "Review",    icon: "✅", desc: "Check & save" },
 ];
 
 /* ─────────────────────────────────
    Validation rules
 ───────────────────────────────── */
 const RULES = {
-  name:        (v) => !v.trim() ? "Họ tên là bắt buộc" : v.trim().length < 2 ? "Tên quá ngắn" : "",
-  age:         (v) => !v ? "Tuổi là bắt buộc" : (Number(v) < 18 || Number(v) > 80) ? "Tuổi phải từ 18–80" : "",
-  sex:         (v) => !v ? "Vui lòng chọn giới tính" : "",
-  email:       (v) => v && !/\S+@\S+\.\S+/.test(v) ? "Email không hợp lệ" : "",
-  employeeId:  (v) => !v.trim() ? "Mã nhân viên là bắt buộc" : !/^[A-Z]{2,4}\d{2,6}$/i.test(v.trim()) ? "Định dạng: EMP001" : "",
-  department:  (v) => !v ? "Vui lòng chọn phòng ban" : "",
-  designation: (v) => !v.trim() ? "Chức danh là bắt buộc" : "",
-  salary:      (v) => !v ? "Lương là bắt buộc" : Number(v) <= 0 ? "Lương phải lớn hơn 0" : "",
+  name:        (v) => !v.trim() ? "Full name is required" : v.trim().length < 2 ? "Name is too short" : "",
+  age:         (v) => !v ? "Age is required" : (Number(v) < 18 || Number(v) > 80) ? "Age must be 18–80" : "",
+  sex:         (v) => !v ? "Please select a gender" : "",
+  email:       (v) => v && !/\S+@\S+\.\S+/.test(v) ? "Invalid email address" : "",
+  employeeId:  (v) => !v.trim() ? "Employee ID is required" : !/^[A-Z]{2,4}\d{2,6}$/i.test(v.trim()) ? "Format: EMP001" : "",
+  department:  (v) => !v ? "Please select a department" : "",
+  designation: (v) => !v.trim() ? "Designation is required" : "",
+  salary:      (v) => !v ? "Salary is required" : Number(v) <= 0 ? "Salary must be greater than 0" : "",
 };
 
 const STEP_FIELDS = {
@@ -72,7 +72,7 @@ function Field({ label, required, error, touched, hint, success, children }) {
       )}
       {showSuccess && (
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-success)", display: "flex", alignItems: "center", gap: "4px" }}>
-          <span aria-hidden="true">✓</span> Hợp lệ
+          <span aria-hidden="true">✓</span> Valid
         </span>
       )}
     </div>
@@ -154,33 +154,33 @@ function StepperHeader({ step, completedSteps, onJump }) {
 function ReviewStep({ formData, onEdit }) {
   const sections = [
     {
-      title: "Cá nhân", stepId: 1,
+      title: "Personal", stepId: 1,
       rows: [
-        { label: "Họ và tên",   value: formData.name },
-        { label: "Tuổi",        value: formData.age },
-        { label: "Giới tính",   value: formData.sex },
+        { label: "Full Name",    value: formData.name },
+        { label: "Age",          value: formData.age },
+        { label: "Gender",       value: formData.sex },
         { label: "Email",       value: formData.email },
-        { label: "Điện thoại",  value: formData.phone },
-        { label: "Địa chỉ",    value: formData.address },
+        { label: "Phone",        value: formData.phone },
+        { label: "Address",      value: formData.address },
       ],
     },
     {
-      title: "Công việc", stepId: 2,
+      title: "Job", stepId: 2,
       rows: [
-        { label: "Mã nhân viên",  value: formData.employeeId },
-        { label: "Phòng ban",     value: formData.department },
-        { label: "Chức danh",     value: formData.designation },
-        { label: "Loại HĐ",      value: formData.type },
-        { label: "Ngày bắt đầu", value: formData.startDate },
-        { label: "Trạng thái",   value: formData.status },
+        { label: "Employee ID",   value: formData.employeeId },
+        { label: "Department",    value: formData.department },
+        { label: "Designation",   value: formData.designation },
+        { label: "Contract Type", value: formData.type },
+        { label: "Start Date",    value: formData.startDate },
+        { label: "Status",        value: formData.status },
       ],
     },
     {
-      title: "Tài chính", stepId: 3,
+      title: "Finance", stepId: 3,
       rows: [
-        { label: "Lương/năm",   value: formData.salary ? `$${Number(formData.salary).toLocaleString()}` : "" },
-        { label: "Lương/tháng", value: formData.salary ? `$${Math.round(formData.salary / 12).toLocaleString()}` : "" },
-        { label: "Ghi chú",    value: formData.notes },
+        { label: "Annual Salary", value: formData.salary ? `$${Number(formData.salary).toLocaleString()}` : "" },
+        { label: "Monthly",       value: formData.salary ? `$${Math.round(formData.salary / 12).toLocaleString()}` : "" },
+        { label: "Notes",         value: formData.notes },
       ],
     },
   ];
@@ -211,7 +211,7 @@ function ReviewStep({ formData, onEdit }) {
                 background: "var(--bg-success-subtle)", color: "var(--txt-success)",
                 border: "1px solid var(--bdr-success)",
               }}>
-                ${Number(formData.salary).toLocaleString()}/năm
+                ${Number(formData.salary).toLocaleString()}/yr
               </span>
             )}
           </div>
@@ -244,10 +244,10 @@ function ReviewStep({ formData, onEdit }) {
                   padding: "2px 6px", borderRadius: "var(--radius-sm)",
                   fontFamily: "inherit",
                 }}
-              >✏ Sửa</button>
+              >✏ Edit</button>
             </div>
             {sec.rows
-              .filter((r) => sec.stepId === 3 ? r.label !== "Lương/tháng" : true)
+              .filter((r) => sec.stepId === 3 ? r.label !== "Monthly" : true)
               .map((row) => (
                 <div key={row.label} style={{
                   display: "flex", justifyContent: "space-between",
@@ -260,7 +260,7 @@ function ReviewStep({ formData, onEdit }) {
                     color: row.value ? "var(--txt-primary)" : "var(--txt-disabled)",
                     fontStyle: row.value ? "normal" : "italic",
                     textAlign: "right",
-                  }}>{row.value || "Chưa điền"}</span>
+                  }}>{row.value || "Not filled"}</span>
                 </div>
               ))}
           </div>
@@ -274,7 +274,7 @@ function ReviewStep({ formData, onEdit }) {
         display: "flex", gap: "var(--sp-3)", alignItems: "flex-start",
       }}>
         <span aria-hidden="true" style={{ flexShrink: 0 }}>ℹ️</span>
-        <span>Kiểm tra kỹ trước khi bấm <strong>Tạo nhân viên</strong>. Bấm <strong>✏ Sửa</strong> trên từng mục để quay lại chỉnh sửa.</span>
+        <span>Please review carefully before clicking <strong>Create Employee</strong>. Click <strong>✏ Edit</strong> on any section to go back and make changes.</span>
       </div>
     </div>
   );
@@ -293,11 +293,11 @@ function SuccessScreen({ name }) {
         margin: "0 auto var(--sp-5)",
       }}>🎉</div>
       <h3 style={{ fontSize: "var(--fs-3xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-2)" }}>
-        Thêm thành công!
+        Added successfully!
       </h3>
       <p style={{ fontSize: "var(--fs-md)", color: "var(--txt-secondary)" }}>
-        <strong>{name}</strong> đã được thêm vào hệ thống.<br />
-        Đang chuyển về danh sách nhân viên...
+        <strong>{name}</strong> has been added to the system.<br />
+        Redirecting to employee list...
       </p>
     </div>
   );
@@ -413,21 +413,21 @@ function AddEmployee() {
           <button
             type="button" onClick={() => navigate("/employees")}
             style={{ background: "none", border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1, padding: "6px 10px", transition: "all 0.15s" }}
-            aria-label="Quay lại"
+            aria-label="Go back"
           >←</button>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
-              Thêm nhân viên mới
+              Add New Employee
             </h2>
             <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-              Bước {step}/{STEPS.length} · {STEPS[step - 1]?.desc}
+              Step {step}/{STEPS.length} · {STEPS[step - 1]?.desc}
             </p>
           </div>
           {/* Step completion mini indicator */}
           {step < 4 && (
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginBottom: "4px" }}>
-                Hoàn thành bước này
+                Step completion
               </div>
               <div style={{ width: "80px", height: "4px", background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)" }}>
                 <div style={{
@@ -457,41 +457,41 @@ function AddEmployee() {
           {step === 1 && (
             <div>
               <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                👤 Thông tin cá nhân
+                👤 Personal Information
               </h3>
               <div className="form-grid">
-                <Field label="Họ và tên" required error={errors.name} touched={touched.name} success={!errors.name && !!form.name}>
-                  <input {...fieldProps("name")} placeholder="Nguyễn Văn A" />
+                <Field label="Full Name" required error={errors.name} touched={touched.name} success={!errors.name && !!form.name}>
+                  <input {...fieldProps("name")} placeholder="John Smith" />
                 </Field>
 
-                <Field label="Tuổi" required error={errors.age} touched={touched.age} success={!errors.age && !!form.age}>
+                <Field label="Age" required error={errors.age} touched={touched.age} success={!errors.age && !!form.age}>
                   <input {...fieldProps("age")} type="number" placeholder="25" min="18" max="80" />
                 </Field>
 
-                <Field label="Giới tính" required error={errors.sex} touched={touched.sex} success={!errors.sex && !!form.sex}>
+                <Field label="Gender" required error={errors.sex} touched={touched.sex} success={!errors.sex && !!form.sex}>
                   <select {...fieldProps("sex")}>
-                    <option value="">Chọn...</option>
+                    <option value="">Select...</option>
                     <option value="Male">Nam</option>
-                    <option value="Female">Nữ</option>
-                    <option value="Other">Khác</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
                 </Field>
 
-                <Field label="Số điện thoại">
+                <Field label="Phone Number">
                   <input
                     name="phone" value={form.phone} onChange={handleChange}
-                    style={inputStyle("phone")} type="tel" placeholder="0901 234 567"
+                    style={inputStyle("phone")} type="tel" placeholder="+1 555 123 4567"
                   />
                 </Field>
 
-                <Field label="Email" error={errors.email} touched={touched.email} success={!errors.email && !!form.email} hint="Dùng để đăng nhập hệ thống">
+                <Field label="Email" error={errors.email} touched={touched.email} success={!errors.email && !!form.email} hint="Used for system login">
                   <input {...fieldProps("email")} type="email" placeholder="nguyenvana@company.com" />
                 </Field>
 
-                <Field label="Địa chỉ">
+                <Field label="Address">
                   <input
                     name="address" value={form.address} onChange={handleChange}
-                    style={inputStyle("address")} placeholder="Số nhà, Đường, Quận/Huyện, Tỉnh/TP"
+                    style={inputStyle("address")} placeholder="Street, City, State, ZIP"
                   />
                 </Field>
               </div>
@@ -502,43 +502,43 @@ function AddEmployee() {
           {step === 2 && (
             <div>
               <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                💼 Thông tin công việc
+                💼 Job Information
               </h3>
               <div className="form-grid">
-                <Field label="Mã nhân viên" required error={errors.employeeId} touched={touched.employeeId} success={!errors.employeeId && !!form.employeeId} hint="Định dạng: EMP001">
+                <Field label="Employee ID" required error={errors.employeeId} touched={touched.employeeId} success={!errors.employeeId && !!form.employeeId} hint="Format: EMP001">
                   <input {...fieldProps("employeeId")} placeholder="EMP009" />
                 </Field>
 
-                <Field label="Ngày bắt đầu">
+                <Field label="Start Date">
                   <input
                     name="startDate" value={form.startDate} onChange={handleChange}
                     style={inputStyle("startDate")} type="date"
                   />
                 </Field>
 
-                <Field label="Phòng ban" required error={errors.department} touched={touched.department} success={!errors.department && !!form.department}>
+                <Field label="Department" required error={errors.department} touched={touched.department} success={!errors.department && !!form.department}>
                   <select {...fieldProps("department")}>
-                    <option value="">Chọn phòng ban...</option>
+                    <option value="">Select department...</option>
                     {departments.map((d) => (
                       <option key={d.id} value={d.name}>{d.name}</option>
                     ))}
                   </select>
                 </Field>
 
-                <Field label="Chức danh" required error={errors.designation} touched={touched.designation} success={!errors.designation && !!form.designation}>
+                <Field label="Designation" required error={errors.designation} touched={touched.designation} success={!errors.designation && !!form.designation}>
                   <input {...fieldProps("designation")} placeholder="Frontend Developer" />
                 </Field>
 
-                <Field label="Loại hợp đồng">
+                <Field label="Contract Type">
                   <select name="type" value={form.type} onChange={handleChange} style={inputStyle("type")}>
                     <option value="Full-time">Full-time</option>
                     <option value="Part-time">Part-time</option>
-                    <option value="Contract">Hợp đồng thời vụ</option>
-                    <option value="Intern">Thực tập sinh</option>
+                    <option value="Contract">Contract</option>
+                    <option value="Intern">Intern</option>
                   </select>
                 </Field>
 
-                <Field label="Trạng thái ban đầu">
+                <Field label="Initial Status">
                   <select name="status" value={form.status} onChange={handleChange} style={inputStyle("status")}>
                     <option value="Active">Active</option>
                     <option value="On Leave">On Leave</option>
@@ -552,10 +552,10 @@ function AddEmployee() {
           {step === 3 && (
             <div>
               <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                💰 Thông tin tài chính
+                💰 Finance Information
               </h3>
               <div className="form-grid">
-                <Field label="Lương hàng năm (USD)" required error={errors.salary} touched={touched.salary} success={!errors.salary && !!form.salary} hint="Lương gross, trước thuế">
+                <Field label="Annual Salary (USD)" required error={errors.salary} touched={touched.salary} success={!errors.salary && !!form.salary} hint="Gross salary, before tax">
                   <input {...fieldProps("salary")} type="number" placeholder="60000" min="0" step="1000" />
                 </Field>
                 <div />
@@ -569,13 +569,13 @@ function AddEmployee() {
                   borderRadius: "var(--radius-md)",
                 }}>
                   <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "var(--sp-4)" }}>
-                    Phân tích lương
+                    Salary Breakdown
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--sp-3)", textAlign: "center" }}>
                     {[
-                      { label: "Hàng năm",  value: `$${Number(form.salary).toLocaleString()}` },
-                      { label: "Hàng tháng", value: `$${Math.round(form.salary / 12).toLocaleString()}` },
-                      { label: "Hàng tuần",  value: `$${Math.round(form.salary / 52).toLocaleString()}` },
+                      { label: "Annual",   value: `$${Number(form.salary).toLocaleString()}` },
+                      { label: "Monthly",  value: `$${Math.round(form.salary / 12).toLocaleString()}` },
+                      { label: "Weekly",   value: `$${Math.round(form.salary / 52).toLocaleString()}` },
                     ].map((item) => (
                       <div key={item.label} style={{
                         padding: "var(--sp-3)", background: "var(--bg-surface)",
@@ -590,11 +590,11 @@ function AddEmployee() {
               )}
 
               <div style={{ marginTop: "var(--sp-5)" }}>
-                <Field label="Ghi chú">
+                <Field label="Notes">
                   <textarea
                     name="notes" value={form.notes} onChange={handleChange}
                     style={{ ...inputStyle("notes"), resize: "vertical" }} rows={3}
-                    placeholder="Thông tin bổ sung về nhân viên..."
+                    placeholder="Additional information about the employee..."
                   />
                 </Field>
               </div>
@@ -617,7 +617,7 @@ function AddEmployee() {
               type="button" className="btn btn-secondary"
               onClick={step === 1 ? () => navigate("/employees") : goBack}
             >
-              {step === 1 ? "Hủy" : "← Quay lại"}
+              {step === 1 ? "Cancel" : "← Back"}
             </button>
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
@@ -637,11 +637,11 @@ function AddEmployee() {
 
               {step < STEPS.length ? (
                 <button type="button" className="btn btn-primary" onClick={goNext}>
-                  Tiếp theo →
+                  Next →
                 </button>
               ) : (
                 <button type="button" className="btn btn-success" onClick={handleSubmit}>
-                  ✓ Tạo nhân viên
+                  ✓ Create Employee
                 </button>
               )}
             </div>
@@ -652,7 +652,7 @@ function AddEmployee() {
         {showToast && (
           <div className="toast toast-success" role="alert">
             <span className="toast-icon">✓</span>
-            <span className="toast-message">Thêm nhân viên thành công!</span>
+            <span className="toast-message">Employee added successfully!</span>
           </div>
         )}
       </div>

@@ -7,11 +7,11 @@
  *   generic : primary | success | warning | danger | info | neutral
  *
  * Props:
- *   variant   — tên variant (default: "neutral")
+ *   variant   — variant name (default: "neutral")
  *   size      — sm | md (default) | lg
- *   dot       — boolean, hiện dot trước label
- *   icon      — ReactNode, icon trước label
- *   pill      — boolean, bo tròn max (default true)
+ *   dot       — boolean, shows dot before label
+ *   icon      — ReactNode, icon before label
+ *   pill      — boolean, fully rounded (default true)
  *   children  — label text
  *
  * Usage:
@@ -22,7 +22,7 @@
  *   <TypeBadge type={employee.type} />
  */
 
-/* ─── Variant → CSS class map ─── */
+/* ─── Variant → CSS class mapping ─── */
 const VARIANT_CLASS = {
   // Employee status
   active:      "badge badge-active",
@@ -98,7 +98,7 @@ function Badge({
   );
 }
 
-/* ─── StatusBadge: tự chọn variant từ status string ─── */
+/* ─── StatusBadge: auto-selects variant from status string ─── */
 export function StatusBadge({ status, size, dot = true, ...rest }) {
   const map = {
     "Active":     "active",
@@ -113,7 +113,7 @@ export function StatusBadge({ status, size, dot = true, ...rest }) {
   );
 }
 
-/* ─── TypeBadge: loại hợp đồng ─── */
+/* ─── TypeBadge: contract type badge ─── */
 export function TypeBadge({ type, size, ...rest }) {
   const map = {
     "Full-time": "full-time",

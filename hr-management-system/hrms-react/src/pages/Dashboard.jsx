@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge } from "../components/Badge";
+import AttendanceTrendChart from "../components/AttendanceTrendChart";
 
 /* ─────────────────────────────────────────
-   SVG Sparkline (thuần, không cần lib)
+   SVG Sparkline (pure SVG, no lib needed)
 ───────────────────────────────────────── */
 function Sparkline({ data = [], color = "var(--clr-primary-400)", height = 44 }) {
   if (data.length < 2) return null;
@@ -38,61 +39,9 @@ function Sparkline({ data = [], color = "var(--clr-primary-400)", height = 44 })
   );
 }
 
-/* ─────────────────────────────────────────
-   Attendance Trend — 7 ngày (bar chart)
-───────────────────────────────────────── */
-function AttendanceTrend({ attendance }) {
-  // Tạo 7 ngày gần nhất (mock relative từ data)
-  const days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-  // Group attendance theo date, tính % present
-  const dates = [...new Set(attendance.map((a) => a.date))].sort().slice(-7);
-  const chartData = days.map((label, i) => {
-    const dateRecords = dates[i]
-      ? attendance.filter((a) => a.date === dates[i])
-      : [];
-    const present = dateRecords.filter((a) => a.status === "Present").length;
-    const total = dateRecords.length || 1;
-    const pct = dateRecords.length ? Math.round((present / total) * 100) : 70 + Math.round(Math.random() * 20);
-    return { label, pct };
-  });
-
-  const max = Math.max(...chartData.map((d) => d.pct), 100);
-
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "80px", paddingBottom: "20px", position: "relative" }}>
-      {chartData.map((d, i) => {
-        const isToday = i === chartData.length - 1;
-        const barH = Math.round((d.pct / max) * 60);
-        return (
-          <div key={d.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", height: "80px", justifyContent: "flex-end" }}>
-            <span style={{ fontSize: "10px", fontWeight: "600", color: isToday ? "var(--clr-primary-400)" : "var(--txt-secondary)" }}>
-              {d.pct}%
-            </span>
-            <div
-              style={{
-                width: "100%", height: `${barH}px`, minHeight: "4px",
-                borderRadius: "4px 4px 0 0",
-                background: isToday
-                  ? "var(--clr-primary-400)"
-                  : d.pct >= 90 ? "var(--clr-success-400)"
-                  : d.pct >= 75 ? "var(--clr-warning-400)"
-                  : "var(--clr-danger-400)",
-                transition: "height 0.4s ease",
-                opacity: isToday ? 1 : 0.65,
-              }}
-            />
-            <span style={{ fontSize: "10px", color: isToday ? "var(--clr-primary-400)" : "var(--txt-secondary)", fontWeight: isToday ? "600" : "400", position: "absolute", bottom: 0 }}>
-              {d.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────
-   Headcount by Department — horizontal bars
+   Headcount by Department — horizontal bar chart
 ───────────────────────────────────────── */
 const DEPT_COLORS = [
   "var(--clr-primary-400)",
@@ -190,7 +139,7 @@ function DonutChart({ segments, total, size = 88 }) {
 }
 
 /* ─────────────────────────────────────────
-   StatCard với sparkline
+   StatCard with sparkline
 ───────────────────────────────────────── */
 function StatCard({ title, value, hint, trend, trendUp, sparkData, accentColor = "var(--clr-primary-400)" }) {
   return (
@@ -252,11 +201,11 @@ function Dashboard() {
     return d.getMonth() === curMonth && d.getFullYear() === curYear;
   }).length;
 
-  // ── Sparklines (7 điểm mock dựa trên số liệu thực) ──
+  // ── Sparklines (7 mock points based on real data) ──
   const attendSpark = [82, 88, 85, 91, 87, 93, attendanceRate];
   const hireSpark   = [0, 1, 1, 2, 1, 2, Math.max(newHires, 1)];
 
-  // ── Donut ──
+  // ── Donut chart data ──
   const contractSegs = [
     { label: "Full-time", value: employees.filter((e) => e.type === "Full-time").length, color: "var(--clr-primary-400)" },
     { label: "Part-time", value: employees.filter((e) => e.type === "Part-time").length, color: "var(--clr-success-500)" },
@@ -271,21 +220,21 @@ function Dashboard() {
 
   // ── Activity feed (mock) ──
   const activities = [
-    { icon: "✚", bg: "var(--bg-success-subtle)", text: `${employees[employees.length - 1]?.name || "New employee"} vừa được thêm vào hệ thống`, time: "2 phút trước" },
-    { icon: "📋", bg: "var(--bg-warning-subtle)", text: `${onLeave} nhân viên đang xin nghỉ phép`, time: "1 giờ trước" },
-    { icon: "💰", bg: "var(--bg-primary-subtle)", text: "Payroll tháng này đã được duyệt", time: "3 giờ trước" },
-    { icon: "📊", bg: "var(--bg-info-subtle)", text: `Attendance rate hôm nay: ${attendanceRate}%`, time: "Hôm nay 8:00" },
-    { icon: "🔔", bg: "var(--bg-danger-subtle)", text: "5 yêu cầu phê duyệt đang chờ xử lý", time: "Hôm qua" },
+    { icon: "✚", bg: "var(--bg-success-subtle)", text: `${employees[employees.length - 1]?.name || "New employee"} was just added to the system`, time: "2 minutes ago" },
+    { icon: "📋", bg: "var(--bg-warning-subtle)", text: `${onLeave} employees currently on leave`, time: "1 hour ago" },
+    { icon: "💰", bg: "var(--bg-primary-subtle)", text: "This month's payroll has been approved", time: "3 hours ago" },
+    { icon: "📊", bg: "var(--bg-info-subtle)", text: `Attendance rate today: ${attendanceRate}%`, time: "Today 8:00" },
+    { icon: "🔔", bg: "var(--bg-danger-subtle)", text: "5 approval requests pending", time: "Yesterday" },
   ];
 
   // ── Quick links ──
   const quickLinks = [
-    { to: "/employees/add", label: "Thêm nhân viên", icon: "➕" },
-    { to: "/employees",     label: "Danh sách NV",   icon: "👥" },
+    { to: "/employees/add", label: "Add Employee", icon: "➕" },
+    { to: "/employees",     label: "All Employees",   icon: "👥" },
     { to: "/attendance",    label: "Attendance",      icon: "🕐" },
     { to: "/payroll",       label: "Payroll",         icon: "💰" },
-    { to: "/departments",   label: "Phòng ban",       icon: "🏢" },
-    { to: "/holidays",      label: "Ngày nghỉ lễ",   icon: "📅" },
+    { to: "/departments",   label: "Departments",       icon: "🏢" },
+    { to: "/holidays",      label: "Holidays",   icon: "📅" },
   ];
 
   return (
@@ -296,62 +245,62 @@ function Dashboard() {
         <StatCard
           title="Total Employees"
           value={totalEmployees}
-          trend="+3 tháng này"
+          trend="+3 this month"
           trendUp
-          hint={`${departments.length} phòng ban`}
+          hint={`${departments.length} departments`}
           accentColor="var(--clr-primary-400)"
         />
         <StatCard
           title="Attendance Rate"
           value={`${attendanceRate}%`}
-          trend="+2% so với tuần trước"
+          trend="+2% vs last week"
           trendUp
-          hint={`${presentCount}/${attendance.length} hôm nay`}
+          hint={`${presentCount}/${attendance.length} today`}
           sparkData={attendSpark}
           accentColor="var(--clr-success-600)"
         />
         <StatCard
           title="On Leave"
           value={onLeave}
-          trend="3 hết hạn tuần tới"
+          trend="3 expiring next week"
           trendUp={false}
-          hint="Chờ phê duyệt"
+          hint="Pending approval"
           accentColor="var(--clr-warning-600)"
         />
         <StatCard
           title="New Hires"
           value={newHires}
-          trend="+2 so với tháng trước"
+          trend="+2 vs last month"
           trendUp
-          hint="Tháng này"
+          hint="This month"
           sparkData={hireSpark}
           accentColor="var(--clr-info-600)"
         />
       </div>
 
-      {/* ── ROW 2: Attendance Trend + Headcount + Donut ── */}
+      {/* ── ROW 2: Attendance Trend + Headcount + Contract Donut ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 220px", gap: "var(--sp-5)" }}>
 
-        {/* Attendance trend 7 ngày */}
+        {/* Attendance trend - last 7 days */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
-              <h3 className="section-title" style={{ margin: 0 }}>Attendance 7 ngày</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>Attendance — Last 7 Days</h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                % nhân viên có mặt mỗi ngày
+                % of employees present each day
               </p>
             </div>
             <Link to="/attendance" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}>
-              Xem chi tiết →
+              View details →
             </Link>
           </div>
-          <AttendanceTrend attendance={attendance} />
+          <AttendanceTrendChart attendance={attendance} totalStaff={totalEmployees} />
           {/* Legend */}
           <div style={{ display: "flex", gap: "var(--sp-4)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
             {[
-              { label: "≥90% (Tốt)", color: "var(--clr-success-400)" },
-              { label: "≥75% (Trung bình)", color: "var(--clr-warning-400)" },
-              { label: "<75% (Thấp)", color: "var(--clr-danger-400)" },
+              { label: "≥90% (Good)", color: "var(--clr-success-400)" },
+              { label: "≥75% (Average)", color: "var(--clr-warning-400)" },
+              { label: "<75% (Low)", color: "var(--clr-danger-400)" },
             ].map((l) => (
               <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: l.color, display: "inline-block" }} />
@@ -367,11 +316,11 @@ function Dashboard() {
             <div>
               <h3 className="section-title" style={{ margin: 0 }}>Headcount</h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                Số nhân viên theo phòng ban
+                Number of employees by department
               </p>
             </div>
             <Link to="/departments" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}>
-              Xem tất cả →
+              View all →
             </Link>
           </div>
           <DeptBars departments={departments} getEmployeeCountByDepartment={getEmployeeCountByDepartment} />
@@ -379,29 +328,29 @@ function Dashboard() {
 
         {/* Contract type donut */}
         <div className="content-card">
-          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>Loại HĐ</h3>
+          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>Contract Types</h3>
           <DonutChart segments={contractSegs} total={totalEmployees} />
         </div>
       </div>
 
-      {/* ── ROW 3: Recent employees + Activity + Quick links ── */}
+      {/* ── ROW 3: Recent Employees + Activity + Quick Links ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: "var(--sp-5)" }}>
 
         {/* Recent employees table */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--sp-5)" }}>
-            <h3 className="section-title" style={{ margin: 0 }}>Nhân viên gần đây</h3>
+            <h3 className="section-title" style={{ margin: 0 }}>Recent Employees</h3>
             <Link to="/employees" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)" }}>
-              Xem tất cả →
+              View all →
             </Link>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Nhân viên</th>
-                <th>Phòng ban</th>
-                <th>Chức danh</th>
-                <th>Trạng thái</th>
+                <th>Employee</th>
+                <th>Department</th>
+                <th>Designation</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -436,7 +385,7 @@ function Dashboard() {
 
           {/* Quick links */}
           <div className="content-card">
-            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Quick actions</h3>
+            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Quick Actions</h3>
             <div className="quick-links">
               {quickLinks.map((link) => (
                 <Link key={link.to} to={link.to} className="quick-link">
@@ -449,7 +398,7 @@ function Dashboard() {
 
           {/* Activity feed */}
           <div className="content-card" style={{ flex: 1 }}>
-            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Hoạt động gần đây</h3>
+            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Recent Activity</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
               {activities.map((a, i) => (
                 <ActivityItem key={i} {...a} />

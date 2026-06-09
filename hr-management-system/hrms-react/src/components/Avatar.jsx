@@ -2,21 +2,21 @@
  * Avatar — HRMS Design System
  *
  * Variants:
- *   initials  — tự lấy initials từ name (default)
- *   image     — hiển thị ảnh từ src
- *   icon      — icon fallback khi không có ảnh
+ *   initials  — auto-generates initials from name (default)
+ *   image     — displays image from src
+ *   icon      — icon fallback when no image
  *
  * Props:
- *   name      — full name, dùng để lấy initials và aria-label
- *   src       — URL ảnh (optional)
+ *   name      — full name, used to generate initials and aria-label
+ *   src       — image URL (optional)
  *   size      — xs(24) | sm(32) | md(40, default) | lg(56) | xl(80)
  *   shape     — circle (default) | square
- *   color     — override màu nền (nếu không truyền thì tự pick từ name)
- *   status    — "active" | "leave" | "remote" | "terminated" — hiện dot góc
+ *   color     — override background color (auto-picked from name if omitted)
+ *   status    — "active" | "leave" | "remote" | "terminated" — shows corner dot
  *   className, style
  *
  * Extras:
- *   AvatarGroup  — stack nhiều Avatar lại
+ *   AvatarGroup  — stacks multiple Avatars together
  *
  * Usage:
  *   <Avatar name="John Doe" />
@@ -25,7 +25,7 @@
  *   <AvatarGroup avatars={employees.slice(0,4)} max={3} />
  */
 
-/* ─── Color palette (pick by name hash) ─── */
+/* ─── Color palette (auto-picked by name hash) ─── */
 const PALETTE = [
   ["linear-gradient(135deg,#7152f3,#9880f4)"],   // purple
   ["linear-gradient(135deg,#10b981,#34d399)"],   // green

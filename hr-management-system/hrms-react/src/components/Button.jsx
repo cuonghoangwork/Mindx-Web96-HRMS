@@ -8,15 +8,15 @@
  * Extras   : leftIcon, rightIcon, ButtonGroup, as (polymorphic)
  *
  * Usage:
- *   <Button variant="primary" onClick={fn}>Lưu</Button>
- *   <Button variant="danger" size="sm" leftIcon="🗑">Xóa</Button>
- *   <Button variant="primary" loading>Đang xử lý...</Button>
- *   <Button as={Link} to="/employees" variant="primary">Danh sách</Button>
- *   <Button variant="ghost" iconOnly aria-label="Xóa">🗑</Button>
+ *   <Button variant="primary" onClick={fn}>Save</Button>
+ *   <Button variant="danger" size="sm" leftIcon="🗑">Delete</Button>
+ *   <Button variant="primary" loading>Processing...</Button>
+ *   <Button as={Link} to="/employees" variant="primary">List</Button>
+ *   <Button variant="ghost" iconOnly aria-label="Delete">🗑</Button>
  *
  *   <ButtonGroup>
- *     <Button variant="secondary">Hủy</Button>
- *     <Button variant="primary">Lưu</Button>
+ *     <Button variant="secondary">Cancel</Button>
+ *     <Button variant="primary">Save</Button>
  *   </ButtonGroup>
  */
 
