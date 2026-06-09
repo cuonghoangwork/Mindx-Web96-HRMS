@@ -2,9 +2,9 @@
  * FormField — HRMS Design System
  *
  * Universal input wrapper component for HRMS.
- * Standardises label + helper text + error/success message
- * replaces 3 scattered patterns (form-group className,
- * inline Field in AddEmployee, and manual span in EmployeeModal).
+ * Standardises label + helper text + error/success message.
+ * Replaces 3 scattered patterns: form-group className,
+ * inline Field in AddEmployee, and manual span in EmployeeModal.
  *
  * Props:
  *   label       — text label (string, required)
@@ -13,7 +13,7 @@
  *   hint        — muted helper text, shown below label
  *   error       — error message (string). If set → red border + message
  *   success     — boolean. If true and no error → green border + "Valid"
- *   touched     — boolean. Only shows error/success after user interaction
+ *   touched     — boolean. Shows error/success only after user interaction
  *   disabled    — dims the entire field
  *   className   — extra class on wrapper div
  *   style       — extra style on wrapper div
@@ -21,7 +21,7 @@
  *
  * Variants (passed via type prop):
  *   "default"   — label above, input below (default)
- *   "inline"    — label left, input right (for Settings toggle)
+ *   "inline"    — label left, input right (for Settings toggle rows)
  *
  * Usage:
  *   // Basic
@@ -42,7 +42,7 @@
  *   </FormField>
  */
 
-import { useId } from "react";
+import { useId, cloneElement, isValidElement } from "react";
 
 /* ─── Icons ─── */
 function WarnIcon() {
@@ -79,29 +79,30 @@ function FormField({
   style,
   children,
 }) {
-  /* Auto-generate id if htmlFor is not provided */
   const autoId  = useId();
   const fieldId = htmlFor ?? autoId;
 
   const showError   = !!(error && touched);
   const showSuccess = !!(success && touched && !error);
 
-  /* ── Inject id + aria attrs into child input if not already set ── */
+  /* ── Inject id + aria attrs into child input (ESM-safe cloneElement) ── */
   let child = children;
-  if (children && !children?.props?.id) {
-    try {
-      const React = require("react");
-      child = React.cloneElement(children, {
-        id: fieldId,
-        "aria-describedby": showError ? `${fieldId}-msg` : showSuccess ? `${fieldId}-ok` : hint ? `${fieldId}-hint` : undefined,
-        "aria-invalid": showError ? "true" : undefined,
-        "aria-required": required ? "true" : undefined,
-      });
-    } catch {
-      child = children;
-    }
+  if (isValidElement(children) && !children.props?.id) {
+    child = cloneElement(children, {
+      id: fieldId,
+      "aria-describedby": showError
+        ? `${fieldId}-msg`
+        : showSuccess
+        ? `${fieldId}-ok`
+        : hint
+        ? `${fieldId}-hint`
+        : undefined,
+      "aria-invalid":   showError  ? "true" : undefined,
+      "aria-required":  required   ? "true" : undefined,
+    });
   }
 
+  /* ── Inline layout (Settings toggle rows) ── */
   if (type === "inline") {
     return (
       <div
@@ -124,9 +125,10 @@ function FormField({
             )}
           </div>
           {hint && (
-            <div id={`${fieldId}-hint`} style={{
-              fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px",
-            }}>
+            <div
+              id={`${fieldId}-hint`}
+              style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}
+            >
               {hint}
             </div>
           )}
@@ -173,7 +175,7 @@ function FormField({
         </span>
       )}
 
-      {/* Input */}
+      {/* Input slot */}
       {child}
 
       {/* Error message */}

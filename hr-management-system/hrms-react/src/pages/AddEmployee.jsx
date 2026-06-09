@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
+import FormField from "../components/FormField";
 
 /* ─────────────────────────────────
    Step config
@@ -51,33 +52,8 @@ function isStepComplete(stepId, data) {
   return Object.keys(validateStep(stepId, data)).length === 0;
 }
 
-/* ─────────────────────────────────
-   Field component — realtime validation
-───────────────────────────────── */
-function Field({ label, required, error, touched, hint, success, children }) {
-  const showError   = error && touched;
-  const showSuccess = success && touched && !error;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-      <label style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
-        {label}
-        {required && <span style={{ color: "var(--txt-danger)", marginLeft: "2px" }}>*</span>}
-      </label>
-      {hint && <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "-2px" }}>{hint}</span>}
-      {children}
-      {showError && (
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-danger)", display: "flex", alignItems: "center", gap: "4px" }}>
-          <span aria-hidden="true">⚠</span>{error}
-        </span>
-      )}
-      {showSuccess && (
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-success)", display: "flex", alignItems: "center", gap: "4px" }}>
-          <span aria-hidden="true">✓</span> Valid
-        </span>
-      )}
-    </div>
-  );
-}
+/* Field = FormField alias for convenience inside this file */
+const Field = FormField;
 
 /* ─────────────────────────────────
    Stepper header
