@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useStore } from "../context/StoreContext";
 import { useLocation, Link } from "react-router-dom";
 import HeaderDateTime from "./HeaderDateTime";
 
 function Header({ onMenuToggle }) {
   const { user, logout } = useAuth();
+  const { unreadNotificationCount } = useStore();
   const location = useLocation();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
@@ -51,9 +53,34 @@ function Header({ onMenuToggle }) {
       <Link
         to="/notifications"
         className="dash-notif"
-        aria-label="Notifications"
+        aria-label={`Notifications${unreadNotificationCount > 0 ? `, ${unreadNotificationCount} unread` : ""}`}
+        style={{ position: "relative" }}
       >
         <span>🔔</span>
+        {unreadNotificationCount > 0 && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              top: "-4px",
+              right: "-4px",
+              minWidth: "16px",
+              height: "16px",
+              padding: "0 4px",
+              borderRadius: "var(--radius-full)",
+              background: "var(--clr-danger-500)",
+              color: "var(--clr-neutral-0)",
+              fontSize: "var(--fs-2xs)",
+              fontWeight: "var(--fw-semibold)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1,
+            }}
+          >
+            {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+          </span>
+        )}
       </Link>
 
       <div style={{ position: "relative" }}>

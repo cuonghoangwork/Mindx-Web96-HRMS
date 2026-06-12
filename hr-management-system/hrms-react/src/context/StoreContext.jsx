@@ -324,10 +324,71 @@ const initialCandidates = [
   },
 ];
 
+// Notifications feed
+const initialNotifications = [
+  {
+    id: 1,
+    category: "leave",
+    title: "New leave request",
+    message: "John Doe requested 3 days off",
+    timestamp: "2026-06-12T10:30:00",
+    read: false,
+  },
+  {
+    id: 2,
+    category: "interview",
+    title: "Interview scheduled",
+    message: "Candidate interview for Design role",
+    timestamp: "2026-06-12T07:00:00",
+    read: false,
+  },
+  {
+    id: 3,
+    category: "payroll",
+    title: "Payroll processed",
+    message: "May payroll has been processed",
+    timestamp: "2026-06-11T09:00:00",
+    read: false,
+  },
+  {
+    id: 4,
+    category: "employee",
+    title: "New employee added",
+    message: "Sarah Smith has joined the team",
+    timestamp: "2026-06-10T14:15:00",
+    read: true,
+  },
+  {
+    id: 5,
+    category: "holiday",
+    title: "Upcoming holiday",
+    message: "Company Anniversary is coming up on Jun 15",
+    timestamp: "2026-06-09T08:00:00",
+    read: true,
+  },
+  {
+    id: 6,
+    category: "system",
+    title: "System maintenance",
+    message: "Scheduled maintenance this weekend from 11 PM to 2 AM",
+    timestamp: "2026-06-08T16:45:00",
+    read: true,
+  },
+  {
+    id: 7,
+    category: "interview",
+    title: "Offer accepted",
+    message: "James Nguyen accepted the Marketing Intern offer",
+    timestamp: "2026-06-07T11:20:00",
+    read: true,
+  },
+];
+
 export function StoreProvider({ children }) {
   const [employees, setEmployees] = useState(initialEmployees);
   const [jobs, setJobs] = useState(initialJobs);
   const [candidates, setCandidates] = useState(initialCandidates);
+  const [notifications, setNotifications] = useState(initialNotifications);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modals, setModals] = useState({
     employee: false,
@@ -512,11 +573,34 @@ export function StoreProvider({ children }) {
     [jobs],
   );
 
+  // Notification actions
+  const markNotificationRead = useCallback((id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const removeNotification = useCallback((id) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const clearReadNotifications = useCallback(() => {
+    setNotifications((prev) => prev.filter((n) => !n.read));
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
+
   const value = {
     // State
     employees,
     jobs,
     candidates,
+    notifications,
+    unreadNotificationCount,
     selectedEmployee,
     modals,
     filters,
@@ -558,6 +642,10 @@ export function StoreProvider({ children }) {
     getCandidatesByJob,
     getApplicantCount,
     getJobById,
+    markNotificationRead,
+    markAllNotificationsRead,
+    removeNotification,
+    clearReadNotifications,
   };
 
   return (
