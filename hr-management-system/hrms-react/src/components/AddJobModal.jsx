@@ -51,7 +51,6 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       location,
       type: formData.type,
       status: formData.status,
-      applicants: job?.applicants ?? 0,
       postedDate: job?.postedDate ?? new Date().toISOString().split("T")[0],
     });
     onClose();

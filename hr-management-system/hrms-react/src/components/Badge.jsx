@@ -128,5 +128,22 @@ export function TypeBadge({ type, size, ...rest }) {
   );
 }
 
+/* ─── CandidateStageBadge: hiring pipeline stage badge ─── */
+export function CandidateStageBadge({ stage, size, ...rest }) {
+  const map = {
+    Applied:   "neutral",
+    Screening: "info",
+    Interview: "warning",
+    Offer:     "primary",
+    Hired:     "success",
+    Rejected:  "danger",
+  };
+  return (
+    <Badge variant={map[stage] ?? "neutral"} size={size} {...rest}>
+      {stage}
+    </Badge>
+  );
+}
+
 Badge.displayName = "Badge";
 export default Badge;

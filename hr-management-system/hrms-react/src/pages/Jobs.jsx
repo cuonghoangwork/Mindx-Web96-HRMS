@@ -10,69 +10,6 @@ const STATUS_VARIANT = {
   Closed: "neutral",
 };
 
-const INITIAL_JOBS = [
-  {
-    id: 1,
-    title: "Senior Software Engineer",
-    department: "Engineering",
-    location: "Remote",
-    type: "Full-time",
-    status: "Open",
-    applicants: 12,
-    postedDate: "2026-04-02",
-  },
-  {
-    id: 2,
-    title: "UI/UX Designer",
-    department: "Design",
-    location: "New York",
-    type: "Full-time",
-    status: "Open",
-    applicants: 8,
-    postedDate: "2026-04-10",
-  },
-  {
-    id: 3,
-    title: "Product Manager",
-    department: "Management",
-    location: "San Francisco",
-    type: "Full-time",
-    status: "Filled",
-    applicants: 24,
-    postedDate: "2026-02-18",
-  },
-  {
-    id: 4,
-    title: "DevOps Engineer",
-    department: "IT",
-    location: "Remote",
-    type: "Contract",
-    status: "Open",
-    applicants: 6,
-    postedDate: "2026-05-01",
-  },
-  {
-    id: 5,
-    title: "Marketing Intern",
-    department: "Marketing",
-    location: "Hanoi",
-    type: "Intern",
-    status: "Open",
-    applicants: 15,
-    postedDate: "2026-05-20",
-  },
-  {
-    id: 6,
-    title: "Sales Associate",
-    department: "Sales",
-    location: "Ho Chi Minh City",
-    type: "Full-time",
-    status: "Closed",
-    applicants: 9,
-    postedDate: "2026-01-05",
-  },
-];
-
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
@@ -83,13 +20,13 @@ function formatDate(dateStr) {
 
 function Jobs() {
   const navigate = useNavigate();
-  const { departments } = useStore();
+  const { departments, jobs, addJob, updateJob, removeJob, getApplicantCount } =
+    useStore();
   const departmentNames = useMemo(
     () => departments.map((d) => d.name),
     [departments],
   );
 
-  const [jobs, setJobs] = useState(INITIAL_JOBS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -98,15 +35,18 @@ function Jobs() {
 
   const stats = useMemo(() => {
     const open = jobs.filter((j) => j.status === "Open");
-    const totalApplicants = jobs.reduce((sum, j) => sum + j.applicants, 0);
-    const filledThisYear = jobs.filter((j) => j.status === "Filled").length;
+    const totalApplicants = jobs.reduce(
+      (sum, j) => sum + getApplicantCount(j.id),
+      0,
+    );
+    const filledCount = jobs.filter((j) => j.status === "Filled").length;
     return {
       openCount: open.length,
       totalApplicants,
-      filledCount: filledThisYear,
+      filledCount,
       totalJobs: jobs.length,
     };
-  }, [jobs]);
+  }, [jobs, getApplicantCount]);
 
   const filteredJobs = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -135,18 +75,17 @@ function Jobs() {
 
   const handleSaveJob = (job) => {
     if (job.id) {
-      setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, ...job } : j)));
+      updateJob(job.id, job);
     } else {
-      setJobs((prev) => [
-        ...prev,
-        { ...job, id: Math.max(0, ...prev.map((j) => j.id)) + 1 },
-      ]);
+      addJob(job);
     }
     setEditingJob(null);
   };
 
   const handleDelete = (id) => {
-    setJobs((prev) => prev.filter((j) => j.id !== id));
+    if (confirm("Delete this job posting? Linked candidates will remain in the pipeline but will show as unassigned.")) {
+      removeJob(id);
+    }
   };
 
   return (
@@ -287,87 +226,90 @@ function Jobs() {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-            {filteredJobs.map((job) => (
-              <div
-                key={job.id}
-                style={{
-                  padding: "var(--sp-5)",
-                  background: "var(--bg-surface-alt)",
-                  borderRadius: "var(--radius-lg)",
-                  border: "1px solid var(--bdr-subtle)",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "var(--sp-4)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ minWidth: "200px" }}>
-                  <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)" }}>
-                    {job.title}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: "var(--fs-sm)",
-                      color: "var(--txt-secondary)",
-                      marginTop: "var(--sp-1)",
-                    }}
-                  >
-                    {job.department} • {job.location} • Posted {formatDate(job.postedDate)}
-                  </p>
-                  <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)" }}>
-                    <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>
-                      {job.status}
-                    </Badge>
-                    <TypeBadge type={job.type} size="sm" />
-                  </div>
-                </div>
-
-                <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                  <div>
-                    <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-                      {job.applicants}
-                    </div>
-                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-                      applicant{job.applicants === 1 ? "" : "s"}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-                    <button
-                      className="btn btn-secondary"
-                      style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
-                      onClick={() => navigate(`/candidates?job=${job.id}`)}
+            {filteredJobs.map((job) => {
+              const applicantCount = getApplicantCount(job.id);
+              return (
+                <div
+                  key={job.id}
+                  style={{
+                    padding: "var(--sp-5)",
+                    background: "var(--bg-surface-alt)",
+                    borderRadius: "var(--radius-lg)",
+                    border: "1px solid var(--bdr-subtle)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "var(--sp-4)",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ minWidth: "200px" }}>
+                    <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)" }}>
+                      {job.title}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: "var(--fs-sm)",
+                        color: "var(--txt-secondary)",
+                        marginTop: "var(--sp-1)",
+                      }}
                     >
-                      View Applicants
-                    </button>
-                    <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                      {job.department} • {job.location} • Posted {formatDate(job.postedDate)}
+                    </p>
+                    <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)" }}>
+                      <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>
+                        {job.status}
+                      </Badge>
+                      <TypeBadge type={job.type} size="sm" />
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                    <div>
+                      <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
+                        {applicantCount}
+                      </div>
+                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                        applicant{applicantCount === 1 ? "" : "s"}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
                       <button
                         className="btn btn-secondary"
                         style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
-                        onClick={() => {
-                          setEditingJob(job);
-                          setModalOpen(true);
-                        }}
+                        onClick={() => navigate(`/candidates?job=${job.id}`)}
                       >
-                        Edit
+                        View Applicants
                       </button>
-                      <button
-                        className="btn btn-secondary"
-                        style={{
-                          padding: "8px 16px",
-                          fontSize: "var(--fs-xs)",
-                          color: "var(--txt-danger)",
-                        }}
-                        onClick={() => handleDelete(job.id)}
-                      >
-                        Delete
-                      </button>
+                      <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                          onClick={() => {
+                            setEditingJob(job);
+                            setModalOpen(true);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          style={{
+                            padding: "8px 16px",
+                            fontSize: "var(--fs-xs)",
+                            color: "var(--txt-danger)",
+                          }}
+                          onClick={() => handleDelete(job.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

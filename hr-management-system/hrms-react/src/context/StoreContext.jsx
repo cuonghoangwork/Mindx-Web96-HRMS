@@ -178,8 +178,156 @@ const initialAttendance = [
   },
 ];
 
+// Job openings (recruitment)
+const initialJobs = [
+  {
+    id: 1,
+    title: "Senior Software Engineer",
+    department: "Engineering",
+    location: "Remote",
+    type: "Full-time",
+    status: "Open",
+    postedDate: "2026-04-02",
+  },
+  {
+    id: 2,
+    title: "UI/UX Designer",
+    department: "Design",
+    location: "New York",
+    type: "Full-time",
+    status: "Open",
+    postedDate: "2026-04-10",
+  },
+  {
+    id: 3,
+    title: "Product Manager",
+    department: "Management",
+    location: "San Francisco",
+    type: "Full-time",
+    status: "Filled",
+    postedDate: "2026-02-18",
+  },
+  {
+    id: 4,
+    title: "DevOps Engineer",
+    department: "IT",
+    location: "Remote",
+    type: "Contract",
+    status: "Open",
+    postedDate: "2026-05-01",
+  },
+  {
+    id: 5,
+    title: "Marketing Intern",
+    department: "Marketing",
+    location: "Hanoi",
+    type: "Intern",
+    status: "Open",
+    postedDate: "2026-05-20",
+  },
+  {
+    id: 6,
+    title: "Sales Associate",
+    department: "Sales",
+    location: "Ho Chi Minh City",
+    type: "Full-time",
+    status: "Closed",
+    postedDate: "2026-01-05",
+  },
+];
+
+// Hiring pipeline candidates, linked to jobs via jobId
+const initialCandidates = [
+  {
+    id: 1,
+    name: "Mike Wilson",
+    jobId: 1,
+    stage: "Interview",
+    rating: 4.5,
+    email: "mike.wilson@example.com",
+    phone: "+84 90 123 4567",
+    appliedDate: "2026-04-12",
+    resumeUrl: "#",
+    notes: "Strong backend experience, available to start immediately.",
+  },
+  {
+    id: 2,
+    name: "Sarah Lee",
+    jobId: 2,
+    stage: "Screening",
+    rating: 4.0,
+    email: "sarah.lee@example.com",
+    phone: "+84 91 234 5678",
+    appliedDate: "2026-04-18",
+    resumeUrl: "#",
+    notes: "Great portfolio, needs a follow-up call on availability.",
+  },
+  {
+    id: 3,
+    name: "Tom Brown",
+    jobId: 4,
+    stage: "Offer",
+    rating: 4.8,
+    email: "tom.brown@example.com",
+    phone: "+84 92 345 6789",
+    appliedDate: "2026-05-03",
+    resumeUrl: "#",
+    notes: "Offer extended, awaiting response by end of week.",
+  },
+  {
+    id: 4,
+    name: "Emily Davis",
+    jobId: 1,
+    stage: "Applied",
+    rating: 3.8,
+    email: "emily.davis@example.com",
+    phone: "+84 93 456 7890",
+    appliedDate: "2026-05-10",
+    resumeUrl: "#",
+    notes: "",
+  },
+  {
+    id: 5,
+    name: "James Nguyen",
+    jobId: 5,
+    stage: "Hired",
+    rating: 4.2,
+    email: "james.nguyen@example.com",
+    phone: "+84 94 567 8901",
+    appliedDate: "2026-03-20",
+    resumeUrl: "#",
+    notes: "Accepted offer, starts June 2026.",
+  },
+  {
+    id: 6,
+    name: "Olivia Tran",
+    jobId: 6,
+    stage: "Rejected",
+    rating: 3.2,
+    email: "olivia.tran@example.com",
+    phone: "+84 95 678 9012",
+    appliedDate: "2026-02-28",
+    resumeUrl: "#",
+    notes: "Not enough relevant experience for the role.",
+  },
+  {
+    id: 7,
+    name: "Daniel Pham",
+    jobId: 2,
+    stage: "Interview",
+    rating: 4.1,
+    email: "daniel.pham@example.com",
+    phone: "+84 96 789 0123",
+    appliedDate: "2026-05-15",
+    resumeUrl: "#",
+    notes: "Second-round interview scheduled for next week.",
+  },
+];
+
 export function StoreProvider({ children }) {
   const [employees, setEmployees] = useState(initialEmployees);
+  const [jobs, setJobs] = useState(initialJobs);
+  const [candidates, setCandidates] = useState(initialCandidates);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modals, setModals] = useState({
     employee: false,
@@ -310,9 +458,65 @@ export function StoreProvider({ children }) {
     [getEmployeesByDepartment],
   );
 
+  // Job actions
+  const addJob = useCallback((job) => {
+    setJobs((prev) => [
+      ...prev,
+      { ...job, id: Math.max(0, ...prev.map((j) => j.id)) + 1 },
+    ]);
+  }, []);
+
+  const updateJob = useCallback((id, updates) => {
+    setJobs((prev) =>
+      prev.map((job) => (job.id === id ? { ...job, ...updates } : job)),
+    );
+  }, []);
+
+  const removeJob = useCallback((id) => {
+    setJobs((prev) => prev.filter((job) => job.id !== id));
+  }, []);
+
+  // Candidate actions
+  const addCandidate = useCallback((candidate) => {
+    setCandidates((prev) => [
+      ...prev,
+      { ...candidate, id: Math.max(0, ...prev.map((c) => c.id)) + 1 },
+    ]);
+  }, []);
+
+  const updateCandidate = useCallback((id, updates) => {
+    setCandidates((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+    );
+  }, []);
+
+  const removeCandidate = useCallback((id) => {
+    setCandidates((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  // Get all candidates applied to a given job
+  const getCandidatesByJob = useCallback(
+    (jobId) => candidates.filter((c) => c.jobId === jobId),
+    [candidates],
+  );
+
+  // Get applicant count for a given job
+  const getApplicantCount = useCallback(
+    (jobId) => getCandidatesByJob(jobId).length,
+    [getCandidatesByJob],
+  );
+
+  // Look up a job by id
+  const getJobById = useCallback(
+    (jobId) => jobs.find((j) => j.id === jobId),
+    [jobs],
+  );
+
   const value = {
     // State
     employees,
+    jobs,
+    candidates,
     selectedEmployee,
     modals,
     filters,
@@ -345,6 +549,15 @@ export function StoreProvider({ children }) {
     getEmployeeCountByDepartment,
     getTotalSalaryByDepartment,
     setAttendance,
+    addJob,
+    updateJob,
+    removeJob,
+    addCandidate,
+    updateCandidate,
+    removeCandidate,
+    getCandidatesByJob,
+    getApplicantCount,
+    getJobById,
   };
 
   return (
