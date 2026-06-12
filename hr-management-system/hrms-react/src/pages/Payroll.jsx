@@ -66,7 +66,7 @@ function TypeDonut({ segments, total }) {
   const circ = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-5)" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-5)" }}>
       <div style={{ position: "relative", width: 96, height: 96, flexShrink: 0 }}>
         <svg width={96} height={96} viewBox="0 0 96 96" style={{ transform: "rotate(-90deg)" }}>
           {segments.map((s, i) => {
@@ -91,12 +91,12 @@ function TypeDonut({ segments, total }) {
           <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>staff</span>
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
         {segments.map((s) => (
           <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1 }}>{s.label}</span>
-            <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
+            <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", flexShrink: 0 }}>
               {fmtK(s.total)}
             </span>
           </div>
@@ -261,7 +261,7 @@ function Payroll() {
         </div>
 
         {/* Type donut */}
-        <div className="content-card">
+        <div className="content-card" style={{ minWidth: 0, overflow: "hidden" }}>
           <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>By Contract Type</h3>
           <TypeDonut segments={typeSegs} total={employees.length} />
         </div>

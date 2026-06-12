@@ -422,22 +422,9 @@ body {
   border: 1px solid rgba(113, 82, 243, 0.25);
 }
 
-/* Info variant (was missing — used by Intern TypeBadge) */
-.badge-info {
-  background: var(--bg-info-subtle);
-  color: var(--txt-info);
-  border: 1px solid var(--bdr-info);
-}
-
 /* Size variants */
 .badge-sm { padding: 2px 8px;  font-size: var(--fs-2xs); }
 .badge-lg { padding: 5px 14px; font-size: var(--fs-sm); }
-
-/* Pulse animation — used by EmployeeStatusBadge active dot */
-@keyframes status-pulse {
-  0%, 100% { opacity: 1;   transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(1.6); }
-}
 
 /* Backward compat — tag classes cũ */
 .tag { display: inline-flex; align-items: center; padding: 4px 12px;
@@ -969,6 +956,7 @@ body {
 }
 
 .data-table th {
+  text-align: left;
   font-size: var(--fs-xs);
   font-weight: var(--fw-medium);
   color: var(--txt-secondary);
