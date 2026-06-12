@@ -55,7 +55,7 @@ function buildChartData(attendance, totalStaff) {
   const result = [];
   const baseDate = realDates.length > 0
     ? new Date(realDates[realDates.length - 1])
-    : new Date("2024-01-15");
+    : new Date("2026-01-15");
 
   for (let i = 6; i >= 0; i--) {
     const d = new Date(baseDate);
