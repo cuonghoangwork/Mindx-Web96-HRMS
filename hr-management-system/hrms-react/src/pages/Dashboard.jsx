@@ -96,12 +96,12 @@ function DeptBars({ departments, getEmployeeCountByDepartment }) {
 /* ─────────────────────────────────────────
    Donut Chart — contract types
 ───────────────────────────────────────── */
-function DonutChart({ segments, total, size = 88 }) {
-  const r = 30, cx = size / 2, cy = size / 2;
+function DonutChart({ segments, total, size = 80 }) {
+  const r = 28, cx = size / 2, cy = size / 2;
   const circ = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-5)" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-4)" }}>
       <div style={{ position: "relative", flexShrink: 0, width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
           style={{ transform: "rotate(-90deg)" }}>
@@ -109,7 +109,7 @@ function DonutChart({ segments, total, size = 88 }) {
             const dash = (seg.value / (total || 1)) * circ;
             const el = (
               <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-                stroke={seg.color} strokeWidth="12"
+                stroke={seg.color} strokeWidth="11"
                 strokeDasharray={`${dash} ${circ - dash}`}
                 strokeDashoffset={-offset} />
             );
@@ -125,11 +125,11 @@ function DonutChart({ segments, total, size = 88 }) {
           <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>total</span>
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "7px", flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
         {segments.map((s) => (
           <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1 }}>{s.label}</span>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
             <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{s.value}</span>
           </div>
         ))}
@@ -279,7 +279,7 @@ function Dashboard() {
       </div>
 
       {/* ── ROW 2: Attendance Trend + Headcount + Contract Donut ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 220px", gap: "var(--sp-5)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 200px", gap: "var(--sp-5)", minWidth: 0 }}>
 
         {/* Attendance trend - last 7 days */}
         <div className="content-card">

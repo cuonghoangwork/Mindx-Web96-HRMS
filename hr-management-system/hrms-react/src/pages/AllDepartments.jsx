@@ -95,10 +95,10 @@ function AllDepartments() {
             <tr>
               <th>Department</th>
               <th>Manager</th>
-              <th>Employees</th>
-              <th>Salary</th>
-              <th>Budget</th>
-              <th>Action</th>
+              <th style={{ textAlign: "center" }}>Employees</th>
+              <th style={{ textAlign: "right" }}>Salary</th>
+              <th style={{ textAlign: "right" }}>Budget</th>
+              <th style={{ textAlign: "center" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -108,7 +108,7 @@ function AllDepartments() {
                   <div style={{ fontWeight: "500" }}>{dept.name}</div>
                 </td>
                 <td>{dept.manager}</td>
-                <td>
+                <td style={{ textAlign: "center" }}>
                   <span
                     style={{
                       display: "inline-flex",
@@ -133,90 +133,59 @@ function AllDepartments() {
                     {dept.employees}
                   </span>
                 </td>
-                <td>{formatBudget(dept.totalSalary)}</td>
-                <td>
+                <td style={{ textAlign: "right" }}>
+                  {formatBudget(dept.totalSalary)}
+                </td>
+                <td style={{ textAlign: "right" }}>
                   {editingId === dept.id ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}
-                    >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
                       <span style={{ color: "var(--text-muted)" }}>$</span>
                       <input
                         type="number"
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         style={{
-                          width: "100px",
-                          padding: "4px 8px",
+                          width: "100px", padding: "4px 8px",
                           border: "1px solid var(--border)",
-                          borderRadius: "4px",
-                          fontSize: "14px",
+                          borderRadius: "4px", fontSize: "14px",
                         }}
                         autoFocus
                       />
                       <button
                         onClick={() => handleSave(dept.id)}
                         style={{
-                          background: "var(--primary)",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          padding: "4px 8px",
-                          cursor: "pointer",
-                          fontSize: "12px",
+                          background: "var(--primary)", color: "white",
+                          border: "none", borderRadius: "4px",
+                          padding: "4px 8px", cursor: "pointer", fontSize: "12px",
                         }}
-                      >
-                        ✓
-                      </button>
+                      >✓</button>
                       <button
                         onClick={handleCancel}
                         style={{
                           background: "var(--surface-alt)",
-                          border: "1px solid var(--border)",
-                          borderRadius: "4px",
-                          padding: "4px 8px",
-                          cursor: "pointer",
-                          fontSize: "12px",
+                          border: "1px solid var(--border)", borderRadius: "4px",
+                          padding: "4px 8px", cursor: "pointer", fontSize: "12px",
                         }}
-                      >
-                        ✕
-                      </button>
+                      >✕</button>
                     </div>
                   ) : (
                     <div
                       onClick={() => handleEditClick(dept)}
                       style={{
-                        cursor: "pointer",
-                        padding: "4px 8px",
-                        borderRadius: "4px",
-                        transition: "background 0.2s",
+                        cursor: "pointer", padding: "4px 8px",
+                        borderRadius: "4px", transition: "background 0.2s",
+                        display: "inline-flex", alignItems: "center", gap: "6px",
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                          "var(--surface-alt)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "transparent")
-                      }
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-alt)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       title="Click to edit budget"
                     >
                       {formatBudget(dept.budget)}
-                      <span
-                        style={{
-                          marginLeft: "8px",
-                          fontSize: "12px",
-                          color: "var(--primary)",
-                        }}
-                      >
-                        ✎
-                      </span>
+                      <span style={{ fontSize: "12px", color: "var(--primary)" }}>✎</span>
                     </div>
                   )}
                 </td>
-                <td>
+                <td style={{ textAlign: "center" }}>
                   <Link
                     to={`/departments/${dept.id}`}
                     className="btn btn-secondary"
