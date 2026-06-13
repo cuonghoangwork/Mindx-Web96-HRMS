@@ -87,7 +87,7 @@ function buildMonthAttendance(year, month, employees, existing) {
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
-function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay }) {
+function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr }) {
   const firstDow   = new Date(year, month, 1).getDay();
   const daysCount  = new Date(year, month + 1, 0).getDate();
   const cells      = Array.from({ length: firstDow + daysCount }, (_, i) =>
@@ -115,7 +115,7 @@ function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay }) {
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const dow     = new Date(year, month, day).getDay();
           const isWeekend = dow === 0 || dow === 6;
-          const isToday   = dateStr === new Date().toISOString().split("T")[0];
+          const isToday   = dateStr === todayStr;
           const isSelected = dateStr === selectedDay;
           const data      = dayData[dateStr];
 
@@ -288,11 +288,11 @@ function DayPanel({ dateStr, rows, onClose }) {
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 function Attendance() {
-  const { attendance, employees } = useStore();
+  const { attendance, employees, getAppNow } = useStore();
 
-  const today      = new Date();
-  const [viewYear,  setViewYear]  = useState(2024); // use data year
-  const [viewMonth, setViewMonth] = useState(0);    // January 2024 has our data
+  const today      = getAppNow();
+  const [viewYear,  setViewYear]  = useState(2026); // use data year
+  const [viewMonth, setViewMonth] = useState(0);    // January 2026 has our data
   const [view,      setView]      = useState("calendar"); // "calendar" | "table"
   const [selectedDay, setSelectedDay] = useState(null);
   const [empFilter,   setEmpFilter]   = useState("all");
@@ -436,6 +436,7 @@ function Attendance() {
               dayData={dayData}
               selectedDay={selectedDay}
               onSelectDay={setSelectedDay}
+              todayStr={today.toISOString().split("T")[0]}
             />
           </div>
 
