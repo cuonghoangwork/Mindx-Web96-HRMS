@@ -422,9 +422,22 @@ body {
   border: 1px solid rgba(113, 82, 243, 0.25);
 }
 
+/* Info variant (was missing — used by Intern TypeBadge) */
+.badge-info {
+  background: var(--bg-info-subtle);
+  color: var(--txt-info);
+  border: 1px solid var(--bdr-info);
+}
+
 /* Size variants */
 .badge-sm { padding: 2px 8px;  font-size: var(--fs-2xs); }
 .badge-lg { padding: 5px 14px; font-size: var(--fs-sm); }
+
+/* Pulse animation — used by EmployeeStatusBadge active dot */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(1.6); }
+}
 
 /* Backward compat — tag classes cũ */
 .tag { display: inline-flex; align-items: center; padding: 4px 12px;
@@ -750,7 +763,7 @@ body {
   place-items: center;
 }
 
-.logo-icon svg { width: 24px; height: 24px; fill: white; }
+.logo-icon svg { width: 24px; height: 24px; }
 
 .brand h1 {
   font-size: var(--fs-3xl);
@@ -956,7 +969,6 @@ body {
 }
 
 .data-table th {
-  text-align: left;
   font-size: var(--fs-xs);
   font-weight: var(--fw-medium);
   color: var(--txt-secondary);
@@ -1141,7 +1153,13 @@ body {
   transition: var(--transition-fast);
 }
 .quick-link:hover { border-color: var(--bdr-brand); background: var(--bg-primary-subtle); color: var(--txt-primary-brand); }
-.quick-link-icon { font-size: 18px; }
+.quick-link-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.quick-link-icon svg { width: 18px; height: 18px; }
 
 .dept-list { list-style: none; margin-bottom: var(--sp-4); }
 .dept-list li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--bdr-subtle); font-size: var(--fs-md); }

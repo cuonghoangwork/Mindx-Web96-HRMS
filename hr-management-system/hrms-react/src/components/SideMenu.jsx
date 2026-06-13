@@ -37,8 +37,11 @@ function SideMenu({ isOpen = false, onNavigate }) {
         title="Go to Dashboard"
       >
         <div className="logo-icon">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 4L5 8v8l7 4 7-4V8l-7-4zm0 3.1l3.9 2.2L12 11.5 8.1 9.3 12 7.1zm-5 3.9l4 2.3v4.6l-4-2.3V11zm6 6.9v-4.6l4-2.3v4.6l-4 2.3z" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+            <circle cx="9.5" cy="7" r="3.5" />
+            <path d="M19.5 21v-1.5a3.5 3.5 0 0 0-2.5-3.36" />
+            <path d="M15.5 3.6a3.5 3.5 0 0 1 0 6.8" />
           </svg>
         </div>
         <h1>HRMS</h1>
