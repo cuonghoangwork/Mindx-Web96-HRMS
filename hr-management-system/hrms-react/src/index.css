@@ -931,11 +931,12 @@ body {
   border: 1px solid var(--bdr-default);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
+  color: var(--txt-secondary);
   display: grid; place-items: center;
   cursor: pointer; font-size: 18px;
   transition: var(--transition-fast);
 }
-.dash-notif:hover { border-color: var(--bdr-brand); background: var(--bg-primary-subtle); }
+.dash-notif:hover { border-color: var(--bdr-brand); background: var(--bg-primary-subtle); color: var(--txt-primary-brand); }
 
 .dash-profile {
   display: flex; align-items: center; gap: var(--sp-3);
