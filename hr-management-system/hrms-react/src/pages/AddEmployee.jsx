@@ -8,11 +8,41 @@ import FormField from "../components/FormField";
 /* ─────────────────────────────────
    Step config
 ───────────────────────────────── */
+/* ── Step SVG icons (outline, currentColor, 20×20) ── */
+const StepIcons = {
+  personal: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  ),
+  job: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+      <line x1="12" y1="12" x2="12" y2="16" />
+      <line x1="10" y1="14" x2="14" y2="14" />
+    </svg>
+  ),
+  finance: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v1m0 8v1M9.5 9.5C9.5 8.1 10.6 7 12 7s2.5 1.1 2.5 2.5c0 2.5-5 2.5-5 5 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5" />
+    </svg>
+  ),
+  review: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 11l3 3L22 4" />
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+    </svg>
+  ),
+};
+
 const STEPS = [
-  { id: 1, label: "Personal",  icon: "👤", desc: "Basic information" },
-  { id: 2, label: "Job",       icon: "💼", desc: "Position & contract" },
-  { id: 3, label: "Finance",   icon: "💰", desc: "Salary & benefits" },
-  { id: 4, label: "Review",    icon: "✅", desc: "Check & save" },
+  { id: 1, label: "Personal",  icon: StepIcons.personal, desc: "Basic information" },
+  { id: 2, label: "Job",       icon: StepIcons.job,      desc: "Position & contract" },
+  { id: 3, label: "Finance",   icon: StepIcons.finance,  desc: "Salary & benefits" },
+  { id: 4, label: "Review",    icon: StepIcons.review,   desc: "Check & save" },
 ];
 
 /* ─────────────────────────────────
@@ -97,14 +127,17 @@ function StepperHeader({ step, completedSteps, onJump }) {
               <div style={{
                 width: "44px", height: "44px", borderRadius: "50%",
                 display: "grid", placeItems: "center",
-                fontSize: done ? "18px" : "20px",
                 background: done ? "var(--clr-primary-400)" : current ? "var(--bg-primary-subtle)" : "var(--bg-surface-alt)",
                 border: `2px solid ${done ? "var(--clr-primary-400)" : current ? "var(--clr-primary-400)" : "var(--bdr-default)"}`,
                 boxShadow: current ? "0 0 0 4px var(--bg-primary-subtle)" : "none",
                 transition: "all 0.25s",
-                color: done ? "white" : "inherit",
+                color: done ? "white" : current ? "var(--clr-primary-400)" : "var(--txt-secondary)",
               }}>
-                {done ? "✓" : s.icon}
+                {done ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : s.icon}
               </div>
 
               {/* Label */}
@@ -432,8 +465,9 @@ function AddEmployee() {
           {/* ── STEP 1 ── */}
           {step === 1 && (
             <div>
-              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                👤 Personal Information
+              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                <span style={{ color: "var(--clr-primary-400)", display: "inline-flex" }}>{StepIcons.personal}</span>
+                Personal Information
               </h3>
               <div className="form-grid">
                 <Field label="Full Name" required error={errors.name} touched={touched.name} success={!errors.name && !!form.name}>
@@ -447,7 +481,7 @@ function AddEmployee() {
                 <Field label="Gender" required error={errors.sex} touched={touched.sex} success={!errors.sex && !!form.sex}>
                   <select {...fieldProps("sex")}>
                     <option value="">Select...</option>
-                    <option value="Male">Nam</option>
+                    <option value="Male">Male</option>
                     <option value="Female">Female</option>
                     <option value="Other">Other</option>
                   </select>
@@ -461,7 +495,7 @@ function AddEmployee() {
                 </Field>
 
                 <Field label="Email" error={errors.email} touched={touched.email} success={!errors.email && !!form.email} hint="Used for system login">
-                  <input {...fieldProps("email")} type="email" placeholder="nguyenvana@company.com" />
+                  <input {...fieldProps("email")} type="email" placeholder="john.smith@company.com" />
                 </Field>
 
                 <Field label="Address">
@@ -477,8 +511,9 @@ function AddEmployee() {
           {/* ── STEP 2 ── */}
           {step === 2 && (
             <div>
-              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                💼 Job Information
+              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                <span style={{ color: "var(--clr-primary-400)", display: "inline-flex" }}>{StepIcons.job}</span>
+                Job Information
               </h3>
               <div className="form-grid">
                 <Field label="Employee ID" required error={errors.employeeId} touched={touched.employeeId} success={!errors.employeeId && !!form.employeeId} hint="Format: EMP001">
@@ -527,8 +562,9 @@ function AddEmployee() {
           {/* ── STEP 3 ── */}
           {step === 3 && (
             <div>
-              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)" }}>
-                💰 Finance Information
+              <h3 style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-6)", color: "var(--txt-primary)", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                <span style={{ color: "var(--clr-primary-400)", display: "inline-flex" }}>{StepIcons.finance}</span>
+                Finance Information
               </h3>
               <div className="form-grid">
                 <Field label="Annual Salary (USD)" required error={errors.salary} touched={touched.salary} success={!errors.salary && !!form.salary} hint="Gross salary, before tax">

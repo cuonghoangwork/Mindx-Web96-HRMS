@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
@@ -9,9 +9,9 @@ const fmtK = (n) => n >= 1_000_000 ? `$${(n/1_000_000).toFixed(1)}M` : n >= 1_00
 
 /* ─── Tax / deduction estimates ─── */
 function calcDeductions(gross) {
-  const tax      = Math.round(gross * 0.22);   // ~22% income tax estimate
-  const social   = Math.round(gross * 0.062);  // Social security 6.2%
-  const medicare = Math.round(gross * 0.0145); // Medicare 1.45%
+  const tax      = Math.round(gross * 0.22);
+  const social   = Math.round(gross * 0.062);
+  const medicare = Math.round(gross * 0.0145);
   const net      = gross - tax - social - medicare;
   return { tax, social, medicare, net };
 }
@@ -154,18 +154,18 @@ function exportCSV(employees) {
 function Payroll() {
   const { employees, departments } = useStore();
 
-  const [search, setSearch]           = useState("");
-  const [deptFilter, setDeptFilter]   = useState("all");
-  const [typeFilter, setTypeFilter]   = useState("all");
-  const [sortField, setSortField]     = useState("salary");
-  const [sortDir, setSortDir]         = useState("desc");
-  const [showBreakdown, setShowBreakdown] = useState(null); // employee id
+  const [search, setSearch]               = useState("");
+  const [deptFilter, setDeptFilter]       = useState("all");
+  const [typeFilter, setTypeFilter]       = useState("all");
+  const [sortField, setSortField]         = useState("salary");
+  const [sortDir, setSortDir]             = useState("desc");
+  const [showBreakdown, setShowBreakdown] = useState(null);
 
   /* ── Computed totals ── */
-  const totalSalary   = employees.reduce((s, e) => s + (e.salary || 0), 0);
-  const avgSalary     = employees.length ? Math.round(totalSalary / employees.length) : 0;
-  const maxSalary     = Math.max(...employees.map((e) => e.salary || 0));
-  const onLeaveCount  = employees.filter((e) => e.status === "On Leave").length;
+  const totalSalary  = employees.reduce((s, e) => s + (e.salary || 0), 0);
+  const avgSalary    = employees.length ? Math.round(totalSalary / employees.length) : 0;
+  const maxSalary    = Math.max(...employees.map((e) => e.salary || 0));
+  const onLeaveCount = employees.filter((e) => e.status === "On Leave").length;
 
   /* ── Dept breakdown ── */
   const deptData = useMemo(() => departments.map((d, i) => ({
@@ -176,9 +176,9 @@ function Payroll() {
   })).sort((a, b) => b.total - a.total), [employees, departments]);
 
   /* ── Type donut ── */
-  const types = ["Full-time", "Part-time", "Contract", "Intern"];
+  const types      = ["Full-time", "Part-time", "Contract", "Intern"];
   const typeColors = ["var(--clr-primary-400)", "var(--clr-success-500)", "var(--clr-warning-500)", "var(--clr-info-500)"];
-  const typeSegs = types.map((t, i) => ({
+  const typeSegs   = types.map((t, i) => ({
     label: t,
     value: employees.filter((e) => e.type === t).length,
     total: employees.filter((e) => e.type === t).reduce((s, e) => s + (e.salary || 0), 0),
@@ -188,10 +188,10 @@ function Payroll() {
   /* ── Filtered + sorted table ── */
   const filtered = useMemo(() => employees
     .filter((e) => {
-      const q = search.toLowerCase();
-      const matchSearch  = !q || e.name.toLowerCase().includes(q) || e.employeeId?.toLowerCase().includes(q);
-      const matchDept    = deptFilter === "all" || e.department === deptFilter;
-      const matchType    = typeFilter === "all" || e.type === typeFilter;
+      const q           = search.toLowerCase();
+      const matchSearch = !q || e.name.toLowerCase().includes(q) || e.employeeId?.toLowerCase().includes(q);
+      const matchDept   = deptFilter === "all" || e.department === deptFilter;
+      const matchType   = typeFilter === "all" || e.type === typeFilter;
       return matchSearch && matchDept && matchType;
     })
     .sort((a, b) => {
@@ -274,7 +274,6 @@ function Payroll() {
           <h3 className="section-title" style={{ margin: 0, flex: "0 0 auto" }}>Salary Table</h3>
           <div style={{ flex: 1 }} />
 
-          {/* Search */}
           <input
             type="text" value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -287,7 +286,6 @@ function Payroll() {
             }}
           />
 
-          {/* Dept filter */}
           <select
             value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
             style={{
@@ -301,7 +299,6 @@ function Payroll() {
             {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
           </select>
 
-          {/* Type filter */}
           <select
             value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
             style={{
@@ -315,7 +312,6 @@ function Payroll() {
             {types.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
 
-          {/* Export */}
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -351,9 +347,9 @@ function Payroll() {
                 const { net } = calcDeductions(emp.salary || 0);
                 const isOpen  = showBreakdown === emp.id;
                 return (
-                  <>
+                  /* ── FIX: Fragment with key instead of bare <> ── */
+                  <Fragment key={emp.id}>
                     <tr
-                      key={emp.id}
                       style={{ background: isOpen ? "var(--bg-primary-subtle)" : undefined, cursor: "pointer" }}
                       onClick={() => setShowBreakdown(isOpen ? null : emp.id)}
                     >
@@ -388,15 +384,15 @@ function Payroll() {
                       </td>
                     </tr>
 
-                    {/* Expanded breakdown row */}
+                    {/* Expanded breakdown row — no key needed, single child of Fragment */}
                     {isOpen && (
-                      <tr key={`${emp.id}-breakdown`}>
+                      <tr>
                         <td colSpan={8} style={{ padding: 0 }}>
                           <BreakdownPanel emp={emp} />
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -450,11 +446,11 @@ function BreakdownPanel({ emp }) {
   const { tax, social, medicare, net } = calcDeductions(emp.salary || 0);
   const monthly = (n) => fmt(Math.round(n / 12));
   const rows = [
-    { label: "Gross Salary",       value: emp.salary,  color: "var(--txt-primary)",   note: "Before deductions" },
-    { label: "Income Tax (est.)",  value: -tax,        color: "var(--txt-danger)",     note: "~22% estimate" },
-    { label: "Social Security",    value: -social,     color: "var(--txt-warning)",    note: "6.2%" },
-    { label: "Medicare",           value: -medicare,   color: "var(--txt-info)",       note: "1.45%" },
-    { label: "Net Pay",            value: net,         color: "var(--clr-success-600)", note: "Take-home" },
+    { label: "Gross Salary",      value: emp.salary, color: "var(--txt-primary)",    note: "Before deductions" },
+    { label: "Income Tax (est.)", value: -tax,       color: "var(--txt-danger)",      note: "~22% estimate" },
+    { label: "Social Security",   value: -social,    color: "var(--txt-warning)",     note: "6.2%" },
+    { label: "Medicare",          value: -medicare,  color: "var(--txt-info)",        note: "1.45%" },
+    { label: "Net Pay",           value: net,        color: "var(--clr-success-600)", note: "Take-home" },
   ];
 
   return (
@@ -498,10 +494,10 @@ function BreakdownPanel({ emp }) {
             Distribution
           </div>
           {[
-            { label: "Net Pay",        value: net,         pct: Math.round((net / emp.salary) * 100),     color: "var(--clr-success-500)" },
-            { label: "Income Tax",     value: tax,         pct: Math.round((tax / emp.salary) * 100),     color: "var(--clr-danger-400)" },
-            { label: "Social Sec.",    value: social,      pct: Math.round((social / emp.salary) * 100),  color: "var(--clr-warning-400)" },
-            { label: "Medicare",       value: medicare,    pct: Math.round((medicare / emp.salary) * 100),color: "var(--clr-info-400)" },
+            { label: "Net Pay",     value: net,      pct: Math.round((net      / emp.salary) * 100), color: "var(--clr-success-500)" },
+            { label: "Income Tax",  value: tax,      pct: Math.round((tax      / emp.salary) * 100), color: "var(--clr-danger-400)" },
+            { label: "Social Sec.", value: social,   pct: Math.round((social   / emp.salary) * 100), color: "var(--clr-warning-400)" },
+            { label: "Medicare",    value: medicare, pct: Math.round((medicare / emp.salary) * 100), color: "var(--clr-info-400)" },
           ].map((s) => (
             <div key={s.label} style={{ marginBottom: "var(--sp-2)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
