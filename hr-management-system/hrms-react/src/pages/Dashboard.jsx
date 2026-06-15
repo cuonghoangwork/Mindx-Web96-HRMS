@@ -186,7 +186,7 @@ function ActivityItem({ icon, bg, text, time }) {
    DASHBOARD
 ═══════════════════════════════════════════ */
 function Dashboard() {
-  const { employees, attendance, departments, getEmployeeCountByDepartment } = useStore();
+  const { employees, attendance, departments, getEmployeeCountByDepartment, getAppNow } = useStore();
 
   // ── Stats ──
   const totalEmployees = employees.length;
@@ -194,8 +194,9 @@ function Dashboard() {
   const attendanceRate = attendance.length > 0
     ? Math.round((presentCount / attendance.length) * 100) : 0;
   const onLeave  = employees.filter((e) => e.status === "On Leave").length;
-  const curMonth = new Date().getMonth();
-  const curYear  = new Date().getFullYear();
+  const now      = getAppNow();
+  const curMonth = now.getMonth();
+  const curYear  = now.getFullYear();
   const newHires = employees.filter((e) => {
     const d = new Date(e.createdAt);
     return d.getMonth() === curMonth && d.getFullYear() === curYear;

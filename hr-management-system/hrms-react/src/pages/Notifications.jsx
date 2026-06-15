@@ -16,8 +16,7 @@ const FILTERS = [
   ...Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => ({ key, label: cfg.label })),
 ];
 
-function timeAgo(timestamp) {
-  const now = new Date("2026-06-12T12:00:00");
+function timeAgo(timestamp, now) {
   const then = new Date(timestamp);
   const diffMs = now - then;
   const minutes = Math.floor(diffMs / 60000);
@@ -31,8 +30,8 @@ function timeAgo(timestamp) {
   return `${days} days ago`;
 }
 
-function isToday(timestamp) {
-  const today = new Date("2026-06-12T12:00:00").toDateString();
+function isToday(timestamp, now) {
+  const today = now.toDateString();
   return new Date(timestamp).toDateString() === today;
 }
 
@@ -43,19 +42,22 @@ function Notifications() {
     markAllNotificationsRead,
     removeNotification,
     clearReadNotifications,
+    getAppNow,
   } = useStore();
+
+  const now = getAppNow();
 
   const [filter, setFilter] = useState("all");
 
   const stats = useMemo(() => {
     const unread = notifications.filter((n) => !n.read).length;
-    const today = notifications.filter((n) => isToday(n.timestamp)).length;
+    const today = notifications.filter((n) => isToday(n.timestamp, now)).length;
     return {
       total: notifications.length,
       unread,
       today,
     };
-  }, [notifications]);
+  }, [notifications, now]);
 
   const filteredNotifications = useMemo(() => {
     const sorted = [...notifications].sort(
@@ -218,7 +220,7 @@ function Notifications() {
                         {notification.message}
                       </p>
                       <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)" }}>
-                        {cfg.label} • {timeAgo(notification.timestamp)}
+                        {cfg.label} • {timeAgo(notification.timestamp, now)}
                       </div>
                     </div>
                   </div>
