@@ -13,6 +13,7 @@ function Login() {
 
   // Get the page user was trying to access
   const from = location.state?.from?.pathname || "/dashboard";
+  const justRegistered = location.state?.justRegistered;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +37,23 @@ function Login() {
           <h1>Welcome Back</h1>
         </div>
         <p className="login-subtitle">Sign in to access your HRMS dashboard</p>
+
+        {justRegistered && (
+          <div
+            style={{
+              marginBottom: "20px", padding: "var(--sp-3) var(--sp-4)",
+              background: "var(--bg-success-subtle)", border: "1px solid var(--bdr-success)",
+              borderRadius: "var(--radius-md)", color: "var(--txt-success)",
+              fontSize: "var(--fs-sm)", display: "flex", alignItems: "center", gap: "var(--sp-2)",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            Account created. Sign in with the demo credentials below to continue.
+          </div>
+        )}
 
         {error && (
           <div className="form-error" style={{ marginBottom: "20px" }}>
@@ -89,6 +107,13 @@ function Login() {
             {isLoading ? "Signing In..." : "Sign In"}
           </button>
         </form>
+
+        <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
+          Don't have an account?{" "}
+          <Link to="/register" className="link-primary">
+            Create one
+          </Link>
+        </p>
 
         <div className="login-demo-credentials">
           <p>

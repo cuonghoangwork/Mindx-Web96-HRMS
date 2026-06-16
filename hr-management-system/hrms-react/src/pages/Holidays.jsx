@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useStore } from "../context/StoreContext";
 import Badge from "../components/Badge";
 import AddHolidayModal from "../components/AddHolidayModal";
 
@@ -30,6 +31,7 @@ function formatDate(dateStr) {
 }
 
 function Holidays() {
+  const { getAppNow } = useStore();
   const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState(null);
@@ -37,10 +39,10 @@ function Holidays() {
   const [draftDate, setDraftDate] = useState("");
 
   const today = useMemo(() => {
-    const d = new Date();
+    const d = getAppNow();
     d.setHours(0, 0, 0, 0);
     return d;
-  }, []);
+  }, [getAppNow]);
 
   const sortedHolidays = useMemo(
     () => [...holidays].sort((a, b) => new Date(a.date) - new Date(b.date)),
@@ -156,7 +158,13 @@ function Holidays() {
       <div className="content-card">
         {sortedHolidays.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🗓️</div>
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <path d="M16 2v4M8 2v4M3 10h18" />
+                <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
+              </svg>
+            </div>
             <div className="empty-state-title">No holidays yet</div>
             <div className="empty-state-description">
               Add a holiday to start building the 2026 calendar.

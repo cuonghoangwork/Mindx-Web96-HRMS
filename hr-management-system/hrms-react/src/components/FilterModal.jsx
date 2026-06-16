@@ -54,7 +54,7 @@ function FilterModal({ onClose }) {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(162, 161, 168, 0.2)",
+        background: "rgba(22, 21, 28, 0.3)",
         backdropFilter: "blur(10px)",
         display: "grid",
         placeItems: "center",
@@ -83,7 +83,7 @@ function FilterModal({ onClose }) {
               fontFamily: "Lexend",
               fontSize: "20px",
               fontWeight: 600,
-              color: "var(--text-main)",
+              color: "var(--txt-primary)",
               margin: 0,
             }}
           >
@@ -95,7 +95,7 @@ function FilterModal({ onClose }) {
         <div
           style={{
             height: "1px",
-            background: "var(--border)",
+            background: "var(--bdr-default)",
             marginBottom: "20px",
           }}
         />
@@ -108,7 +108,7 @@ function FilterModal({ onClose }) {
               alignItems: "center",
               gap: "10px",
               padding: "13px 16px",
-              border: "1px solid rgba(162, 161, 168, 0.1)",
+              border: "1px solid var(--bdr-subtle)",
               borderRadius: "10px",
               cursor: "pointer",
             }}
@@ -126,7 +126,7 @@ function FilterModal({ onClose }) {
                 fontFamily: "Lexend",
                 fontSize: "16px",
                 fontWeight: 300,
-                color: "var(--text-main)",
+                color: "var(--txt-primary)",
                 outline: "none",
               }}
             />
@@ -140,7 +140,7 @@ function FilterModal({ onClose }) {
               fontFamily: "Lexend",
               fontSize: "16px",
               fontWeight: 600,
-              color: "var(--text-main)",
+              color: "var(--txt-primary)",
               marginBottom: "16px",
             }}
           >
@@ -198,7 +198,7 @@ function FilterModal({ onClose }) {
               fontFamily: "Lexend",
               fontSize: "16px",
               fontWeight: 600,
-              color: "var(--text-main)",
+              color: "var(--txt-primary)",
               marginBottom: "16px",
             }}
           >
@@ -235,10 +235,10 @@ function FilterModal({ onClose }) {
             style={{
               flex: 1,
               padding: "20px",
-              border: "1px solid var(--border)",
+              border: "1px solid var(--bdr-default)",
               borderRadius: "10px",
               background: "transparent",
-              color: "var(--text-main)",
+              color: "var(--txt-primary)",
               fontFamily: "Poppins",
               fontSize: "16px",
               cursor: "pointer",
@@ -253,8 +253,8 @@ function FilterModal({ onClose }) {
               padding: "20px",
               border: "none",
               borderRadius: "10px",
-              background: "var(--primary)",
-              color: "#FFFFFF",
+              background: "var(--bg-primary)",
+              color: "var(--txt-on-brand)",
               fontFamily: "Poppins",
               fontSize: "16px",
               cursor: "pointer",
@@ -283,8 +283,8 @@ function CheckboxItem({ label, checked, onChange }) {
           width: "24px",
           height: "24px",
           borderRadius: "4px",
-          border: checked ? "none" : "1.5px solid rgba(162, 161, 168, 0.2)",
-          background: checked ? "var(--primary)" : "transparent",
+          border: checked ? "none" : "1.5px solid var(--bdr-subtle)",
+          background: checked ? "var(--bg-primary)" : "transparent",
           display: "grid",
           placeItems: "center",
           fontSize: "14px",
@@ -304,7 +304,7 @@ function CheckboxItem({ label, checked, onChange }) {
           fontFamily: "Lexend",
           fontSize: "16px",
           fontWeight: 300,
-          color: "var(--text-main)",
+          color: "var(--txt-primary)",
         }}
       >
         {label}
@@ -329,7 +329,7 @@ function RadioItem({ label, checked, onChange }) {
           height: "24px",
           borderRadius: "50%",
           border: "1.5px solid",
-          borderColor: checked ? "var(--primary)" : "rgba(162, 161, 168, 0.2)",
+          borderColor: checked ? "var(--bg-primary)" : "var(--bdr-subtle)",
           display: "grid",
           placeItems: "center",
           padding: "2px",
@@ -341,7 +341,7 @@ function RadioItem({ label, checked, onChange }) {
               width: "14px",
               height: "14px",
               borderRadius: "50%",
-              background: "var(--primary)",
+              background: "var(--bg-primary)",
             }}
           />
         )}
@@ -357,7 +357,7 @@ function RadioItem({ label, checked, onChange }) {
           fontFamily: "Lexend",
           fontSize: "16px",
           fontWeight: 300,
-          color: "var(--text-main)",
+          color: "var(--txt-primary)",
         }}
       >
         {label}

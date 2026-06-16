@@ -493,25 +493,35 @@ function BreakdownPanel({ emp }) {
           <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--txt-secondary)", marginBottom: "var(--sp-3)" }}>
             Distribution
           </div>
-          {[
-            { label: "Net Pay",     value: net,      pct: Math.round((net      / emp.salary) * 100), color: "var(--clr-success-500)" },
-            { label: "Income Tax",  value: tax,      pct: Math.round((tax      / emp.salary) * 100), color: "var(--clr-danger-400)" },
-            { label: "Social Sec.", value: social,   pct: Math.round((social   / emp.salary) * 100), color: "var(--clr-warning-400)" },
-            { label: "Medicare",    value: medicare, pct: Math.round((medicare / emp.salary) * 100), color: "var(--clr-info-400)" },
-          ].map((s) => (
-            <div key={s.label} style={{ marginBottom: "var(--sp-2)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{s.label}</span>
-                <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{s.pct}%</span>
+          {(() => {
+            const netPct    = Math.round((net    / emp.salary) * 100);
+            const taxPct    = Math.round((tax    / emp.salary) * 100);
+            const socialPct = Math.round((social / emp.salary) * 100);
+            // Medicare absorbs the rounding remainder so the four percentages always sum to 100
+            const medicarePct = 100 - netPct - taxPct - socialPct;
+
+            const distribution = [
+              { label: "Net Pay",     value: net,      pct: netPct,      color: "var(--clr-success-500)" },
+              { label: "Income Tax",  value: tax,      pct: taxPct,      color: "var(--clr-danger-400)" },
+              { label: "Social Sec.", value: social,   pct: socialPct,   color: "var(--clr-warning-400)" },
+              { label: "Medicare",    value: medicare, pct: medicarePct, color: "var(--clr-info-400)" },
+            ];
+
+            return distribution.map((s) => (
+              <div key={s.label} style={{ marginBottom: "var(--sp-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{s.label}</span>
+                  <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{s.pct}%</span>
+                </div>
+                <div style={{ background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)", height: "6px" }}>
+                  <div style={{
+                    height: "6px", borderRadius: "var(--radius-full)",
+                    background: s.color, width: `${s.pct}%`,
+                  }} />
+                </div>
               </div>
-              <div style={{ background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)", height: "6px" }}>
-                <div style={{
-                  height: "6px", borderRadius: "var(--radius-full)",
-                  background: s.color, width: `${s.pct}%`,
-                }} />
-              </div>
-            </div>
-          ))}
+            ));
+          })()}
         </div>
 
       </div>

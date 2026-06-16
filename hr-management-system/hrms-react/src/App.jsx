@@ -16,6 +16,7 @@ import Notifications from "./pages/Notifications";
 import AllDepartments from "./pages/AllDepartments";
 import ViewDepartment from "./pages/ViewDepartment";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import EnterOTP from "./pages/EnterOTP";
 import LoginSuccessful from "./pages/LoginSuccessful";
@@ -30,6 +31,12 @@ function App() {
         path="/login"
         element={
           isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />
         }
       />
       <Route path="/forgot-password" element={<ForgotPassword />} />
