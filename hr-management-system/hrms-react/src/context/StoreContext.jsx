@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from "react";
+import { generateId, idsMatch } from "../utils/id";
 
 const StoreContext = createContext(null);
 
@@ -434,16 +435,16 @@ export function StoreProvider({ children }) {
 
   // Employee actions
   const addEmployee = useCallback((employee) => {
-    setEmployees((prev) => [...prev, { ...employee, id: Date.now() }]);
+    setEmployees((prev) => [...prev, { ...employee, id: generateId() }]);
   }, []);
 
   const removeEmployee = useCallback((id) => {
-    setEmployees((prev) => prev.filter((emp) => emp.id !== id));
+    setEmployees((prev) => prev.filter((emp) => !idsMatch(emp.id, id)));
   }, []);
 
   const updateEmployee = useCallback((id, updates) => {
     setEmployees((prev) =>
-      prev.map((emp) => (emp.id === id ? { ...emp, ...updates } : emp)),
+      prev.map((emp) => (idsMatch(emp.id, id) ? { ...emp, ...updates } : emp)),
     );
   }, []);
 
@@ -490,13 +491,13 @@ export function StoreProvider({ children }) {
   const updateDepartmentBudget = useCallback((id, newBudget) => {
     setDepartments((prev) =>
       prev.map((dept) =>
-        dept.id === id ? { ...dept, budget: newBudget } : dept,
+        idsMatch(dept.id, id) ? { ...dept, budget: newBudget } : dept,
       ),
     );
   }, []);
 
   const addDepartment = useCallback((department) => {
-    setDepartments((prev) => [...prev, { ...department, id: Date.now() }]);
+    setDepartments((prev) => [...prev, { ...department, id: generateId() }]);
   }, []);
 
   const getEmployeesByDepartment = useCallback(
@@ -523,41 +524,41 @@ export function StoreProvider({ children }) {
   const addJob = useCallback((job) => {
     setJobs((prev) => [
       ...prev,
-      { ...job, id: Math.max(0, ...prev.map((j) => j.id)) + 1 },
+      { ...job, id: generateId() },
     ]);
   }, []);
 
   const updateJob = useCallback((id, updates) => {
     setJobs((prev) =>
-      prev.map((job) => (job.id === id ? { ...job, ...updates } : job)),
+      prev.map((job) => (idsMatch(job.id, id) ? { ...job, ...updates } : job)),
     );
   }, []);
 
   const removeJob = useCallback((id) => {
-    setJobs((prev) => prev.filter((job) => job.id !== id));
+    setJobs((prev) => prev.filter((job) => !idsMatch(job.id, id)));
   }, []);
 
   // Candidate actions
   const addCandidate = useCallback((candidate) => {
     setCandidates((prev) => [
       ...prev,
-      { ...candidate, id: Math.max(0, ...prev.map((c) => c.id)) + 1 },
+      { ...candidate, id: generateId() },
     ]);
   }, []);
 
   const updateCandidate = useCallback((id, updates) => {
     setCandidates((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+      prev.map((c) => (idsMatch(c.id, id) ? { ...c, ...updates } : c)),
     );
   }, []);
 
   const removeCandidate = useCallback((id) => {
-    setCandidates((prev) => prev.filter((c) => c.id !== id));
+    setCandidates((prev) => prev.filter((c) => !idsMatch(c.id, id)));
   }, []);
 
   // Get all candidates applied to a given job
   const getCandidatesByJob = useCallback(
-    (jobId) => candidates.filter((c) => c.jobId === jobId),
+    (jobId) => candidates.filter((c) => idsMatch(c.jobId, jobId)),
     [candidates],
   );
 
@@ -569,14 +570,14 @@ export function StoreProvider({ children }) {
 
   // Look up a job by id
   const getJobById = useCallback(
-    (jobId) => jobs.find((j) => j.id === jobId),
+    (jobId) => jobs.find((j) => idsMatch(j.id, jobId)),
     [jobs],
   );
 
   // Notification actions
   const markNotificationRead = useCallback((id) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      prev.map((n) => (idsMatch(n.id, id) ? { ...n, read: true } : n)),
     );
   }, []);
 
@@ -585,7 +586,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   const removeNotification = useCallback((id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications((prev) => prev.filter((n) => !idsMatch(n.id, id)));
   }, []);
 
   const clearReadNotifications = useCallback(() => {

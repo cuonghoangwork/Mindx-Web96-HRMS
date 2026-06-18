@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "../context/StoreContext";
 import Badge from "../components/Badge";
 import AddHolidayModal from "../components/AddHolidayModal";
+import { generateId } from "../utils/id";
 
 const HOLIDAY_TYPE_VARIANT = {
   Public: "success",
@@ -69,7 +70,7 @@ function Holidays() {
     } else {
       setHolidays((prev) => [
         ...prev,
-        { ...holiday, id: Math.max(0, ...prev.map((h) => h.id)) + 1 },
+        { ...holiday, id: generateId() },
       ]);
     }
     setEditingHoliday(null);

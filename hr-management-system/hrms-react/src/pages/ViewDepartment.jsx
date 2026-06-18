@@ -1,5 +1,6 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { idsMatch } from "../utils/id";
 
 function formatBudget(amount) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -12,7 +13,7 @@ function ViewDepartment() {
   const navigate = useNavigate();
   const { departments, getEmployeesByDepartment } = useStore();
 
-  const department = departments.find((d) => d.id === Number(id));
+  const department = departments.find((d) => idsMatch(d.id, id));
 
   if (!department) {
     return (

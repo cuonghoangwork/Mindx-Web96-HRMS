@@ -4,6 +4,7 @@ import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { CandidateStageBadge } from "../components/Badge";
 import CandidateSidePanel from "../components/CandidateSidePanel";
+import { idsMatch } from "../utils/id";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 
@@ -36,7 +37,7 @@ function Candidates() {
   const [stageFilter, setStageFilter] = useState("all");
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
 
-  const jobFilterId = jobIdParam ? Number(jobIdParam) : null;
+  const jobFilterId = jobIdParam || null;
   const jobFilter = jobFilterId ? getJobById(jobFilterId) : null;
 
   const stats = useMemo(() => {
@@ -66,7 +67,7 @@ function Candidates() {
         c.name.toLowerCase().includes(q) ||
         roleTitle.toLowerCase().includes(q);
       const matchesStage = stageFilter === "all" || c.stage === stageFilter;
-      const matchesJob = !jobFilterId || c.jobId === jobFilterId;
+      const matchesJob = !jobFilterId || idsMatch(c.jobId, jobFilterId);
       return matchesSearch && matchesStage && matchesJob;
     });
   }, [candidates, search, stageFilter, jobFilterId, getJobById]);

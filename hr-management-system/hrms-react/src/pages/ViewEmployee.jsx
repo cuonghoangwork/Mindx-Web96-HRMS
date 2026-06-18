@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
+import { idsMatch } from "../utils/id";
 
 const EMPLOYEE_TYPES = ["Full-time", "Part-time", "Contract", "Intern"];
 
@@ -14,7 +15,7 @@ function ViewEmployee() {
   const { employees, updateEmployee } = useStore();
   const [pendingChange, setPendingChange] = useState(null);
 
-  const employee = employees.find((emp) => emp.id === Number(id));
+  const employee = employees.find((emp) => idsMatch(emp.id, id));
 
   if (!employee) {
     return (

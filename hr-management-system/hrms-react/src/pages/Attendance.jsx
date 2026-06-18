@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
+import { idsMatch, compareIds, numericSeed } from "../utils/id";
 
 /* ─── helpers ─── */
 const fmt = (v) => {
@@ -49,7 +50,7 @@ function buildMonthAttendance(year, month, employees, existing) {
       if (existingKeys.has(key)) return;
 
       // Deterministic pseudo-random based on emp.id + day
-      const seed = (emp.id * 17 + day * 7) % 100;
+      const seed = (numericSeed(emp.id) * 17 + day * 7) % 100;
       let status, checkIn, checkOut;
 
       if (seed < 5) {
@@ -329,9 +330,9 @@ function Attendance() {
   const tableRows = useMemo(() => {
     const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-`;
     return fullMonth
-      .filter((r) => r.date.startsWith(prefix) && (empFilter === "all" || r.employeeId === Number(empFilter)))
+      .filter((r) => r.date.startsWith(prefix) && (empFilter === "all" || idsMatch(r.employeeId, empFilter)))
       .map((r) => ({ ...r, status: resolveStatus(r), name: employees.find((e) => e.id === r.employeeId)?.name ?? `#${r.employeeId}` }))
-      .sort((a, b) => b.date.localeCompare(a.date) || a.employeeId - b.employeeId);
+      .sort((a, b) => b.date.localeCompare(a.date) || compareIds(a.employeeId, b.employeeId));
   }, [fullMonth, viewYear, viewMonth, empFilter, employees]);
 
   /* ── Month summary stats ── */
