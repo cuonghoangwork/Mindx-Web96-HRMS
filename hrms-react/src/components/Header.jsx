@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
 import { useLocation, Link } from "react-router-dom";
 import HeaderDateTime from "./HeaderDateTime";
+import { getRoleLabel } from "../utils/roles";
 
 function Header({ onMenuToggle }) {
   const { user, logout } = useAuth();
@@ -112,7 +113,7 @@ function Header({ onMenuToggle }) {
               {user?.name || "Admin User"}
             </span>
             <span className="dash-profile-role">
-              {user?.role || "Administrator"}
+              {getRoleLabel(user?.role) || "Administrator"}
             </span>
           </span>
           <span>⌄</span>

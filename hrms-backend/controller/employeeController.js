@@ -2,6 +2,7 @@ import EmployeeModel from "../model/Employee.js";
 import DepartmentModel from "../model/Department.js";
 import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
+import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -121,6 +122,39 @@ const employeeController = {
       const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
       if (!employee) throw new Error("Employee not found.");
       res.json({ success: true, message: "Employee deleted." });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Multer (middleware/upload.js, memoryStorage) puts the file on req.file as a buffer.
+  // Uploads it to Cloudinary and AWAITS the result before responding - fixing the race
+  // condition in the course's lesson9 example (see WEB96_BACKEND_REFERENCE.md §10 and
+  // utils/cloudinary.js), where the response was sent before secure_url was available.
+  uploadAvatar: async (req, res) => {
+    try {
+      if (!isCloudinaryConfigured()) {
+        throw new Error(
+          "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        );
+      }
+      if (!req.file) throw new Error("No image file was uploaded.");
+
+      const employee = await EmployeeModel.findById(req.params.id);
+      if (!employee) throw new Error("Employee not found.");
+
+      const result = await uploadBufferToCloudinary(req.file.buffer, {
+        folder: "hrms/avatars",
+        public_id: `employee_${employee._id}`,
+        overwrite: true,
+        resource_type: "image",
+      });
+
+      employee.avatar = result.secure_url;
+      await employee.save();
+      await employee.populate("department", "name");
+
+      res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }

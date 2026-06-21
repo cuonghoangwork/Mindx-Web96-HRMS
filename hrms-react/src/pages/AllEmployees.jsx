@@ -97,7 +97,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange }) {
           flexShrink: 0,
         }}>
           <Avatar
-            name={employee.name} size="lg"
+            name={employee.name} src={employee.avatar} size="lg"
             status={employee.status === "Active" ? "active" : employee.status === "On Leave" ? "leave" : "terminated"}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -441,7 +441,7 @@ function AllEmployees() {
                     {/* Name */}
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <Avatar name={employee.name} size="sm" />
+                        <Avatar name={employee.name} src={employee.avatar} size="sm" />
                         <div>
                           <div className="employee-row-name">{employee.name}</div>
                           <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>

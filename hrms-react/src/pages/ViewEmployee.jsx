@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
@@ -9,11 +9,17 @@ const EMPLOYEE_TYPES = ["Full-time", "Part-time", "Contract", "Intern"];
 
 const EMPLOYEE_STATUSES = ["Active", "On Leave", "Terminated"];
 
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // keep in sync with hrms-backend/middleware/upload.js
+const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
 function ViewEmployee() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employees, updateEmployee } = useStore();
+  const { employees, updateEmployee, uploadEmployeeAvatar } = useStore();
   const [pendingChange, setPendingChange] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const fileInputRef = useRef(null);
 
   const employee = employees.find((emp) => idsMatch(emp.id, id));
 
@@ -35,6 +41,33 @@ function ViewEmployee() {
     );
   }
 
+  const handleAvatarPick = () => fileInputRef.current?.click();
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      setAvatarError("Please choose a JPEG, PNG, WEBP, or GIF image.");
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarError("Image must be 5MB or smaller.");
+      return;
+    }
+
+    setAvatarError("");
+    setAvatarUploading(true);
+    try {
+      await uploadEmployeeAvatar(employee.id, file);
+    } catch (err) {
+      setAvatarError(err.message || "Failed to upload photo.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleFieldChange = (field, label, newValue) => {
     const currentValue = employee[field];
     if (newValue === currentValue) return;
@@ -55,16 +88,63 @@ function ViewEmployee() {
     <>
       <div className="content-card">
         <div className="employee-detail-header">
-          <Avatar
-            name={employee.name}
-            size="xl"
-            status={
-              employee.status === "On Leave" ? "leave"
-              : employee.status === "Active" ? "active"
-              : employee.status === "Terminated" ? "terminated"
-              : undefined
-            }
-          />
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <Avatar
+              name={employee.name}
+              src={employee.avatar}
+              size="xl"
+              status={
+                employee.status === "On Leave" ? "leave"
+                : employee.status === "Active" ? "active"
+                : employee.status === "Terminated" ? "terminated"
+                : undefined
+              }
+            />
+
+            <button
+              type="button"
+              onClick={handleAvatarPick}
+              disabled={avatarUploading}
+              aria-label="Change profile photo"
+              title="Change profile photo"
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: "none",
+                cursor: avatarUploading ? "default" : "pointer",
+                background: "rgba(0,0,0,0.45)",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: avatarUploading ? 1 : 0,
+                transition: "opacity 0.15s",
+              }}
+              onMouseEnter={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = "1"; }}
+              onMouseLeave={(e) => { if (!avatarUploading) e.currentTarget.style.opacity = "0"; }}
+            >
+              {avatarUploading ? (
+                <svg width="22" height="22" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ animation: "btn-spin 0.7s linear infinite" }}>
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+                  <path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              )}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ALLOWED_AVATAR_TYPES.join(",")}
+              onChange={handleAvatarChange}
+              style={{ display: "none" }}
+            />
+          </div>
 
           <div style={{ flex: 1 }}>
             <h2>{employee.name}</h2>
@@ -76,6 +156,11 @@ function ViewEmployee() {
               <StatusBadge status={employee.status} size="lg" dot />
               <TypeBadge type={employee.type} size="lg" />
             </div>
+            {avatarError && (
+              <p style={{ color: "var(--txt-danger)", fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+                {avatarError}
+              </p>
+            )}
           </div>
 
           <button

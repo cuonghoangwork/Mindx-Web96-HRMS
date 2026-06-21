@@ -355,7 +355,7 @@ function Payroll() {
                     >
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                          <Avatar name={emp.name} size="sm" />
+                          <Avatar name={emp.name} src={emp.avatar} size="sm" />
                           <div>
                             <div style={{ fontWeight: "var(--fw-medium)", fontSize: "var(--fs-md)" }}>{emp.name}</div>
                             <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{emp.employeeId}</div>

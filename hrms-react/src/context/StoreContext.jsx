@@ -25,6 +25,12 @@ export function StoreProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [loadingStore, setLoadingStore] = useState(true);
   const [storeError, setStoreError] = useState(null);
+  const [toast, setToast] = useState(null); // { type: "error"|"success", message } | null
+
+  const showToast = useCallback((type, message) => {
+    setToast({ type, message });
+  }, []);
+  const dismissToast = useCallback(() => setToast(null), []);
 
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modals, setModals] = useState({
@@ -112,6 +118,14 @@ export function StoreProvider({ children }) {
     setEmployees((prev) =>
       prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
     );
+  }, []);
+
+  const uploadEmployeeAvatar = useCallback(async (id, file) => {
+    const res = await EmployeesAPI.uploadAvatar(id, file);
+    setEmployees((prev) =>
+      prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
+    );
+    return res.data;
   }, []);
 
   const selectEmployee = useCallback((employee) => {
@@ -240,37 +254,37 @@ export function StoreProvider({ children }) {
     );
     try {
       await NotificationsAPI.markRead(id);
-    } catch {
-      /* optimistic update already applied; ignore transient errors in demo */
+    } catch (err) {
+      showToast("error", err.message || "Failed to mark notification as read.");
     }
-  }, []);
+  }, [showToast]);
 
   const markAllNotificationsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     try {
       await NotificationsAPI.markAllRead();
-    } catch {
-      /* noop */
+    } catch (err) {
+      showToast("error", err.message || "Failed to mark all notifications as read.");
     }
-  }, []);
+  }, [showToast]);
 
   const removeNotification = useCallback(async (id) => {
     setNotifications((prev) => prev.filter((n) => !idsMatch(n.id, id)));
     try {
       await NotificationsAPI.remove(id);
-    } catch {
-      /* noop */
+    } catch (err) {
+      showToast("error", err.message || "Failed to dismiss notification.");
     }
-  }, []);
+  }, [showToast]);
 
   const clearReadNotifications = useCallback(async () => {
     setNotifications((prev) => prev.filter((n) => !n.read));
     try {
       await NotificationsAPI.clearRead();
-    } catch {
-      /* noop */
+    } catch (err) {
+      showToast("error", err.message || "Failed to clear read notifications.");
     }
-  }, []);
+  }, [showToast]);
 
   const unreadNotificationCount = notifications.filter((n) => !n.read).length;
 
@@ -292,6 +306,8 @@ export function StoreProvider({ children }) {
     isClockAdjusted,
     loadingStore,
     storeError,
+    toast,
+    dismissToast,
     getAppNow,
     setAppDateTime,
     resetAppDateTime,
@@ -301,6 +317,7 @@ export function StoreProvider({ children }) {
     addEmployee,
     removeEmployee,
     updateEmployee,
+    uploadEmployeeAvatar,
     selectEmployee,
     openModal,
     closeModal,

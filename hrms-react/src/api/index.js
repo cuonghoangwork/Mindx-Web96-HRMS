@@ -20,6 +20,11 @@ export const EmployeesAPI = {
   create: (data) => apiFetch("/employees", { method: "POST", body: data }),
   update: (id, data) => apiFetch(`/employees/${id}`, { method: "PUT", body: data }),
   remove: (id) => apiFetch(`/employees/${id}`, { method: "DELETE" }),
+  uploadAvatar: (id, file) => {
+    const form = new FormData();
+    form.append("avatar", file);
+    return apiFetch(`/employees/${id}/avatar`, { method: "POST", body: form });
+  },
 };
 
 export const DepartmentsAPI = {

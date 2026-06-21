@@ -61,7 +61,8 @@ export async function apiFetch(
   { method = "GET", body, auth = true, retry = true } = {},
 ) {
   const { access } = getTokens();
-  const headers = { "Content-Type": "application/json" };
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers = isFormData ? {} : { "Content-Type": "application/json" };
   if (auth && access) headers.Authorization = `Bearer ${access}`;
 
   let res;
@@ -69,7 +70,7 @@ export async function apiFetch(
     res = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     });
   } catch (networkErr) {
     throw new Error(

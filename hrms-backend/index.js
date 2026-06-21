@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import multer from "multer";
 
 const env = process.env.NODE_ENV || "dev";
 dotenv.config({ path: `.env.${env}` });
@@ -22,7 +23,10 @@ app.use((req, res) => {
 // Final error handler - catches anything thrown/passed via next(err) outside controller try/catch
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({
+  // Multer errors (oversized file, fileFilter rejection) are a bad request, not a server fault.
+  const isMulterError = err instanceof multer.MulterError || /image/i.test(err.message || "");
+  const status = err.status || (isMulterError ? 400 : 500);
+  res.status(status).json({
     success: false,
     message: err.message || "Internal server error",
   });

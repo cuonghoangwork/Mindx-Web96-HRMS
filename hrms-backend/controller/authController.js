@@ -126,7 +126,12 @@ const authController = {
     try {
       const user = await UserModel.findById(req.user.id).select("-password -refreshToken");
       if (!user) throw new Error("User not found.");
-      res.json({ success: true, data: user });
+      // Normalized to the same {id, email, name, role} shape as /auth/login's
+      // `user` object, rather than the raw Mongoose doc (_id, no `id`).
+      res.json({
+        success: true,
+        data: { id: user._id, email: user.email, name: user.name, role: user.role },
+      });
     } catch (error) {
       res.status(404).json({ success: false, message: error.message });
     }
