@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>View Department</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="view-department-screen">
+      <aside class="side-menu">
+        <div class="brand">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 4L5 8v8l7 4 7-4V8l-7-4zm0 3.1l3.9 2.2L12 11.5 8.1 9.3 12 7.1zm-5 3.9l4 2.3v4.6l-4-2.3V11zm6 6.9v-4.6l4-2.3v4.6l-4 2.3z"
+              />
+            </svg>
+          </div>
+          <h1>HRMS</h1>
+        </div>
+
+        <nav class="menu-list" aria-label="Sidebar">
+          <button
+            class="menu-item"
+            data-title="Dashboard"
+            data-link="dashboard.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">Dashboard</span>
+          </button>
+
+          <button
+            class="menu-item"
+            data-title="All Employees"
+            data-link="index.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M16 11a4 4 0 1 0-3.999-4A4 4 0 0 0 16 11zM8 12a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm8 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM8 14c-2.33 0-7 1.17-7 3.5V20h5v-2c0-1.2.62-2.27 1.7-3.14A8.2 8.2 0 0 0 8 14z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">All Employees</span>
+          </button>
+
+          <button
+            class="menu-item active"
+            data-title="All Departments"
+            data-link="all-departments.html"
+          >
+            <span class="menu-indicator"></span>
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 2a10 10 0 1 0 10 10A10.01 10.01 0 0 0 12 2zm0 4a2 2 0 1 1-2 2 2 2 0 0 1 2-2zm0 12c-2.67 0-5.03-1.34-6.47-3.38A7.98 7.98 0 0 1 12 11a7.98 7.98 0 0 1 6.47 3.62A7.98 7.98 0 0 1 12 18z"
+                ></path>
+              </svg>
+            </span>
+            <span class="menu-text">All Departments</span>
+          </button>
+        </nav>
+
+        <div
+          class="theme-switch"
+          id="theme-switch"
+          role="tablist"
+          aria-label="Theme switcher"
+        >
+          <button
+            class="theme-option active"
+            data-theme-option="light"
+            type="button"
+          >
+            <span class="theme-icon">☀</span>
+            <span>Light</span>
+          </button>
+          <button class="theme-option" data-theme-option="dark" type="button">
+            <span class="theme-icon">◐</span>
+            <span>Dark</span>
+          </button>
+        </div>
+      </aside>
+
+      <header class="dash-header">
+        <div class="dash-title">
+          <div class="dash-title-main" id="page-title">View Department</div>
+          <div class="dash-title-sub">
+            Department overview, active projects, and team performance.
+          </div>
+        </div>
+
+        <div class="dash-search" aria-hidden="true">
+          <span>Department metrics • Member roster</span>
+        </div>
+
+        <button class="dash-notif" type="button" aria-label="Notifications">
+          <span class="dash-notif-icon">🔔</span>
+        </button>
+
+        <button class="dash-profile" type="button" aria-label="My Profile">
+          <span class="dash-avatar" aria-hidden="true"></span>
+          <span class="dash-profile-text">
+            <span class="dash-profile-name">My Profile</span>
+            <span class="dash-profile-role">Admin</span>
+          </span>
+          <span class="dash-profile-caret">⌄</span>
+        </button>
+      </header>
+
+      <main class="view-department-content" role="main">
+        <section class="department-summary-grid">
+          <article class="department-overview panel-card">
+            <div class="department-overview-head">
+              <div>
+                <p class="department-label">Design Department</p>
+                <h2 class="department-heading">Product & Creative</h2>
+              </div>
+              <button type="button" class="secondary-btn">
+                View org chart
+              </button>
+            </div>
+            <p class="department-intro">
+              A cross-functional team focused on product design, UX research,
+              and brand systems for the company’s core product experiences.
+            </p>
+            <div class="department-details-grid">
+              <div class="detail-card">
+                <span class="detail-label">Department head</span>
+                <span class="detail-value">Dianne Russell</span>
+              </div>
+              <div class="detail-card">
+                <span class="detail-label">Location</span>
+                <span class="detail-value">New York HQ</span>
+              </div>
+              <div class="detail-card">
+                <span class="detail-label">Team size</span>
+                <span class="detail-value">24 members</span>
+              </div>
+              <div class="detail-card">
+                <span class="detail-label">Open roles</span>
+                <span class="detail-value">3 roles</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="department-metrics panel-card">
+            <div class="department-metrics-head">
+              <h3>Key metrics</h3>
+              <button type="button" class="secondary-btn">Refresh</button>
+            </div>
+            <div class="metric-grid">
+              <div class="metric-card">
+                <span class="metric-value">8</span>
+                <span class="metric-label">Active projects</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value">92%</span>
+                <span class="metric-label">On-time delivery</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value">4.8</span>
+                <span class="metric-label">Avg. performance</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value">15</span>
+                <span class="metric-label">Support requests</span>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="department-team-panel panel-card">
+          <div class="panel-header">
+            <div>
+              <h2>Team members</h2>
+              <p class="panel-subtitle">
+                Review active contributors, their roles, and current status.
+              </p>
+            </div>
+            <button type="button" class="primary-btn">Export roster</button>
+          </div>
+
+          <div class="department-table-wrapper">
+            <table class="department-table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Office</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>345321231</td>
+                  <td>Brooklyn Simmons</td>
+                  <td>Lead UI/UX Designer</td>
+                  <td>New York</td>
+                  <td><span class="status-tag status-active">Active</span></td>
+                  <td><button class="secondary-btn">View</button></td>
+                </tr>
+                <tr>
+                  <td>453367122</td>
+                  <td>Cody Fisher</td>
+                  <td>Sr. UI/UX Designer</td>
+                  <td>New York</td>
+                  <td><span class="status-tag status-active">Active</span></td>
+                  <td><button class="secondary-btn">View</button></td>
+                </tr>
+                <tr>
+                  <td>671190345</td>
+                  <td>Arlene McCoy</td>
+                  <td>Sr. Project Manager</td>
+                  <td>New York</td>
+                  <td>
+                    <span class="status-tag status-on-leave">On leave</span>
+                  </td>
+                  <td><button class="secondary-btn">View</button></td>
+                </tr>
+                <tr>
+                  <td>009812890</td>
+                  <td>Jacob Jones</td>
+                  <td>UX Designer</td>
+                  <td>Remote</td>
+                  <td><span class="status-tag status-active">Active</span></td>
+                  <td><button class="secondary-btn">View</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="store.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

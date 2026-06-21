@@ -1,0 +1,315 @@
+import { useMemo, useState } from "react";
+import { useStore } from "../context/StoreContext";
+
+const CATEGORY_CONFIG = {
+  leave: {
+    label: "Leave", color: "var(--clr-warning-500)", bg: "var(--bg-warning-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  interview: {
+    label: "Hiring", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="2" y="7" width="20" height="14" rx="2" />
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+        <line x1="12" y1="12" x2="12" y2="16" />
+        <line x1="10" y1="14" x2="14" y2="14" />
+      </svg>
+    ),
+  },
+  payroll: {
+    label: "Payroll", color: "var(--clr-success-500)", bg: "var(--bg-success-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v1m0 8v1M9.5 9.5C9.5 8.1 10.6 7 12 7s2.5 1.1 2.5 2.5c0 2.5-5 2.5-5 5 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5" />
+      </svg>
+    ),
+  },
+  employee: {
+    label: "Employee", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+      </svg>
+    ),
+  },
+  holiday: {
+    label: "Holiday", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+        <path d="M8 14h.01M12 14h.01M16 14h.01" />
+      </svg>
+    ),
+  },
+  system: {
+    label: "System", color: "var(--txt-secondary)", bg: "var(--bg-surface-sub)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+        <path d="M12 2v2m0 16v2M2 12h2m16 0h2" />
+      </svg>
+    ),
+  },
+};
+
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "unread", label: "Unread" },
+  ...Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => ({ key, label: cfg.label })),
+];
+
+function timeAgo(timestamp, now) {
+  const then = new Date(timestamp);
+  const diffMs = now - then;
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
+}
+
+function isToday(timestamp, now) {
+  const today = now.toDateString();
+  return new Date(timestamp).toDateString() === today;
+}
+
+function Notifications() {
+  const {
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    removeNotification,
+    clearReadNotifications,
+    getAppNow,
+  } = useStore();
+
+  const now = getAppNow();
+
+  const [filter, setFilter] = useState("all");
+
+  const stats = useMemo(() => {
+    const unread = notifications.filter((n) => !n.read).length;
+    const today = notifications.filter((n) => isToday(n.timestamp, now)).length;
+    return {
+      total: notifications.length,
+      unread,
+      today,
+    };
+  }, [notifications, now]);
+
+  const filteredNotifications = useMemo(() => {
+    const sorted = [...notifications].sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+    );
+    if (filter === "all") return sorted;
+    if (filter === "unread") return sorted.filter((n) => !n.read);
+    return sorted.filter((n) => n.category === filter);
+  }, [notifications, filter]);
+
+  const hasUnread = stats.unread > 0;
+  const hasRead = notifications.some((n) => n.read);
+
+  return (
+    <div>
+      <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
+        <h2 style={{ flex: 1 }}>Notifications</h2>
+        <button
+          className="btn btn-secondary"
+          onClick={markAllNotificationsRead}
+          disabled={!hasUnread}
+        >
+          Mark all as read
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={clearReadNotifications}
+          disabled={!hasRead}
+        >
+          Clear read
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "var(--sp-4)",
+          marginBottom: "var(--sp-5)",
+        }}
+      >
+        <div className="stat-card">
+          <div className="stat-card-label">Total</div>
+          <div className="stat-card-value">{stats.total}</div>
+          <div className="stat-card-hint">All notifications</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-card-label">Unread</div>
+          <div className="stat-card-value" style={{ color: "var(--clr-danger-500)" }}>{stats.unread}</div>
+          <div className="stat-card-hint">Needs your attention</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-card-label">Today</div>
+          <div className="stat-card-value">{stats.today}</div>
+          <div className="stat-card-hint">Received today</div>
+        </div>
+      </div>
+
+      <div className="content-card">
+        <div className="toolbar" style={{ marginBottom: "var(--sp-4)" }}>
+          {FILTERS.map((f) => {
+            const isActive = filter === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setFilter(f.key)}
+                style={
+                  isActive
+                    ? {
+                        borderColor: "var(--bdr-brand)",
+                        color: "var(--txt-primary-brand)",
+                        background: "var(--bg-primary-subtle)",
+                      }
+                    : undefined
+                }
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {filteredNotifications.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div className="empty-state-title">No notifications</div>
+            <div className="empty-state-description">
+              {filter === "all"
+                ? "You're all caught up. New notifications will appear here."
+                : "Nothing here for this filter."}
+            </div>
+            {filter !== "all" && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setFilter("all")}
+              >
+                View all notifications
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+            {filteredNotifications.map((notification) => {
+              const cfg = CATEGORY_CONFIG[notification.category] ?? CATEGORY_CONFIG.system;
+              return (
+                <div
+                  key={notification.id}
+                  style={{
+                    padding: "var(--sp-4) var(--sp-5)",
+                    background: notification.read ? "transparent" : "var(--bg-surface-alt)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--bdr-subtle)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "var(--sp-4)",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", minWidth: 0 }}>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "var(--radius-md)",
+                        background: cfg.bg,
+                        color: cfg.color,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {cfg.icon}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                        <h3 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+                          {notification.title}
+                        </h3>
+                        {!notification.read && (
+                          <span
+                            aria-label="Unread"
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              borderRadius: "50%",
+                              background: "var(--bg-primary)",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                      </div>
+                      <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "var(--sp-1)" }}>
+                        {notification.message}
+                      </p>
+                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)" }}>
+                        {cfg.label} • {timeAgo(notification.timestamp, now)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }}>
+                    {!notification.read && (
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: "8px 12px", fontSize: "var(--fs-xs)" }}
+                        onClick={() => markNotificationRead(notification.id)}
+                      >
+                        Mark read
+                      </button>
+                    )}
+                    <button
+                      className="btn btn-secondary"
+                      style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--txt-danger)" }}
+                      onClick={() => removeNotification(notification.id)}
+                      aria-label="Dismiss notification"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Notifications;

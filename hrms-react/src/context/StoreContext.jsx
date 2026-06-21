@@ -1,0 +1,349 @@
+import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { idsMatch } from "../utils/id";
+import { useAuth } from "./AuthContext";
+import {
+  EmployeesAPI,
+  DepartmentsAPI,
+  JobsAPI,
+  CandidatesAPI,
+  HolidaysAPI,
+  AttendanceAPI,
+  NotificationsAPI,
+} from "../api";
+
+const StoreContext = createContext(null);
+
+export function StoreProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+
+  const [employees, setEmployees] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [candidates, setCandidates] = useState([]);
+  const [holidays, setHolidays] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingStore, setLoadingStore] = useState(true);
+  const [storeError, setStoreError] = useState(null);
+
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [modals, setModals] = useState({
+    employee: false,
+    filter: false,
+    job: false,
+    holiday: false,
+  });
+  const [filters, setFilters] = useState({
+    department: "",
+    search: "",
+    type: "all",
+  });
+
+  const [activePage, setActivePage] = useState("Dashboard");
+  const [clockOffset, setClockOffset] = useState(0);
+
+  const getAppNow = useCallback(
+    () => new Date(Date.now() + clockOffset),
+    [clockOffset],
+  );
+  const setAppDateTime = useCallback((date) => {
+    setClockOffset(date.getTime() - Date.now());
+  }, []);
+  const resetAppDateTime = useCallback(() => setClockOffset(0), []);
+  const isClockAdjusted = clockOffset !== 0;
+
+  /* ── Initial load from the backend, once signed in ── */
+  const refreshAll = useCallback(async () => {
+    setLoadingStore(true);
+    setStoreError(null);
+    try {
+      const [emp, dept, job, cand, hol, att, notif] = await Promise.all([
+        EmployeesAPI.list(),
+        DepartmentsAPI.list(),
+        JobsAPI.list(),
+        CandidatesAPI.list(),
+        HolidaysAPI.list(),
+        AttendanceAPI.list(),
+        NotificationsAPI.list(),
+      ]);
+      setEmployees(emp.items || []);
+      setDepartments(dept.items || []);
+      setJobs(job.items || []);
+      setCandidates(cand.items || []);
+      setHolidays(hol.items || []);
+      setAttendance(att.items || []);
+      setNotifications(notif.items || []);
+    } catch (err) {
+      setStoreError(err.message || "Failed to load data from the backend.");
+    } finally {
+      setLoadingStore(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshAll();
+    } else {
+      setEmployees([]);
+      setDepartments([]);
+      setJobs([]);
+      setCandidates([]);
+      setHolidays([]);
+      setAttendance([]);
+      setNotifications([]);
+      setLoadingStore(false);
+    }
+  }, [isAuthenticated, refreshAll]);
+
+  /* ── Employee actions ── */
+  const addEmployee = useCallback(async (employee) => {
+    const res = await EmployeesAPI.create(employee);
+    setEmployees((prev) => [...prev, res.data]);
+    return res.data;
+  }, []);
+
+  const removeEmployee = useCallback(async (id) => {
+    await EmployeesAPI.remove(id);
+    setEmployees((prev) => prev.filter((emp) => !idsMatch(emp.id, id)));
+  }, []);
+
+  const updateEmployee = useCallback(async (id, updates) => {
+    const res = await EmployeesAPI.update(id, updates);
+    setEmployees((prev) =>
+      prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
+    );
+  }, []);
+
+  const selectEmployee = useCallback((employee) => {
+    setSelectedEmployee(employee);
+  }, []);
+
+  /* ── Modal actions ── */
+  const openModal = useCallback((modalName) => {
+    setModals((prev) => ({ ...prev, [modalName]: true }));
+  }, []);
+  const closeModal = useCallback((modalName) => {
+    setModals((prev) => ({ ...prev, [modalName]: false }));
+  }, []);
+  const closeAllModals = useCallback(() => {
+    setModals({ employee: false, filter: false, job: false, holiday: false });
+  }, []);
+
+  /* ── Filter actions ── */
+  const setSearchFilter = useCallback((search) => {
+    setFilters((prev) => ({ ...prev, search }));
+  }, []);
+  const setDepartmentFilter = useCallback((department) => {
+    setFilters((prev) => ({ ...prev, department }));
+  }, []);
+  const setTypeFilter = useCallback((type) => {
+    setFilters((prev) => ({ ...prev, type }));
+  }, []);
+  const clearFilters = useCallback(() => {
+    setFilters({ department: "", search: "", type: "all" });
+  }, []);
+
+  /* ── Department actions ── */
+  const updateDepartmentBudget = useCallback(async (id, newBudget) => {
+    const res = await DepartmentsAPI.update(id, { budget: newBudget });
+    setDepartments((prev) =>
+      prev.map((dept) => (idsMatch(dept.id, id) ? res.data : dept)),
+    );
+  }, []);
+
+  const addDepartment = useCallback(async (department) => {
+    const res = await DepartmentsAPI.create(department);
+    setDepartments((prev) => [...prev, res.data]);
+    return res.data;
+  }, []);
+
+  const getEmployeesByDepartment = useCallback(
+    (departmentName) =>
+      employees.filter((emp) => emp.department === departmentName),
+    [employees],
+  );
+  const getEmployeeCountByDepartment = useCallback(
+    (departmentName) => getEmployeesByDepartment(departmentName).length,
+    [getEmployeesByDepartment],
+  );
+  const getTotalSalaryByDepartment = useCallback(
+    (departmentName) =>
+      getEmployeesByDepartment(departmentName).reduce(
+        (sum, emp) => sum + (emp.salary || 0),
+        0,
+      ),
+    [getEmployeesByDepartment],
+  );
+
+  /* ── Job actions ── */
+  const addJob = useCallback(async (job) => {
+    const res = await JobsAPI.create(job);
+    setJobs((prev) => [...prev, res.data]);
+    return res.data;
+  }, []);
+  const updateJob = useCallback(async (id, updates) => {
+    const res = await JobsAPI.update(id, updates);
+    setJobs((prev) => prev.map((j) => (idsMatch(j.id, id) ? res.data : j)));
+  }, []);
+  const removeJob = useCallback(async (id) => {
+    await JobsAPI.remove(id);
+    setJobs((prev) => prev.filter((j) => !idsMatch(j.id, id)));
+  }, []);
+
+  /* ── Candidate actions ── */
+  const addCandidate = useCallback(async (candidate) => {
+    const res = await CandidatesAPI.create(candidate);
+    setCandidates((prev) => [...prev, res.data]);
+    return res.data;
+  }, []);
+  const updateCandidate = useCallback(async (id, updates) => {
+    const res = await CandidatesAPI.update(id, updates);
+    setCandidates((prev) => prev.map((c) => (idsMatch(c.id, id) ? res.data : c)));
+  }, []);
+  const removeCandidate = useCallback(async (id) => {
+    await CandidatesAPI.remove(id);
+    setCandidates((prev) => prev.filter((c) => !idsMatch(c.id, id)));
+  }, []);
+
+  const getCandidatesByJob = useCallback(
+    (jobId) => candidates.filter((c) => idsMatch(c.jobId, jobId)),
+    [candidates],
+  );
+  const getApplicantCount = useCallback(
+    (jobId) => getCandidatesByJob(jobId).length,
+    [getCandidatesByJob],
+  );
+  const getJobById = useCallback(
+    (jobId) => jobs.find((j) => idsMatch(j.id, jobId)),
+    [jobs],
+  );
+
+  /* ── Holiday actions ── */
+  const addHoliday = useCallback(async (holiday) => {
+    const res = await HolidaysAPI.create(holiday);
+    setHolidays((prev) => [...prev, res.data]);
+    return res.data;
+  }, []);
+  const updateHoliday = useCallback(async (id, updates) => {
+    const res = await HolidaysAPI.update(id, updates);
+    setHolidays((prev) => prev.map((h) => (idsMatch(h.id, id) ? res.data : h)));
+  }, []);
+  const removeHoliday = useCallback(async (id) => {
+    await HolidaysAPI.remove(id);
+    setHolidays((prev) => prev.filter((h) => !idsMatch(h.id, id)));
+  }, []);
+
+  /* ── Notification actions (optimistic, backed by the API) ── */
+  const markNotificationRead = useCallback(async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (idsMatch(n.id, id) ? { ...n, read: true } : n)),
+    );
+    try {
+      await NotificationsAPI.markRead(id);
+    } catch {
+      /* optimistic update already applied; ignore transient errors in demo */
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await NotificationsAPI.markAllRead();
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const removeNotification = useCallback(async (id) => {
+    setNotifications((prev) => prev.filter((n) => !idsMatch(n.id, id)));
+    try {
+      await NotificationsAPI.remove(id);
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const clearReadNotifications = useCallback(async () => {
+    setNotifications((prev) => prev.filter((n) => !n.read));
+    try {
+      await NotificationsAPI.clearRead();
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
+
+  const value = {
+    // State
+    employees,
+    jobs,
+    candidates,
+    holidays,
+    notifications,
+    unreadNotificationCount,
+    selectedEmployee,
+    modals,
+    filters,
+    activePage,
+    departments,
+    attendance,
+    clockOffset,
+    isClockAdjusted,
+    loadingStore,
+    storeError,
+    getAppNow,
+    setAppDateTime,
+    resetAppDateTime,
+    refreshAll,
+
+    // Actions
+    addEmployee,
+    removeEmployee,
+    updateEmployee,
+    selectEmployee,
+    openModal,
+    closeModal,
+    closeAllModals,
+    setSearchFilter,
+    setDepartmentFilter,
+    setTypeFilter,
+    clearFilters,
+    setActivePage,
+    setDepartments,
+    updateDepartmentBudget,
+    addDepartment,
+    getEmployeesByDepartment,
+    getEmployeeCountByDepartment,
+    getTotalSalaryByDepartment,
+    setAttendance,
+    addJob,
+    updateJob,
+    removeJob,
+    addCandidate,
+    updateCandidate,
+    removeCandidate,
+    getCandidatesByJob,
+    getApplicantCount,
+    getJobById,
+    addHoliday,
+    updateHoliday,
+    removeHoliday,
+    markNotificationRead,
+    markAllNotificationsRead,
+    removeNotification,
+    clearReadNotifications,
+  };
+
+  return (
+    <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+  );
+}
+
+export function useStore() {
+  const context = useContext(StoreContext);
+  if (!context) {
+    throw new Error("useStore must be used within a StoreProvider");
+  }
+  return context;
+}

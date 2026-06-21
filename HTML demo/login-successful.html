@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Successful</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="light">
+    <div class="success-screen">
+      <div class="success-visual" aria-hidden="true"></div>
+      <div class="success-backdrop"></div>
+
+      <div class="success-card">
+        <div class="success-card-inner">
+          <div class="success-icon">✓</div>
+          <div class="success-copy">
+            <h2>Login Successful</h2>
+            <p>
+              Your password was updated successfully. You can continue to the
+              dashboard now.
+            </p>
+          </div>
+          <button
+            class="success-button"
+            type="button"
+            onclick="window.location.href = 'dashboard.html'"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+    <script src="store.js"></script>
+  </body>
+</html>
