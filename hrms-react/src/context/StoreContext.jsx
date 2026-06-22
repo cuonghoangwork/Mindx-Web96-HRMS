@@ -13,6 +13,29 @@ import {
 
 const StoreContext = createContext(null);
 
+/* ─── Helper: upsert an attendance record returned by the API into local state ─── */
+function upsertAttendanceRecord(prev, record) {
+  // Match by _id first (API records always have one)
+  if (record.id) {
+    const idx = prev.findIndex((r) => r.id && idsMatch(r.id, record.id));
+    if (idx >= 0) {
+      const next = [...prev];
+      next[idx] = record;
+      return next;
+    }
+  }
+  // Fall back to employeeId + date (catches mock-generated rows without ids)
+  const idx = prev.findIndex(
+    (r) => idsMatch(r.employeeId, record.employeeId) && r.date === record.date,
+  );
+  if (idx >= 0) {
+    const next = [...prev];
+    next[idx] = record;
+    return next;
+  }
+  return [...prev, record];
+}
+
 export function StoreProvider({ children }) {
   const { isAuthenticated } = useAuth();
 
@@ -247,6 +270,35 @@ export function StoreProvider({ children }) {
     setHolidays((prev) => prev.filter((h) => !idsMatch(h.id, id)));
   }, []);
 
+  /* ── Attendance actions ── */
+
+  /**
+   * clockIn — records a check-in for the given employee on the given date.
+   * Sends the current app-clock time so it respects the demo clock (HeaderDateTime).
+   *
+   * @param {string} employeeId  MongoDB ObjectId of the employee
+   * @param {string} date        "YYYY-MM-DD"
+   * @param {string} checkInTime "HH:MM" — derived from getAppNow() by the caller
+   */
+  const clockIn = useCallback(async (employeeId, date, checkInTime) => {
+    const res = await AttendanceAPI.checkIn({ employeeId, date, checkIn: checkInTime });
+    setAttendance((prev) => upsertAttendanceRecord(prev, res.data));
+    return res.data;
+  }, []);
+
+  /**
+   * clockOut — records a check-out for an employee who has already clocked in.
+   *
+   * @param {string} employeeId   MongoDB ObjectId of the employee
+   * @param {string} date         "YYYY-MM-DD"
+   * @param {string} checkOutTime "HH:MM"
+   */
+  const clockOut = useCallback(async (employeeId, date, checkOutTime) => {
+    const res = await AttendanceAPI.checkOut({ employeeId, date, checkOut: checkOutTime });
+    setAttendance((prev) => upsertAttendanceRecord(prev, res.data));
+    return res.data;
+  }, []);
+
   /* ── Notification actions (optimistic, backed by the API) ── */
   const markNotificationRead = useCallback(async (id) => {
     setNotifications((prev) =>
@@ -334,6 +386,8 @@ export function StoreProvider({ children }) {
     getEmployeeCountByDepartment,
     getTotalSalaryByDepartment,
     setAttendance,
+    clockIn,
+    clockOut,
     addJob,
     updateJob,
     removeJob,

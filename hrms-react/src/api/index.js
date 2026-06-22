@@ -57,6 +57,9 @@ export const HolidaysAPI = {
 
 export const AttendanceAPI = {
   list: (params = {}) => apiFetch(`/attendance${qs({ pageSize: ALL, ...params })}`),
+  // employeeId: MongoDB ObjectId string, date: "YYYY-MM-DD", checkIn/checkOut: "HH:MM" (optional)
+  checkIn: (data) => apiFetch("/attendance/check-in", { method: "POST", body: data }),
+  checkOut: (data) => apiFetch("/attendance/check-out", { method: "POST", body: data }),
 };
 
 export const NotificationsAPI = {
