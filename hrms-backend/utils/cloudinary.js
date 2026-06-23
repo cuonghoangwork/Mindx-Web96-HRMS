@@ -11,11 +11,19 @@
 
 import { v2 as cloudinary } from "cloudinary";
 
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-});
+/**
+ * Configure lazily — called once per upload — because cloudinary.config() runs
+ * at module-import time in ESM, which is BEFORE dotenv.config() in index.js has
+ * had a chance to populate process.env. Calling it here (inside the function)
+ * guarantees the env vars are already set by the time we need them.
+ */
+function configureCloudinary() {
+  cloudinary.config({
+    cloud_name: process.env.CLOUD_NAME,
+    api_key:    process.env.API_KEY,
+    api_secret: process.env.API_SECRET,
+  });
+}
 
 export function isCloudinaryConfigured() {
   return Boolean(process.env.CLOUD_NAME && process.env.API_KEY && process.env.API_SECRET);
@@ -30,6 +38,7 @@ export function isCloudinaryConfigured() {
  * @returns {Promise<{secure_url: string, public_id: string}>}
  */
 export function uploadBufferToCloudinary(buffer, options = {}) {
+  configureCloudinary();
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
       if (error) return reject(error);
@@ -41,6 +50,7 @@ export function uploadBufferToCloudinary(buffer, options = {}) {
 
 export function destroyCloudinaryAsset(publicId) {
   if (!publicId) return Promise.resolve(null);
+  configureCloudinary();
   return new Promise((resolve, reject) => {
     cloudinary.uploader.destroy(publicId, (error, result) => {
       if (error) return reject(error);
