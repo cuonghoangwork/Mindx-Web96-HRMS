@@ -3,6 +3,7 @@ import DepartmentModel from "../model/Department.js";
 import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
+import { logAction, diffChanges } from "../utils/auditLog.js";
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -11,9 +12,9 @@ const employeeController = {
         pageSize = 10,
         pageNumber = 1,
         search,
-        department, // comma-separated department NAMES, matching the frontend's filters.department
-        status, // client-shaped label, e.g. "Active"
-        type, // client-shaped label, e.g. "Full-time"
+        department,
+        status,
+        type,
         sortBy = "name",
         sortDir = 1,
       } = req.query;
@@ -22,10 +23,7 @@ const employeeController = {
       if (search) condition.name = { $regex: search, $options: "i" };
 
       if (department) {
-        const names = department
-          .split(",")
-          .map((d) => d.trim())
-          .filter(Boolean);
+        const names = department.split(",").map((d) => d.trim()).filter(Boolean);
         if (names.length) {
           const depts = await DepartmentModel.find({ name: { $in: names } }, "_id");
           condition.department = { $in: depts.map((d) => d._id) };
@@ -41,7 +39,6 @@ const employeeController = {
         if (mapped.contractType) condition.contractType = mapped.contractType;
       }
 
-      // sortBy may arrive as a client-shaped field name; translate to the DB field to sort on.
       const SORT_FIELD_MAP = { type: "contractType", sex: "gender", salary: "annualSalary" };
       const dbSortField = SORT_FIELD_MAP[sortBy] || sortBy;
 
@@ -55,13 +52,7 @@ const employeeController = {
         .skip(skip)
         .limit(Number(pageSize));
 
-      res.json({
-        success: true,
-        totalItems,
-        totalPages,
-        currentPage: +pageNumber,
-        items: docs.map(employeeToClient),
-      });
+      res.json({ success: true, totalItems, totalPages, currentPage: +pageNumber, items: docs.map(employeeToClient) });
     } catch (error) {
       res.status(500).json({ success: false, message: "Error getting employees", error: error.message });
     }
@@ -91,7 +82,16 @@ const employeeController = {
 
       const employee = await EmployeeModel.create(data);
       await employee.populate("department", "name");
-      res.status(201).json({ success: true, data: employeeToClient(employee) });
+      const clientData = employeeToClient(employee);
+
+      await logAction(req, {
+        action:     "created",
+        resource:   "employee",
+        resourceId: employee._id,
+        label:      `${employee.name} (${employee.employeeId})`,
+      });
+
+      res.status(201).json({ success: true, data: clientData });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -99,6 +99,10 @@ const employeeController = {
 
   update: async (req, res) => {
     try {
+      // Snapshot before for diff
+      const before = await EmployeeModel.findById(req.params.id).populate("department", "name");
+      const beforeClient = before ? employeeToClient(before) : null;
+
       const data = employeeFromClient(req.body);
       if (req.body.department !== undefined) {
         data.department = req.body.department
@@ -111,7 +115,23 @@ const employeeController = {
         runValidators: true,
       }).populate("department", "name");
       if (!employee) throw new Error("Employee not found.");
-      res.json({ success: true, data: employeeToClient(employee) });
+
+      const afterClient = employeeToClient(employee);
+
+      // Detect if this was specifically a status change
+      const action = req.body.status && beforeClient?.status !== req.body.status
+        ? "status_changed"
+        : "updated";
+
+      await logAction(req, {
+        action,
+        resource:   "employee",
+        resourceId: employee._id,
+        label:      `${employee.name} (${employee.employeeId})`,
+        changes:    diffChanges(beforeClient, afterClient),
+      });
+
+      res.json({ success: true, data: afterClient });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -121,22 +141,24 @@ const employeeController = {
     try {
       const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
       if (!employee) throw new Error("Employee not found.");
+
+      await logAction(req, {
+        action:     "deleted",
+        resource:   "employee",
+        resourceId: req.params.id,
+        label:      `${employee.name} (${employee.employeeId})`,
+      });
+
       res.json({ success: true, message: "Employee deleted." });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
   },
 
-  // Multer (middleware/upload.js, memoryStorage) puts the file on req.file as a buffer.
-  // Uploads it to Cloudinary and AWAITS the result before responding - fixing the race
-  // condition in the course's lesson9 example (see WEB96_BACKEND_REFERENCE.md §10 and
-  // utils/cloudinary.js), where the response was sent before secure_url was available.
   uploadAvatar: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error(
-          "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
-        );
+        throw new Error("Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).");
       }
       if (!req.file) throw new Error("No image file was uploaded.");
 
@@ -144,15 +166,22 @@ const employeeController = {
       if (!employee) throw new Error("Employee not found.");
 
       const result = await uploadBufferToCloudinary(req.file.buffer, {
-        folder: "hrms/avatars",
-        public_id: `employee_${employee._id}`,
-        overwrite: true,
+        folder:        "hrms/avatars",
+        public_id:     `employee_${employee._id}`,
+        overwrite:     true,
         resource_type: "image",
       });
 
       employee.avatar = result.secure_url;
       await employee.save();
       await employee.populate("department", "name");
+
+      await logAction(req, {
+        action:     "uploaded_avatar",
+        resource:   "employee",
+        resourceId: employee._id,
+        label:      `${employee.name} (${employee.employeeId})`,
+      });
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {

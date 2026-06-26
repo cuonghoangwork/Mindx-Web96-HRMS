@@ -2,14 +2,12 @@ import DepartmentModel from "../model/Department.js";
 import EmployeeModel from "../model/Employee.js";
 import { departmentToClient, departmentFromClient } from "../utils/mappers.js";
 import { resolveManagerRef } from "../utils/refResolvers.js";
+import { logAction, diffChanges } from "../utils/auditLog.js";
 
 const departmentController = {
   getAll: async (req, res) => {
     try {
       const departments = await DepartmentModel.find().populate("manager", "name");
-
-      // Mirrors the frontend's getEmployeeCountByDepartment / getTotalSalaryByDepartment
-      // selectors - computed live rather than stored as a redundant counter.
       const items = await Promise.all(
         departments.map(async (dept) => {
           const employeeCount = await EmployeeModel.countDocuments({ department: dept._id });
@@ -21,7 +19,6 @@ const departmentController = {
           return departmentToClient({ ...dept.toObject(), employeeCount, totalSalary });
         }),
       );
-
       res.json({ success: true, items });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -32,27 +29,18 @@ const departmentController = {
     try {
       const department = await DepartmentModel.findById(req.params.id).populate("manager", "name");
       if (!department) throw new Error("Department not found.");
-
-      const employeeDocs = await EmployeeModel.find({ department: department._id }).populate(
-        "department",
-        "name",
-      );
-
+      const employeeDocs = await EmployeeModel.find({ department: department._id }).populate("department", "name");
       const employeeCount = employeeDocs.length;
       const totalSalary = employeeDocs.reduce((sum, e) => sum + (e.annualSalary || 0), 0);
-
       res.json({
         success: true,
         data: departmentToClient({ ...department.toObject(), employeeCount, totalSalary }),
-        // The frontend's ViewDepartment.jsx renders employees via the Employee shape directly.
         employees: employeeDocs.map((e) => ({
           id: String(e._id),
           name: e.name,
           employeeId: e.employeeId,
           designation: e.designation,
-          status:
-            { active: "Active", "on-leave": "On Leave", terminated: "Terminated" }[e.status] ??
-            e.status,
+          status: { active: "Active", "on-leave": "On Leave", terminated: "Terminated" }[e.status] ?? e.status,
         })),
       });
     } catch (error) {
@@ -64,17 +52,22 @@ const departmentController = {
     try {
       const { name } = req.body;
       if (!name) throw new Error("Department name is required.");
-
       const exists = await DepartmentModel.findOne({ name });
       if (exists) throw new Error("A department with this name already exists.");
-
       const data = departmentFromClient(req.body);
       if (req.body.manager !== undefined) {
         Object.assign(data, await resolveManagerRef(req.body.manager));
       }
-
       const department = await DepartmentModel.create(data);
       await department.populate("manager", "name");
+
+      await logAction(req, {
+        action:     "created",
+        resource:   "department",
+        resourceId: department._id,
+        label:      department.name,
+      });
+
       res.status(201).json({ success: true, data: departmentToClient(department) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -83,16 +76,31 @@ const departmentController = {
 
   update: async (req, res) => {
     try {
+      const before = await DepartmentModel.findById(req.params.id).populate("manager", "name");
+      const beforeClient = before ? departmentToClient({ ...before.toObject(), employeeCount: 0, totalSalary: 0 }) : null;
+
       const data = departmentFromClient(req.body);
       if (req.body.manager !== undefined) {
         Object.assign(data, await resolveManagerRef(req.body.manager));
       }
-
       const department = await DepartmentModel.findByIdAndUpdate(req.params.id, data, {
-        new: true,
-        runValidators: true,
+        new: true, runValidators: true,
       }).populate("manager", "name");
       if (!department) throw new Error("Department not found.");
+
+      const afterClient = departmentToClient({ ...department.toObject(), employeeCount: 0, totalSalary: 0 });
+      const action = req.body.budget !== undefined && beforeClient?.budget !== req.body.budget
+        ? "budget_updated"
+        : "updated";
+
+      await logAction(req, {
+        action,
+        resource:   "department",
+        resourceId: department._id,
+        label:      department.name,
+        changes:    diffChanges(beforeClient, afterClient),
+      });
+
       res.json({ success: true, data: departmentToClient(department) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -103,6 +111,14 @@ const departmentController = {
     try {
       const department = await DepartmentModel.findByIdAndDelete(req.params.id);
       if (!department) throw new Error("Department not found.");
+
+      await logAction(req, {
+        action:     "deleted",
+        resource:   "department",
+        resourceId: req.params.id,
+        label:      department.name,
+      });
+
       res.json({ success: true, message: "Department deleted." });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });

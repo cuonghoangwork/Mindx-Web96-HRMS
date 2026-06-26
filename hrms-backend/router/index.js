@@ -7,6 +7,7 @@ import jobRouter from "./jobRouter.js";
 import candidateRouter from "./candidateRouter.js";
 import holidayRouter from "./holidayRouter.js";
 import notificationRouter from "./notificationRouter.js";
+import auditLogRouter from "./auditLogRouter.js";
 
 const rootRouter = Router();
 
@@ -18,5 +19,6 @@ rootRouter.use("/jobs", jobRouter);
 rootRouter.use("/candidates", candidateRouter);
 rootRouter.use("/holidays", holidayRouter);
 rootRouter.use("/notifications", notificationRouter);
+rootRouter.use("/audit-log", auditLogRouter);
 
 export default rootRouter;
