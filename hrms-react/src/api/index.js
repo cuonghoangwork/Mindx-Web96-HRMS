@@ -74,3 +74,16 @@ export const NotificationsAPI = {
   clearRead: () => apiFetch("/notifications/clear-read", { method: "DELETE" }),
   remove: (id) => apiFetch(`/notifications/${id}`, { method: "DELETE" }),
 };
+
+export const ProfileEditRequestsAPI = {
+  /** Employee submits a request: changes = { name, phone, address, age, sex } (only changed fields) */
+  create: (changes) => apiFetch("/profile-edit-requests", { method: "POST", body: { changes } }),
+  /** List requests; EMPLOYEE gets only own, HR/Admin get all */
+  list: (params = {}) => apiFetch(`/profile-edit-requests${qs(params)}`),
+  /** HR/Admin: decision = "approved" | "rejected", reviewNote optional */
+  review: (id, decision, reviewNote = "") =>
+    apiFetch(`/profile-edit-requests/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
+};

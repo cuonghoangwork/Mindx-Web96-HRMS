@@ -8,6 +8,7 @@ import candidateRouter from "./candidateRouter.js";
 import holidayRouter from "./holidayRouter.js";
 import notificationRouter from "./notificationRouter.js";
 import auditLogRouter from "./auditLogRouter.js";
+import profileEditRequestRouter from "./profileEditRequestRouter.js";
 
 const rootRouter = Router();
 
@@ -20,5 +21,6 @@ rootRouter.use("/candidates", candidateRouter);
 rootRouter.use("/holidays", holidayRouter);
 rootRouter.use("/notifications", notificationRouter);
 rootRouter.use("/audit-log", auditLogRouter);
+rootRouter.use("/profile-edit-requests", profileEditRequestRouter);
 
 export default rootRouter;
