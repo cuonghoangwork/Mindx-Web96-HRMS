@@ -4,47 +4,6 @@ import FormField from "../components/FormField";
 import { useAuth } from "../context/AuthContext";
 
 /* ─────────────────────────────────
-   Role options (for future role-based access)
-───────────────────────────────── */
-const ROLES = [
-  {
-    value: "Employee",
-    label: "Employee",
-    desc: "View your profile, attendance & payslips",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-      </svg>
-    ),
-  },
-  {
-    value: "HR",
-    label: "HR",
-    desc: "Manage employees, hiring & attendance",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
-  {
-    value: "Administrator",
-    label: "Admin",
-    desc: "Full access to all system settings",
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
-        <path d="M9 12l2 2 4-4" />
-      </svg>
-    ),
-  },
-];
-
-/* ─────────────────────────────────
    Validation rules
 ───────────────────────────────── */
 function validateField(name, value, form) {
@@ -57,8 +16,6 @@ function validateField(name, value, form) {
       return !value ? "Password is required" : value.length < 8 ? "Use at least 8 characters" : "";
     case "confirmPassword":
       return !value ? "Please confirm your password" : value !== form.password ? "Passwords don't match" : "";
-    case "role":
-      return !value ? "Please select a role" : "";
     default:
       return "";
   }
@@ -79,77 +36,6 @@ function passwordStrength(pw) {
   return { label: "Strong", pct: 100, color: "var(--clr-success-500)" };
 }
 
-/* ─────────────────────────────────
-   Role selector
-───────────────────────────────── */
-function RoleSelector({ value, onChange, error, touched }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-      <label
-        style={{
-          fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)",
-          color: "var(--txt-primary)", lineHeight: 1.4,
-        }}
-      >
-        Role
-        <span style={{ color: "var(--txt-danger)", marginLeft: "3px" }} aria-hidden="true">*</span>
-      </label>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--sp-2)" }}>
-        {ROLES.map((role) => {
-          const selected = value === role.value;
-          return (
-            <button
-              key={role.value}
-              type="button"
-              onClick={() => onChange(role.value)}
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
-                padding: "var(--sp-3) var(--sp-2)",
-                borderRadius: "var(--radius-md)",
-                border: `1.5px solid ${selected ? "var(--bdr-brand)" : "var(--bdr-default)"}`,
-                background: selected ? "var(--bg-primary-subtle)" : "var(--bg-surface)",
-                color: selected ? "var(--txt-primary-brand)" : "var(--txt-secondary)",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "all 0.15s",
-              }}
-              aria-pressed={selected}
-            >
-              {role.icon}
-              <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>{role.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Description of selected role */}
-      {value && (
-        <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-          {ROLES.find((r) => r.value === value)?.desc}
-        </p>
-      )}
-
-      {error && touched && (
-        <span
-          role="alert"
-          style={{
-            fontSize: "var(--fs-xs)", color: "var(--txt-danger)",
-            display: "flex", alignItems: "center", gap: "4px", lineHeight: 1.4,
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="M6 1L11 10H1L6 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-            <path d="M6 5V7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            <circle cx="6" cy="8.5" r="0.6" fill="currentColor" />
-          </svg>
-          {error}
-        </span>
-      )}
-    </div>
-  );
-}
-
 /* ═══════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════ */
@@ -157,11 +43,9 @@ function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
 
-  const [form, setForm] = useState({
-    name: "", email: "", password: "", confirmPassword: "", role: "",
-  });
-  const [errors, setErrors]     = useState({});
-  const [touched, setTouched]   = useState({});
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+  const [errors, setErrors]   = useState({});
+  const [touched, setTouched] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed]     = useState(false);
@@ -177,7 +61,6 @@ function Register() {
       if (touched[name]) {
         setErrors((prevErr) => ({ ...prevErr, [name]: validateField(name, value, next) }));
       }
-      // Re-validate confirmPassword live if password changes
       if (name === "password" && touched.confirmPassword) {
         setErrors((prevErr) => ({ ...prevErr, confirmPassword: validateField("confirmPassword", next.confirmPassword, next) }));
       }
@@ -191,16 +74,10 @@ function Register() {
     setErrors((prev) => ({ ...prev, [name]: validateField(name, value, form) }));
   };
 
-  const handleRoleChange = (value) => {
-    setForm((prev) => ({ ...prev, role: value }));
-    setTouched((prev) => ({ ...prev, role: true }));
-    setErrors((prev) => ({ ...prev, role: "" }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const fields = ["name", "email", "password", "confirmPassword", "role"];
+    const fields = ["name", "email", "password", "confirmPassword"];
     const allTouched = {};
     fields.forEach((f) => { allTouched[f] = true; });
     setTouched((prev) => ({ ...prev, ...allTouched }));
@@ -217,7 +94,7 @@ function Register() {
 
     setIsLoading(true);
     setServerError("");
-    const result = await register(form);
+    const result = await register({ name: form.name, email: form.email, password: form.password });
     setIsLoading(false);
 
     if (!result.success) {
@@ -237,11 +114,11 @@ function Register() {
 
   return (
     <div className="login-page">
-      <div className="login-card" style={{ maxWidth: "460px" }}>
+      <div className="login-card" style={{ maxWidth: "440px" }}>
         <div className="login-header">
           <h1>Create Account</h1>
         </div>
-        <p className="login-subtitle">Set up access to your HRMS workspace</p>
+        <p className="login-subtitle">Set up your HRMS Employee account</p>
 
         {serverError && (
           <div className="form-error" style={{ marginBottom: "20px" }}>
@@ -315,7 +192,7 @@ function Register() {
             </div>
           </FormField>
 
-          {/* Strength meter */}
+          {/* Password strength meter */}
           {form.password && (
             <div style={{ marginTop: "-10px", marginBottom: "var(--sp-5)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
@@ -338,30 +215,49 @@ function Register() {
             success={!errors.confirmPassword && !!form.confirmPassword}
           >
             <input
-              id="reg-confirm-password" name="confirmPassword" type={showPassword ? "text" : "password"}
+              id="reg-confirm-password" name="confirmPassword"
+              type={showPassword ? "text" : "password"}
               value={form.confirmPassword} onChange={handleChange} onBlur={handleBlur}
               placeholder="••••••••" autoComplete="new-password"
               style={inputStyle("confirmPassword")}
             />
           </FormField>
 
-          <div style={{ marginBottom: "var(--sp-5)" }}>
-            <RoleSelector
-              value={form.role}
-              onChange={handleRoleChange}
-              error={errors.role}
-              touched={touched.role}
-            />
+          {/* Role info — read-only, no selector */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "var(--sp-3)",
+            padding: "var(--sp-3) var(--sp-4)",
+            background: "var(--bg-surface-alt)",
+            border: "1px solid var(--bdr-subtle)",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "var(--sp-5)",
+          }}>
+            <span style={{
+              width: "36px", height: "36px", flexShrink: 0, borderRadius: "var(--radius-md)",
+              background: "var(--bg-primary-subtle)", color: "var(--clr-primary-400)",
+              display: "grid", placeItems: "center",
+            }} aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+            </span>
+            <div>
+              <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+                Employee Account
+              </div>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                All new accounts start as Employee. An Admin can promote you to HR/Manager.
+              </div>
+            </div>
           </div>
 
           {/* Terms agreement */}
           <div style={{ marginBottom: "var(--sp-6)" }}>
-            <label
-              style={{
-                display: "flex", alignItems: "flex-start", gap: "var(--sp-2)",
-                cursor: "pointer", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)",
-              }}
-            >
+            <label style={{
+              display: "flex", alignItems: "flex-start", gap: "var(--sp-2)",
+              cursor: "pointer", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)",
+            }}>
               <input
                 type="checkbox"
                 checked={agreed}
@@ -374,13 +270,10 @@ function Register() {
               </span>
             </label>
             {!agreed && agreedTouched && (
-              <span
-                role="alert"
-                style={{
-                  fontSize: "var(--fs-xs)", color: "var(--txt-danger)",
-                  display: "flex", alignItems: "center", gap: "4px", marginTop: "6px", marginLeft: "24px",
-                }}
-              >
+              <span role="alert" style={{
+                fontSize: "var(--fs-xs)", color: "var(--txt-danger)",
+                display: "flex", alignItems: "center", gap: "4px", marginTop: "6px", marginLeft: "24px",
+              }}>
                 Please accept the terms to continue
               </span>
             )}
@@ -398,16 +291,8 @@ function Register() {
 
         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
           Already have an account?{" "}
-          <Link to="/login" className="link-primary">
-            Sign in
-          </Link>
+          <Link to="/login" className="link-primary">Sign in</Link>
         </p>
-
-        <div className="login-demo-credentials" style={{ marginTop: "var(--sp-5)" }}>
-          <p>
-            <strong>Note:</strong> Administrator accounts can't be self-registered — choosing "Admin" here creates a Manager-level account. Ask an existing admin to promote it if you need full access.
-          </p>
-        </div>
       </div>
     </div>
   );

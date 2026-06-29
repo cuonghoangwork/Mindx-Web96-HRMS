@@ -10,7 +10,6 @@ export function AuthProvider({ children }) {
     return savedUser ? JSON.parse(savedUser) : null
   })
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getTokens().access))
-  // Avoids redirecting to /login before we've had a chance to verify an existing token.
   const [loading, setLoading] = useState(() => Boolean(getTokens().access))
 
   useEffect(() => {
@@ -47,19 +46,11 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // role: "Employee" | "HR" | "Administrator" (frontend labels) — mapped to the
-  // backend's self-registerable roles (EMPLOYEE / MANAGER). ADMIN can't be
-  // self-assigned; see hrms-backend/controller/authController.js.
-  const ROLE_MAP = { Employee: 'EMPLOYEE', HR: 'MANAGER', Administrator: 'MANAGER' }
-
-  const register = async ({ name, email, password, role }) => {
+  // All registrations create EMPLOYEE accounts — no role selector needed.
+  // Promotion to MANAGER is done by ADMIN only via the Settings page.
+  const register = async ({ name, email, password }) => {
     try {
-      const res = await AuthAPI.register({
-        name,
-        email,
-        password,
-        role: ROLE_MAP[role] || 'EMPLOYEE',
-      })
+      const res = await AuthAPI.register({ name, email, password })
       return { success: true, data: res.data }
     } catch (err) {
       return { success: false, error: err.message || 'Registration failed' }
@@ -74,10 +65,18 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false)
   }, [])
 
+  // Helpers for role checks — used by ProtectedRoute and page-level guards
+  const isAdmin = user?.role === 'ADMIN'
+  const isHR = user?.role === 'MANAGER' || user?.role === 'ADMIN'
+  const isEmployee = Boolean(user)
+
   const value = {
     user,
     isAuthenticated,
     loading,
+    isAdmin,
+    isHR,      // true for MANAGER + ADMIN
+    isEmployee, // true for all authenticated users
     login,
     register,
     logout,

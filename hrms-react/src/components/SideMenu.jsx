@@ -1,25 +1,57 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 function SideMenu({ isOpen = false, onNavigate }) {
   const { theme, toggleTheme } = useTheme();
+  const { isHR, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const menuItems = [
-    { path: "/dashboard", title: "Dashboard", icon: dashboardIcon },
-    { path: "/employees", title: "All Employees", icon: employeesIcon },
-    { path: "/departments", title: "All Departments", icon: departmentsIcon },
-    { path: "/attendance", title: "Attendance", icon: attendanceIcon },
-    { path: "/payroll", title: "Payroll", icon: payrollIcon },
-    { path: "/jobs", title: "Jobs", icon: jobsIcon },
-    { path: "/candidates", title: "Candidates", icon: candidatesIcon },
-    { path: "/holidays", title: "Holidays", icon: holidaysIcon },
-    { path: "/settings", title: "Settings", icon: settingsIcon },
+  // Base items visible to all authenticated users
+  const baseItems = [
+    { path: "/dashboard",    title: "Dashboard",   icon: dashboardIcon },
+    { path: "/attendance",   title: "Attendance",  icon: attendanceIcon },
+    { path: "/notifications",title: "Notifications",icon: notifIcon },
+    { path: "/settings",     title: "Settings",    icon: settingsIcon },
   ];
 
-  const goToHome = () => {
-    navigate("/dashboard");
-  };
+  // HR / Manager + Admin items
+  const hrItems = [
+    { path: "/employees",    title: "All Employees",    icon: employeesIcon },
+    { path: "/departments",  title: "All Departments",  icon: departmentsIcon },
+    { path: "/payroll",      title: "Payroll",          icon: payrollIcon },
+    { path: "/jobs",         title: "Jobs",             icon: jobsIcon },
+    { path: "/candidates",   title: "Candidates",       icon: candidatesIcon },
+    { path: "/holidays",     title: "Holidays",         icon: holidaysIcon },
+  ];
+
+  // Build the final ordered list
+  // Dashboard → HR section (if applicable) → Attendance → Notifications → Settings
+  let menuItems;
+  if (isHR) {
+    menuItems = [
+      { path: "/dashboard",     title: "Dashboard",      icon: dashboardIcon },
+      { path: "/employees",     title: "All Employees",  icon: employeesIcon },
+      { path: "/departments",   title: "All Departments",icon: departmentsIcon },
+      { path: "/attendance",    title: "Attendance",     icon: attendanceIcon },
+      { path: "/payroll",       title: "Payroll",        icon: payrollIcon },
+      { path: "/jobs",          title: "Jobs",           icon: jobsIcon },
+      { path: "/candidates",    title: "Candidates",     icon: candidatesIcon },
+      { path: "/holidays",      title: "Holidays",       icon: holidaysIcon },
+      { path: "/notifications", title: "Notifications",  icon: notifIcon },
+      { path: "/settings",      title: "Settings",       icon: settingsIcon },
+    ];
+  } else {
+    // EMPLOYEE — only attendance + notifications + settings + dashboard
+    menuItems = [
+      { path: "/dashboard",     title: "Dashboard",     icon: dashboardIcon },
+      { path: "/attendance",    title: "Attendance",    icon: attendanceIcon },
+      { path: "/notifications", title: "Notifications", icon: notifIcon },
+      { path: "/settings",      title: "Settings",      icon: settingsIcon },
+    ];
+  }
+
+  const goToHome = () => navigate("/dashboard");
 
   return (
     <aside className={`side-menu${isOpen ? " open" : ""}`}>
@@ -28,16 +60,14 @@ function SideMenu({ isOpen = false, onNavigate }) {
         onClick={goToHome}
         type="button"
         style={{
-          cursor: "pointer",
-          background: "none",
-          border: "none",
-          textAlign: "left",
-          fontFamily: "inherit",
+          cursor: "pointer", background: "none", border: "none",
+          textAlign: "left", fontFamily: "inherit",
         }}
         title="Go to Dashboard"
       >
         <div className="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
             <circle cx="9.5" cy="7" r="3.5" />
             <path d="M19.5 21v-1.5a3.5 3.5 0 0 0-2.5-3.36" />
@@ -47,14 +77,55 @@ function SideMenu({ isOpen = false, onNavigate }) {
         <h1>HRMS</h1>
       </button>
 
+      {/* Role badge */}
+      {!isHR && (
+        <div style={{
+          margin: "0 0 var(--sp-4) 0",
+          padding: "var(--sp-2) var(--sp-3)",
+          background: "var(--bg-surface-alt)",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid var(--bdr-subtle)",
+          display: "flex", alignItems: "center", gap: "var(--sp-2)",
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+          </svg>
+          <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+            Employee access
+          </span>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div style={{
+          margin: "0 0 var(--sp-4) 0",
+          padding: "var(--sp-2) var(--sp-3)",
+          background: "var(--bg-primary-subtle)",
+          borderRadius: "var(--radius-md)",
+          border: "1px solid rgba(113,82,243,0.25)",
+          display: "flex", alignItems: "center", gap: "var(--sp-2)",
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
+            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
+            Administrator
+          </span>
+        </div>
+      )}
+
       <nav className="menu-list">
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            className={({ isActive }) =>
-              `menu-item ${isActive ? "active" : ""}`
-            }
+            className={({ isActive }) => `menu-item ${isActive ? "active" : ""}`}
             end={item.path === "/dashboard"}
             onClick={onNavigate}
           >
@@ -87,7 +158,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
   );
 }
 
-// SVG Icons
+/* ── SVG Icons ── */
 const dashboardIcon = (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z" />
@@ -139,6 +210,14 @@ const holidaysIcon = (
 const settingsIcon = (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.08 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+  </svg>
+);
+
+const notifIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 

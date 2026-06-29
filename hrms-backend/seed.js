@@ -1,13 +1,16 @@
 // One-off seed script — populates MongoDB with enough demo data to run the
-// HRMS frontend end-to-end (login, employees, departments, jobs, candidates,
-// holidays, attendance, notifications).
+// HRMS frontend end-to-end.
 //
 // Usage:
 //   cp .env.example .env.dev   (fill in CONNECT_STRING, AT_SECRETKEY, RT_SECRETKEY)
 //   npm run seed:env
 //
-// Safe to re-run: it skips creation for anything that already exists by a
-// natural unique key (email / employeeId / name+date / etc).
+// Safe to re-run: skips anything that already exists by natural unique key.
+//
+// Role policy enforced here:
+//   ADMIN   — only via this seed (or direct DB entry). Never self-registerable.
+//   MANAGER — promoted by ADMIN via /auth/users/:id/promote. Seeded here for demo.
+//   EMPLOYEE — default for all self-registered accounts.
 
 import dotenv from "dotenv";
 const env = process.env.NODE_ENV || "dev";
@@ -26,34 +29,57 @@ import NotificationModel from "./model/Notification.js";
 
 const SALT_ROUNDS = 10;
 
+function hashPassword(plain) {
+  const salt = bcrypt.genSaltSync(SALT_ROUNDS);
+  return bcrypt.hashSync(plain, salt);
+}
+
+/* ── Admin account (ADMIN role — seed only) ── */
 async function upsertAdmin() {
   const email = "admin@hrms.com";
-  const existing = await UserModel.findOne({ email });
-  if (existing) {
+  let user = await UserModel.findOne({ email });
+  if (user) {
     console.log("✓ Admin user already exists:", email);
-    return existing;
+    return user;
   }
-  const salt = bcrypt.genSaltSync(SALT_ROUNDS);
-  const hash = bcrypt.hashSync("admin123", salt);
-  const user = await UserModel.create({
+  user = await UserModel.create({
     email,
-    password: hash,
+    password: hashPassword("admin123"),
     name: "Admin User",
-    role: "ADMIN",
+    role: "ADMIN", // explicitly set — register endpoint never allows this
   });
-  console.log("✓ Created admin user:", email, "/ admin123");
+  console.log("✓ Created ADMIN user:", email, "/ admin123");
   return user;
 }
 
+/* ── Demo HR/Manager account (MANAGER role — promoted for demo) ── */
+async function upsertHRUser() {
+  const email = "hr@hrms.com";
+  let user = await UserModel.findOne({ email });
+  if (user) {
+    console.log("✓ HR user already exists:", email);
+    return user;
+  }
+  user = await UserModel.create({
+    email,
+    password: hashPassword("hr123456"),
+    name: "HR Manager",
+    role: "MANAGER", // seeded directly; in production promote via /auth/users/:id/promote
+  });
+  console.log("✓ Created MANAGER user:", email, "/ hr123456");
+  return user;
+}
+
+/* ── Departments ── */
 async function seedDepartments() {
   const defs = [
-    { name: "Engineering", managerName: "John Smith", budget: 500000 },
-    { name: "Design", managerName: "Sarah Lee", budget: 200000 },
-    { name: "Marketing", managerName: "Mike Johnson", budget: 150000 },
-    { name: "Finance", managerName: "Lisa Brown", budget: 100000 },
-    { name: "Sales", managerName: "Tom Wilson", budget: 300000 },
-    { name: "IT", managerName: "David Chen", budget: 400000 },
-    { name: "Management", managerName: "Robert Kim", budget: 600000 },
+    { name: "Engineering",  managerName: "John Smith",   budget: 500000 },
+    { name: "Design",       managerName: "Sarah Lee",    budget: 200000 },
+    { name: "Marketing",    managerName: "Mike Johnson", budget: 150000 },
+    { name: "Finance",      managerName: "Lisa Brown",   budget: 100000 },
+    { name: "Sales",        managerName: "Tom Wilson",   budget: 300000 },
+    { name: "IT",           managerName: "David Chen",   budget: 400000 },
+    { name: "Management",   managerName: "Robert Kim",   budget: 600000 },
   ];
   const byName = {};
   for (const def of defs) {
@@ -67,38 +93,66 @@ async function seedDepartments() {
   return byName;
 }
 
+/* ── Employees — each gets a linked User account (EMPLOYEE role) ── */
 async function seedEmployees(deptByName) {
   const defs = [
-    { employeeId: "EMP001", name: "John Doe", department: "Engineering", designation: "Software Engineer", contractType: "full-time", status: "active", age: 28, gender: "male", email: "john.doe@hrms.com", address: "123 Main St, New York, NY", annualSalary: 85000 },
-    { employeeId: "EMP002", name: "Jane Smith", department: "Design", designation: "UI Designer", contractType: "full-time", status: "active", age: 32, gender: "female", email: "jane.smith@hrms.com", address: "456 Oak Ave, Los Angeles, CA", annualSalary: 75000 },
-    { employeeId: "EMP003", name: "Bob Johnson", department: "Marketing", designation: "Marketing Manager", contractType: "full-time", status: "on-leave", age: 45, gender: "male", email: "bob.johnson@hrms.com", address: "789 Pine Rd, Chicago, IL", annualSalary: 95000 },
-    { employeeId: "EMP004", name: "Alice Brown", department: "Finance", designation: "HR Specialist", contractType: "part-time", status: "active", age: 29, gender: "female", email: "alice.brown@hrms.com", address: "321 Elm St, Houston, TX", annualSalary: 45000 },
-    { employeeId: "EMP005", name: "Mike Wilson", department: "Sales", designation: "Sales Manager", contractType: "contract", status: "active", age: 38, gender: "male", email: "mike.wilson@hrms.com", address: "654 Maple Dr, Phoenix, AZ", annualSalary: 80000 },
-    { employeeId: "EMP006", name: "Sarah Lee", department: "IT", designation: "DevOps Engineer", contractType: "part-time", status: "active", age: 26, gender: "female", email: "sarah.lee@hrms.com", address: "987 Cedar Ln, Seattle, WA", annualSalary: 55000 },
-    { employeeId: "EMP007", name: "Tom Davis", department: "Management", designation: "Product Manager", contractType: "full-time", status: "active", age: 42, gender: "male", email: "tom.davis@hrms.com", address: "147 Birch Blvd, Boston, MA", annualSalary: 110000 },
-    { employeeId: "EMP008", name: "Lisa Chen", department: "Design", designation: "UX Designer", contractType: "contract", status: "on-leave", age: 31, gender: "female", email: "lisa.chen@hrms.com", address: "258 Spruce Way, San Francisco, CA", annualSalary: 90000 },
+    { employeeId: "EMP001", name: "John Doe",      email: "john.doe@hrms.com",      department: "Engineering",  designation: "Software Engineer",  contractType: "full-time", status: "active",    age: 28, gender: "male",   address: "123 Main St, New York, NY",        annualSalary: 85000 },
+    { employeeId: "EMP002", name: "Jane Smith",    email: "jane.smith@hrms.com",    department: "Design",       designation: "UI Designer",        contractType: "full-time", status: "active",    age: 32, gender: "female", address: "456 Oak Ave, Los Angeles, CA",     annualSalary: 75000 },
+    { employeeId: "EMP003", name: "Bob Johnson",   email: "bob.johnson@hrms.com",   department: "Marketing",    designation: "Marketing Manager",  contractType: "full-time", status: "on-leave",  age: 45, gender: "male",   address: "789 Pine Rd, Chicago, IL",         annualSalary: 95000 },
+    { employeeId: "EMP004", name: "Alice Brown",   email: "alice.brown@hrms.com",   department: "Finance",      designation: "HR Specialist",      contractType: "part-time", status: "active",    age: 29, gender: "female", address: "321 Elm St, Houston, TX",          annualSalary: 45000 },
+    { employeeId: "EMP005", name: "Mike Wilson",   email: "mike.wilson@hrms.com",   department: "Sales",        designation: "Sales Manager",      contractType: "contract",  status: "active",    age: 38, gender: "male",   address: "654 Maple Dr, Phoenix, AZ",        annualSalary: 80000 },
+    { employeeId: "EMP006", name: "Sarah Lee",     email: "sarah.lee@hrms.com",     department: "IT",           designation: "DevOps Engineer",    contractType: "part-time", status: "active",    age: 26, gender: "female", address: "987 Cedar Ln, Seattle, WA",        annualSalary: 55000 },
+    { employeeId: "EMP007", name: "Tom Davis",     email: "tom.davis@hrms.com",     department: "Management",   designation: "Product Manager",    contractType: "full-time", status: "active",    age: 42, gender: "male",   address: "147 Birch Blvd, Boston, MA",       annualSalary: 110000 },
+    { employeeId: "EMP008", name: "Lisa Chen",     email: "lisa.chen@hrms.com",     department: "Design",       designation: "UX Designer",        contractType: "contract",  status: "on-leave",  age: 31, gender: "female", address: "258 Spruce Way, San Francisco, CA", annualSalary: 90000 },
   ];
+
   const created = [];
   for (const def of defs) {
     let emp = await EmployeeModel.findOne({ employeeId: def.employeeId });
+
+    // Ensure a linked User account exists for each employee
+    let userAcc = await UserModel.findOne({ email: def.email });
+    if (!userAcc) {
+      // Derive a simple demo password from the employee ID
+      userAcc = await UserModel.create({
+        email: def.email,
+        password: hashPassword(`${def.employeeId.toLowerCase()}pass`),
+        name: def.name,
+        role: "EMPLOYEE",
+      });
+      console.log(`✓ Created EMPLOYEE user: ${def.email} / ${def.employeeId.toLowerCase()}pass`);
+    }
+
     if (!emp) {
       const dept = deptByName[def.department];
-      emp = await EmployeeModel.create({ ...def, department: dept ? dept._id : undefined });
+      emp = await EmployeeModel.create({
+        ...def,
+        department: dept ? dept._id : undefined,
+        userId: userAcc._id,
+      });
       console.log("✓ Created employee:", def.employeeId, def.name);
     }
+
+    // Link user → employee if not already set
+    if (!userAcc.employee) {
+      userAcc.employee = emp._id;
+      await userAcc.save();
+    }
+
     created.push(emp);
   }
   return created;
 }
 
+/* ── Jobs ── */
 async function seedJobs(deptByName) {
   const defs = [
-    { title: "Senior Software Engineer", department: "Engineering", location: "Remote", type: "full-time", status: "open" },
-    { title: "UI/UX Designer", department: "Design", location: "New York", type: "full-time", status: "open" },
-    { title: "Product Manager", department: "Management", location: "San Francisco", type: "full-time", status: "filled" },
-    { title: "DevOps Engineer", department: "IT", location: "Remote", type: "contract", status: "open" },
-    { title: "Marketing Intern", department: "Marketing", location: "Hanoi", type: "intern", status: "open" },
-    { title: "Sales Associate", department: "Sales", location: "Ho Chi Minh City", type: "full-time", status: "closed" },
+    { title: "Senior Software Engineer", department: "Engineering", location: "Remote",            type: "full-time", status: "open"   },
+    { title: "UI/UX Designer",           department: "Design",      location: "New York",          type: "full-time", status: "open"   },
+    { title: "Product Manager",          department: "Management",  location: "San Francisco",     type: "full-time", status: "filled" },
+    { title: "DevOps Engineer",          department: "IT",          location: "Remote",            type: "contract",  status: "open"   },
+    { title: "Marketing Intern",         department: "Marketing",   location: "Hanoi",             type: "intern",    status: "open"   },
+    { title: "Sales Associate",          department: "Sales",       location: "Ho Chi Minh City",  type: "full-time", status: "closed" },
   ];
   const created = [];
   for (const def of defs) {
@@ -113,45 +167,38 @@ async function seedJobs(deptByName) {
   return created;
 }
 
+/* ── Candidates ── */
 async function seedCandidates(jobs) {
   const byTitle = Object.fromEntries(jobs.map((j) => [j.title, j]));
   const defs = [
-    { name: "Mike Wilson", jobTitle: "Senior Software Engineer", stage: "interview", rating: 4.5, email: "mike.wilson.cand@example.com", phone: "+84 90 123 4567", notes: "Strong backend experience." },
-    { name: "Sarah Lee", jobTitle: "UI/UX Designer", stage: "screening", rating: 4.0, email: "sarah.lee.cand@example.com", phone: "+84 91 234 5678", notes: "Great portfolio." },
-    { name: "Tom Brown", jobTitle: "DevOps Engineer", stage: "offer", rating: 4.8, email: "tom.brown@example.com", phone: "+84 92 345 6789", notes: "Offer extended." },
-    { name: "Emily Davis", jobTitle: "Senior Software Engineer", stage: "applied", rating: 3.8, email: "emily.davis@example.com", phone: "+84 93 456 7890", notes: "" },
-    { name: "James Nguyen", jobTitle: "Marketing Intern", stage: "hired", rating: 4.2, email: "james.nguyen@example.com", phone: "+84 94 567 8901", notes: "Starts soon." },
+    { name: "Mike Wilson",  jobTitle: "Senior Software Engineer", stage: "interview", rating: 4.5, email: "mike.wilson.cand@example.com", phone: "+84 90 123 4567", notes: "Strong backend experience." },
+    { name: "Sarah Lee",    jobTitle: "UI/UX Designer",           stage: "screening", rating: 4.0, email: "sarah.lee.cand@example.com",   phone: "+84 91 234 5678", notes: "Great portfolio."           },
+    { name: "Tom Brown",    jobTitle: "DevOps Engineer",          stage: "offer",     rating: 4.8, email: "tom.brown@example.com",        phone: "+84 92 345 6789", notes: "Offer extended."            },
+    { name: "Emily Davis",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.8, email: "emily.davis@example.com",      phone: "+84 93 456 7890", notes: ""                           },
+    { name: "James Nguyen", jobTitle: "Marketing Intern",         stage: "hired",     rating: 4.2, email: "james.nguyen@example.com",     phone: "+84 94 567 8901", notes: "Starts soon."              },
   ];
   for (const def of defs) {
     const job = byTitle[def.jobTitle];
     if (!job) continue;
     const exists = await CandidateModel.findOne({ email: def.email });
     if (!exists) {
-      await CandidateModel.create({
-        name: def.name,
-        email: def.email,
-        phone: def.phone,
-        job: job._id,
-        stage: def.stage,
-        rating: def.rating,
-        notes: def.notes,
-        resumeUrl: "#",
-      });
+      await CandidateModel.create({ ...def, job: job._id, resumeUrl: "#" });
       console.log("✓ Created candidate:", def.name);
     }
   }
 }
 
+/* ── Holidays ── */
 async function seedHolidays() {
   const defs = [
-    { name: "New Year's Day", date: "2026-01-01", type: "public" },
-    { name: "Tet Holiday (Lunar New Year)", date: "2026-02-17", type: "public" },
-    { name: "Hung Kings' Temple Festival", date: "2026-04-26", type: "public" },
-    { name: "Reunification Day", date: "2026-04-30", type: "public" },
-    { name: "International Labor Day", date: "2026-05-01", type: "public" },
-    { name: "Company Anniversary", date: "2026-06-15", type: "company" },
-    { name: "National Day", date: "2026-09-02", type: "public" },
-    { name: "Year-End Wellness Day", date: "2026-12-24", type: "optional" },
+    { name: "New Year's Day",                  date: "2026-01-01", type: "public"   },
+    { name: "Tet Holiday (Lunar New Year)",    date: "2026-02-17", type: "public"   },
+    { name: "Hung Kings' Temple Festival",     date: "2026-04-26", type: "public"   },
+    { name: "Reunification Day",               date: "2026-04-30", type: "public"   },
+    { name: "International Labor Day",         date: "2026-05-01", type: "public"   },
+    { name: "Company Anniversary",             date: "2026-06-15", type: "company"  },
+    { name: "National Day",                    date: "2026-09-02", type: "public"   },
+    { name: "Year-End Wellness Day",           date: "2026-12-24", type: "optional" },
   ];
   for (const def of defs) {
     const date = new Date(def.date);
@@ -163,17 +210,18 @@ async function seedHolidays() {
   }
 }
 
+/* ── Attendance ── */
 async function seedAttendance(employees) {
   const date = new Date("2026-01-15");
   const statuses = [
-    { checkIn: "09:00", checkOut: "18:00", status: "present" },
-    { checkIn: "09:15", checkOut: "18:30", status: "present" },
-    { checkIn: null, checkOut: null, status: "on-leave" },
-    { checkIn: "08:45", checkOut: "17:30", status: "present" },
-    { checkIn: "09:30", checkOut: null, status: "present" },
-    { checkIn: "09:45", checkOut: "18:00", status: "present" },
-    { checkIn: "08:30", checkOut: "17:00", status: "present" },
-    { checkIn: null, checkOut: null, status: "on-leave" },
+    { checkIn: "09:00", checkOut: "18:00", status: "present"  },
+    { checkIn: "09:15", checkOut: "18:30", status: "present"  },
+    { checkIn: null,    checkOut: null,    status: "on-leave"  },
+    { checkIn: "08:45", checkOut: "17:30", status: "present"  },
+    { checkIn: "09:30", checkOut: null,    status: "present"  },
+    { checkIn: "09:45", checkOut: "18:00", status: "present"  },
+    { checkIn: "08:30", checkOut: "17:00", status: "present"  },
+    { checkIn: null,    checkOut: null,    status: "on-leave"  },
   ];
   for (let i = 0; i < employees.length; i++) {
     const emp = employees[i];
@@ -183,17 +231,18 @@ async function seedAttendance(employees) {
       await AttendanceModel.create({ employee: emp._id, date, ...def });
     }
   }
-  console.log("✓ Seeded attendance for", employees.length, "employees on", date.toISOString().slice(0, 10));
+  console.log("✓ Seeded attendance for", employees.length, "employees on 2026-01-15");
 }
 
+/* ── Notifications ── */
 async function seedNotifications() {
   const defs = [
-    { category: "leave", title: "New leave request", message: "John Doe requested 3 days off" },
-    { category: "hiring", title: "Interview scheduled", message: "Candidate interview for Design role" },
-    { category: "payroll", title: "Payroll processed", message: "May payroll has been processed" },
-    { category: "employee", title: "New employee added", message: "Sarah Smith has joined the team" },
-    { category: "holiday", title: "Upcoming holiday", message: "Company Anniversary is coming up on Jun 15" },
-    { category: "system", title: "System maintenance", message: "Scheduled maintenance this weekend" },
+    { category: "leave",   title: "New leave request",    message: "John Doe requested 3 days off"                        },
+    { category: "hiring",  title: "Interview scheduled",  message: "Candidate interview for Design role"                  },
+    { category: "payroll", title: "Payroll processed",    message: "May payroll has been processed"                       },
+    { category: "employee",title: "New employee added",   message: "Sarah Smith has joined the team"                      },
+    { category: "holiday", title: "Upcoming holiday",     message: "Company Anniversary is coming up on Jun 15"          },
+    { category: "system",  title: "System maintenance",   message: "Scheduled maintenance this weekend"                   },
   ];
   for (const def of defs) {
     const exists = await NotificationModel.findOne({ title: def.title, user: null });
@@ -204,17 +253,27 @@ async function seedNotifications() {
   }
 }
 
+/* ── Main ── */
 async function main() {
   await connectDB();
+
   await upsertAdmin();
+  await upsertHRUser();
+
   const deptByName = await seedDepartments();
-  const employees = await seedEmployees(deptByName);
-  const jobs = await seedJobs(deptByName);
+  const employees  = await seedEmployees(deptByName);
+  const jobs       = await seedJobs(deptByName);
+
   await seedCandidates(jobs);
   await seedHolidays();
   await seedAttendance(employees);
   await seedNotifications();
-  console.log("\n✅ Seed complete. Login with admin@hrms.com / admin123\n");
+
+  console.log("\n✅ Seed complete.");
+  console.log("   Admin  → admin@hrms.com  / admin123");
+  console.log("   HR     → hr@hrms.com     / hr123456");
+  console.log("   Employees → <firstname>.<lastname>@hrms.com / emp001pass … emp008pass\n");
+
   process.exit(0);
 }
 

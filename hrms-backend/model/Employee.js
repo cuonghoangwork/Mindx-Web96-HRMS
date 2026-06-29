@@ -20,6 +20,8 @@ const employeeSchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "on-leave", "terminated"], default: "active" },
     annualSalary: { type: Number, default: 0 },
     avatar: { type: String },
+    // Back-link to the User account that belongs to this employee (optional 1:1)
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true },
 );

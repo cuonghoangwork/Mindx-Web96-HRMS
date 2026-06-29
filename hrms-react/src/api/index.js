@@ -1,14 +1,19 @@
 // Resource-specific helpers built on top of apiFetch(). One namespace per
-// hrms-backend router (see hr-management-system/hrms-backend/router/).
+// hrms-backend router (see hrms-backend/router/).
 import { apiFetch, qs } from "./client";
 
 export const AuthAPI = {
   login: (email, password) =>
     apiFetch("/auth/login", { method: "POST", body: { email, password }, auth: false }),
-  register: (payload) =>
-    apiFetch("/auth/register", { method: "POST", body: payload, auth: false }),
+  // No role field — all self-registered accounts are EMPLOYEE
+  register: ({ name, email, password }) =>
+    apiFetch("/auth/register", { method: "POST", body: { name, email, password }, auth: false }),
   me: () => apiFetch("/auth/me"),
   logout: () => apiFetch("/auth/logout", { method: "POST" }),
+  // Admin-only
+  listUsers: () => apiFetch("/auth/users"),
+  promoteUser: (id, role) =>
+    apiFetch(`/auth/users/${id}/promote`, { method: "PATCH", body: { role } }),
 };
 
 // Large page size so the existing client-side filter/sort/paginate logic in
@@ -17,6 +22,7 @@ const ALL = 1000;
 
 export const EmployeesAPI = {
   list: (params = {}) => apiFetch(`/employees${qs({ pageSize: ALL, ...params })}`),
+  myProfile: () => apiFetch("/employees/me"),
   create: (data) => apiFetch("/employees", { method: "POST", body: data }),
   update: (id, data) => apiFetch(`/employees/${id}`, { method: "PUT", body: data }),
   remove: (id) => apiFetch(`/employees/${id}`, { method: "DELETE" }),
@@ -57,7 +63,6 @@ export const HolidaysAPI = {
 
 export const AttendanceAPI = {
   list: (params = {}) => apiFetch(`/attendance${qs({ pageSize: ALL, ...params })}`),
-  // employeeId: MongoDB ObjectId string, date: "YYYY-MM-DD", checkIn/checkOut: "HH:MM" (optional)
   checkIn: (data) => apiFetch("/attendance/check-in", { method: "POST", body: data }),
   checkOut: (data) => apiFetch("/attendance/check-out", { method: "POST", body: data }),
 };

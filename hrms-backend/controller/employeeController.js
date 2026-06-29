@@ -1,9 +1,9 @@
 import EmployeeModel from "../model/Employee.js";
+import UserModel from "../model/User.js";
 import DepartmentModel from "../model/Department.js";
 import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
-import { logAction, diffChanges } from "../utils/auditLog.js";
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -52,7 +52,13 @@ const employeeController = {
         .skip(skip)
         .limit(Number(pageSize));
 
-      res.json({ success: true, totalItems, totalPages, currentPage: +pageNumber, items: docs.map(employeeToClient) });
+      res.json({
+        success: true,
+        totalItems,
+        totalPages,
+        currentPage: +pageNumber,
+        items: docs.map(employeeToClient),
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: "Error getting employees", error: error.message });
     }
@@ -62,9 +68,47 @@ const employeeController = {
     try {
       const employee = await EmployeeModel.findById(req.params.id).populate("department", "name");
       if (!employee) throw new Error("Employee not found.");
+
+      // EMPLOYEE role users can only view their own profile
+      if (req.user.role === "EMPLOYEE") {
+        const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
+        if (!myEmp || String(myEmp._id) !== String(employee._id)) {
+          return res.status(403).json({ success: false, message: "Access denied." });
+        }
+      }
+
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
       res.status(404).json({ success: false, message: error.message });
+    }
+  },
+
+  // GET /api/v1/employees/me — returns the employee profile for the logged-in user
+  getMyProfile: async (req, res) => {
+    try {
+      const user = await UserModel.findById(req.user.id);
+      if (!user) throw new Error("User not found.");
+
+      let employee = null;
+      if (user.employee) {
+        employee = await EmployeeModel.findById(user.employee).populate("department", "name");
+      }
+      if (!employee) {
+        // Fallback: match by email
+        employee = await EmployeeModel.findOne({ email: user.email }).populate("department", "name");
+        if (employee && !employee.userId) {
+          employee.userId = user._id;
+          await employee.save();
+        }
+      }
+
+      if (!employee) {
+        return res.json({ success: true, data: null, message: "No employee profile linked to this account." });
+      }
+
+      res.json({ success: true, data: employeeToClient(employee) });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
     }
   },
 
@@ -80,18 +124,20 @@ const employeeController = {
         data.department = await resolveDepartmentIdByName(req.body.department);
       }
 
+      // If a User account with the same email already exists, link them
+      const existingUser = await UserModel.findOne({ email: email.toLowerCase() });
+      if (existingUser) data.userId = existingUser._id;
+
       const employee = await EmployeeModel.create(data);
       await employee.populate("department", "name");
-      const clientData = employeeToClient(employee);
 
-      await logAction(req, {
-        action:     "created",
-        resource:   "employee",
-        resourceId: employee._id,
-        label:      `${employee.name} (${employee.employeeId})`,
-      });
+      // Also update the user record to point to this employee
+      if (existingUser && !existingUser.employee) {
+        existingUser.employee = employee._id;
+        await existingUser.save();
+      }
 
-      res.status(201).json({ success: true, data: clientData });
+      res.status(201).json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -99,10 +145,6 @@ const employeeController = {
 
   update: async (req, res) => {
     try {
-      // Snapshot before for diff
-      const before = await EmployeeModel.findById(req.params.id).populate("department", "name");
-      const beforeClient = before ? employeeToClient(before) : null;
-
       const data = employeeFromClient(req.body);
       if (req.body.department !== undefined) {
         data.department = req.body.department
@@ -115,23 +157,7 @@ const employeeController = {
         runValidators: true,
       }).populate("department", "name");
       if (!employee) throw new Error("Employee not found.");
-
-      const afterClient = employeeToClient(employee);
-
-      // Detect if this was specifically a status change
-      const action = req.body.status && beforeClient?.status !== req.body.status
-        ? "status_changed"
-        : "updated";
-
-      await logAction(req, {
-        action,
-        resource:   "employee",
-        resourceId: employee._id,
-        label:      `${employee.name} (${employee.employeeId})`,
-        changes:    diffChanges(beforeClient, afterClient),
-      });
-
-      res.json({ success: true, data: afterClient });
+      res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -142,12 +168,10 @@ const employeeController = {
       const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
       if (!employee) throw new Error("Employee not found.");
 
-      await logAction(req, {
-        action:     "deleted",
-        resource:   "employee",
-        resourceId: req.params.id,
-        label:      `${employee.name} (${employee.employeeId})`,
-      });
+      // Unlink the user account if one was linked
+      if (employee.userId) {
+        await UserModel.findByIdAndUpdate(employee.userId, { employee: null });
+      }
 
       res.json({ success: true, message: "Employee deleted." });
     } catch (error) {
@@ -158,30 +182,32 @@ const employeeController = {
   uploadAvatar: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error("Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).");
+        throw new Error(
+          "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        );
       }
       if (!req.file) throw new Error("No image file was uploaded.");
 
       const employee = await EmployeeModel.findById(req.params.id);
       if (!employee) throw new Error("Employee not found.");
 
+      // EMPLOYEE role can only upload their own avatar
+      if (req.user.role === "EMPLOYEE") {
+        if (!employee.userId || String(employee.userId) !== String(req.user.id)) {
+          return res.status(403).json({ success: false, message: "You can only update your own avatar." });
+        }
+      }
+
       const result = await uploadBufferToCloudinary(req.file.buffer, {
-        folder:        "hrms/avatars",
-        public_id:     `employee_${employee._id}`,
-        overwrite:     true,
+        folder: "hrms/avatars",
+        public_id: `employee_${employee._id}`,
+        overwrite: true,
         resource_type: "image",
       });
 
       employee.avatar = result.secure_url;
       await employee.save();
       await employee.populate("department", "name");
-
-      await logAction(req, {
-        action:     "uploaded_avatar",
-        resource:   "employee",
-        resourceId: employee._id,
-        label:      `${employee.name} (${employee.employeeId})`,
-      });
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
