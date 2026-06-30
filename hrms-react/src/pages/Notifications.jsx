@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
+import AddNotificationModal from "../components/AddNotificationModal";
 
 const CATEGORY_CONFIG = {
   leave: {
@@ -61,6 +64,15 @@ const CATEGORY_CONFIG = {
       </svg>
     ),
   },
+  announcement: {
+    label: "Notice", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 11l18-5v12L3 14v-3z" />
+        <path d="M11.6 16.8a2 2 0 0 1-3.2 2.4L6 16" />
+      </svg>
+    ),
+  },
 };
 
 const FILTERS = [
@@ -95,12 +107,17 @@ function Notifications() {
     markAllNotificationsRead,
     removeNotification,
     clearReadNotifications,
+    sendNotification,
     getAppNow,
   } = useStore();
+  const { isHR } = useAuth();
+  const navigate = useNavigate();
 
   const now = getAppNow();
 
   const [filter, setFilter] = useState("all");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
 
   const stats = useMemo(() => {
     const unread = notifications.filter((n) => !n.read).length;
@@ -124,10 +141,31 @@ function Notifications() {
   const hasUnread = stats.unread > 0;
   const hasRead = notifications.some((n) => n.read);
 
+  const handleOpen = (notification) => {
+    if (!notification.read) markNotificationRead(notification.id);
+    if (notification.link) {
+      navigate(notification.link);
+    } else {
+      setExpandedId((prev) => (prev === notification.id ? null : notification.id));
+    }
+  };
+
+  const handleSend = async (payload) => {
+    await sendNotification(payload);
+  };
+
   return (
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>Notifications</h2>
+        {isHR && (
+          <button
+            className="btn btn-primary"
+            onClick={() => setComposeOpen(true)}
+          >
+            + Send Notice
+          </button>
+        )}
         <button
           className="btn btn-secondary"
           onClick={markAllNotificationsRead}
@@ -225,9 +263,24 @@ function Notifications() {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
             {filteredNotifications.map((notification) => {
               const cfg = CATEGORY_CONFIG[notification.category] ?? CATEGORY_CONFIG.system;
+              const isExpanded = expandedId === notification.id;
+              const isOpenable = Boolean(notification.link) || Boolean(notification.message);
               return (
                 <div
                   key={notification.id}
+                  onClick={isOpenable ? () => handleOpen(notification) : undefined}
+                  role={isOpenable ? "button" : undefined}
+                  tabIndex={isOpenable ? 0 : undefined}
+                  onKeyDown={
+                    isOpenable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleOpen(notification);
+                          }
+                        }
+                      : undefined
+                  }
                   style={{
                     padding: "var(--sp-4) var(--sp-5)",
                     background: notification.read ? "transparent" : "var(--bg-surface-alt)",
@@ -237,9 +290,11 @@ function Notifications() {
                     justifyContent: "space-between",
                     alignItems: "flex-start",
                     gap: "var(--sp-4)",
+                    cursor: isOpenable ? "pointer" : "default",
+                    transition: "border-color 0.15s",
                   }}
                 >
-                  <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
                     <span
                       aria-hidden="true"
                       style={{
@@ -256,7 +311,7 @@ function Notifications() {
                     >
                       {cfg.icon}
                     </span>
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
                         <h3 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                           {notification.title}
@@ -274,16 +329,32 @@ function Notifications() {
                           />
                         )}
                       </div>
-                      <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "var(--sp-1)" }}>
+                      <p
+                        style={{
+                          fontSize: "var(--fs-sm)",
+                          color: "var(--txt-secondary)",
+                          marginTop: "var(--sp-1)",
+                          display: !isExpanded && !notification.link ? "-webkit-box" : "block",
+                          WebkitLineClamp: !isExpanded && !notification.link ? 2 : undefined,
+                          WebkitBoxOrient: !isExpanded && !notification.link ? "vertical" : undefined,
+                          overflow: !isExpanded && !notification.link ? "hidden" : undefined,
+                        }}
+                      >
                         {notification.message}
                       </p>
-                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)" }}>
-                        {cfg.label} • {timeAgo(notification.timestamp, now)}
+                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)", display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                        <span>{cfg.label} • {timeAgo(notification.timestamp, now)}</span>
+                        {notification.senderName && <span>· from {notification.senderName}</span>}
+                        {notification.link && (
+                          <span style={{ color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
+                            {notification.linkLabel || "Open"} →
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                     {!notification.read && (
                       <button
                         className="btn btn-secondary"
@@ -308,6 +379,13 @@ function Notifications() {
           </div>
         )}
       </div>
+
+      {composeOpen && (
+        <AddNotificationModal
+          onClose={() => setComposeOpen(false)}
+          onSend={handleSend}
+        />
+      )}
     </div>
   );
 }

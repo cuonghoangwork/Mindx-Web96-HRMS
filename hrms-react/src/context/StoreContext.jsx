@@ -338,6 +338,19 @@ export function StoreProvider({ children }) {
     }
   }, [showToast]);
 
+  // HR/Admin: compose and send a custom notice. Doesn't optimistically add to local
+  // state for targeted sends (the recipient isn't necessarily "me"), but does for
+  // broadcasts the sender themself would also see.
+  const sendNotification = useCallback(async (payload) => {
+    const res = await NotificationsAPI.create(payload);
+    const isBroadcastToSelf =
+      !payload.recipientId && (!payload.recipientIds || payload.recipientIds.length === 0);
+    if (isBroadcastToSelf && res.data) {
+      setNotifications((prev) => [res.data, ...prev]);
+    }
+    return res.data;
+  }, []);
+
   const unreadNotificationCount = notifications.filter((n) => !n.read).length;
 
   const value = {
@@ -404,6 +417,7 @@ export function StoreProvider({ children }) {
     markAllNotificationsRead,
     removeNotification,
     clearReadNotifications,
+    sendNotification,
   };
 
   return (

@@ -48,7 +48,8 @@ const ATTENDANCE_STATUS = {
 
 // hrms_schema_docs.md names this category "hiring"; the frontend's StoreContext mock
 // data and Notifications.jsx CATEGORY_CONFIG both actually use "interview" for the same
-// thing. Bridge it here rather than picking a side.
+// thing. Bridge it here rather than picking a side. "announcement" passes through as-is
+// since it's a new category with no legacy naming mismatch.
 const NOTIFICATION_CATEGORY = { interview: "hiring" };
 
 function invert(map) {
@@ -301,6 +302,12 @@ export function notificationToClient(doc) {
     message: o.message ?? "",
     timestamp: o.createdAt,
     read: o.read,
+    link: o.link ?? null,
+    linkLabel: o.linkLabel ?? null,
+    isCustom: Boolean(o.isCustom),
+    senderName: o.sender?.name ?? null,
+    audience: o.audience ?? "all",
+    recipientId: o.user ? idOf(o.user) : null,
   };
 }
 
@@ -309,6 +316,9 @@ export function notificationFromClient(body = {}) {
   carry(body, "category", out, "category", (v) => toDb(NOTIFICATION_CATEGORY, v));
   carry(body, "title", out, "title");
   carry(body, "message", out, "message");
+  carry(body, "link", out, "link");
+  carry(body, "linkLabel", out, "linkLabel");
+  carry(body, "audience", out, "audience");
   if (body.user !== undefined) out.user = body.user;
   return out;
 }

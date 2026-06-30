@@ -69,6 +69,8 @@ export const AttendanceAPI = {
 
 export const NotificationsAPI = {
   list: () => apiFetch("/notifications"),
+  create: (data) => apiFetch("/notifications", { method: "POST", body: data }),
+  recipients: () => apiFetch("/notifications/recipients"),
   markRead: (id) => apiFetch(`/notifications/${id}/read`, { method: "PATCH" }),
   markAllRead: () => apiFetch("/notifications/read-all", { method: "PATCH" }),
   clearRead: () => apiFetch("/notifications/clear-read", { method: "DELETE" }),

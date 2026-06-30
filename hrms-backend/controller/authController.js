@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import { signTokens } from "../utils/tokens.js";
+import { notifyHR } from "./notificationController.js";
 
 const SALT_ROUNDS = 10;
 
@@ -38,6 +39,14 @@ const authController = {
         newUser.employee = empMatch._id;
         await newUser.save();
       }
+
+      notifyHR({
+        title: "New account registered",
+        message: `${newUser.name} (${newUser.email}) created an Employee account.`,
+        category: "employee",
+        link: "/settings",
+        linkLabel: "Manage user roles",
+      });
 
       res.status(201).json({
         success: true,

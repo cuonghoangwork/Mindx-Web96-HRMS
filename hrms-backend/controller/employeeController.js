@@ -4,6 +4,7 @@ import DepartmentModel from "../model/Department.js";
 import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
+import { notifyHR } from "./notificationController.js";
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -137,6 +138,14 @@ const employeeController = {
         await existingUser.save();
       }
 
+      notifyHR({
+        title: "New employee added",
+        message: `${employee.name} (${employee.employeeId}) was added by ${req.user.name}.`,
+        category: "employee",
+        link: `/employees/${employee._id}`,
+        linkLabel: "View profile",
+      });
+
       res.status(201).json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -172,6 +181,12 @@ const employeeController = {
       if (employee.userId) {
         await UserModel.findByIdAndUpdate(employee.userId, { employee: null });
       }
+
+      notifyHR({
+        title: "Employee removed",
+        message: `${employee.name} (${employee.employeeId}) was removed by ${req.user.name}.`,
+        category: "employee",
+      });
 
       res.json({ success: true, message: "Employee deleted." });
     } catch (error) {
