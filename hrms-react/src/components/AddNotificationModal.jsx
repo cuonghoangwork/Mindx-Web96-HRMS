@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { NotificationsAPI } from "../api";
+
+const TITLE_MAX = 120;
+const MESSAGE_MAX = 2000;
 
 /**
  * AddNotificationModal — HR/Admin composes a custom notice.
@@ -14,6 +17,7 @@ function AddNotificationModal({ onClose, onSend }) {
   const [link, setLink] = useState("");
   const [recipientMode, setRecipientMode] = useState("all"); // "all" | "employees" | "hr" | "individual"
   const [recipientIds, setRecipientIds] = useState([]);
+  const [recipientSearch, setRecipientSearch] = useState("");
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [error, setError] = useState("");
@@ -34,12 +38,34 @@ function AddNotificationModal({ onClose, onSend }) {
     );
   };
 
+  const filteredEmployees = useMemo(() => {
+    const q = recipientSearch.trim().toLowerCase();
+    if (!q) return employees;
+    return employees.filter(
+      (emp) =>
+        emp.name.toLowerCase().includes(q) ||
+        emp.employeeId?.toLowerCase().includes(q) ||
+        emp.email?.toLowerCase().includes(q),
+    );
+  }, [employees, recipientSearch]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedMessage = message.trim();
+
+    if (!trimmedTitle) {
       setError("A title is required.");
+      return;
+    }
+    if (trimmedTitle.length > TITLE_MAX) {
+      setError(`Title must be ${TITLE_MAX} characters or fewer.`);
+      return;
+    }
+    if (trimmedMessage.length > MESSAGE_MAX) {
+      setError(`Message must be ${MESSAGE_MAX} characters or fewer.`);
       return;
     }
     if (recipientMode === "individual" && recipientIds.length === 0) {
@@ -48,8 +74,8 @@ function AddNotificationModal({ onClose, onSend }) {
     }
 
     const payload = {
-      title: title.trim(),
-      message: message.trim(),
+      title: trimmedTitle,
+      message: trimmedMessage,
       category: "announcement",
       link: link.trim() || undefined,
       linkLabel: link.trim() ? "View" : undefined,
@@ -76,6 +102,9 @@ function AddNotificationModal({ onClose, onSend }) {
     }
   };
 
+  const titleOverLimit = title.length > TITLE_MAX;
+  const messageOverLimit = message.length > MESSAGE_MAX;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
@@ -99,8 +128,20 @@ function AddNotificationModal({ onClose, onSend }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Office closed Friday"
+              maxLength={TITLE_MAX + 20}
               required
+              className={titleOverLimit ? "error" : ""}
             />
+            <span
+              className="form-hint"
+              style={{
+                display: "block",
+                textAlign: "right",
+                color: titleOverLimit ? "var(--txt-danger)" : "var(--txt-secondary)",
+              }}
+            >
+              {title.length}/{TITLE_MAX}
+            </span>
           </div>
 
           <div className="form-group">
@@ -114,7 +155,18 @@ function AddNotificationModal({ onClose, onSend }) {
               rows={4}
               placeholder="Details for the recipient(s)..."
               style={{ resize: "vertical" }}
+              className={messageOverLimit ? "error" : ""}
             />
+            <span
+              className="form-hint"
+              style={{
+                display: "block",
+                textAlign: "right",
+                color: messageOverLimit ? "var(--txt-danger)" : "var(--txt-secondary)",
+              }}
+            >
+              {message.length}/{MESSAGE_MAX}
+            </span>
           </div>
 
           <div className="form-group">
@@ -171,46 +223,57 @@ function AddNotificationModal({ onClose, onSend }) {
               {loadingEmployees ? (
                 <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>Loading employees…</p>
               ) : (
-                <div
-                  style={{
-                    maxHeight: "200px",
-                    overflowY: "auto",
-                    border: "1px solid var(--bdr-default)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "var(--sp-2)",
-                  }}
-                >
-                  {employees.length === 0 && (
-                    <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", padding: "var(--sp-2)" }}>
-                      No employees found.
-                    </p>
+                <>
+                  {employees.length > 5 && (
+                    <input
+                      type="text"
+                      value={recipientSearch}
+                      onChange={(e) => setRecipientSearch(e.target.value)}
+                      placeholder="Search by name, ID, or email..."
+                      style={{ marginBottom: "var(--sp-2)" }}
+                    />
                   )}
-                  {employees.map((emp) => (
-                    <label
-                      key={emp.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "var(--sp-2)",
-                        padding: "6px var(--sp-2)",
-                        cursor: "pointer",
-                        fontSize: "var(--fs-sm)",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={recipientIds.includes(emp.id)}
-                        onChange={() => toggleRecipient(emp.id)}
-                      />
-                      <span>{emp.name}</span>
-                      <span style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-xs)" }}>
-                        {emp.employeeId}
-                        {!emp.hasAccount && " · no account"}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                  <div
+                    style={{
+                      maxHeight: "200px",
+                      overflowY: "auto",
+                      border: "1px solid var(--bdr-default)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "var(--sp-2)",
+                    }}
+                  >
+                    {filteredEmployees.length === 0 && (
+                      <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", padding: "var(--sp-2)" }}>
+                        {employees.length === 0 ? "No employees found." : "No matches for your search."}
+                      </p>
+                    )}
+                    {filteredEmployees.map((emp) => (
+                      <label
+                        key={emp.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "var(--sp-2)",
+                          padding: "6px var(--sp-2)",
+                          cursor: "pointer",
+                          fontSize: "var(--fs-sm)",
+                          borderRadius: "var(--radius-sm)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={recipientIds.includes(emp.id)}
+                          onChange={() => toggleRecipient(emp.id)}
+                        />
+                        <span>{emp.name}</span>
+                        <span style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-xs)" }}>
+                          {emp.employeeId}
+                          {!emp.hasAccount && " · no account"}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
               )}
               {recipientIds.length > 0 && (
                 <span className="form-hint">{recipientIds.length} selected</span>
@@ -222,7 +285,11 @@ function AddNotificationModal({ onClose, onSend }) {
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={submitting || titleOverLimit || messageOverLimit}
+            >
               {submitting ? "Sending…" : "Send Notice"}
             </button>
           </div>

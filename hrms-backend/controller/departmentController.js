@@ -3,6 +3,7 @@ import EmployeeModel from "../model/Employee.js";
 import { departmentToClient, departmentFromClient } from "../utils/mappers.js";
 import { resolveManagerRef } from "../utils/refResolvers.js";
 import { logAction, diffChanges } from "../utils/auditLog.js";
+import { notifyHR } from "./notificationController.js";
 
 const departmentController = {
   getAll: async (req, res) => {
@@ -68,6 +69,14 @@ const departmentController = {
         label:      department.name,
       });
 
+      notifyHR({
+        title: "New department created",
+        message: `${department.name} was added by ${req.user?.name ?? "a team member"}.`,
+        category: "employee",
+        link: `/departments/${department._id}`,
+        linkLabel: "View department",
+      });
+
       res.status(201).json({ success: true, data: departmentToClient(department) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
@@ -117,6 +126,12 @@ const departmentController = {
         resource:   "department",
         resourceId: req.params.id,
         label:      department.name,
+      });
+
+      notifyHR({
+        title: "Department removed",
+        message: `${department.name} was removed by ${req.user?.name ?? "a team member"}.`,
+        category: "employee",
       });
 
       res.json({ success: true, message: "Department deleted." });
