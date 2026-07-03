@@ -1,87 +1,259 @@
-# HRMS — Frontend ↔ Backend Integration (Demo Quick-Start)
+﻿# HRMS — Human Resource Management System
 
-This wires `hrms-react` (Vite + React) to `hrms-backend` (Express + MongoDB) for a
-live demo. Previously the frontend ran entirely on mock state in `StoreContext.jsx` /
-`AuthContext.jsx`; both now call the real API.
+**MindX Web96 Capstone Project**
+Repo: [github.com/cuonghoangwork/Mindx-Web96-HRMS](https://github.com/cuonghoangwork/Mindx-Web96-HRMS)
 
-## What changed
+A complete full-stack HR management system with employee lifecycle workflows, role-based access control, attendance tracking, payroll support, recruiting and candidate management, holidays, notifications, audit logging, and a self-service profile edit request flow.
 
-**New frontend files**
-- `hrms-react/src/api/client.js` — fetch wrapper: attaches `Authorization: Bearer <access_token>`,
-  auto-refreshes on a 401 using the refresh token, unwraps `{success, ...}` responses.
-- `hrms-react/src/api/index.js` — one namespace per backend resource (`EmployeesAPI`,
-  `DepartmentsAPI`, `JobsAPI`, `CandidatesAPI`, `HolidaysAPI`, `AttendanceAPI`,
-  `NotificationsAPI`, `AuthAPI`).
-- `hrms-react/.env.development` / `.env.example` — `VITE_API_URL` (defaults to
-  `http://localhost:8080/api/v1`).
+---
 
-**Rewired (same external shape, real backend underneath)**
-- `AuthContext.jsx` — `login`/`register`/`logout` now hit `/auth/*`; tokens persist in
-  `localStorage`; `/auth/me` is called on load to restore a session.
-- `StoreContext.jsx` — `employees`, `departments`, `jobs`, `candidates`, `holidays`,
-  `attendance`, `notifications` are now fetched from the API on sign-in, and every
-  mutator (`addEmployee`, `updateJob`, `markNotificationRead`, etc.) calls the matching
-  endpoint. All existing pages/components keep working unchanged because the function
-  names and signatures are identical to the old mock versions.
-- `ProtectedRoute.jsx` — waits for the initial `/auth/me` check before redirecting, so a
-  page refresh doesn't bounce a logged-in user back to `/login`.
-- `Register.jsx` — now calls the real `/auth/register` instead of simulating a delay.
-- `Holidays.jsx` — switched from local component state to `StoreContext` (it was the one
-  page not already reading holidays from the store).
-- `AddEmployee.jsx`, `EmployeeModal.jsx`, `AddDepartmentModal.jsx`, `Jobs.jsx` — create
-  flows now `await` the API call and show the backend's validation error inline instead
-  of optimistically succeeding.
+## Table of Contents
 
-**New backend file**
-- `hrms-backend/seed.js` — populates MongoDB with the admin login + demo employees,
-  departments, jobs, candidates, holidays, attendance, and notifications, so the app
-  isn't empty on first run. Re-runnable; skips anything that already exists.
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Demo Credentials](#demo-credentials)
+- [API Reference](#api-reference)
+- [Database Schema](#database-schema)
+- [Notes](#notes)
 
-No changes were needed to `hrms-backend`'s routes/controllers/models — the existing
-`utils/mappers.js` + `utils/refResolvers.js` mapping layer already speaks the frontend's
-vocabulary (see `hrms-backend/README.md`).
+---
 
-## Run it
+## Tech Stack
 
-**1. Backend**
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 with Vite, React Router v6, Context API, custom design system |
+| Backend | Node.js, Express, MVC architecture |
+| Database | MongoDB with Mongoose |
+| Authentication | JWT access + refresh tokens |
+| File storage | Cloudinary for avatars |
+| Testing | Vitest + Supertest + mongodb-memory-server |
+
+---
+
+## Project Structure
+
+```
+repo/hr-management-system/
+├── hrms-backend/          # Backend server
+│   ├── controller/         # Request handlers
+│   ├── model/              # Mongoose schemas
+│   ├── router/             # Express routes
+│   ├── middleware/         # Auth, validation, upload, audit
+│   ├── utils/              # Helpers and services
+│   ├── seed.js             # Demo data seeding
+│   └── .env.example        # Environment template
+
+├── hrms-react/            # Frontend app
+│   ├── src/api/            # API client and helpers
+│   ├── src/components/     # Reusable UI components and modals
+│   ├── src/context/        # App state and auth contexts
+│   ├── src/pages/          # Route pages
+│   └── .env.development    # Frontend env config
+
+└── README.md              # This file
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18+
+- MongoDB instance or MongoDB Atlas cluster
+- Optional: Cloudinary account for avatar uploads
+
+### Backend Setup
+
 ```bash
-cd hrms-backend
+cd repo/hr-management-system/hrms-backend
 npm install
 cp .env.example .env.dev
 ```
-Edit `.env.dev`:
-- `CONNECT_STRING` — your MongoDB Atlas URI (or a local `mongodb://127.0.0.1:27017/hrms`)
-- `AT_SECRETKEY` / `RT_SECRETKEY` — two different random strings, e.g.
-  `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
-- `CORS_ORIGIN=http://localhost:3000` (already the default)
 
-```bash
-npm run seed:env   # one-time: creates admin@hrms.com / admin123 + demo data
-npm run dev:env    # starts on http://localhost:8080
+Edit `.env.dev` with:
+
+```env
+CONNECT_STRING=mongodb://127.0.0.1:27017/hrms
+AT_SECRETKEY=<random string>
+RT_SECRETKEY=<a different random string>
+CORS_ORIGIN=http://localhost:3000
+CLOUD_NAME=
+CLOUD_API_KEY=
+CLOUD_API_SECRET=
 ```
 
-**2. Frontend**
+Generate secrets with:
+
 ```bash
-cd hrms-react
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Start the backend:
+
+```bash
+npm run seed:env
+npm run dev:env
+```
+
+The backend runs by default on `http://localhost:8080`.
+
+### Frontend Setup
+
+```bash
+cd ../hrms-react
 npm install
-npm run dev        # starts on http://localhost:3000
+npm run dev
 ```
 
-**3. Sign in**
-Go to `http://localhost:3000/login` → use the demo credentials already shown on the
-page: `admin@hrms.com` / `admin123` (seeded with role `ADMIN`).
+If the backend is not on `http://localhost:8080/api/v1`, set `VITE_API_URL` in `hrms-react/.env.development`.
 
-## Notes for the demo
+### Run Backend Tests
 
-- New registrations via `/register` can only self-assign `Employee` or `HR` (mapped to
-  backend roles `EMPLOYEE`/`MANAGER`) — `Administrator` is intentionally not
-  self-registerable; the seeded admin account covers that.
-- Lists are fetched with a large page size (1000) so the existing client-side
-  search/sort/pagination in `AllEmployees.jsx` / `Jobs.jsx` / `Candidates.jsx` keeps
-  working unchanged — fine at demo scale, not meant for a large production dataset.
-- IDs are now MongoDB ObjectId strings end-to-end; every comparison already goes
-  through `utils/id.js`'s `idsMatch()`/`compareIds()` helpers, so this required no
-  further frontend changes (this was the one gap flagged in the earlier backend
-  summary, and it's now closed).
-- The adjustable demo clock (`HeaderDateTime`, `getAppNow()`) remains purely
-  client-side/local — the backend has no concept of it.
+```bash
+cd ../hrms-backend
+npm test
+```
+
+---
+
+## Environment Variables
+
+### Backend (`hrms-backend/.env.example`)
+
+```env
+NODE_ENV=dev
+PORT=8080
+CONNECT_STRING=
+AT_SECRETKEY=
+RT_SECRETKEY=
+AT_EXPIRES_IN=20m
+RT_EXPIRES_IN=4w
+CORS_ORIGIN=http://localhost:3000
+CLOUD_NAME=
+CLOUD_API_KEY=
+CLOUD_API_SECRET=
+```
+
+### Frontend (`hrms-react/.env.development`)
+
+```env
+VITE_API_URL=http://localhost:8080/api/v1
+```
+
+---
+
+## Demo Credentials
+
+Seeded by `npm run seed:env`:
+
+| Role | Email | Password |
+|---|---|---|
+| Administrator | `admin@hrms.com` | `admin123` |
+| HR / Manager | `hr@hrms.com` | `hr123456` |
+| Employee | `john.doe@hrms.com` (and other seeded accounts) | `emp001pass` |
+
+---
+
+## API Reference
+
+Base URL: `/api/v1`.
+
+### Auth
+- `POST /auth/register` — Create an employee account
+- `POST /auth/login` — Returns `{ access_token, refresh_token, user }`
+- `POST /auth/refresh-token` — Exchange refresh token for new tokens
+- `POST /auth/logout` — Clear refresh token
+- `GET /auth/me` — Current user profile
+- `GET /auth/users` — Admin list accounts
+- `PATCH /auth/users/:id/promote` — Admin promote/demote role
+
+### Employees
+- `GET /employees/me`
+- `GET /employees`
+- `GET /employees/:id`
+- `POST /employees`
+- `PUT /employees/:id`
+- `DELETE /employees/:id`
+- `POST /employees/:id/avatar`
+
+### Departments
+- `GET /departments`
+- `GET /departments/:id`
+- `POST /departments`
+- `PUT /departments/:id`
+- `DELETE /departments/:id`
+
+### Attendance
+- `GET /attendance`
+- `POST /attendance/check-in`
+- `POST /attendance/check-out`
+- `PUT /attendance/:id`
+- `DELETE /attendance/:id`
+
+### Jobs
+- `GET /jobs`
+- `GET /jobs/:id`
+- `POST /jobs`
+- `PUT /jobs/:id`
+- `DELETE /jobs/:id`
+
+### Candidates
+- `GET /candidates`
+- `GET /candidates/:id`
+- `POST /candidates`
+- `PUT /candidates/:id`
+- `DELETE /candidates/:id`
+
+### Holidays
+- `GET /holidays`
+- `POST /holidays`
+- `PUT /holidays/:id`
+- `DELETE /holidays/:id`
+
+### Notifications
+- `GET /notifications`
+- `GET /notifications/recipients`
+- `POST /notifications`
+- `PATCH /notifications/:id/read`
+- `PATCH /notifications/read-all`
+- `DELETE /notifications/:id`
+- `DELETE /notifications/clear-read`
+
+### Profile Edit Requests
+- `GET /profile-edit-requests`
+- `POST /profile-edit-requests`
+- `PATCH /profile-edit-requests/:id/review`
+
+### Audit Log
+- `GET /audit-log/recent`
+- `GET /audit-log`
+
+---
+
+## Database Schema
+
+Collections:
+- `users`
+- `employees`
+- `departments`
+- `attendance`
+- `jobs`
+- `candidates`
+- `holidays`
+- `notifications`
+- `auditlogs`
+- `profileEditRequests`
+
+See `hrms_schema_docs.md` for full schema documentation.
+
+---
+
+## Notes
+
+- The frontend and backend are separate apps within the same repository.
+- Only `.env.example` files are tracked; actual `.env.*` files are ignored.
+- Cloudinary credentials are optional and required only for avatar uploads.
+- Use `npm install` in both `hrms-backend` and `hrms-react` before running locally.
