@@ -1,0 +1,56 @@
+# Render Blueprint — deploys the HRMS backend (Web Service) and frontend (Static Site).
+# Usage: push this file to the repo root, then in Render Dashboard choose
+# New -> Blueprint and select this repository. Render will read this file
+# and propose both services below for you to review before creating them.
+#
+# MongoDB is NOT hosted by Render — create a free cluster at
+# https://www.mongodb.com/atlas and paste its connection string into the
+# CONNECT_STRING field when prompted (marked sync: false below).
+
+services:
+  # ── Backend — Express + MongoDB API ──────────────────────────────────
+  - type: web
+    name: hrms-backend
+    runtime: node
+    plan: free
+    rootDir: hrms-backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/audit-log/recent
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AT_EXPIRES_IN
+        value: 20m
+      - key: RT_EXPIRES_IN
+        value: 4w
+      - key: CONNECT_STRING
+        sync: false          # paste your MongoDB Atlas URI
+      - key: AT_SECRETKEY
+        generateValue: true  # Render auto-generates a random secret
+      - key: RT_SECRETKEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://hrms-frontend.onrender.com   # update after the static site is created
+      - key: CLOUD_NAME
+        sync: false           # optional — leave blank to disable avatar upload
+      - key: API_KEY
+        sync: false
+      - key: API_SECRET
+        sync: false
+
+  # ── Frontend — Vite + React static build ─────────────────────────────
+  - type: web
+    name: hrms-frontend
+    runtime: static
+    plan: free
+    rootDir: hrms-react
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://hrms-backend.onrender.com/api/v1   # update to match your actual backend URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
