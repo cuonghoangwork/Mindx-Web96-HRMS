@@ -5,6 +5,15 @@ import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
 import { notifyHR } from "./notificationController.js";
+import { logAction } from "../utils/auditLog.js";
+import bcrypt from "bcryptjs";
+import {
+  generateTempPassword,
+  resolveAccountEmail,
+  assertCanAssignRole,
+} from "../utils/credentials.js";
+
+const SALT_ROUNDS = 10;
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -114,41 +123,99 @@ const employeeController = {
   },
 
   create: async (req, res) => {
+    let createdUserId = null;
     try {
-      const { employeeId, name, email } = req.body;
+      const { employeeId, name, email, createAccount, accountRole = "EMPLOYEE" } = req.body;
       if (!employeeId) throw new Error("employeeId is required.");
       if (!name) throw new Error("name is required.");
-      if (!email) throw new Error("email is required.");
+
+      const wantsAccount = createAccount === true || createAccount === "true";
+      if (!wantsAccount && !email) throw new Error("email is required.");
+
+      if (wantsAccount) assertCanAssignRole(req.user.role, accountRole);
+
+      const accountEmail = resolveAccountEmail(employeeId, email);
+
+      const employeeClash = await EmployeeModel.findOne({ email: accountEmail });
+      if (employeeClash) {
+        return res.status(409).json({
+          success: false,
+          message: `An employee already uses the email ${accountEmail}.`,
+        });
+      }
 
       const data = employeeFromClient(req.body);
+      data.email = accountEmail;
       if (req.body.department) {
         data.department = await resolveDepartmentIdByName(req.body.department);
       }
 
-      // If a User account with the same email already exists, link them
-      const existingUser = await UserModel.findOne({ email: email.toLowerCase() });
+      let existingUser = await UserModel.findOne({ email: accountEmail });
+      let account = null;
+
+      if (existingUser) {
+        account = { email: accountEmail, role: existingUser.role, linked: true };
+      } else if (wantsAccount) {
+        const tempPassword = generateTempPassword();
+        const salt = bcrypt.genSaltSync(SALT_ROUNDS);
+        existingUser = await UserModel.create({
+          email: accountEmail,
+          password: bcrypt.hashSync(tempPassword, salt),
+          name,
+          role: accountRole,
+          mustChangePassword: true,
+        });
+        createdUserId = existingUser._id;
+        account = {
+          email: accountEmail,
+          role: accountRole,
+          tempPassword,
+          mustChangePassword: true,
+        };
+      }
+
       if (existingUser) data.userId = existingUser._id;
 
       const employee = await EmployeeModel.create(data);
       await employee.populate("department", "name");
 
-      // Also update the user record to point to this employee
       if (existingUser && !existingUser.employee) {
         existingUser.employee = employee._id;
         await existingUser.save();
       }
 
+      await logAction(req, {
+        action: "created",
+        resource: "employee",
+        resourceId: employee._id,
+        label: `${employee.name} (${employee.employeeId})`,
+      });
+
+      if (createdUserId) {
+        await logAction(req, {
+          action: "created",
+          resource: "user",
+          resourceId: createdUserId,
+          label: `${accountEmail} (${accountRole})`,
+        });
+      }
+
       notifyHR({
         title: "New employee added",
-        message: `${employee.name} (${employee.employeeId}) was added by ${req.user.name}.`,
+        message: createdUserId
+          ? `${employee.name} (${employee.employeeId}) was added with a ${accountRole} login account.`
+          : `${employee.name} (${employee.employeeId}) was added.`,
         category: "employee",
         link: `/employees/${employee._id}`,
         linkLabel: "View profile",
       });
 
-      res.status(201).json({ success: true, data: employeeToClient(employee) });
+      res.status(201).json({ success: true, data: employeeToClient(employee), account });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      if (createdUserId) {
+        await UserModel.findByIdAndDelete(createdUserId).catch(() => {});
+      }
+      res.status(error.status || 400).json({ success: false, message: error.message });
     }
   },
 

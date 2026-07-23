@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
 import FormField from "../components/FormField";
@@ -64,6 +65,20 @@ const STEP_FIELDS = {
   2: ["employeeId", "department", "designation"],
   3: ["salary"],
 };
+
+const ROLE_LABELS = {
+  EMPLOYEE: "Employee",
+  MANAGER: "HR / Manager",
+  ADMIN: "Administrator",
+};
+
+function deriveLoginEmail(email, employeeId, domain) {
+  const supplied = (email || "").trim();
+  if (supplied) return supplied.toLowerCase();
+  const code = (employeeId || "").trim();
+  if (!code) return "";
+  return `${code.toLowerCase()}@${(domain || "hrms.com").toLowerCase()}`;
+}
 
 function validateField(name, value) {
   return RULES[name] ? RULES[name](value) : "";
@@ -160,7 +175,7 @@ function StepperHeader({ step, completedSteps, onJump }) {
 /* ─────────────────────────────────
    Review step
 ───────────────────────────────── */
-function ReviewStep({ formData, onEdit }) {
+function ReviewStep({ formData, onEdit, loginEmail }) {
   const sections = [
     {
       title: "Personal", stepId: 1,
@@ -182,6 +197,14 @@ function ReviewStep({ formData, onEdit }) {
         { label: "Contract Type", value: formData.type },
         { label: "Start Date",    value: formData.startDate },
         { label: "Status",        value: formData.status },
+      ],
+    },
+    {
+      title: "Account", stepId: 2,
+      rows: [
+        { label: "Login account", value: formData.createAccount ? "Will be created" : "Not created" },
+        { label: "Login email",   value: formData.createAccount ? loginEmail : "" },
+        { label: "Role",          value: formData.createAccount ? ROLE_LABELS[formData.accountRole] : "" },
       ],
     },
     {
@@ -292,7 +315,48 @@ function ReviewStep({ formData, onEdit }) {
 /* ─────────────────────────────────
    Success screen
 ───────────────────────────────── */
-function SuccessScreen({ name }) {
+function CredentialRow({ label, value }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "var(--sp-3)",
+      padding: "var(--sp-3) 0", borderBottom: "1px solid var(--bdr-subtle)",
+    }}>
+      <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", width: "110px", flexShrink: 0, textAlign: "left" }}>
+        {label}
+      </span>
+      <code style={{
+        flex: 1, textAlign: "left", fontFamily: "monospace", fontSize: "var(--fs-md)",
+        color: "var(--txt-primary)", wordBreak: "break-all",
+      }}>{value}</code>
+      <button
+        type="button"
+        onClick={copy}
+        style={{
+          flexShrink: 0, fontSize: "var(--fs-xs)", padding: "4px 10px",
+          borderRadius: "var(--radius-sm)", cursor: "pointer",
+          border: "1px solid var(--bdr-default)", background: "var(--bg-surface)",
+          color: "var(--txt-primary)", fontFamily: "inherit",
+        }}
+      >{copied ? "Copied" : "Copy"}</button>
+    </div>
+  );
+}
+
+function SuccessScreen({ name, account, onDone }) {
+  const hasCredentials = Boolean(account?.tempPassword);
+
   return (
     <div style={{ textAlign: "center", padding: "var(--sp-12) var(--sp-6)" }}>
       <div style={{
@@ -305,9 +369,65 @@ function SuccessScreen({ name }) {
         Added successfully!
       </h3>
       <p style={{ fontSize: "var(--fs-md)", color: "var(--txt-secondary)" }}>
-        <strong>{name}</strong> has been added to the system.<br />
-        Redirecting to employee list...
+        <strong>{name}</strong> has been added to the system.
+        {!hasCredentials && (
+          <>
+            <br />
+            Redirecting to employee list...
+          </>
+        )}
       </p>
+
+      {account?.linked && (
+        <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "var(--sp-3)" }}>
+          Linked to the existing account <strong>{account.email}</strong>.
+        </p>
+      )}
+
+      {hasCredentials && (
+        <>
+          <div style={{
+            maxWidth: "460px", margin: "var(--sp-7) auto 0",
+            padding: "var(--sp-5)", textAlign: "left",
+            background: "var(--bg-surface-alt)", border: "1px solid var(--bdr-subtle)",
+            borderRadius: "var(--radius-lg)",
+          }}>
+            <div style={{
+              fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)",
+              textTransform: "uppercase", letterSpacing: "0.08em",
+              color: "var(--txt-secondary)", marginBottom: "var(--sp-2)",
+            }}>Login details</div>
+            <CredentialRow label="Email" value={account.email} />
+            <CredentialRow label="Temp password" value={account.tempPassword} />
+            <CredentialRow label="Role" value={ROLE_LABELS[account.role] || account.role} />
+          </div>
+
+          <div style={{
+            maxWidth: "460px", margin: "var(--sp-4) auto 0",
+            padding: "var(--sp-4)", textAlign: "left",
+            background: "var(--bg-warning-subtle, var(--bg-surface-alt))",
+            border: "1px solid var(--bdr-warning, var(--bdr-subtle))",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--fs-sm)", color: "var(--txt-warning, var(--txt-secondary))",
+            display: "flex", gap: "var(--sp-3)", alignItems: "flex-start",
+          }}>
+            <span aria-hidden="true" style={{ flexShrink: 0 }}>⚠️</span>
+            <span>
+              This password is shown <strong>once only</strong> and is not stored anywhere.
+              Copy it now and hand it over securely. The employee must change it at first sign-in.
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onDone}
+            className="btn btn-primary"
+            style={{ marginTop: "var(--sp-6)" }}
+          >
+            Done
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -318,19 +438,25 @@ function SuccessScreen({ name }) {
 function AddEmployee() {
   const navigate = useNavigate();
   const { addEmployee, departments } = useStore();
+  const { isAdmin, accountEmailDomain } = useAuth();
 
   const [step, setStep]             = useState(1);
   const [errors, setErrors]         = useState({});
   const [touched, setTouched]       = useState({});
   const [submitted, setSubmitted]   = useState(false);
   const [showToast, setShowToast]   = useState(false);
+  const [createdAccount, setCreatedAccount] = useState(null);
   const [completedSteps, setCompletedSteps] = useState(new Set());
 
   const [form, setForm] = useState({
     name: "", email: "", phone: "", age: "", sex: "", address: "",
     employeeId: "", department: "", designation: "", type: "Full-time", status: "Active",
     salary: "", startDate: "", notes: "",
+    createAccount: true, accountRole: "EMPLOYEE",
   });
+
+  const loginEmail = deriveLoginEmail(form.email, form.employeeId, accountEmailDomain);
+  const roleOptions = isAdmin ? ["EMPLOYEE", "MANAGER", "ADMIN"] : ["EMPLOYEE"];
 
   /* ── realtime: validate on change ── */
   const handleChange = useCallback((e) => {
@@ -376,15 +502,18 @@ function AddEmployee() {
   const handleSubmit = async () => {
     setSubmitError("");
     try {
-      await addEmployee({
+      const res = await addEmployee({
         ...form,
         age: Number(form.age),
         salary: Number(form.salary),
         createdAt: new Date().toISOString().split("T")[0],
       });
+      setCreatedAccount(res?.account || null);
       setSubmitted(true);
       setShowToast(true);
-      setTimeout(() => navigate("/employees"), 2500);
+      if (!res?.account?.tempPassword) {
+        setTimeout(() => navigate("/employees"), 2500);
+      }
     } catch (err) {
       setSubmitError(err.message || "Failed to create employee.");
     }
@@ -563,6 +692,66 @@ function AddEmployee() {
                   </select>
                 </Field>
               </div>
+
+              <div style={{
+                marginTop: "var(--sp-6)", padding: "var(--sp-5)",
+                background: "var(--bg-surface)", border: "1px solid var(--bdr-subtle)",
+                borderRadius: "var(--radius-md)",
+              }}>
+                <div style={{
+                  fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)",
+                  textTransform: "uppercase", letterSpacing: "0.08em",
+                  color: "var(--txt-secondary)", marginBottom: "var(--sp-4)",
+                }}>Account access</div>
+
+                <label style={{
+                  display: "flex", alignItems: "flex-start", gap: "var(--sp-3)",
+                  cursor: "pointer", marginBottom: form.createAccount ? "var(--sp-5)" : 0,
+                }}>
+                  <input
+                    type="checkbox"
+                    name="createAccount"
+                    checked={form.createAccount}
+                    onChange={(e) => setForm((prev) => ({ ...prev, createAccount: e.target.checked }))}
+                    style={{ marginTop: "3px", flexShrink: 0 }}
+                  />
+                  <span>
+                    <span style={{ fontSize: "var(--fs-md)", color: "var(--txt-primary)", fontWeight: "var(--fw-medium)" }}>
+                      Create a login account
+                    </span>
+                    <span style={{ display: "block", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                      A temporary password is generated and shown once after saving. The employee must change it at first sign-in.
+                    </span>
+                  </span>
+                </label>
+
+                {form.createAccount && (
+                  <div className="form-grid">
+                    <Field label="Role" hint={isAdmin ? undefined : "Only an Administrator can create HR or Admin accounts"}>
+                      <select
+                        name="accountRole"
+                        value={form.accountRole}
+                        onChange={handleChange}
+                        style={inputStyle("accountRole")}
+                        disabled={roleOptions.length === 1}
+                      >
+                        {roleOptions.map((role) => (
+                          <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Login email" hint={form.email ? "Taken from the Personal step" : "Derived from the Employee ID"}>
+                      <input
+                        value={loginEmail}
+                        readOnly
+                        placeholder="Enter an Employee ID or email"
+                        style={{ ...inputStyle("loginEmail"), background: "var(--bg-surface-alt)", cursor: "default" }}
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -622,11 +811,17 @@ function AddEmployee() {
 
           {/* ── STEP 4: Review ── */}
           {step === 4 && !submitted && (
-            <ReviewStep formData={form} onEdit={jumpTo} />
+            <ReviewStep formData={form} onEdit={jumpTo} loginEmail={loginEmail} />
           )}
 
           {/* ── Success ── */}
-          {submitted && <SuccessScreen name={form.name} />}
+          {submitted && (
+            <SuccessScreen
+              name={form.name}
+              account={createdAccount}
+              onDone={() => navigate("/employees")}
+            />
+          )}
         </div>
 
         {/* ── Submit error ── */}

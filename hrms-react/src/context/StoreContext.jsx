@@ -37,7 +37,7 @@ function upsertAttendanceRecord(prev, record) {
 }
 
 export function StoreProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, mustChangePassword } = useAuth();
 
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -110,7 +110,7 @@ export function StoreProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !mustChangePassword) {
       refreshAll();
     } else {
       setEmployees([]);
@@ -120,15 +120,16 @@ export function StoreProvider({ children }) {
       setHolidays([]);
       setAttendance([]);
       setNotifications([]);
+      setStoreError(null);
       setLoadingStore(false);
     }
-  }, [isAuthenticated, refreshAll]);
+  }, [isAuthenticated, mustChangePassword, refreshAll]);
 
   /* ── Employee actions ── */
   const addEmployee = useCallback(async (employee) => {
     const res = await EmployeesAPI.create(employee);
     setEmployees((prev) => [...prev, res.data]);
-    return res.data;
+    return res;
   }, []);
 
   const removeEmployee = useCallback(async (id) => {
