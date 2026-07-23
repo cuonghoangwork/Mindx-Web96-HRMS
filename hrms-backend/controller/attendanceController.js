@@ -1,6 +1,8 @@
 import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
 import { attendanceToClient, attendanceFromClient } from "../utils/mappers.js";
+import { closeAttendanceDay } from "../jobs/closeAttendanceDay.js";
+import { dateKeyInTz } from "../utils/workday.js";
 
 const attendanceController = {
   getAll: async (req, res) => {
@@ -131,6 +133,17 @@ const attendanceController = {
       const record = await AttendanceModel.findByIdAndDelete(req.params.id);
       if (!record) throw new Error("Attendance record not found.");
       res.json({ success: true, message: "Attendance record deleted." });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  closeDay: async (req, res) => {
+    try {
+      const timeZone = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
+      const dateKey = req.body?.date || dateKeyInTz(new Date(), timeZone);
+      const result = await closeAttendanceDay({ dateKey });
+      res.json({ success: true, data: result });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
