@@ -3,6 +3,7 @@
 import { apiFetch, qs } from "./client";
 
 export const AuthAPI = {
+  config: () => apiFetch("/auth/config", { auth: false }),
   login: (email, password) =>
     apiFetch("/auth/login", { method: "POST", body: { email, password }, auth: false }),
   // No role field — all self-registered accounts are EMPLOYEE
@@ -10,6 +11,11 @@ export const AuthAPI = {
     apiFetch("/auth/register", { method: "POST", body: { name, email, password }, auth: false }),
   me: () => apiFetch("/auth/me"),
   logout: () => apiFetch("/auth/logout", { method: "POST" }),
+  changePassword: (currentPassword, newPassword) =>
+    apiFetch("/auth/change-password", {
+      method: "POST",
+      body: { currentPassword, newPassword },
+    }),
   // Admin-only
   listUsers: () => apiFetch("/auth/users"),
   promoteUser: (id, role) =>
@@ -65,6 +71,7 @@ export const AttendanceAPI = {
   list: (params = {}) => apiFetch(`/attendance${qs({ pageSize: ALL, ...params })}`),
   checkIn: (data) => apiFetch("/attendance/check-in", { method: "POST", body: data }),
   checkOut: (data) => apiFetch("/attendance/check-out", { method: "POST", body: data }),
+  closeDay: (date) => apiFetch("/attendance/close-day", { method: "POST", body: { date } }),
 };
 
 export const NotificationsAPI = {
