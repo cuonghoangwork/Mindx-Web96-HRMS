@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext'
  *   <ProtectedRoute requireAdmin>  — ADMIN only
  */
 function ProtectedRoute({ children, requireHR = false, requireAdmin = false }) {
-  const { isAuthenticated, isHR, isAdmin, loading } = useAuth()
+  const { isAuthenticated, isHR, isAdmin, loading, mustChangePassword } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -28,6 +28,10 @@ function ProtectedRoute({ children, requireHR = false, requireAdmin = false }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
   }
 
   if (requireAdmin && !isAdmin) {

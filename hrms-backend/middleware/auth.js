@@ -1,5 +1,12 @@
 import jwt from "jsonwebtoken";
 
+const PASSWORD_GATE_ALLOW = ["/auth/me", "/auth/change-password", "/auth/logout"];
+
+export function isPasswordGateAllowed(baseUrl = "", path = "") {
+  const route = `${baseUrl}${path}`.replace(/\/+$/, "") || `${baseUrl}${path}`;
+  return PASSWORD_GATE_ALLOW.some((allowed) => route.endsWith(allowed));
+}
+
 export const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // "Bearer <token>"
@@ -12,6 +19,15 @@ export const verifyToken = (req, res, next) => {
     if (decoded.tokenType !== "AT") {
       return res.status(401).json({ success: false, message: "Invalid token type." });
     }
+
+    if (decoded.mustChangePassword === true && !isPasswordGateAllowed(req.baseUrl, req.path)) {
+      return res.status(403).json({
+        success: false,
+        code: "PASSWORD_CHANGE_REQUIRED",
+        message: "You must change your password before continuing.",
+      });
+    }
+
     req.user = decoded;
     next();
   } catch {
