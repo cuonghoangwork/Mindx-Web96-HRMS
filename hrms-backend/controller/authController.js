@@ -4,12 +4,21 @@ import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import { signTokens } from "../utils/tokens.js";
 import { notifyHR } from "./notificationController.js";
+import { publicRegistrationEnabled, accountEmailDomain } from "../middleware/registrationGate.js";
 
 const SALT_ROUNDS = 10;
 
 const authController = {
-  // All self-registered accounts are EMPLOYEE. MANAGER/ADMIN can only be
-  // set via seed.js (ADMIN) or the promote endpoint (MANAGER).
+  config: (req, res) => {
+    res.json({
+      success: true,
+      data: {
+        publicRegistration: publicRegistrationEnabled(),
+        accountEmailDomain: accountEmailDomain(),
+      },
+    });
+  },
+
   register: async (req, res) => {
     try {
       const { email, password, name } = req.body;
@@ -73,10 +82,12 @@ const authController = {
         return res.status(400).json({ success: false, message: "Email or password is incorrect." });
       }
 
+      const mustChangePassword = Boolean(user.mustChangePassword);
       const { access_token, refresh_token } = signTokens({
         id: user._id,
         email: user.email,
         role: user.role,
+        mustChangePassword,
       });
 
       user.refreshToken = refresh_token;
@@ -93,6 +104,7 @@ const authController = {
             name: user.name,
             role: user.role,
             employeeId: user.employee ? String(user.employee) : null,
+            mustChangePassword,
           },
         },
       });
@@ -127,6 +139,7 @@ const authController = {
         id: user._id,
         email: user.email,
         role: user.role,
+        mustChangePassword: Boolean(user.mustChangePassword),
       });
 
       user.refreshToken = new_refresh_token;
@@ -159,10 +172,66 @@ const authController = {
           name: user.name,
           role: user.role,
           employeeId: user.employee ? String(user.employee) : null,
+          mustChangePassword: Boolean(user.mustChangePassword),
         },
       });
     } catch (error) {
       res.status(404).json({ success: false, message: error.message });
+    }
+  },
+
+  changePassword: async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword) throw new Error("currentPassword is required.");
+      if (!newPassword) throw new Error("newPassword is required.");
+      if (newPassword.length < 8) {
+        throw new Error("New password must be at least 8 characters.");
+      }
+      if (newPassword === currentPassword) {
+        throw new Error("New password must be different from the current password.");
+      }
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user) throw new Error("User not found.");
+
+      if (!bcrypt.compareSync(currentPassword, user.password)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Current password is incorrect." });
+      }
+
+      const salt = bcrypt.genSaltSync(SALT_ROUNDS);
+      user.password = bcrypt.hashSync(newPassword, salt);
+      user.mustChangePassword = false;
+
+      const { access_token, refresh_token } = signTokens({
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        mustChangePassword: false,
+      });
+      user.refreshToken = refresh_token;
+      await user.save();
+
+      res.json({
+        success: true,
+        message: "Password updated.",
+        data: {
+          access_token,
+          refresh_token,
+          user: {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            employeeId: user.employee ? String(user.employee) : null,
+            mustChangePassword: false,
+          },
+        },
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
     }
   },
 
@@ -178,6 +247,7 @@ const authController = {
           name: u.name,
           role: u.role,
           employeeId: u.employee ? String(u.employee) : null,
+          mustChangePassword: Boolean(u.mustChangePassword),
           createdAt: u.createdAt,
         })),
       });
@@ -187,29 +257,19 @@ const authController = {
   },
 
   // PATCH /api/v1/auth/users/:id/promote — ADMIN only
-  // Allows promoting EMPLOYEE → MANAGER, or demoting MANAGER → EMPLOYEE.
-  // ADMIN accounts can never be promoted/demoted this way (only via seed/config).
   promote: async (req, res) => {
     try {
       const { role } = req.body;
-      if (!["EMPLOYEE", "MANAGER"].includes(role)) {
+      if (!["EMPLOYEE", "MANAGER", "ADMIN"].includes(role)) {
         return res.status(400).json({
           success: false,
-          message: "Only EMPLOYEE and MANAGER roles can be set through this endpoint.",
+          message: "role must be one of EMPLOYEE, MANAGER or ADMIN.",
         });
       }
 
       const target = await UserModel.findById(req.params.id);
       if (!target) throw new Error("User not found.");
 
-      if (target.role === "ADMIN") {
-        return res.status(403).json({
-          success: false,
-          message: "ADMIN accounts cannot be modified through this endpoint.",
-        });
-      }
-
-      // Prevent an admin from demoting themselves (they could lock themselves out)
       if (String(target._id) === String(req.user.id)) {
         return res.status(403).json({
           success: false,
@@ -217,12 +277,26 @@ const authController = {
         });
       }
 
+      if (target.role === role) {
+        return res.json({
+          success: true,
+          message: `${target.name} is already ${role}.`,
+          data: { id: target._id, email: target.email, name: target.name, role: target.role },
+        });
+      }
+
+      const LABELS = {
+        EMPLOYEE: "set back to Employee",
+        MANAGER: "promoted to HR/Manager",
+        ADMIN: "promoted to Administrator",
+      };
+
       target.role = role;
       await target.save();
 
       res.json({
         success: true,
-        message: `${target.name} has been ${role === "MANAGER" ? "promoted to HR/Manager" : "set back to Employee"}.`,
+        message: `${target.name} has been ${LABELS[role]}.`,
         data: { id: target._id, email: target.email, name: target.name, role: target.role },
       });
     } catch (error) {

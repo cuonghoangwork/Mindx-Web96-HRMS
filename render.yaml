@@ -38,6 +38,24 @@ services:
         sync: false
       - key: API_SECRET
         sync: false
+      - key: ALLOW_PUBLIC_REGISTRATION
+        value: "false"        # accounts are created through the Add Employee flow
+      - key: ACCOUNT_EMAIL_DOMAIN
+        value: hrms.com
+      # Free web services sleep after ~15 min idle, so an in-process cron never
+      # fires. Leave this false here and trigger POST /api/v1/attendance/close-day
+      # from a Render Cron Job (or GitHub Actions) with an ADMIN token.
+      # Switch to "true" once this service runs on an always-on paid plan.
+      - key: ENABLE_SCHEDULER
+        value: "false"
+      - key: SCHEDULER_TZ
+        value: Asia/Ho_Chi_Minh
+      - key: CRON_CLOSE_ATTENDANCE
+        value: 0 22 * * *
+      - key: WORKDAY_END
+        value: "18:00"
+      - key: WORKDAY_LATE_AFTER
+        value: "09:15"
 
   # ── Frontend — Vite + React static build ─────────────────────────────
   - type: web

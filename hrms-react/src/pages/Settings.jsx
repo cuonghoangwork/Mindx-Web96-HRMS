@@ -710,12 +710,24 @@ function PromoteUsersPanel() {
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>{u.email}</div>
               </div>
               <RolePill role={u.role} />
-              {!isAdminAcc && !isSelf && (
+              {u.mustChangePassword && (
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', flexShrink: 0 }}>Not activated</span>
+              )}
+              {!isSelf && (
                 <div style={{ display: 'flex', gap: 'var(--sp-2)', flexShrink: 0 }}>
-                  {isManager ? (
-                    <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
-                      {isLoading ? '…' : 'Demote'}
+                  {isAdminAcc ? (
+                    <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
+                      {isLoading ? '…' : 'Demote to HR'}
                     </button>
+                  ) : isManager ? (
+                    <>
+                      <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
+                        {isLoading ? '…' : 'Demote'}
+                      </button>
+                      <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
+                        {isLoading ? '…' : 'Make Admin'}
+                      </button>
+                    </>
                   ) : (
                     <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
                       {isLoading ? '…' : 'Promote to HR'}
@@ -723,15 +735,15 @@ function PromoteUsersPanel() {
                   )}
                 </div>
               )}
-              {isAdminAcc && !isSelf && (
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-disabled)', flexShrink: 0 }}>Cannot modify</span>
+              {isSelf && (
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-disabled)', flexShrink: 0 }}>Cannot change own role</span>
               )}
             </div>
           )
         })}
       </div>
       <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: 'var(--sp-4)' }}>
-        ADMIN accounts can only be created via database configuration. Promote grants full HR/Manager access; Demote returns the account to Employee read-only mode.
+        Accounts are created through the Add Employee flow. Promote grants full HR/Manager access; Demote returns the account to Employee read-only mode. You cannot change your own role.
       </p>
     </div>
   )

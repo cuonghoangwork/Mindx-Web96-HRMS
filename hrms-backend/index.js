@@ -8,6 +8,7 @@ dotenv.config({ path: `.env.${env}` });
 
 import { connectDB } from "./config/db.js";
 import rootRouter from "./router/index.js";
+import { startScheduler } from "./jobs/index.js";
 
 const app = express();
 
@@ -36,6 +37,7 @@ const PORT = process.env.PORT || 8080;
 
 connectDB()
   .then(() => {
+    startScheduler();
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
   })
   .catch((err) => {

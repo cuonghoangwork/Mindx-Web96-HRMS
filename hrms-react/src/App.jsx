@@ -20,6 +20,23 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import EnterOTP from "./pages/EnterOTP";
 import LoginSuccessful from "./pages/LoginSuccessful";
+import ChangePassword from "./pages/ChangePassword";
+
+function ConfigPending() {
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--bg-page)" }}>
+      <span style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-md)" }}>Loading…</span>
+    </div>
+  );
+}
+
+function RegisterRoute() {
+  const { isAuthenticated, publicRegistration, configLoading } = useAuth();
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (configLoading) return <ConfigPending />;
+  if (!publicRegistration) return <Navigate to="/login" replace />;
+  return <Register />;
+}
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -31,13 +48,19 @@ function App() {
         path="/login"
         element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
       />
-      <Route
-        path="/register"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Register />}
-      />
+      <Route path="/register" element={<RegisterRoute />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/enter-otp" element={<EnterOTP />} />
       <Route path="/login-successful" element={<LoginSuccessful />} />
+
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePassword />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected app shell */}
       <Route

@@ -9,6 +9,7 @@ import holidayRouter from "./holidayRouter.js";
 import notificationRouter from "./notificationRouter.js";
 import auditLogRouter from "./auditLogRouter.js";
 import profileEditRequestRouter from "./profileEditRequestRouter.js";
+import leaveRequestRouter from "./leaveRequestRouter.js";
 
 const rootRouter = Router();
 
@@ -22,5 +23,6 @@ rootRouter.use("/holidays", holidayRouter);
 rootRouter.use("/notifications", notificationRouter);
 rootRouter.use("/audit-log", auditLogRouter);
 rootRouter.use("/profile-edit-requests", profileEditRequestRouter);
+rootRouter.use("/leave-requests", leaveRequestRouter);
 
 export default rootRouter;

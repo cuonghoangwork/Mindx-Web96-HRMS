@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, publicRegistration, configLoading } = useAuth();
   const [email, setEmail] = useState("admin@hrms.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
@@ -24,7 +24,7 @@ function Login() {
     setIsLoading(false);
 
     if (result.success) {
-      navigate(from, { replace: true });
+      navigate(result.mustChangePassword ? "/change-password" : from, { replace: true });
     } else {
       setError(result.error);
     }
@@ -108,12 +108,14 @@ function Login() {
           </button>
         </form>
 
-        <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
-          Don't have an account?{" "}
-          <Link to="/register" className="link-primary">
-            Create one
-          </Link>
-        </p>
+        {!configLoading && publicRegistration && (
+          <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
+            Don't have an account?{" "}
+            <Link to="/register" className="link-primary">
+              Create one
+            </Link>
+          </p>
+        )}
 
         <div className="login-demo-credentials">
           <p>

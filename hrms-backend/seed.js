@@ -6,11 +6,6 @@
 //   npm run seed:env
 //
 // Safe to re-run: skips anything that already exists by natural unique key.
-//
-// Role policy enforced here:
-//   ADMIN   — only via this seed (or direct DB entry). Never self-registerable.
-//   MANAGER — promoted by ADMIN via /auth/users/:id/promote. Seeded here for demo.
-//   EMPLOYEE — default for all self-registered accounts.
 
 import dotenv from "dotenv";
 const env = process.env.NODE_ENV || "dev";
@@ -46,7 +41,7 @@ async function upsertAdmin() {
     email,
     password: hashPassword("admin123"),
     name: "Admin User",
-    role: "ADMIN", // explicitly set — register endpoint never allows this
+    role: "ADMIN",
   });
   console.log("✓ Created ADMIN user:", email, "/ admin123");
   return user;
@@ -64,7 +59,7 @@ async function upsertHRUser() {
     email,
     password: hashPassword("hr123456"),
     name: "HR Manager",
-    role: "MANAGER", // seeded directly; in production promote via /auth/users/:id/promote
+    role: "MANAGER",
   });
   console.log("✓ Created MANAGER user:", email, "/ hr123456");
   return user;
