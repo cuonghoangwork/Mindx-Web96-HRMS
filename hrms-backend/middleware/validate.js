@@ -280,6 +280,17 @@ const attendanceCheckOut = makeValidator([
   (body) => body.checkOut && !TIME_RE.test(body.checkOut) ? "checkOut must be in HH:MM format." : null,
 ]);
 
+/* ══════════════════════════════════════════════════
+   LEAVE REQUEST (task 4.1)
+══════════════════════════════════════════════════ */
+const leaveRequestCreate = makeValidator([
+  required("startDate", "Start date"),
+  isDateString("startDate", "Start date"),
+  required("endDate", "End date"),
+  isDateString("endDate", "End date"),
+  maxLength("reason", "Reason", 500),
+]);
+
 /* ── Exports ── */
 export const validate = {
   employee:   { create: employeeCreate, update: employeeUpdate },
@@ -289,4 +300,5 @@ export const validate = {
   holiday:    { create: holidayCreate, update: holidayUpdate },
   auth:       { register: authRegister, login: authLogin },
   attendance: { checkIn: attendanceCheckIn, checkOut: attendanceCheckOut },
+  leaveRequest: { create: leaveRequestCreate },
 };
