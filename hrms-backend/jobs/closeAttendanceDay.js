@@ -1,8 +1,10 @@
 import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
 import HolidayModel from "../model/Holiday.js";
+import LeaveRequestModel from "../model/LeaveRequest.js";
 import { logAction } from "../utils/auditLog.js";
 import { notifyHR } from "../controller/notificationController.js";
+import { getRemainingPaidDays } from "../utils/leaveBalance.js";
 import {
   WORKDAY_END,
   WORKDAY_LATE_AFTER,
@@ -43,6 +45,18 @@ async function autoCheckOut(date) {
   return closed;
 }
 
+/**
+ * Task 4.2: "late count as half-day paid leave or half-day unpaid leave".
+ * For each employee whose check-in is after WORKDAY_LATE_AFTER, mark the day
+ * "late" and decide whether it draws from their paid leave balance (if they
+ * have >= 0.5 remaining for the year) or is unpaid (once exhausted).
+ *
+ * Processed sequentially (not Promise.all) so that when the SAME employee has
+ * multiple late days queued in one run, each check sees the previous one's
+ * deduction already applied via getRemainingPaidDays — otherwise two late
+ * days in the same batch could both read the same "before" balance and both
+ * get marked "paid" even though only one 0.5-day slice was actually left.
+ */
 async function markLate(date) {
   const candidates = await AttendanceModel.find({
     date,
@@ -50,24 +64,42 @@ async function markLate(date) {
     status: "present",
   });
 
-  const lateIds = [];
-  for (const record of candidates) {
+  const lateRecords = candidates.filter((record) => {
     try {
-      if (isLater(record.checkIn, WORKDAY_LATE_AFTER)) lateIds.push(record._id);
+      return isLater(record.checkIn, WORKDAY_LATE_AFTER);
     } catch {
-      continue;
+      return false;
     }
-  }
-  if (!lateIds.length) return 0;
+  });
+  if (!lateRecords.length) return { count: 0, unpaidCount: 0 };
 
-  const result = await AttendanceModel.updateMany(
-    { _id: { $in: lateIds } },
-    { status: "late" },
-  );
-  return result.modifiedCount ?? lateIds.length;
+  const year = date.getUTCFullYear();
+  let unpaidCount = 0;
+
+  for (const record of lateRecords) {
+    const remaining = await getRemainingPaidDays(record.employee, year);
+    const type = remaining >= 0.5 ? "paid" : "unpaid";
+    if (type === "unpaid") unpaidCount += 1;
+
+    record.status = "late";
+    record.lateHalfDayType = type;
+    await record.save();
+  }
+
+  return { count: lateRecords.length, unpaidCount };
 }
 
-async function markAbsent(dateKey, date) {
+/**
+ * Task 4.6: employees who are neither checked in nor covered by a
+ * pending/approved LeaveRequest for this date are "no-shows", not generic
+ * "absent" — "absent" stays available for manual HR entry. A pending
+ * (not-yet-reviewed) request still counts as "covered": the employee did
+ * file something, and it would be unfair to flag them before HR has acted
+ * on it. Approved requests are already reflected as "on-leave" attendance
+ * records by leaveRequestController's onApprove hook, so they're excluded
+ * here via the `covered` (existing attendance) check, same as before.
+ */
+async function markNoShow(dateKey, date) {
   const employees = await EmployeeModel.find(
     { status: "active", createdAt: { $lte: endOfUtcDay(dateKey) } },
     "_id",
@@ -77,15 +109,25 @@ async function markAbsent(dateKey, date) {
   const existing = await AttendanceModel.find({ date }, "employee");
   const covered = new Set(existing.map((r) => String(r.employee)));
 
+  const leaveRequests = await LeaveRequestModel.find(
+    {
+      status: { $in: ["pending", "approved"] },
+      startDate: { $lte: date },
+      endDate: { $gte: date },
+    },
+    "employee",
+  );
+  const hasLeaveOnFile = new Set(leaveRequests.map((r) => String(r.employee)));
+
   const toInsert = employees
-    .filter((e) => !covered.has(String(e._id)))
+    .filter((e) => !covered.has(String(e._id)) && !hasLeaveOnFile.has(String(e._id)))
     .map((e) => ({
       employee: e._id,
       date,
       checkIn: null,
       checkOut: null,
       hours: 0,
-      status: "absent",
+      status: "no-show",
     }));
 
   if (!toInsert.length) return 0;
@@ -111,13 +153,16 @@ export async function closeAttendanceDay({ dateKey } = {}) {
   const autoCheckedOut = await autoCheckOut(date);
 
   let markedLate = 0;
-  let markedAbsent = 0;
+  let markedLateUnpaid = 0;
+  let markedNoShow = 0;
   if (!reason) {
-    markedLate = await markLate(date);
-    markedAbsent = await markAbsent(dateKey, date);
+    const lateResult = await markLate(date);
+    markedLate = lateResult.count;
+    markedLateUnpaid = lateResult.unpaidCount;
+    markedNoShow = await markNoShow(dateKey, date);
   }
 
-  const total = autoCheckedOut + markedLate + markedAbsent;
+  const total = autoCheckedOut + markedLate + markedNoShow;
   if (total > 0) {
     await logAction(
       {},
@@ -128,14 +173,15 @@ export async function closeAttendanceDay({ dateKey } = {}) {
         changes: {
           autoCheckedOut: { from: 0, to: autoCheckedOut },
           markedLate: { from: 0, to: markedLate },
-          markedAbsent: { from: 0, to: markedAbsent },
+          markedLateUnpaid: { from: 0, to: markedLateUnpaid },
+          markedNoShow: { from: 0, to: markedNoShow },
         },
       },
     );
 
     await notifyHR({
       title: `Attendance closed for ${dateKey}`,
-      message: `${autoCheckedOut} auto checked out, ${markedLate} marked late, ${markedAbsent} marked absent.`,
+      message: `${autoCheckedOut} auto checked out, ${markedLate} marked late (${markedLateUnpaid} unpaid), ${markedNoShow} marked no-show.`,
       category: "system",
       link: "/attendance",
       linkLabel: "View attendance",
@@ -148,7 +194,8 @@ export async function closeAttendanceDay({ dateKey } = {}) {
     reason,
     autoCheckedOut,
     markedLate,
-    markedAbsent,
+    markedLateUnpaid,
+    markedNoShow,
   };
 }
 

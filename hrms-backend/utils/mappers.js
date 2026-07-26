@@ -44,6 +44,9 @@ const ATTENDANCE_STATUS = {
   Late: "late",
   "On Leave": "on-leave",
   Absent: "absent",
+  // Task 4.6: automated end-of-day "no one heard from them" status, distinct from the
+  // manually-entered "Absent". See jobs/closeAttendanceDay.js markNoShow().
+  "No-show": "no-show",
 };
 
 // hrms_schema_docs.md names this category "hiring"; the frontend's StoreContext mock
@@ -277,6 +280,8 @@ export function attendanceToClient(doc) {
     checkOut: o.checkOut ?? null,
     hours: o.hours ?? 0,
     status: toClient(ATTENDANCE_STATUS_REV, o.status),
+    // Task 4.2 — "paid" | "unpaid" | null. Only ever set when status is "Late".
+    lateHalfDayType: o.lateHalfDayType ?? null,
   };
 }
 
@@ -287,6 +292,7 @@ export function attendanceFromClient(body = {}) {
   carry(body, "checkIn", out, "checkIn");
   carry(body, "checkOut", out, "checkOut");
   carry(body, "status", out, "status", (v) => toDb(ATTENDANCE_STATUS, v));
+  carry(body, "lateHalfDayType", out, "lateHalfDayType");
   return out;
 }
 
