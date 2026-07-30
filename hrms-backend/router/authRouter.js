@@ -2,12 +2,13 @@ import { Router } from "express";
 import authController from "../controller/authController.js";
 import { verifyToken, authorize } from "../middleware/auth.js";
 import { blockIfRegistrationClosed } from "../middleware/registrationGate.js";
+import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
 router.get("/config", authController.config);
 
-router.post("/register", blockIfRegistrationClosed, authController.register);
+router.post("/register", blockIfRegistrationClosed, validate.auth.register, authController.register);
 router.post("/login", authController.login);
 router.post("/refresh-token", authController.refreshToken);
 router.post("/logout", verifyToken, authController.logout);
