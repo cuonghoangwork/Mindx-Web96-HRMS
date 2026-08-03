@@ -23,6 +23,16 @@ export function dateKeyInTz(date = new Date(), timeZone = "UTC") {
   }).format(date);
 }
 
+export function utcDateKey(date) {
+  return dateKeyInTz(new Date(date), "UTC");
+}
+
+export function localDateKey(date) {
+  const d = new Date(date);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function utcMidnight(dateKey) {
   if (typeof dateKey !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
     throw new Error(`Invalid date key: ${dateKey}`);

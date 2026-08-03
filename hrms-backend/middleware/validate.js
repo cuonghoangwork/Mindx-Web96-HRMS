@@ -291,6 +291,62 @@ const leaveRequestCreate = makeValidator([
   maxLength("reason", "Reason", 500),
 ]);
 
+const promotionRequestCreate = makeValidator([
+  required("employeeId", "Employee"),
+  (body) =>
+    !body.designation && !body.department && (body.salary === undefined || body.salary === "")
+      ? "Provide at least one of designation, department or annual salary."
+      : null,
+  maxLength("designation", "Designation", 120),
+  isPositiveNumber("salary", "Proposed annual salary"),
+  isDateString("effectiveDate", "Effective date"),
+  maxLength("reason", "Reason", 500),
+]);
+
+export const providedVnd = (value) => value !== undefined && value !== null && value !== "";
+
+const MONEY_FIELDS = ["baseSalary", "bonus", "allowance", "deduction"];
+
+const isVndAmount = (field, label) => (body) => {
+  if (!providedVnd(body[field])) return null;
+  const n = Number(body[field]);
+  if (!Number.isFinite(n) || n < 0) return `${label} must be a non-negative VND amount.`;
+  if (!Number.isInteger(n)) return `${label} must be a whole number of VND (no decimals).`;
+  return null;
+};
+
+const isIntInRange = (field, label, min, max) => (body) => {
+  const n = Number(body[field]);
+  return Number.isInteger(n) && n >= min && n <= max
+    ? null
+    : `${label} must be an integer between ${min} and ${max}.`;
+};
+
+const payrollCreatePeriod = makeValidator([
+  required("year", "Year"),
+  isIntInRange("year", "Year", 2000, 2100),
+  required("month", "Month"),
+  isIntInRange("month", "Month", 1, 12),
+  (body) =>
+    !providedVnd(body.fxRate)
+      ? null
+      : Number.isFinite(Number(body.fxRate)) && Number(body.fxRate) > 0
+        ? null
+        : "FX rate must be a positive number.",
+  maxLength("note", "Note", 300),
+]);
+
+const payrollUpdatePayslip = makeValidator([
+  (body) =>
+    MONEY_FIELDS.some((k) => providedVnd(body[k]))
+      ? null
+      : "Provide at least one of baseSalary, bonus, allowance or deduction.",
+  isVndAmount("baseSalary", "Base salary"),
+  isVndAmount("bonus", "Bonus"),
+  isVndAmount("allowance", "Allowance"),
+  isVndAmount("deduction", "Deduction"),
+]);
+
 /* ── Exports ── */
 export const validate = {
   employee:   { create: employeeCreate, update: employeeUpdate },
@@ -301,4 +357,6 @@ export const validate = {
   auth:       { register: authRegister, login: authLogin },
   attendance: { checkIn: attendanceCheckIn, checkOut: attendanceCheckOut },
   leaveRequest: { create: leaveRequestCreate },
+  promotionRequest: { create: promotionRequestCreate },
+  payroll: { createPeriod: payrollCreatePeriod, updatePayslip: payrollUpdatePayslip },
 };

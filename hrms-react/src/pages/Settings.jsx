@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
+import { useStore } from '../context/StoreContext'
 import { apiFetch } from '../api/client'
-import { ProfileEditRequestsAPI, EmployeesAPI } from '../api'
+import { ProfileEditRequestsAPI, EmployeesAPI, PromotionRequestsAPI } from '../api'
 import { getRoleLabel } from '../utils/roles'
 
 /* ─────────────────────────────────────────────
@@ -392,6 +393,402 @@ function MyProfileEditSection() {
 /* ─────────────────────────────────────────────
    HR/Admin: Review pending profile edit requests
 ───────────────────────────────────────────── */
+const usd = (n) =>
+  n === null || n === undefined || n === '' ? '—' : `$${Number(n).toLocaleString()}`
+
+function PromotionProposeSection() {
+  const { employees, departments } = useStore()
+  const [form, setForm] = useState({
+    employeeId: '', designation: '', department: '', salary: '', effectiveDate: '', reason: '',
+  })
+  const [mine, setMine] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [toast, setToast] = useState('')
+
+  const selected = useMemo(
+    () => employees.find((e) => String(e.id) === String(form.employeeId)) ?? null,
+    [employees, form.employeeId],
+  )
+
+  const loadMine = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await PromotionRequestsAPI.list()
+      setMine(res.items ?? [])
+      setError('')
+    } catch (err) {
+      setError(err.message || 'Failed to load proposals.')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadMine() }, [loadMine])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(''), 4000)
+    return () => clearTimeout(id)
+  }, [toast])
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!form.employeeId) { setError('Pick an employee first.'); return }
+    setSubmitting(true)
+    try {
+      const body = { employeeId: form.employeeId }
+      if (form.designation.trim()) body.designation = form.designation.trim()
+      if (form.department) body.department = form.department
+      if (form.salary !== '') body.salary = Number(form.salary)
+      if (form.effectiveDate) body.effectiveDate = form.effectiveDate
+      if (form.reason.trim()) body.reason = form.reason.trim()
+      await PromotionRequestsAPI.create(body)
+      setToast('Promotion proposal submitted for Administrator review.')
+      setForm({ employeeId: '', designation: '', department: '', salary: '', effectiveDate: '', reason: '' })
+      loadMine()
+    } catch (err) {
+      setError(err.message || 'Failed to submit proposal.')
+    }
+    setSubmitting(false)
+  }
+
+  return (
+    <div>
+      {toast && (
+        <div style={{
+          marginBottom: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
+          background: 'var(--bg-success-subtle)', border: '1px solid var(--bdr-success)',
+          borderRadius: 'var(--radius-md)', color: 'var(--txt-success)', fontSize: 'var(--fs-sm)',
+        }}>{toast}</div>
+      )}
+      {error && (
+        <div style={{
+          marginBottom: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
+          background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)',
+          borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)',
+        }}>{error}</div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div className="form-grid">
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-employee">Employee <span className="required">*</span></label>
+            <select id="promo-employee" name="employeeId" value={form.employeeId} onChange={handleChange}>
+              <option value="">Select an employee…</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>{e.name} ({e.employeeId})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-effective">Effective date</label>
+            <input id="promo-effective" name="effectiveDate" type="date"
+              value={form.effectiveDate} onChange={handleChange} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-designation">New designation</label>
+            <input id="promo-designation" name="designation" value={form.designation}
+              onChange={handleChange} placeholder={selected?.designation || 'Senior Developer'} />
+            {selected && (
+              <span className="form-hint">Currently: {selected.designation || '—'}</span>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-department">New department</label>
+            <select id="promo-department" name="department" value={form.department} onChange={handleChange}>
+              <option value="">Leave unchanged</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+            {selected && (
+              <span className="form-hint">Currently: {selected.department || '—'}</span>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-salary">New annual salary (USD)</label>
+            <input id="promo-salary" name="salary" type="number" min="0" step="1000"
+              value={form.salary} onChange={handleChange} placeholder={selected?.salary ?? '75000'} />
+            {selected && (
+              <span className="form-hint">Currently: {usd(selected.salary)}</span>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="promo-reason">Reason</label>
+            <textarea id="promo-reason" name="reason" rows={2} value={form.reason}
+              onChange={handleChange} placeholder="Why this promotion is justified…"
+              style={{ resize: 'vertical' }} />
+          </div>
+        </div>
+
+        <button type="submit" className="btn btn-primary" disabled={submitting}>
+          {submitting ? 'Submitting…' : 'Submit proposal'}
+        </button>
+      </form>
+
+      <div style={{ marginTop: 'var(--sp-6)' }}>
+        <div style={{
+          fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-semibold)', textTransform: 'uppercase',
+          letterSpacing: '0.08em', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-3)',
+        }}>Recent proposals</div>
+        {loading ? (
+          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>Loading…</div>
+        ) : mine.length === 0 ? (
+          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>No proposals yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
+            {mine.slice(0, 5).map((r) => (
+              <div key={r.id} style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', flexWrap: 'wrap',
+                padding: 'var(--sp-3) var(--sp-4)', background: 'var(--bg-surface-alt)',
+                border: '1px solid var(--bdr-subtle)', borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--fs-sm)',
+              }}>
+                <span style={{ fontWeight: 'var(--fw-medium)', color: 'var(--txt-primary)' }}>
+                  {r.employeeName}
+                </span>
+                <span style={{ color: 'var(--txt-secondary)', flex: 1, minWidth: '160px' }}>
+                  {[
+                    r.proposed.designation && `title → ${r.proposed.designation}`,
+                    r.proposed.department && `dept → ${r.proposed.department}`,
+                    r.proposed.salary !== null && `salary → ${usd(r.proposed.salary)}`,
+                  ].filter(Boolean).join(' · ') || '—'}
+                </span>
+                <StatusBadge status={r.status} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PromotionReviewPanel() {
+  const { user } = useAuth()
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filterStatus, setFilter] = useState('pending')
+  const [reviewingId, setReviewingId] = useState(null)
+  const [note, setNote] = useState('')
+  const [actionLoading, setActionL] = useState(null)
+  const [toast, setToast] = useState('')
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true); setError('')
+    try {
+      const res = await PromotionRequestsAPI.list({ status: filterStatus })
+      setRequests(res.items ?? [])
+    } catch (err) {
+      setError(err.message || 'Failed to load proposals.')
+    }
+    setLoading(false)
+  }, [filterStatus])
+
+  useEffect(() => { loadRequests() }, [loadRequests])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(''), 4000)
+    return () => clearTimeout(id)
+  }, [toast])
+
+  const handleReview = async (requestId, decision) => {
+    setActionL(decision)
+    try {
+      await PromotionRequestsAPI.review(requestId, decision, note)
+      setToast(decision === 'approved' ? 'Promotion approved and applied.' : 'Proposal rejected.')
+      setReviewingId(null)
+      setNote('')
+      loadRequests()
+    } catch (err) {
+      setToast(`Error: ${err.message}`)
+    }
+    setActionL(null)
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', marginBottom: 'var(--sp-5)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--sp-1)', padding: '3px', background: 'var(--bg-surface-alt)', borderRadius: 'var(--radius-sm)' }}>
+          {['pending', 'approved', 'rejected', 'all'].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => { setFilter(s); setReviewingId(null) }}
+              style={{
+                padding: '5px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                background: filterStatus === s ? 'var(--bg-surface)' : 'transparent',
+                color: filterStatus === s ? 'var(--txt-primary)' : 'var(--txt-secondary)',
+                fontFamily: 'var(--font-family)', fontSize: 'var(--fs-xs)',
+                fontWeight: filterStatus === s ? 'var(--fw-medium)' : 'var(--fw-regular)',
+                boxShadow: filterStatus === s ? 'var(--shadow-xs)' : 'none',
+                textTransform: 'capitalize',
+              }}
+            >{s}</button>
+          ))}
+        </div>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>Refresh</button>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
+          {requests.length} proposal{requests.length === 1 ? '' : 's'}
+        </span>
+      </div>
+
+      {toast && (
+        <div style={{
+          marginBottom: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
+          background: toast.startsWith('Error') ? 'var(--bg-danger-subtle)' : 'var(--bg-success-subtle)',
+          border: `1px solid ${toast.startsWith('Error') ? 'var(--bdr-danger)' : 'var(--bdr-success)'}`,
+          borderRadius: 'var(--radius-md)', fontSize: 'var(--fs-sm)',
+          color: toast.startsWith('Error') ? 'var(--txt-danger)' : 'var(--txt-success)',
+        }}>{toast}</div>
+      )}
+
+      {error && (
+        <div style={{
+          marginBottom: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
+          background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)',
+          borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)',
+        }}>{error}</div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 'var(--sp-6)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
+          Loading proposals…
+        </div>
+      ) : requests.length === 0 ? (
+        <div style={{ padding: 'var(--sp-8)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
+          No {filterStatus !== 'all' ? filterStatus : ''} proposals.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+          {requests.map((req) => {
+            const isOpen = reviewingId === req.id
+            const isMine = String(req.requestedBy) === String(user?.id)
+            const rows = [
+              ['Designation', req.current.designation, req.proposed.designation],
+              ['Department', req.current.department, req.proposed.department],
+              ['Annual Salary', usd(req.current.salary), req.proposed.salary === null ? null : usd(req.proposed.salary)],
+            ].filter(([, , to]) => to !== null && to !== undefined)
+
+            return (
+              <div key={req.id} style={{
+                border: `1px solid ${isOpen ? 'var(--bdr-brand)' : 'var(--bdr-subtle)'}`,
+                borderRadius: 'var(--radius-md)', padding: 'var(--sp-4)',
+                background: 'var(--bg-surface-alt)', transition: 'border-color 0.15s',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+                  <div style={{
+                    width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--bg-primary)', color: '#fff', display: 'grid',
+                    placeItems: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)',
+                  }}>{req.employeeName?.[0]?.toUpperCase() ?? '?'}</div>
+                  <div style={{ flex: 1, minWidth: '180px' }}>
+                    <div style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-medium)', color: 'var(--txt-primary)' }}>
+                      {req.employeeName} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>({req.employeeCode})</span>
+                    </div>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
+                      Proposed by {req.requestedByName ?? 'HR'} · {new Date(req.createdAt).toLocaleDateString()}
+                      {req.effectiveDate ? ` · effective ${req.effectiveDate}` : ''}
+                    </div>
+                  </div>
+                  <StatusBadge status={req.status} />
+                  {req.status === 'pending' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
+                    >{isOpen ? 'Close' : 'Review'}</button>
+                  )}
+                </div>
+
+                {isOpen && (
+                  <div style={{ marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-4)', borderTop: '1px solid var(--bdr-subtle)' }}>
+                    <div style={{
+                      fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-semibold)', textTransform: 'uppercase',
+                      letterSpacing: '0.08em', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-2)',
+                    }}>Proposed changes</div>
+                    {rows.map(([label, from, to]) => (
+                      <FieldRow key={label} label={label} from={from} to={to} />
+                    ))}
+
+                    {req.reason && (
+                      <div style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)' }}>
+                        <strong style={{ color: 'var(--txt-primary)' }}>Reason:</strong> {req.reason}
+                      </div>
+                    )}
+
+                    {isMine ? (
+                      <div style={{
+                        marginTop: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
+                        background: 'var(--bg-warning-subtle)', border: '1px solid var(--bdr-warning)',
+                        borderRadius: 'var(--radius-md)', color: 'var(--txt-warning)', fontSize: 'var(--fs-sm)',
+                      }}>
+                        You created this proposal — another Administrator must review it.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="form-group" style={{ marginTop: 'var(--sp-4)' }}>
+                          <label className="form-label" htmlFor={`promo-note-${req.id}`}>
+                            Review Note <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>(optional)</span>
+                          </label>
+                          <textarea
+                            id={`promo-note-${req.id}`}
+                            rows={2}
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Add a note for the employee…"
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-success"
+                            disabled={actionLoading !== null}
+                            onClick={() => handleReview(req.id, 'approved')}
+                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</button>
+                          <button
+                            type="button"
+                            className="btn btn-danger"
+                            disabled={actionLoading !== null}
+                            onClick={() => handleReview(req.id, 'rejected')}
+                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {req.status !== 'pending' && req.reviewNote && (
+                  <div style={{
+                    marginTop: 'var(--sp-3)', paddingTop: 'var(--sp-3)',
+                    borderTop: '1px solid var(--bdr-subtle)', fontStyle: 'italic',
+                    fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)',
+                  }}>Admin note: {req.reviewNote}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ProfileEditReviewPanel() {
   const [requests, setRequests]       = useState([])
   const [loading, setLoading]         = useState(true)
@@ -855,6 +1252,39 @@ function Settings() {
             description="Review and approve or reject employee requests to update their personal information."
           >
             <ProfileEditReviewPanel />
+          </SectionCard>
+        )}
+
+        {/* ── HR/Admin: propose a promotion ── */}
+        {isHR && (
+          <SectionCard
+            accent
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5"/>
+                <path d="M5 12l7-7 7 7"/>
+              </svg>
+            }
+            title="Propose a Promotion"
+            description="Propose a new designation, department or salary for an employee. An Administrator must approve it before it takes effect."
+          >
+            <PromotionProposeSection />
+          </SectionCard>
+        )}
+
+        {/* ── Admin only: promotion approval queue ── */}
+        {isAdmin && (
+          <SectionCard
+            accent
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+            }
+            title="Promotion Approval Queue"
+            description="Approve or reject promotion proposals. You cannot review a proposal you created yourself."
+          >
+            <PromotionReviewPanel />
           </SectionCard>
         )}
 
