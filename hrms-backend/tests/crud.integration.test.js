@@ -32,6 +32,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  if (!dbAvailable) return;
   await clearDb();
   const result = await seedAdminAndLogin(app);
   token = result.token;
@@ -73,45 +74,52 @@ async function createEmployee(overrides = {}) {
 // DEPARTMENTS
 // ══════════════════════════════════════════════════════════
 describe("Department CRUD", () => {
-  it.skipIf(!dbAvailable)("GET /departments returns empty list initially", async () => {
+  it("GET /departments returns empty list initially", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.get("/api/v1/departments").set(auth());
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([]);
   });
 
-  it.skipIf(!dbAvailable)("POST /departments creates a department", async () => {
+  it("POST /departments creates a department", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const dept = await createDepartment("Design");
     expect(dept.name).toBe("Design");
     expect(dept.budget).toBe(500000);
     expect(dept.id).toBeTruthy();
   });
 
-  it.skipIf(!dbAvailable)("POST /departments rejects missing name (validate middleware)", async () => {
+  it("POST /departments rejects missing name (validate middleware)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.post("/api/v1/departments").set(auth()).send({ budget: 100000 });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/Department name/i);
   });
 
-  it.skipIf(!dbAvailable)("POST /departments rejects negative budget", async () => {
+  it("POST /departments rejects negative budget", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.post("/api/v1/departments").set(auth()).send({ name: "X", budget: -1000 });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/Budget/i);
   });
 
-  it.skipIf(!dbAvailable)("POST /departments rejects duplicate name", async () => {
+  it("POST /departments rejects duplicate name", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     await createDepartment("HR");
     const res = await request.post("/api/v1/departments").set(auth()).send({ name: "HR", budget: 0 });
     expect(res.status).toBe(400);
   });
 
-  it.skipIf(!dbAvailable)("PUT /departments/:id updates budget", async () => {
+  it("PUT /departments/:id updates budget", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const dept = await createDepartment("Finance");
     const res = await request.put(`/api/v1/departments/${dept.id}`).set(auth()).send({ budget: 999999 });
     expect(res.status).toBe(200);
     expect(res.body.data.budget).toBe(999999);
   });
 
-  it.skipIf(!dbAvailable)("GET /departments returns created departments", async () => {
+  it("GET /departments returns created departments", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     await createDepartment("Marketing");
     await createDepartment("Sales");
     const res = await request.get("/api/v1/departments").set(auth());
@@ -119,7 +127,8 @@ describe("Department CRUD", () => {
     expect(res.body.items.length).toBe(2);
   });
 
-  it.skipIf(!dbAvailable)("requires authentication", async () => {
+  it("requires authentication", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.get("/api/v1/departments");
     expect(res.status).toBe(401);
   });
@@ -129,7 +138,8 @@ describe("Department CRUD", () => {
 // EMPLOYEES
 // ══════════════════════════════════════════════════════════
 describe("Employee CRUD", () => {
-  it.skipIf(!dbAvailable)("POST /employees creates an employee", async () => {
+  it("POST /employees creates an employee", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const { employee, res } = await createEmployee();
     expect(res.status).toBe(201);
     expect(employee.name).toBe("Jane Doe");
@@ -140,7 +150,8 @@ describe("Employee CRUD", () => {
     expect(employee.id).toBeTruthy();
   });
 
-  it.skipIf(!dbAvailable)("POST /employees rejects missing name (validate)", async () => {
+  it("POST /employees rejects missing name (validate)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const dept = await createDepartment();
     const res = await request.post("/api/v1/employees").set(auth()).send({
       employeeId: "EMP002", email: "x@test.com", age: 25, department: dept.name, salary: 50000,
@@ -149,7 +160,8 @@ describe("Employee CRUD", () => {
     expect(res.body.message).toMatch(/name/i);
   });
 
-  it.skipIf(!dbAvailable)("POST /employees rejects invalid employeeId format (validate)", async () => {
+  it("POST /employees rejects invalid employeeId format (validate)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const dept = await createDepartment();
     const res = await request.post("/api/v1/employees").set(auth()).send({
       name: "Bob", employeeId: "123", email: "b@test.com", age: 25, department: dept.name, salary: 50000,
@@ -158,7 +170,8 @@ describe("Employee CRUD", () => {
     expect(res.body.message).toMatch(/Employee ID/i);
   });
 
-  it.skipIf(!dbAvailable)("POST /employees rejects age out of range (validate)", async () => {
+  it("POST /employees rejects age out of range (validate)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const dept = await createDepartment();
     const res = await request.post("/api/v1/employees").set(auth()).send({
       name: "Bob", employeeId: "EMP099", email: "b@test.com", age: 15, department: dept.name, salary: 50000,
@@ -167,7 +180,8 @@ describe("Employee CRUD", () => {
     expect(res.body.message).toMatch(/Age/i);
   });
 
-  it.skipIf(!dbAvailable)("GET /employees returns created employees", async () => {
+  it("GET /employees returns created employees", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     await createEmployee();
     const res = await request.get("/api/v1/employees").set(auth());
     expect(res.status).toBe(200);
@@ -175,7 +189,8 @@ describe("Employee CRUD", () => {
     expect(res.body.totalItems).toBe(1);
   });
 
-  it.skipIf(!dbAvailable)("GET /employees/:id returns a single employee", async () => {
+  it("GET /employees/:id returns a single employee", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const { employee } = await createEmployee();
     const res = await request.get(`/api/v1/employees/${employee.id}`).set(auth());
     expect(res.status).toBe(200);
@@ -183,12 +198,14 @@ describe("Employee CRUD", () => {
     expect(res.body.data.name).toBe("Jane Doe");
   });
 
-  it.skipIf(!dbAvailable)("GET /employees/:id returns 404 for unknown id", async () => {
+  it("GET /employees/:id returns 404 for unknown id", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.get("/api/v1/employees/507f1f77bcf86cd799439099").set(auth());
     expect(res.status).toBe(404);
   });
 
-  it.skipIf(!dbAvailable)("PUT /employees/:id updates status", async () => {
+  it("PUT /employees/:id updates status", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const { employee } = await createEmployee();
     const res = await request
       .put(`/api/v1/employees/${employee.id}`)
@@ -198,7 +215,8 @@ describe("Employee CRUD", () => {
     expect(res.body.data.status).toBe("On Leave");
   });
 
-  it.skipIf(!dbAvailable)("PUT /employees/:id rejects invalid status (validate)", async () => {
+  it("PUT /employees/:id rejects invalid status (validate)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const { employee } = await createEmployee();
     const res = await request
       .put(`/api/v1/employees/${employee.id}`)
@@ -208,7 +226,8 @@ describe("Employee CRUD", () => {
     expect(res.body.message).toMatch(/Status/i);
   });
 
-  it.skipIf(!dbAvailable)("DELETE /employees/:id removes the employee", async () => {
+  it("DELETE /employees/:id removes the employee", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const { employee } = await createEmployee();
     const delRes = await request.delete(`/api/v1/employees/${employee.id}`).set(auth());
     expect(delRes.status).toBe(200);
@@ -216,16 +235,23 @@ describe("Employee CRUD", () => {
     expect(getRes.status).toBe(404);
   });
 
-  it.skipIf(!dbAvailable)("requires authentication", async () => {
+  it("requires authentication", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.get("/api/v1/employees");
     expect(res.status).toBe(401);
   });
 
-  it.skipIf(!dbAvailable)("rejects EMPLOYEE role from creating staff (authorize middleware)", async () => {
-    // Register a plain employee account
-    await request.post("/api/v1/auth/register").send({
-      name: "Staff", email: "staff@hrms.com", password: "staffpass1", role: "EMPLOYEE",
-    });
+  it("rejects EMPLOYEE role from creating staff (authorize middleware)", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
+    // Create a plain EMPLOYEE account directly (registration is gated by
+    // Sprint 1's ALLOW_PUBLIC_REGISTRATION; this test only cares about the
+    // authorize() middleware, not the registration endpoint, so it bypasses
+    // the gate the same way seedAdminAndLogin bypasses it for the admin user).
+    const bcrypt = (await import("bcryptjs")).default;
+    const { default: UserModel } = await import("../model/User.js");
+    const hash = bcrypt.hashSync("staffpass1", 10);
+    await UserModel.create({ email: "staff@hrms.com", password: hash, name: "Staff", role: "EMPLOYEE" });
+
     const loginRes = await request.post("/api/v1/auth/login").send({ email: "staff@hrms.com", password: "staffpass1" });
     const staffToken = loginRes.body.data?.access_token;
     const dept = await createDepartment();
@@ -241,7 +267,8 @@ describe("Employee CRUD", () => {
 // AUDIT LOG
 // ══════════════════════════════════════════════════════════
 describe("Audit log", () => {
-  it.skipIf(!dbAvailable)("GET /audit-log/recent returns entries after employee creation", async () => {
+  it("GET /audit-log/recent returns entries after employee creation", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     await createEmployee();
     const res = await request.get("/api/v1/audit-log/recent?limit=5").set(auth());
     expect(res.status).toBe(200);
@@ -251,7 +278,8 @@ describe("Audit log", () => {
     expect(actions).toContain("created");
   });
 
-  it.skipIf(!dbAvailable)("GET /audit-log/recent entries have title and category fields", async () => {
+  it("GET /audit-log/recent entries have title and category fields", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     await createEmployee();
     const res = await request.get("/api/v1/audit-log/recent").set(auth());
     const entry = res.body.items[0];
@@ -259,7 +287,8 @@ describe("Audit log", () => {
     expect(entry.category).toBeTruthy();
   });
 
-  it.skipIf(!dbAvailable)("GET /audit-log requires authentication", async () => {
+  it("GET /audit-log requires authentication", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
     const res = await request.get("/api/v1/audit-log");
     expect(res.status).toBe(401);
   });
