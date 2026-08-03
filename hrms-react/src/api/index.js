@@ -84,6 +84,29 @@ export const NotificationsAPI = {
   remove: (id) => apiFetch(`/notifications/${id}`, { method: "DELETE" }),
 };
 
+export const PromotionRequestsAPI = {
+  create: (data) => apiFetch("/promotion-requests", { method: "POST", body: data }),
+  list: (params = {}) => apiFetch(`/promotion-requests${qs(params)}`),
+  review: (id, decision, reviewNote = "") =>
+    apiFetch(`/promotion-requests/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
+};
+
+export const PayrollAPI = {
+  listPeriods: (params = {}) => apiFetch(`/payroll/periods${qs(params)}`),
+  createPeriod: (body) => apiFetch("/payroll/periods", { method: "POST", body }),
+  regenerate: (id) => apiFetch(`/payroll/periods/${id}/regenerate`, { method: "POST" }),
+  listPayslips: (id) => apiFetch(`/payroll/periods/${id}/payslips`),
+  setPeriodStatus: (id, status) =>
+    apiFetch(`/payroll/periods/${id}/status`, { method: "PATCH", body: { status } }),
+  removePeriod: (id) => apiFetch(`/payroll/periods/${id}`, { method: "DELETE" }),
+  updatePayslip: (id, body) => apiFetch(`/payroll/payslips/${id}`, { method: "PATCH", body }),
+  recomputeDeduction: (id) =>
+    apiFetch(`/payroll/payslips/${id}/recompute-deduction`, { method: "POST" }),
+};
+
 export const ProfileEditRequestsAPI = {
   /** Employee submits a request: changes = { name, phone, address, age, sex } (only changed fields) */
   create: (changes) => apiFetch("/profile-edit-requests", { method: "POST", body: { changes } }),

@@ -1,245 +1,154 @@
-import { useState, useMemo, Fragment } from "react";
-import { useStore } from "../context/StoreContext";
+import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
+import { useAuth } from "../context/AuthContext";
+import { PayrollAPI } from "../api";
 import Avatar from "../components/Avatar";
-import { StatusBadge, TypeBadge } from "../components/Badge";
+import { TypeBadge } from "../components/Badge";
 
-/* ─── Helpers ───
-   fmt/fmtK take an amount already expressed in the app's canonical unit — an annual USD
-   figure, matching how `employee.salary` is stored — plus an optional `currency` ("USD"
-   default, or "VND"). When "VND" is requested, the amount is converted using the same
-   USD_TO_VND rate the Vietnam payroll engine below uses, so switching currency and
-   switching to a VN-computed breakdown always agree on the same conversion. (USD_TO_VND
-   is declared further down in this file; that's fine since these functions aren't
-   invoked until render time, well after the whole module has finished evaluating.) */
-function fmt(amountUsd, currency = "USD") {
-  if (currency === "VND") {
-    const vnd = Math.round(amountUsd * USD_TO_VND);
-    return `${vnd.toLocaleString("vi-VN")} ₫`;
-  }
-  return `$${Number(amountUsd).toLocaleString()}`;
-}
-
-function fmtK(amountUsd, currency = "USD") {
-  if (currency === "VND") {
-    const vnd = amountUsd * USD_TO_VND;
-    if (vnd >= 1_000_000_000) return `${(vnd / 1_000_000_000).toFixed(1)} tỷ ₫`;
-    if (vnd >= 1_000_000)     return `${(vnd / 1_000_000).toFixed(0)} triệu ₫`;
-    return `${Math.round(vnd).toLocaleString("vi-VN")} ₫`;
-  }
-  return amountUsd >= 1_000_000 ? `$${(amountUsd / 1_000_000).toFixed(1)}M`
-       : amountUsd >= 1_000     ? `$${(amountUsd / 1_000).toFixed(0)}K`
-       : `$${amountUsd}`;
-}
-
-// Matches AllEmployees.jsx's EMPLOYEES_PER_PAGE pattern — the salary table previously
-// rendered every filtered row unpaginated, which doesn't scale past demo data volume.
 const PAYROLL_PER_PAGE = 10;
 
-/* ─── Vietnam payroll deduction engine ───
-   Replaces the previous flat US-style 22% federal / 6.2% Social Security / 1.45%
-   Medicare estimate with Vietnam's actual statutory formulas:
-     - Employee-side social/health/unemployment insurance contributions
-     - Progressive monthly Personal Income Tax (PIT) on resident employment income
-
-   Currency note: `employee.salary` is stored and displayed as an ANNUAL USD figure
-   throughout the rest of the app (seed data, `fmt`/`fmtK`, the salary table). Vietnamese
-   payroll law is denominated in VND with brackets/caps set in VND, so this function
-   converts the USD gross to a monthly VND figure, runs the real VN formulas against
-   that, then converts each resulting bucket back to an annual USD-equivalent so every
-   existing caller (`SalaryBar`, `BreakdownPanel`, `exportCSV`, the salary table) keeps
-   working with its current "$" formatting unchanged. The conversion rate is a constant
-   below rather than a live FX lookup — real payroll would lock in a rate per pay period,
-   but a fixed rate is enough to make the VN brackets/caps apply meaningfully to this
-   demo's USD-denominated seed salaries. */
-
-// Approximate USD → VND conversion used only to translate this demo's USD-denominated
-// salaries into a realistic VND monthly gross before applying Vietnamese payroll law.
-const USD_TO_VND = 25_000;
-
-// Statutory base salary ("lương cơ sở"), effective July 1, 2024 (Decree 73/2024/NĐ-CP).
-// Caps employee BHXH (social insurance) + BHYT (health insurance) contributions at 20×.
-const BASE_SALARY_VND = 2_340_000;
-const BHXH_BHYT_CAP_VND = BASE_SALARY_VND * 20; // 46,800,000 VND/month
-
-// Region I regional minimum wage, effective July 1, 2024 (Decree 74/2024/NĐ-CP).
-// Caps employee BHTN (unemployment insurance) contributions at 20×.
-const REGION_I_MIN_WAGE_VND = 4_960_000;
-const BHTN_CAP_VND = REGION_I_MIN_WAGE_VND * 20; // 99,200,000 VND/month
-
-// Employee-side statutory insurance contribution rates (Law on Social Insurance).
-const BHXH_RATE = 0.08;  // Social insurance ("bảo hiểm xã hội")
-const BHYT_RATE = 0.015; // Health insurance  ("bảo hiểm y tế")
-const BHTN_RATE = 0.01;  // Unemployment insurance ("bảo hiểm thất nghiệp")
-
-// Personal Income Tax family circumstance deductions (Resolution 954/2020/UBTVQH14).
-const PERSONAL_DEDUCTION_VND = 11_000_000; // per month, for the taxpayer themselves
-
-// Progressive monthly PIT brackets for resident employment income (Law on Personal
-// Income Tax, "lũy tiến từng phần" — partial progressive method: each VND of taxable
-// income is taxed at the rate of the bracket it falls in, not the top bracket rate
-// applied to the whole amount).
-const PIT_BRACKETS_VND = [
-  { upTo: 5_000_000,     rate: 0.05 },
-  { upTo: 10_000_000,    rate: 0.10 },
-  { upTo: 18_000_000,    rate: 0.15 },
-  { upTo: 32_000_000,    rate: 0.20 },
-  { upTo: 52_000_000,    rate: 0.25 },
-  { upTo: 80_000_000,    rate: 0.30 },
-  { upTo: Infinity,      rate: 0.35 },
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
-/** Progressive PIT on a monthly VND taxable-income figure (already net of insurance + deductions). */
-function calcProgressivePitVnd(taxableIncomeVnd) {
-  let tax = 0;
-  let lowerBound = 0;
-  for (const { upTo, rate } of PIT_BRACKETS_VND) {
-    if (taxableIncomeVnd <= lowerBound) break;
-    const bandAmount = Math.min(taxableIncomeVnd, upTo) - lowerBound;
-    tax += bandAmount * rate;
-    lowerBound = upTo;
-  }
-  return tax;
-}
+const STATUS_STYLE = {
+  draft: { bg: "var(--bg-warning-subtle)", color: "var(--txt-warning)", border: "var(--bdr-warning)" },
+  approved: { bg: "var(--bg-info-subtle)", color: "var(--txt-info)", border: "var(--bdr-info)" },
+  paid: { bg: "var(--bg-success-subtle)", color: "var(--txt-success)", border: "var(--bdr-success)" },
+};
 
-/**
- * Computes a Vietnamese payroll breakdown for an ANNUAL USD gross salary.
- * Returns annual USD-equivalent buckets so existing "$"-formatted callers are unaffected.
- *
- * NOTE: assumes a resident taxpayer with 0 registered dependents (the `Employee` schema
- * has no `dependents` field yet — see PAYROLL_IMPROVEMENT_SUGGESTIONS.md for a suggestion
- * to add one and apply the 4,400,000 VND/month per-dependent deduction here).
- */
-function calcDeductions(grossAnnualUsd) {
-  const monthlyGrossVnd = (grossAnnualUsd / 12) * USD_TO_VND;
-
-  // Employee-side insurance, each capped independently per its own statutory ceiling.
-  const bhxhBase = Math.min(monthlyGrossVnd, BHXH_BHYT_CAP_VND);
-  const bhtnBase = Math.min(monthlyGrossVnd, BHTN_CAP_VND);
-  const bhxhVnd = bhxhBase * BHXH_RATE;
-  const bhytVnd = bhxhBase * BHYT_RATE;
-  const bhtnVnd = bhtnBase * BHTN_RATE;
-  const insuranceTotalVnd = bhxhVnd + bhytVnd + bhtnVnd;
-
-  // PIT taxable base = gross − insurance − personal deduction (dependents: none tracked yet).
-  const taxableIncomeVnd = Math.max(0, monthlyGrossVnd - insuranceTotalVnd - PERSONAL_DEDUCTION_VND);
-  const pitVnd = calcProgressivePitVnd(taxableIncomeVnd);
-
-  // Convert each monthly VND bucket back to an annual USD-equivalent, at the same rate
-  // used to convert gross in. Round tax/social/medicare independently, then let `net`
-  // absorb whatever rounding remainder is left — same "last bucket absorbs the remainder"
-  // approach already used for the distribution percentages in BreakdownPanel below —
-  // so the four buckets always reconcile exactly to the original USD gross figure.
-  const toAnnualUsd = (vnd) => Math.round((vnd / USD_TO_VND) * 12);
-  const taxUsd      = toAnnualUsd(pitVnd);
-  const socialUsd   = toAnnualUsd(bhxhVnd);
-  const medicareUsd = toAnnualUsd(bhytVnd + bhtnVnd);
-  const netUsd       = Math.round(grossAnnualUsd) - taxUsd - socialUsd - medicareUsd;
-
-  return {
-    tax:      taxUsd,      // Personal Income Tax (PIT)
-    social:   socialUsd,   // Social insurance (BHXH)
-    medicare: medicareUsd, // Health + Unemployment (BHYT + BHTN)
-    net:      netUsd,
-    // Exposed for the breakdown panel's transparency note — not used by SalaryBar/CSV.
-    monthlyGrossVnd,
-  };
-}
-
-/* ─── Horizontal bar chart (dept salary) ─── */
 const DEPT_COLORS = [
   "var(--clr-primary-400)",
+  "var(--clr-info-500)",
   "var(--clr-success-500)",
   "var(--clr-warning-500)",
-  "var(--clr-info-500)",
+  "var(--clr-danger-500)",
   "var(--clr-primary-300)",
-  "var(--clr-success-400)",
-  "var(--clr-danger-400)",
+  "var(--clr-info-400)",
 ];
 
-/** Deterministic per-name color pick — same hashing approach Avatar.jsx already uses
- *  for its per-employee gradient, applied here so a department's chart color is a
- *  function of its name alone, not its index in whatever array order/sort it happens
- *  to be rendered in. Previously `deptData` assigned color by position after a
- *  `.sort((a,b) => b.total - a.total)`, so a department's color could visibly flip
- *  whenever salary totals changed enough to reorder the list. */
-function colorForName(name = "", palette) {
+function colorForName(name, palette) {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
   return palette[Math.abs(hash) % palette.length];
 }
 
-function DeptChart({ data, currency }) {
-  const max = Math.max(...data.map((d) => d.total), 1);
+function fmtMoney(vnd, currency, fxRate) {
+  const n = Number(vnd) || 0;
+  if (currency === "USD" && fxRate > 0) {
+    return `$${Math.round(n / fxRate).toLocaleString()}`;
+  }
+  return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
+}
+
+function fmtMoneyK(vnd, currency, fxRate) {
+  const n = Number(vnd) || 0;
+  if (currency === "USD" && fxRate > 0) {
+    const usd = n / fxRate;
+    if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(1)}M`;
+    if (usd >= 1_000) return `$${(usd / 1_000).toFixed(0)}K`;
+    return `$${Math.round(usd)}`;
+  }
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} tỷ ₫`;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)} triệu ₫`;
+  return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
+}
+
+function csvCell(value) {
+  const s = String(value ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function StatusPill({ status }) {
+  const s = STATUS_STYLE[status] ?? STATUS_STYLE.draft;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: "5px",
+      padding: "3px 10px", borderRadius: "var(--radius-full)",
+      fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      textTransform: "capitalize",
+    }}>
+      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentColor" }} />
+      {status}
+    </span>
+  );
+}
+
+function DeptChart({ data, currency, fxRate }) {
+  const max = Math.max(...data.map((d) => d.total), 1);
+  if (!data.length) {
+    return (
+      <div style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-sm)", padding: "var(--sp-4) 0" }}>
+        No department data for this period.
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
       {data.map((d) => (
-        <div key={d.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div key={d.name} style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
           <span style={{
-            fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
-            width: "88px", textAlign: "right", flexShrink: 0,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            width: "88px", flexShrink: 0, textAlign: "right", fontSize: "var(--fs-xs)",
+            color: "var(--txt-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>{d.name}</span>
-          <div style={{ flex: 1, background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)", height: "10px" }}>
+          <div style={{ flex: 1, height: "10px", background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)" }}>
             <div style={{
-              height: "10px", borderRadius: "var(--radius-full)",
-              background: d.color,
-              width: `${Math.round((d.total / max) * 100)}%`,
-              transition: "width 0.5s ease",
+              height: "10px", borderRadius: "var(--radius-full)", background: d.color,
+              width: `${Math.round((d.total / max) * 100)}%`, transition: "width 0.5s ease",
             }} />
           </div>
-          <span style={{
-            fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
-            color: "var(--txt-primary)", minWidth: "52px", textAlign: "right",
-          }}>{fmtK(d.total, currency)}</span>
-          <span style={{
-            fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
-            minWidth: "20px", textAlign: "right",
-          }}>{d.count}</span>
+          <span style={{ width: "92px", textAlign: "right", fontSize: "var(--fs-xs)", color: "var(--txt-primary)" }}>
+            {fmtMoneyK(d.total, currency, fxRate)}
+          </span>
+          <span style={{ width: "28px", textAlign: "right", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+            {d.count}
+          </span>
         </div>
       ))}
     </div>
   );
 }
 
-/* ─── Donut chart (type breakdown) ─── */
-function TypeDonut({ segments, total, currency }) {
-  const r = 32, cx = 48, cy = 48;
-  const circ = 2 * Math.PI * r;
+function TypeDonut({ segments, total, currency, fxRate }) {
+  const sum = segments.reduce((acc, s) => acc + s.value, 0) || 1;
   let offset = 0;
+  const circumference = 2 * Math.PI * 32;
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-5)" }}>
-      <div style={{ position: "relative", width: 96, height: 96, flexShrink: 0 }}>
-        <svg width={96} height={96} viewBox="0 0 96 96" style={{ transform: "rotate(-90deg)" }}>
-          {segments.map((s, i) => {
-            const dash = (s.value / (total || 1)) * circ;
+    <div>
+      <div style={{ position: "relative", width: "96px", height: "96px", margin: "0 auto var(--sp-4)" }}>
+        <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: "rotate(-90deg)" }}>
+          {segments.map((s) => {
+            const len = (s.value / sum) * circumference;
             const el = (
-              <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+              <circle
+                key={s.label}
+                cx="48" cy="48" r="32" fill="none"
                 stroke={s.color} strokeWidth="13"
-                strokeDasharray={`${dash} ${circ - dash}`}
-                strokeDashoffset={-offset} />
+                strokeDasharray={`${len} ${circumference - len}`}
+                strokeDashoffset={-offset}
+              />
             );
-            offset += dash;
+            offset += len;
             return el;
           })}
         </svg>
         <div style={{
-          position: "absolute", inset: 0, display: "flex",
-          flexDirection: "column", alignItems: "center", justifyContent: "center",
+          position: "absolute", inset: 0, display: "grid", placeItems: "center",
+          flexDirection: "column", textAlign: "center",
         }}>
-          <span style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", lineHeight: 1 }}>
-            {total}
-          </span>
-          <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>staff</span>
+          <div>
+            <div style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>{total}</div>
+            <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>staff</div>
+          </div>
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         {segments.map((s) => (
-          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-xs)" }}>
             <span style={{ width: "9px", height: "9px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
-            <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", flexShrink: 0 }}>
-              {fmtK(s.total, currency)}
-            </span>
+            <span style={{ flex: 1, color: "var(--txt-secondary)" }}>{s.label}</span>
+            <span style={{ color: "var(--txt-primary)" }}>{fmtMoneyK(s.total, currency, fxRate)}</span>
           </div>
         ))}
       </div>
@@ -247,604 +156,783 @@ function TypeDonut({ segments, total, currency }) {
   );
 }
 
-/* ─── Salary breakdown inline bar ─── */
-function SalaryBar({ gross, currency }) {
-  const { tax, social, medicare, net } = calcDeductions(gross);
-  const segs = [
-    { label: "Net", title: "Net take-home pay",                    value: net,      color: "var(--clr-success-500)" },
-    { label: "PIT", title: "Personal Income Tax",                   value: tax,      color: "var(--clr-danger-400)" },
-    { label: "BHXH", title: "Social Insurance (BHXH, 8%)",          value: social,   color: "var(--clr-warning-400)" },
-    { label: "BHYT/BHTN", title: "Health + Unemployment Insurance (BHYT 1.5% + BHTN 1%)", value: medicare, color: "var(--clr-info-400)" },
-  ];
-  return (
-    <div style={{ display: "flex", gap: "2px", height: "6px", borderRadius: "var(--radius-full)", overflow: "hidden", width: "80px" }}>
-      {segs.map((s) => (
-        <div key={s.label} style={{
-          height: "100%",
-          width: `${Math.round((s.value / gross) * 100)}%`,
-          background: s.color,
-        }} title={`${s.title}: ${fmt(s.value, currency)}`} />
-      ))}
-    </div>
-  );
-}
-
-/* ─── Export CSV ─── */
-function exportCSV(employees) {
-  const headers = [
-    "Name", "Employee ID", "Department", "Type", "Status",
-    "Annual Salary (USD)", "Monthly (USD)",
-    "PIT (est.)", "BHXH 8% (est.)", "BHYT+BHTN 2.5% (est.)", "Net (est.)",
-  ];
-  const rows = employees.map((e) => {
-    const { tax, social, medicare, net } = calcDeductions(e.salary || 0);
-    return [
-      e.name, e.employeeId, e.department, e.type, e.status,
-      e.salary || 0,
-      Math.round((e.salary || 0) / 12),
-      tax, social, medicare, net,
-    ].join(",");
-  });
-  // Disclosure row: these are estimates derived from Vietnamese PIT brackets and
-  // statutory BHXH/BHYT/BHTN insurance rates, converted from the app's USD-denominated
-  // salaries at a fixed demo exchange rate — not verified payroll figures.
-  const disclosure = `# Estimated using Vietnamese PIT brackets + BHXH/BHYT/BHTN insurance rates, USD salaries converted at ${USD_TO_VND.toLocaleString()} VND/USD — not actual payroll figures.`;
-  const csv  = [disclosure, headers.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href = url; a.download = "payroll.csv"; a.click();
-  URL.revokeObjectURL(url);
-}
-
-/* ─── Sortable column header — same pattern as AllEmployees.jsx's SortableHeader,
-   reused here so Employee/Department/Type/Status/Annual are all sortable instead
-   of only the Annual salary column. ─── */
-function SortableHeader({ label, field, sortField, sortDir, onSort, align }) {
-  const isActive = sortField === field;
+function SortableHeader({ field, label, sortField, sortDir, onSort, align = "left" }) {
+  const active = sortField === field;
   return (
     <th
-      className="sortable-header"
       onClick={() => onSort(field)}
-      title={`Sort by ${label}`}
-      style={align ? { textAlign: align } : undefined}
+      style={{ cursor: "pointer", userSelect: "none", textAlign: align, whiteSpace: "nowrap" }}
     >
       {label}
-      {isActive && (
-        <span className="sort-indicator" aria-hidden="true">{sortDir === "asc" ? " ▲" : " ▼"}</span>
-      )}
+      <span style={{ marginLeft: "4px", opacity: active ? 1 : 0.25 }}>
+        {active && sortDir === "asc" ? "▲" : "▼"}
+      </span>
     </th>
   );
 }
 
-/* ═══════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════ */
-function Payroll() {
-  const { employees, departments } = useStore();
+function MoneyInput({ value, disabled, onCommit }) {
+  const [draft, setDraft] = useState(String(value ?? 0));
+  const [saving, setSaving] = useState(false);
 
-  const [search, setSearch]               = useState("");
-  const [deptFilter, setDeptFilter]       = useState("all");
-  const [typeFilter, setTypeFilter]       = useState("all");
-  const [sortField, setSortField]         = useState("salary");
-  const [sortDir, setSortDir]             = useState("desc");
-  const [showBreakdown, setShowBreakdown] = useState(null);
-  const [currentPage, setCurrentPage]     = useState(1);
-  // Display currency toggle — the Vietnam payroll engine below computes internally in
-  // VND regardless of this setting; this only controls how already-computed amounts are
-  // formatted for display (USD, the app's historical default, or VND).
-  const [currency, setCurrency]           = useState("USD");
+  useEffect(() => { setDraft(String(value ?? 0)); }, [value]);
 
-  /* ── Filtered + sorted table ──
-     Computed first (rather than after the stat cards, as it originally was) so the
-     top-of-page stat cards below can be derived from it too — previously they always
-     read from the raw `employees` array and silently ignored search/department/type
-     filters, which disagreed with the table footer just below them. ── */
-  const filtered = useMemo(() => employees
-    .filter((e) => {
-      const q           = search.toLowerCase();
-      const matchSearch = !q || e.name.toLowerCase().includes(q) || e.employeeId?.toLowerCase().includes(q);
-      const matchDept   = deptFilter === "all" || e.department === deptFilter;
-      const matchType   = typeFilter === "all" || e.type === typeFilter;
-      return matchSearch && matchDept && matchType;
-    })
-    .sort((a, b) => {
-      const va = a[sortField] || 0;
-      const vb = b[sortField] || 0;
-      if (typeof va === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-      return sortDir === "asc" ? va - vb : vb - va;
-    }),
-  [employees, search, deptFilter, typeFilter, sortField, sortDir]);
-
-  const hasActiveFilters = Boolean(search) || deptFilter !== "all" || typeFilter !== "all";
-
-  /* ── Computed totals — now scoped to the current filters, matching the table footer ── */
-  const totalSalary  = filtered.reduce((s, e) => s + (e.salary || 0), 0);
-  const avgSalary    = filtered.length ? Math.round(totalSalary / filtered.length) : 0;
-  // Math.max(...[]) is -Infinity — guard against an empty/loading employees list so the
-  // "Highest Salary" stat card never renders "$-InfinityK".
-  const maxSalary    = filtered.length ? Math.max(...filtered.map((e) => e.salary || 0)) : 0;
-  const onLeaveCount = filtered.filter((e) => e.status === "On Leave").length;
-
-  /* ── Dept breakdown — intentionally stays org-wide (all employees, not the filtered
-     table view) since it's meant to answer "how is payroll distributed across the
-     company", not "what does my current search/filter show" ── */
-  const deptData = useMemo(() => departments.map((d) => ({
-    name:  d.name,
-    total: employees.filter((e) => e.department === d.name).reduce((s, e) => s + (e.salary || 0), 0),
-    count: employees.filter((e) => e.department === d.name).length,
-    color: colorForName(d.name, DEPT_COLORS),
-  })).sort((a, b) => b.total - a.total), [employees, departments]);
-
-  /* ── Type donut — same org-wide reasoning as deptData above ── */
-  const types      = ["Full-time", "Part-time", "Contract", "Intern"];
-  const typeColors = ["var(--clr-primary-400)", "var(--clr-success-500)", "var(--clr-warning-500)", "var(--clr-info-500)"];
-  const typeSegs   = types.map((t, i) => ({
-    label: t,
-    value: employees.filter((e) => e.type === t).length,
-    total: employees.filter((e) => e.type === t).reduce((s, e) => s + (e.salary || 0), 0),
-    color: typeColors[i],
-  })).filter((s) => s.value > 0);
-
-  /* ── Pagination — totals/footer stay based on the full `filtered` set, only the
-     rendered table rows are sliced, mirroring AllEmployees.jsx's approach ── */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAYROLL_PER_PAGE));
-  // Clamp defensively: if a filter shrinks the result set while on a later page
-  // (e.g. searching while viewing page 3), fall back to the last valid page
-  // instead of rendering an empty table with visible pagination controls.
-  const safePage   = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * PAYROLL_PER_PAGE;
-  const paginated  = filtered.slice(startIndex, startIndex + PAYROLL_PER_PAGE);
-
-  const handleSort = (field) => {
-    if (sortField === field) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortField(field); setSortDir("desc"); }
-    setCurrentPage(1);
+  const commit = async () => {
+    if (saving || disabled) return;
+    const next = draft.trim();
+    if (next === "" || Number(next) === Number(value)) {
+      setDraft(String(value ?? 0));
+      return;
+    }
+    setSaving(true);
+    try {
+      await onCommit(Number(next));
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const handleSearchChange = (value) => {
-    setSearch(value);
-    setCurrentPage(1);
-  };
-
-  const handleDeptFilterChange = (value) => {
-    setDeptFilter(value);
-    setCurrentPage(1);
-  };
-
-  const handleTypeFilterChange = (value) => {
-    setTypeFilter(value);
-    setCurrentPage(1);
-  };
-
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+    <input
+      type="number"
+      min="0"
+      step="1000"
+      value={draft}
+      disabled={disabled || saving}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") setDraft(String(value ?? 0));
+      }}
+      style={{
+        width: "112px", padding: "4px 6px", textAlign: "right",
+        border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)",
+        background: disabled ? "var(--bg-surface-alt)" : "var(--bg-surface)",
+        color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
+      }}
+    />
+  );
+}
 
-      {/* Filter-scope banner — makes it explicit that the stat cards below now move
-          with the active search/department/type filters, instead of silently always
-          showing org-wide totals while the table below shows a filtered subset. */}
-      {hasActiveFilters && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: "var(--sp-2)",
-          padding: "var(--sp-2) var(--sp-4)",
-          background: "var(--bg-primary-subtle)", border: "1px solid var(--bdr-brand)",
-          borderRadius: "var(--radius-md)",
-          fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)",
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-          </svg>
-          Stats below reflect your current filters — {filtered.length} of {employees.length} employees.
-        </div>
-      )}
+function BreakdownPanel({ slip, currency, fxRate, period }) {
+  const rows = [
+    { label: "Base salary", value: slip.baseSalary, sign: 1 },
+    { label: "Bonus", value: slip.bonus, sign: 1 },
+    { label: "Allowance", value: slip.allowance, sign: 1 },
+    { label: "Deduction", value: slip.deduction, sign: -1 },
+    { label: "Gross pay", value: slip.grossPay, total: true },
+    { label: "Social insurance (BHXH 8%)", value: slip.bhxh, sign: -1 },
+    { label: "Health insurance (BHYT 1.5%)", value: slip.bhyt, sign: -1 },
+    { label: "Unemployment (BHTN 1%)", value: slip.bhtn, sign: -1 },
+    { label: "Personal income tax", value: slip.pit, sign: -1 },
+    { label: "Net pay", value: slip.netPay, total: true },
+  ];
 
-      {/* ── STAT CARDS ── */}
-      <div className="stat-grid">
-        <div className="stat-card">
-          <div className="stat-card-label">Total Annual Payroll</div>
-          <div className="stat-card-value" style={{ color: "var(--clr-primary-400)" }}>{fmtK(totalSalary, currency)}</div>
-          <div className="stat-card-hint">
-            {hasActiveFilters ? `${filtered.length} of ${employees.length} employees` : `All ${employees.length} employees`}
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-label">Average Salary</div>
-          <div className="stat-card-value" style={{ color: "var(--clr-success-600)" }}>{fmtK(avgSalary, currency)}</div>
-          <div className="stat-card-hint">Per employee / year</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-label">Highest Salary</div>
-          <div className="stat-card-value" style={{ color: "var(--clr-info-600)" }}>{fmtK(maxSalary, currency)}</div>
-          <div className="stat-card-hint">{filtered.find((e) => e.salary === maxSalary)?.name}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-card-label">Monthly Payroll</div>
-          <div className="stat-card-value" style={{ color: "var(--clr-warning-600)" }}>{fmtK(Math.round(totalSalary / 12), currency)}</div>
-          <div className="stat-card-hint">Next run: Jan 31</div>
-          <div className="stat-card-trend down">
-            <span>⚠</span> {onLeaveCount} on leave
-          </div>
-        </div>
+  return (
+    <div style={{
+      padding: "var(--sp-5)", background: "var(--bg-surface-alt)",
+      borderRadius: "var(--radius-md)", border: "1px solid var(--bdr-subtle)",
+    }}>
+      <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
+        Salary breakdown — {slip.employeeName}
       </div>
 
-      {/* ── CHARTS ROW ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 240px", gap: "var(--sp-5)" }}>
-
-        {/* Dept chart */}
-        <div className="content-card" style={{ gridColumn: "span 2" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
-            <div>
-              <h3 className="section-title" style={{ margin: 0 }}>Salary by Department</h3>
-              <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                Annual payroll total · sorted by spend
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center" }}>
-              <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Total · Count</span>
-            </div>
+      <div style={{ maxWidth: "520px" }}>
+        {rows.map((r) => (
+          <div key={r.label} style={{
+            display: "flex", justifyContent: "space-between", gap: "var(--sp-4)",
+            padding: "7px 0", borderBottom: "1px solid var(--bdr-subtle)",
+            fontWeight: r.total ? "var(--fw-semibold)" : "var(--fw-regular)",
+          }}>
+            <span style={{ fontSize: "var(--fs-sm)", color: r.total ? "var(--txt-primary)" : "var(--txt-secondary)" }}>
+              {r.label}
+            </span>
+            <span style={{
+              fontSize: "var(--fs-sm)",
+              color: r.total ? "var(--txt-primary)" : r.sign === -1 ? "var(--txt-danger)" : "var(--txt-primary)",
+            }}>
+              {r.sign === -1 ? "− " : ""}{fmtMoney(r.value, currency, fxRate)}
+            </span>
           </div>
-          <DeptChart data={deptData} currency={currency} />
-        </div>
-
-        {/* Type donut */}
-        <div className="content-card" style={{ minWidth: 0, overflow: "hidden" }}>
-          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>By Contract Type</h3>
-          <TypeDonut segments={typeSegs} total={employees.length} currency={currency} />
-        </div>
+        ))}
       </div>
 
-      {/* ── SALARY TABLE ── */}
-      <div className="content-card">
-        {/* Toolbar */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
-          <h3 className="section-title" style={{ margin: 0, flex: "0 0 auto" }}>Salary Table</h3>
-          <div style={{ flex: 1 }} />
-
-          <input
-            type="text" value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search employee..."
-            style={{
-              padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
-              borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
-              color: "var(--txt-primary)", fontFamily: "var(--font-family)",
-              fontSize: "var(--fs-sm)", outline: "none", width: "180px",
-            }}
-          />
-
-          <select
-            value={deptFilter} onChange={(e) => handleDeptFilterChange(e.target.value)}
-            style={{
-              padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
-              borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
-              color: "var(--txt-primary)", fontFamily: "var(--font-family)",
-              fontSize: "var(--fs-sm)", outline: "none", cursor: "pointer",
-            }}
-          >
-            <option value="all">All Departments</option>
-            {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-          </select>
-
-          <select
-            value={typeFilter} onChange={(e) => handleTypeFilterChange(e.target.value)}
-            style={{
-              padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
-              borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
-              color: "var(--txt-primary)", fontFamily: "var(--font-family)",
-              fontSize: "var(--fs-sm)", outline: "none", cursor: "pointer",
-            }}
-          >
-            <option value="all">All Types</option>
-            {types.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-
-          {/* Currency display toggle — the VN payroll engine always computes internally
-              in VND regardless of this setting; it only controls display formatting. */}
-          <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
-            {["USD", "VND"].map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCurrency(c)}
-                aria-pressed={currency === c}
-                style={{
-                  padding: "5px 12px", borderRadius: "6px", border: "none", cursor: "pointer",
-                  background: currency === c ? "var(--bg-surface)" : "transparent",
-                  color: currency === c ? "var(--txt-primary)" : "var(--txt-secondary)",
-                  fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
-                  fontWeight: currency === c ? "var(--fw-medium)" : "var(--fw-regular)",
-                  boxShadow: currency === c ? "var(--shadow-xs)" : "none",
-                }}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => exportCSV(filtered)}
-            title="CSV export is always USD-denominated with raw numeric columns, regardless of the display currency toggle above, so it stays spreadsheet-friendly."
-          >
-            ↓ Export CSV
-          </button>
-        </div>
-
-        {/* Table */}
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <SortableHeader label="Employee"   field="name"       sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Department" field="department" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Type"       field="type"       sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Status"     field="status"     sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                <SortableHeader label="Annual"     field="salary"     sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
-                <th style={{ textAlign: "right" }}>Monthly</th>
-                <th style={{ textAlign: "right" }}>Net (est.)</th>
-                <th>Breakdown</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((emp) => {
-                const hasSalary = Boolean(emp.salary);
-                const { net } = hasSalary ? calcDeductions(emp.salary) : { net: 0 };
-                const isOpen  = showBreakdown === emp.id;
-                return (
-                  /* ── FIX: Fragment with key instead of bare <> ── */
-                  <Fragment key={emp.id}>
-                    <tr
-                      style={{
-                        background: isOpen ? "var(--bg-primary-subtle)" : undefined,
-                        cursor: hasSalary ? "pointer" : "default",
-                      }}
-                      onClick={() => hasSalary && setShowBreakdown(isOpen ? null : emp.id)}
-                      // Keyboard accessibility: the row acts as an expand/collapse toggle
-                      // for its breakdown panel, so it needs the same semantics a button
-                      // would — previously only mouse users could open a breakdown.
-                      role={hasSalary ? "button" : undefined}
-                      tabIndex={hasSalary ? 0 : undefined}
-                      aria-expanded={hasSalary ? isOpen : undefined}
-                      aria-label={hasSalary ? `${isOpen ? "Collapse" : "Expand"} salary breakdown for ${emp.name}` : undefined}
-                      onKeyDown={hasSalary ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setShowBreakdown(isOpen ? null : emp.id);
-                        }
-                      } : undefined}
-                    >
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                          <Avatar name={emp.name} src={emp.avatar} size="sm" />
-                          <div>
-                            <div style={{ fontWeight: "var(--fw-medium)", fontSize: "var(--fs-md)" }}>{emp.name}</div>
-                            <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{emp.employeeId}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: "var(--fs-sm)" }}>{emp.department}</td>
-                      <td><TypeBadge type={emp.type} size="sm" /></td>
-                      <td><StatusBadge status={emp.status} dot /></td>
-                      <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-                        {hasSalary ? fmt(emp.salary, currency) : "—"}
-                      </td>
-                      <td style={{ textAlign: "right", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
-                        {hasSalary ? fmt(Math.round(emp.salary / 12), currency) : "—"}
-                      </td>
-                      <td style={{ textAlign: "right", fontSize: "var(--fs-sm)", color: "var(--clr-success-700)" }}>
-                        {hasSalary ? fmt(net, currency) : "—"}
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-                          {hasSalary ? <SalaryBar gross={emp.salary} currency={currency} /> : "—"}
-                          {hasSalary && (
-                            <span style={{ fontSize: "10px", color: "var(--txt-disabled)" }} aria-hidden="true">
-                              {isOpen ? "▲" : "▼"}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* Expanded breakdown row — only ever opened for employees with a salary,
-                        so BreakdownPanel's gross-based percentage math never divides by 0. */}
-                    {isOpen && hasSalary && (
-                      <tr>
-                        <td colSpan={8} style={{ padding: 0 }}>
-                          <BreakdownPanel emp={emp} currency={currency} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-
-            {/* Footer totals */}
-            {filtered.length > 0 && (
-              <tfoot>
-                <tr style={{ borderTop: "2px solid var(--bdr-subtle)" }}>
-                  <td colSpan={4} style={{
-                    padding: "var(--sp-3) var(--sp-4)",
-                    fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)",
-                    color: "var(--txt-secondary)",
-                  }}>
-                    {/* Totals below cover every filtered employee, not just this page —
-                        wording updated so it doesn't imply "shown" = "on screen". */}
-                    {filtered.length} employee{filtered.length === 1 ? "" : "s"} match filters
-                  </td>
-                  <td style={{
-                    textAlign: "right", padding: "var(--sp-3) var(--sp-4)",
-                    fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)",
-                    fontSize: "var(--fs-md)",
-                  }}>
-                    {fmt(totalSalary, currency)}
-                  </td>
-                  <td style={{
-                    textAlign: "right", padding: "var(--sp-3) var(--sp-4)",
-                    fontWeight: "var(--fw-semibold)", color: "var(--txt-secondary)",
-                    fontSize: "var(--fs-sm)",
-                  }}>
-                    {fmt(Math.round(totalSalary / 12), currency)}
-                  </td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-
-        {/* ── Pagination ── */}
-        {filtered.length > 0 && totalPages > 1 && (
-          <div className="pagination">
-            <div className="pagination-info">
-              Showing {startIndex + 1}–{Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length)} of {filtered.length} employees
-              {filtered.length !== employees.length && (
-                <span style={{ color: "var(--txt-secondary)", marginLeft: "8px" }}>
-                  (filtered from {employees.length})
-                </span>
-              )}
-            </div>
-            <div className="pagination-controls">
-              <button
-                className="page-btn"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-              >‹</button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  className={`page-btn ${safePage === page ? "active" : ""}`}
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                className="page-btn"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-              >›</button>
-            </div>
-          </div>
-        )}
-
-        {filtered.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-state-icon">💰</div>
-            <h3 className="empty-state-title">No results</h3>
-            <p className="empty-state-description">Try adjusting your search or filters.</p>
-          </div>
-        )}
+      <div style={{
+        marginTop: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+        background: "var(--bg-info-subtle)", border: "1px solid var(--bdr-info)",
+        borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-info)",
+      }}>
+        Period {period.label} · {period.standardWorkingDays} standard working days · FX rate locked at{" "}
+        {Number(period.fxRate).toLocaleString()} VND/USD · {slip.unpaidLeaveDays} unpaid leave day
+        {slip.unpaidLeaveDays === 1 ? "" : "s"} · {slip.absentDays} absent day
+        {slip.absentDays === 1 ? "" : "s"} · assumes 0 registered dependents.
       </div>
     </div>
   );
 }
 
-/* ─── Inline breakdown panel ─── */
-function BreakdownPanel({ emp, currency }) {
-  const { tax, social, medicare, net, monthlyGrossVnd } = calcDeductions(emp.salary || 0);
-  const monthly = (n) => fmt(Math.round(n / 12), currency);
-  const rows = [
-    { label: "Gross Salary",                     value: emp.salary, color: "var(--txt-primary)",    note: "Before deductions" },
-    { label: "Personal Income Tax (PIT)",        value: -tax,       color: "var(--txt-danger)",      note: "VN progressive brackets" },
-    { label: "Social Insurance (BHXH)",          value: -social,    color: "var(--txt-warning)",     note: "8%" },
-    { label: "Health + Unemployment (BHYT/BHTN)", value: -medicare,  color: "var(--txt-info)",        note: "1.5% + 1%" },
-    { label: "Net Pay",                           value: net,        color: "var(--clr-success-600)", note: "Take-home" },
-  ];
+function Payroll() {
+  const { isAdmin, isHR } = useAuth();
+
+  const [periods, setPeriods] = useState([]);
+  const [periodId, setPeriodId] = useState("");
+  const [period, setPeriod] = useState(null);
+  const [payslips, setPayslips] = useState([]);
+  const [loadingPeriods, setLoadingPeriods] = useState(true);
+  const [loadingSlips, setLoadingSlips] = useState(false);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [showNewForm, setShowNewForm] = useState(false);
+  const now = new Date();
+  const [newPeriod, setNewPeriod] = useState({
+    month: now.getMonth() + 1,
+    year: now.getFullYear(),
+    fxRate: 25000,
+  });
+
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [sortField, setSortField] = useState("netPay");
+  const [sortDir, setSortDir] = useState("desc");
+  const [expanded, setExpanded] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [currency, setCurrency] = useState("VND");
+
+  const fxRate = period?.fxRate ?? 0;
+  const isDraft = period?.status === "draft";
+  const canEdit = isDraft && isHR;
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const id = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const loadPeriods = useCallback(async (preferId) => {
+    setLoadingPeriods(true);
+    setError("");
+    try {
+      const res = await PayrollAPI.listPeriods();
+      const items = res.items ?? [];
+      setPeriods(items);
+      setPeriodId((prev) => {
+        const wanted = preferId ?? prev;
+        if (wanted && items.some((p) => p.id === wanted)) return wanted;
+        return items[0]?.id ?? "";
+      });
+    } catch (err) {
+      setError(err.message || "Failed to load pay periods.");
+    }
+    setLoadingPeriods(false);
+  }, []);
+
+  useEffect(() => { loadPeriods(); }, [loadPeriods]);
+
+  const loadPayslips = useCallback(async (id) => {
+    if (!id) {
+      setPeriod(null);
+      setPayslips([]);
+      return;
+    }
+    setLoadingSlips(true);
+    setError("");
+    try {
+      const res = await PayrollAPI.listPayslips(id);
+      setPeriod(res.period);
+      setPayslips(res.items ?? []);
+    } catch (err) {
+      setError(err.message || "Failed to load payslips.");
+      setPeriod(null);
+      setPayslips([]);
+    }
+    setLoadingSlips(false);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setExpanded(null);
+    loadPayslips(periodId);
+  }, [periodId, loadPayslips]);
+
+  const deptOptions = useMemo(
+    () => [...new Set(payslips.map((p) => p.departmentName).filter(Boolean))].sort(),
+    [payslips],
+  );
+  const typeOptions = useMemo(
+    () => [...new Set(payslips.map((p) => p.type).filter(Boolean))].sort(),
+    [payslips],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const rows = payslips.filter((p) => {
+      const matchesSearch =
+        !q ||
+        p.employeeName?.toLowerCase().includes(q) ||
+        p.employeeCode?.toLowerCase().includes(q);
+      const matchesDept = deptFilter === "all" || p.departmentName === deptFilter;
+      const matchesType = typeFilter === "all" || p.type === typeFilter;
+      return matchesSearch && matchesDept && matchesType;
+    });
+    return rows.sort((a, b) => {
+      const va = a[sortField];
+      const vb = b[sortField];
+      if (typeof va === "string" || typeof vb === "string") {
+        const cmp = String(va ?? "").localeCompare(String(vb ?? ""));
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      const cmp = (Number(va) || 0) - (Number(vb) || 0);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [payslips, search, deptFilter, typeFilter, sortField, sortDir]);
+
+  const deptData = useMemo(() => {
+    const map = new Map();
+    for (const p of payslips) {
+      const name = p.departmentName ?? "Unassigned";
+      const cur = map.get(name) ?? { name, total: 0, count: 0 };
+      cur.total += p.grossPay;
+      cur.count += 1;
+      map.set(name, cur);
+    }
+    return [...map.values()]
+      .sort((a, b) => b.total - a.total)
+      .map((d) => ({ ...d, color: colorForName(d.name, DEPT_COLORS) }));
+  }, [payslips]);
+
+  const typeSegs = useMemo(() => {
+    const map = new Map();
+    for (const p of payslips) {
+      const label = p.type ?? "Unspecified";
+      const cur = map.get(label) ?? { label, value: 0, total: 0 };
+      cur.value += 1;
+      cur.total += p.grossPay;
+      map.set(label, cur);
+    }
+    return [...map.values()].map((s) => ({ ...s, color: colorForName(s.label, DEPT_COLORS) }));
+  }, [payslips]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAYROLL_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * PAYROLL_PER_PAGE;
+  const paginated = filtered.slice(startIndex, startIndex + PAYROLL_PER_PAGE);
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortField(field); setSortDir("desc"); }
+    setCurrentPage(1);
+  };
+
+  const patchPayslip = async (id, body) => {
+    try {
+      const res = await PayrollAPI.updatePayslip(id, body);
+      setPayslips((prev) => prev.map((p) => (p.id === id ? res.data : p)));
+      await refreshPeriodTotals();
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+  };
+
+  const refreshPeriodTotals = async () => {
+    try {
+      const res = await PayrollAPI.listPeriods();
+      const items = res.items ?? [];
+      setPeriods(items);
+      const fresh = items.find((p) => p.id === periodId);
+      if (fresh) setPeriod((prev) => (prev ? { ...prev, totals: fresh.totals, payslipCount: fresh.payslipCount } : prev));
+    } catch (err) {
+      setError(err.message || "Could not refresh period totals.");
+    }
+  };
+
+  const handleRecompute = async (id) => {
+    try {
+      const res = await PayrollAPI.recomputeDeduction(id);
+      setPayslips((prev) => prev.map((p) => (p.id === id ? res.data : p)));
+      setToast("Deduction recomputed from attendance and leave.");
+      await refreshPeriodTotals();
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+  };
+
+  const handleCreatePeriod = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await PayrollAPI.createPeriod({
+        year: Number(newPeriod.year),
+        month: Number(newPeriod.month),
+        fxRate: Number(newPeriod.fxRate),
+      });
+      setToast(`${res.generated} draft payslip${res.generated === 1 ? "" : "s"} generated.`);
+      setShowNewForm(false);
+      await loadPeriods(res.data.id);
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setBusy(false);
+  };
+
+  const handleStatus = async (status, confirmText) => {
+    if (confirmText && !window.confirm(confirmText)) return;
+    setBusy(true);
+    try {
+      await PayrollAPI.setPeriodStatus(periodId, status);
+      setToast(`Period marked ${status}.`);
+      await loadPeriods(periodId);
+      await loadPayslips(periodId);
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setBusy(false);
+  };
+
+  const handleRegenerate = async () => {
+    if (!window.confirm("Regenerate discards every manual bonus, allowance and deduction edit for this period. Continue?")) return;
+    setBusy(true);
+    try {
+      const res = await PayrollAPI.regenerate(periodId);
+      setToast(`${res.generated} payslip${res.generated === 1 ? "" : "s"} regenerated.`);
+      await loadPayslips(periodId);
+      await refreshPeriodTotals();
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setBusy(false);
+  };
+
+  const handleDeletePeriod = async () => {
+    if (!window.confirm("Delete this draft period and all of its payslips?")) return;
+    setBusy(true);
+    try {
+      await PayrollAPI.removePeriod(periodId);
+      setToast("Period deleted.");
+      setPeriodId("");
+      await loadPeriods();
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setBusy(false);
+  };
+
+  const exportCSV = () => {
+    if (!period) return;
+    const headers = [
+      "Employee", "Employee ID", "Department", "Type",
+      "Base Salary (VND)", "Bonus (VND)", "Allowance (VND)", "Deduction (VND)",
+      "Gross (VND)", "BHXH (VND)", "BHYT (VND)", "BHTN (VND)", "PIT (VND)", "Net (VND)",
+    ];
+    const lines = filtered.map((p) => [
+      p.employeeName, p.employeeCode, p.departmentName ?? "", p.type ?? "",
+      p.baseSalary, p.bonus, p.allowance, p.deduction,
+      p.grossPay, p.bhxh, p.bhyt, p.bhtn, p.pit, p.netPay,
+    ].map(csvCell).join(","));
+
+    const disclosure = `# Payroll ${period.label} — status ${period.status} — FX rate ${period.fxRate} VND/USD — all amounts in VND`;
+    const blob = new Blob([[disclosure, headers.map(csvCell).join(","), ...lines].join("\n")], {
+      type: "text/csv",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payroll-${period.label}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const totals = period?.totals ?? {};
 
   return (
-    <div style={{
-      background: "var(--bg-surface-alt)", padding: "var(--sp-4) var(--sp-6)",
-      borderBottom: "1px solid var(--bdr-subtle)",
-    }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--sp-6)" }}>
+    <div>
+      {/* ── Period bar ── */}
+      <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
+            Payroll
+          </h2>
 
-        {/* Breakdown table */}
-        <div style={{ gridColumn: "span 2" }}>
-          <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--txt-secondary)", marginBottom: "var(--sp-3)" }}>
-            Salary Breakdown — {emp.name}
+          {periods.length > 0 && (
+            <select
+              value={periodId}
+              onChange={(e) => setPeriodId(e.target.value)}
+              style={{
+                padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
+                borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
+                color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
+              }}
+            >
+              {periods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {MONTHS[p.month - 1]} {p.year} · {p.status}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {period && <StatusPill status={period.status} />}
+
+          <div style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+            {isHR && (
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowNewForm((v) => !v)}>
+                {showNewForm ? "Cancel" : "+ New period"}
+              </button>
+            )}
+            {period && isDraft && isHR && (
+              <>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={handleRegenerate}>
+                  Regenerate drafts
+                </button>
+                <button type="button" className="btn btn-success btn-sm" disabled={busy}
+                  onClick={() => handleStatus("approved")}>
+                  Approve payroll
+                </button>
+              </>
+            )}
+            {period && isDraft && isAdmin && (
+              <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={handleDeletePeriod}>
+                Delete period
+              </button>
+            )}
+            {period?.status === "approved" && isHR && (
+              <button type="button" className="btn btn-success btn-sm" disabled={busy}
+                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}>
+                Mark as paid
+              </button>
+            )}
+            {period?.status === "approved" && isAdmin && (
+              <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+                onClick={() => handleStatus("draft")}>
+                Reopen to draft
+              </button>
+            )}
           </div>
-          {rows.map((r, i) => (
-            <div key={r.label} style={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "8px 0",
-              borderBottom: i < rows.length - 1 ? "1px solid var(--bdr-subtle)" : "2px solid var(--bdr-default)",
-              borderTop: i === rows.length - 1 ? "2px solid var(--bdr-default)" : undefined,
-            }}>
-              <div>
-                <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)" }}>{r.label}</span>
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginLeft: "var(--sp-2)" }}>{r.note}</span>
-              </div>
-              <div style={{ display: "flex", gap: "var(--sp-5)", textAlign: "right" }}>
-                <span style={{ fontSize: "var(--fs-sm)", color: r.color, fontWeight: i === rows.length - 1 ? "var(--fw-semibold)" : "var(--fw-regular)", minWidth: "90px" }}>
-                  {r.value < 0 ? `−${fmt(Math.abs(r.value), currency)}` : fmt(r.value, currency)}
-                </span>
-                <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", minWidth: "80px" }}>
-                  {monthly(Math.abs(r.value))}/mo
-                </span>
-              </div>
-            </div>
-          ))}
+        </div>
 
-          {/* Transparency note — discloses the FX assumption and the VND figure Vietnam's
-              actual PIT/insurance formulas were applied to, since the table above still
-              displays everything in the app's native "$" formatting. */}
+        {period?.status === "paid" && (
           <div style={{
-            marginTop: "var(--sp-3)", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
-            display: "flex", alignItems: "flex-start", gap: "6px",
+            marginTop: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+            background: "var(--bg-success-subtle)", border: "1px solid var(--bdr-success)",
+            borderRadius: "var(--radius-md)", color: "var(--txt-success)", fontSize: "var(--fs-sm)",
           }}>
-            <span aria-hidden="true" style={{ flexShrink: 0 }}>ℹ</span>
-            <span>
-              Computed on a monthly gross of ₫{Math.round(monthlyGrossVnd).toLocaleString("vi-VN")} using
-              Vietnam's PIT brackets and statutory BHXH (8%) / BHYT (1.5%) / BHTN (1%) rates,
-              converting at {USD_TO_VND.toLocaleString()} VND/USD. Assumes 0 registered dependents.
-            </span>
+            This period is closed. Payslips are read-only.
+          </div>
+        )}
+        {period?.status === "approved" && (
+          <div style={{
+            marginTop: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+            background: "var(--bg-info-subtle)", border: "1px solid var(--bdr-info)",
+            borderRadius: "var(--radius-md)", color: "var(--txt-info)", fontSize: "var(--fs-sm)",
+          }}>
+            This period is approved and locked. An Administrator can reopen it to make changes.
+          </div>
+        )}
+
+        {showNewForm && (
+          <form onSubmit={handleCreatePeriod} style={{
+            marginTop: "var(--sp-4)", paddingTop: "var(--sp-4)", borderTop: "1px solid var(--bdr-subtle)",
+            display: "flex", gap: "var(--sp-4)", alignItems: "flex-end", flexWrap: "wrap",
+          }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" htmlFor="np-month">Month</label>
+              <select id="np-month" value={newPeriod.month}
+                onChange={(e) => setNewPeriod((p) => ({ ...p, month: e.target.value }))}>
+                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" htmlFor="np-year">Year</label>
+              <input id="np-year" type="number" min="2000" max="2100" value={newPeriod.year}
+                onChange={(e) => setNewPeriod((p) => ({ ...p, year: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" htmlFor="np-fx">FX rate (VND per USD)</label>
+              <input id="np-fx" type="number" min="1" step="100" value={newPeriod.fxRate}
+                onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
+              <span className="form-hint">Locked once the period is created.</span>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {busy ? "Generating…" : "Create & generate drafts"}
+            </button>
+          </form>
+        )}
+      </div>
+
+      {toast && (
+        <div style={{
+          marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+          background: toast.startsWith("Error") ? "var(--bg-danger-subtle)" : "var(--bg-success-subtle)",
+          border: `1px solid ${toast.startsWith("Error") ? "var(--bdr-danger)" : "var(--bdr-success)"}`,
+          borderRadius: "var(--radius-md)", fontSize: "var(--fs-sm)",
+          color: toast.startsWith("Error") ? "var(--txt-danger)" : "var(--txt-success)",
+        }}>{toast}</div>
+      )}
+
+      {error && (
+        <div style={{
+          marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+          background: "var(--bg-danger-subtle)", border: "1px solid var(--bdr-danger)",
+          borderRadius: "var(--radius-md)", color: "var(--txt-danger)", fontSize: "var(--fs-sm)",
+        }}>{error}</div>
+      )}
+
+      {loadingPeriods ? (
+        <div className="content-card" style={{ textAlign: "center", color: "var(--txt-secondary)" }}>
+          Loading pay periods…
+        </div>
+      ) : periods.length === 0 ? (
+        <div className="content-card">
+          <div className="empty-state">
+            <div className="empty-state-icon">💰</div>
+            <div className="empty-state-title">No pay periods yet</div>
+            <div className="empty-state-description">
+              Create your first pay period to generate draft payslips for every employee.
+            </div>
           </div>
         </div>
-
-        {/* Mini visual */}
-        <div>
-          <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--txt-secondary)", marginBottom: "var(--sp-3)" }}>
-            Distribution
-          </div>
-          {(() => {
-            // emp.salary is guaranteed truthy here — the caller only renders BreakdownPanel
-            // when hasSalary is true — so this division is safe from NaN%/Infinity%.
-            const netPct    = Math.round((net    / emp.salary) * 100);
-            const taxPct    = Math.round((tax    / emp.salary) * 100);
-            const socialPct = Math.round((social / emp.salary) * 100);
-            // The "other insurance" bucket absorbs the rounding remainder so the four
-            // percentages always sum to exactly 100.
-            const otherInsurancePct = 100 - netPct - taxPct - socialPct;
-
-            const distribution = [
-              { label: "Net Pay",           value: net,      pct: netPct,           color: "var(--clr-success-500)" },
-              { label: "PIT",                value: tax,      pct: taxPct,           color: "var(--clr-danger-400)" },
-              { label: "BHXH (Social)",     value: social,   pct: socialPct,        color: "var(--clr-warning-400)" },
-              { label: "BHYT/BHTN",         value: medicare, pct: otherInsurancePct, color: "var(--clr-info-400)" },
-            ];
-
-            return distribution.map((s) => (
-              <div key={s.label} style={{ marginBottom: "var(--sp-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{s.label}</span>
-                  <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{s.pct}%</span>
+      ) : (
+        <>
+          {/* ── Stat cards ── */}
+          <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
+            {[
+              { label: "Total gross", value: totals.grossPay, color: "var(--clr-primary-400)", hint: `${period?.payslipCount ?? 0} payslips` },
+              { label: "Total net", value: totals.netPay, color: "var(--clr-success-600)", hint: "Take-home total" },
+              { label: "Tax + insurance", value: (totals.pit ?? 0) + (totals.insuranceTotal ?? 0), color: "var(--clr-info-600)", hint: "PIT + BHXH/BHYT/BHTN" },
+              { label: "Total deductions", value: totals.deduction, color: "var(--clr-warning-600)", hint: "Unpaid leave & absence" },
+            ].map((c) => (
+              <div key={c.label} className="stat-card">
+                <div className="stat-card-label">{c.label}</div>
+                <div className="stat-card-value" style={{ color: c.color }}>
+                  {fmtMoneyK(c.value, currency, fxRate)}
                 </div>
-                <div style={{ background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)", height: "6px" }}>
-                  <div style={{
-                    height: "6px", borderRadius: "var(--radius-full)",
-                    background: s.color, width: `${s.pct}%`,
-                  }} />
+                <div className="stat-card-hint">{c.hint}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Charts ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "var(--sp-5)", marginBottom: "var(--sp-5)" }}>
+            <div className="content-card">
+              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
+                Gross pay by department
+              </div>
+              <DeptChart data={deptData} currency={currency} fxRate={fxRate} />
+            </div>
+            <div className="content-card">
+              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
+                By contract type
+              </div>
+              <TypeDonut segments={typeSegs} total={payslips.length} currency={currency} fxRate={fxRate} />
+            </div>
+          </div>
+
+          {/* ── Payslip table ── */}
+          <div className="content-card">
+            <div className="toolbar">
+              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
+                Payslips
+              </div>
+              <input
+                className="search-input"
+                style={{ width: "180px" }}
+                placeholder="Search employee…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+              />
+              <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="all">All departments</option>
+                {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}>
+                <option value="all">All types</option>
+                {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <div style={{ display: "flex", gap: "2px", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
+                {["VND", "USD"].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    aria-pressed={currency === c}
+                    onClick={() => setCurrency(c)}
+                    style={{
+                      padding: "4px 11px", borderRadius: "6px", border: "none", cursor: "pointer",
+                      background: currency === c ? "var(--bg-surface)" : "transparent",
+                      color: currency === c ? "var(--txt-primary)" : "var(--txt-secondary)",
+                      fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
+                      boxShadow: currency === c ? "var(--shadow-xs)" : "none",
+                    }}
+                  >{c}</button>
+                ))}
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={exportCSV}
+                title="CSV export is always raw VND, regardless of the display currency above.">
+                ↓ Export CSV
+              </button>
+            </div>
+
+            {loadingSlips ? (
+              <div style={{ padding: "var(--sp-8)", textAlign: "center", color: "var(--txt-secondary)" }}>
+                Loading payslips…
+              </div>
+            ) : payslips.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">📄</div>
+                <div className="empty-state-title">No payslips in this period</div>
+                <div className="empty-state-description">
+                  {isDraft && isHR ? "Use Regenerate drafts to build them." : "This period has no payslips."}
                 </div>
               </div>
-            ));
-          })()}
-        </div>
+            ) : filtered.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">💰</div>
+                <div className="empty-state-title">No results</div>
+                <div className="empty-state-description">Try adjusting your search or filters.</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ overflowX: "auto" }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <SortableHeader field="employeeName" label="Employee" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="departmentName" label="Department" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="type" label="Type" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="baseSalary" label="Base" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <th style={{ textAlign: "right" }}>Bonus</th>
+                        <th style={{ textAlign: "right" }}>Allowance</th>
+                        <th style={{ textAlign: "right" }}>Deduction</th>
+                        <SortableHeader field="grossPay" label="Gross" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <th style={{ textAlign: "right" }}>Insurance</th>
+                        <th style={{ textAlign: "right" }}>PIT</th>
+                        <SortableHeader field="netPay" label="Net" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginated.map((p) => (
+                        <Fragment key={p.id}>
+                          <tr>
+                            <td>
+                              <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                                <Avatar name={p.employeeName} size="sm" />
+                                <div>
+                                  <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{p.employeeName}</div>
+                                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{p.employeeCode}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>{p.departmentName ?? "—"}</td>
+                            <td>{p.type ? <TypeBadge type={p.type} /> : "—"}</td>
+                            <td style={{ textAlign: "right" }}>
+                              {canEdit
+                                ? <MoneyInput value={p.baseSalary} onCommit={(v) => patchPayslip(p.id, { baseSalary: v })} />
+                                : fmtMoney(p.baseSalary, currency, fxRate)}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              {canEdit
+                                ? <MoneyInput value={p.bonus} onCommit={(v) => patchPayslip(p.id, { bonus: v })} />
+                                : fmtMoney(p.bonus, currency, fxRate)}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              {canEdit
+                                ? <MoneyInput value={p.allowance} onCommit={(v) => patchPayslip(p.id, { allowance: v })} />
+                                : fmtMoney(p.allowance, currency, fxRate)}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              {canEdit
+                                ? <MoneyInput value={p.deduction} onCommit={(v) => patchPayslip(p.id, { deduction: v })} />
+                                : fmtMoney(p.deduction, currency, fxRate)}
+                              <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                                {p.unpaidLeaveDays} unpaid + {p.absentDays} absent
+                                {p.deductionOverridden && canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRecompute(p.id)}
+                                    style={{
+                                      marginLeft: "6px", background: "none", border: "none", padding: 0,
+                                      cursor: "pointer", color: "var(--txt-primary-brand)",
+                                      font: "inherit", textDecoration: "underline",
+                                    }}
+                                  >recompute</button>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ textAlign: "right", fontWeight: "var(--fw-medium)" }}>{fmtMoney(p.grossPay, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>−{fmtMoney(p.insuranceTotal, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>−{fmtMoney(p.pit, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)", color: "var(--txt-success)" }}>
+                              {fmtMoney(p.netPay, currency, fxRate)}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <button
+                                type="button"
+                                onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+                                aria-expanded={expanded === p.id}
+                                style={{
+                                  background: "none", border: "none", cursor: "pointer",
+                                  color: "var(--txt-secondary)", fontSize: "var(--fs-sm)",
+                                }}
+                              >{expanded === p.id ? "▲" : "▼"}</button>
+                            </td>
+                          </tr>
+                          {expanded === p.id && (
+                            <tr>
+                              <td colSpan={12} style={{ padding: "var(--sp-4)" }}>
+                                <BreakdownPanel slip={p} currency={currency} fxRate={fxRate} period={period} />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={7} style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                          {filtered.length} payslip{filtered.length === 1 ? "" : "s"} match filters
+                        </td>
+                        <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)" }}>
+                          {fmtMoney(filtered.reduce((s, p) => s + p.grossPay, 0), currency, fxRate)}
+                        </td>
+                        <td colSpan={2} />
+                        <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)" }}>
+                          {fmtMoney(filtered.reduce((s, p) => s + p.netPay, 0), currency, fxRate)}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
 
-      </div>
+                {totalPages > 1 && (
+                  <div className="pagination">
+                    <div className="pagination-info">
+                      Showing {startIndex + 1}–{Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length)} of {filtered.length}
+                    </div>
+                    <div className="pagination-controls">
+                      <button type="button" className="page-btn" disabled={safePage === 1}
+                        onClick={() => setCurrentPage(safePage - 1)}>‹</button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`page-btn ${n === safePage ? "active" : ""}`}
+                          onClick={() => setCurrentPage(n)}
+                        >{n}</button>
+                      ))}
+                      <button type="button" className="page-btn" disabled={safePage === totalPages}
+                        onClick={() => setCurrentPage(safePage + 1)}>›</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

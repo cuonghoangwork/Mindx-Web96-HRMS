@@ -50,6 +50,8 @@ const auditLogSchema = new mongoose.Schema(
         "attendance",
         "notification",
         "user",
+        "promotion",
+        "payroll",
       ],
     },
     resourceId: { type: String },

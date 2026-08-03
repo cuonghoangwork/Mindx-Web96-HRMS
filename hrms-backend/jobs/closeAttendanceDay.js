@@ -12,6 +12,8 @@ import {
   hoursBetween,
   isLater,
   isWeekend,
+  localDateKey,
+  utcDateKey,
   utcMidnight,
 } from "../utils/workday.js";
 
@@ -106,8 +108,20 @@ async function markNoShow(dateKey, date) {
   );
   if (!employees.length) return 0;
 
-  const existing = await AttendanceModel.find({ date }, "employee");
-  const covered = new Set(existing.map((r) => String(r.employee)));
+  const existing = await AttendanceModel.find(
+    {
+      date: {
+        $gte: new Date(date.getTime() - 86400000),
+        $lte: new Date(date.getTime() + 2 * 86400000),
+      },
+    },
+    "employee date",
+  );
+  const covered = new Set(
+    existing
+      .filter((r) => utcDateKey(r.date) === dateKey || localDateKey(r.date) === dateKey)
+      .map((r) => String(r.employee)),
+  );
 
   const leaveRequests = await LeaveRequestModel.find(
     {

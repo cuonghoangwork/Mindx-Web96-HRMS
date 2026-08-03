@@ -54,6 +54,8 @@ const auditLogController = {
         holiday:      "holiday",
         notification: "system",
         user:         "system",
+        promotion:    "employee",
+        payroll:      "payroll",
       };
 
       const enriched = items.map((entry) => {
