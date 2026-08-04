@@ -15,6 +15,10 @@ const EMPLOYEE_ID_RE = /^[A-Z]{2,4}\d{2,6}$/i; // matches AddEmployee.jsx RULES.
 
 const VALID_STATUSES = ["Active", "On Leave", "Terminated"];
 const VALID_TYPES    = ["Full-time", "Part-time", "Contract", "Intern"];
+// Position Ladder (task 2.1) — deliberately a separate list from VALID_TYPES
+// even though "Full-time" appears in both; contractType and positionLevel
+// are different concepts (see DECISION_2.6_Manager_Level.md).
+const VALID_POSITION_LEVELS_EMPLOYEE = ["Intern", "Full-time", "Senior", "Manager"];
 const VALID_GENDERS  = ["Male", "Female", "Other"];
 const VALID_JOB_STATUSES     = ["Open", "Filled", "Closed"];
 const VALID_CANDIDATE_STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
@@ -107,6 +111,7 @@ const employeeCreate = makeValidator([
   isOneOf("sex", "Gender", VALID_GENDERS),
   isOneOf("type", "Contract type", VALID_TYPES),
   isOneOf("status", "Status", VALID_STATUSES),
+  isOneOf("positionLevel", "Position level", VALID_POSITION_LEVELS_EMPLOYEE),
 
   isPositiveNumber("salary", "Annual salary"),
   isDateString("startDate", "Start date"),
@@ -128,6 +133,7 @@ const employeeUpdate = makeValidator([
   isOneOf("sex", "Gender", VALID_GENDERS),
   isOneOf("type", "Contract type", VALID_TYPES),
   isOneOf("status", "Status", VALID_STATUSES),
+  isOneOf("positionLevel", "Position level", VALID_POSITION_LEVELS_EMPLOYEE),
 
   isPositiveNumber("salary", "Annual salary"),
   isDateString("startDate", "Start date"),
@@ -291,14 +297,20 @@ const leaveRequestCreate = makeValidator([
   maxLength("reason", "Reason", 500),
 ]);
 
+const VALID_POSITION_LEVELS = ["Intern", "Full-time", "Senior", "Manager"];
+
 const promotionRequestCreate = makeValidator([
   required("employeeId", "Employee"),
   (body) =>
-    !body.designation && !body.department && (body.salary === undefined || body.salary === "")
-      ? "Provide at least one of designation, department or annual salary."
+    !body.designation &&
+    !body.department &&
+    (body.salary === undefined || body.salary === "") &&
+    !body.positionLevel
+      ? "Provide at least one of designation, department, annual salary or position level."
       : null,
   maxLength("designation", "Designation", 120),
   isPositiveNumber("salary", "Proposed annual salary"),
+  isOneOf("positionLevel", "Position level", VALID_POSITION_LEVELS),
   isDateString("effectiveDate", "Effective date"),
   maxLength("reason", "Reason", 500),
 ]);

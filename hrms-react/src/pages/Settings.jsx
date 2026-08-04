@@ -396,10 +396,15 @@ function MyProfileEditSection() {
 const usd = (n) =>
   n === null || n === undefined || n === '' ? '—' : `$${Number(n).toLocaleString()}`
 
+// Position Ladder (task 2.1) — mirrors model/PositionLevel.js's POSITION_LEVELS.
+// Kept as a local constant (no shared constants module exists yet in this
+// frontend), matching how EMPLOYEE_TYPES is scoped locally in ViewEmployee.jsx.
+const POSITION_LEVELS = ['Intern', 'Full-time', 'Senior', 'Manager']
+
 function PromotionProposeSection() {
   const { employees, departments } = useStore()
   const [form, setForm] = useState({
-    employeeId: '', designation: '', department: '', salary: '', effectiveDate: '', reason: '',
+    employeeId: '', designation: '', department: '', salary: '', positionLevel: '', effectiveDate: '', reason: '',
   })
   const [mine, setMine] = useState([])
   const [loading, setLoading] = useState(true)
@@ -447,11 +452,12 @@ function PromotionProposeSection() {
       if (form.designation.trim()) body.designation = form.designation.trim()
       if (form.department) body.department = form.department
       if (form.salary !== '') body.salary = Number(form.salary)
+      if (form.positionLevel) body.positionLevel = form.positionLevel
       if (form.effectiveDate) body.effectiveDate = form.effectiveDate
       if (form.reason.trim()) body.reason = form.reason.trim()
       await PromotionRequestsAPI.create(body)
       setToast('Promotion proposal submitted for Administrator review.')
-      setForm({ employeeId: '', designation: '', department: '', salary: '', effectiveDate: '', reason: '' })
+      setForm({ employeeId: '', designation: '', department: '', salary: '', positionLevel: '', effectiveDate: '', reason: '' })
       loadMine()
     } catch (err) {
       setError(err.message || 'Failed to submit proposal.')
@@ -517,6 +523,19 @@ function PromotionProposeSection() {
           </div>
 
           <div className="form-group">
+            <label className="form-label" htmlFor="promo-position-level">New position level</label>
+            <select id="promo-position-level" name="positionLevel" value={form.positionLevel} onChange={handleChange}>
+              <option value="">Leave unchanged</option>
+              {POSITION_LEVELS.map((lvl) => (
+                <option key={lvl} value={lvl}>{lvl}</option>
+              ))}
+            </select>
+            {selected && (
+              <span className="form-hint">Currently: {selected.positionLevel || '—'}</span>
+            )}
+          </div>
+
+          <div className="form-group">
             <label className="form-label" htmlFor="promo-salary">New annual salary (USD)</label>
             <input id="promo-salary" name="salary" type="number" min="0" step="1000"
               value={form.salary} onChange={handleChange} placeholder={selected?.salary ?? '75000'} />
@@ -561,11 +580,19 @@ function PromotionProposeSection() {
                 </span>
                 <span style={{ color: 'var(--txt-secondary)', flex: 1, minWidth: '160px' }}>
                   {[
+                    r.proposed.positionLevel && `level → ${r.proposed.positionLevel}`,
                     r.proposed.designation && `title → ${r.proposed.designation}`,
                     r.proposed.department && `dept → ${r.proposed.department}`,
                     r.proposed.salary !== null && `salary → ${usd(r.proposed.salary)}`,
                   ].filter(Boolean).join(' · ') || '—'}
                 </span>
+                {r.systemGenerated && (
+                  <span style={{
+                    fontSize: 'var(--fs-xs)', padding: '2px 8px', borderRadius: 'var(--radius-full, 999px)',
+                    background: 'var(--bg-info-subtle, var(--bg-surface-alt))', color: 'var(--txt-info, var(--txt-secondary))',
+                    border: '1px solid var(--bdr-subtle)',
+                  }}>Auto-flagged</span>
+                )}
                 <StatusBadge status={r.status} />
               </div>
             ))}
@@ -679,6 +706,7 @@ function PromotionReviewPanel() {
             const isOpen = reviewingId === req.id
             const isMine = String(req.requestedBy) === String(user?.id)
             const rows = [
+              ['Position Level', req.current.positionLevel, req.proposed.positionLevel],
               ['Designation', req.current.designation, req.proposed.designation],
               ['Department', req.current.department, req.proposed.department],
               ['Annual Salary', usd(req.current.salary), req.proposed.salary === null ? null : usd(req.proposed.salary)],
@@ -701,10 +729,17 @@ function PromotionReviewPanel() {
                       {req.employeeName} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>({req.employeeCode})</span>
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
-                      Proposed by {req.requestedByName ?? 'HR'} · {new Date(req.createdAt).toLocaleDateString()}
+                      {req.systemGenerated ? 'Auto-flagged by system' : `Proposed by ${req.requestedByName ?? 'HR'}`} · {new Date(req.createdAt).toLocaleDateString()}
                       {req.effectiveDate ? ` · effective ${req.effectiveDate}` : ''}
                     </div>
                   </div>
+                  {req.systemGenerated && (
+                    <span style={{
+                      fontSize: 'var(--fs-xs)', padding: '2px 8px', borderRadius: 'var(--radius-full, 999px)',
+                      background: 'var(--bg-info-subtle, var(--bg-surface-alt))', color: 'var(--txt-info, var(--txt-secondary))',
+                      border: '1px solid var(--bdr-subtle)',
+                    }}>Auto-flagged</span>
+                  )}
                   <StatusBadge status={req.status} />
                   {req.status === 'pending' && (
                     <button

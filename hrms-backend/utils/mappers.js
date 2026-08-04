@@ -127,6 +127,12 @@ export function employeeToClient(doc) {
     status: toClient(EMPLOYEE_STATUS_REV, o.status),
     salary: o.annualSalary,
     avatar: o.avatar ?? null,
+    // Position Ladder (tasks 2.1/2.2) — positionLevel/levelStartDate use
+    // the same string values client- and DB-side (Intern/Full-time/Senior/
+    // Manager), so no toClient/toDb translation table is needed here,
+    // unlike gender/contractType/status above.
+    positionLevel: o.positionLevel ?? null,
+    levelStartDate: o.levelStartDate ?? null,
     createdAt: o.createdAt,
   };
 }
@@ -146,6 +152,7 @@ export function employeeFromClient(body = {}) {
   carry(body, "status", out, "status", (v) => toDb(EMPLOYEE_STATUS, v));
   carry(body, "salary", out, "annualSalary", (v) => Number(v) || 0);
   carry(body, "avatar", out, "avatar");
+  carry(body, "positionLevel", out, "positionLevel");
   return out;
 }
 

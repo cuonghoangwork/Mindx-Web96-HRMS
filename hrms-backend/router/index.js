@@ -12,6 +12,7 @@ import profileEditRequestRouter from "./profileEditRequestRouter.js";
 import leaveRequestRouter from "./leaveRequestRouter.js";
 import promotionRequestRouter from "./promotionRequestRouter.js";
 import payrollRouter from "./payrollRouter.js";
+import positionLevelRouter from "./positionLevelRouter.js";
 
 const rootRouter = Router();
 
@@ -28,5 +29,6 @@ rootRouter.use("/profile-edit-requests", profileEditRequestRouter);
 rootRouter.use("/leave-requests", leaveRequestRouter);
 rootRouter.use("/promotion-requests", promotionRequestRouter);
 rootRouter.use("/payroll", payrollRouter);
+rootRouter.use("/position-levels", positionLevelRouter);
 
 export default rootRouter;

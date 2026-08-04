@@ -177,6 +177,10 @@ function ViewEmployee() {
           <div className="employee-detail-grid-span">
             <InfoItem label="Designation" value={employee.designation} />
           </div>
+          <InfoItem
+            label="Position Level"
+            value={employee.positionLevel || "—"}
+          />
           <EditableSelect
             label="Employment Type"
             id="employee-type"

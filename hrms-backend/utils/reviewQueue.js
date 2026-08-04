@@ -56,7 +56,14 @@ export const REVIEW_STATUSES = ["pending", "approved", "rejected"];
 export function reviewRequestBaseFields() {
   return {
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", required: true },
-    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    // Optional (not required): a human-initiated request always sets this,
+    // but a scheduled job auto-flagging something for review (e.g. task 2.4's
+    // promotion-eligibility check, and eventually 4.7's no-show flagging)
+    // has no user to attribute it to. Use systemGenerated to distinguish
+    // "the system flagged this" from "a person proposed this" rather than
+    // attributing automated flags to an arbitrary admin account.
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    systemGenerated: { type: Boolean, default: false },
     status: { type: String, enum: REVIEW_STATUSES, default: "pending" },
     // Optional note from HR/Admin when approving or rejecting
     reviewNote: { type: String, default: "" },
