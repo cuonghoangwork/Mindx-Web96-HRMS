@@ -73,6 +73,8 @@ Core HR record for every staff member.
 | `status` | String | — | `active` \| `on-leave` \| `terminated` |
 | `annualSalary` | Number | — | Default `0` |
 | `avatar` | String | — | URL |
+| `contractUrl` | String | — | Task 1.4 — contract PDF, HR/Admin-uploaded only (Cloudinary raw asset). `null` until uploaded |
+| `contractUploadedAt` | Date | — | Task 1.4 — set alongside `contractUrl` |
 | `createdAt` | Date | auto | |
 | `updatedAt` | Date | auto | |
 

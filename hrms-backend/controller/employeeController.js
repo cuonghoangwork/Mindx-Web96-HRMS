@@ -296,6 +296,49 @@ const employeeController = {
       res.status(400).json({ success: false, message: error.message });
     }
   },
+
+  // Task 1.4 — contract PDF upload. Unlike avatars, HR/Admin-only (see
+  // router/employeeRouter.js's authorize() on this route) — a contract is
+  // an official HR document, not something an employee self-serves.
+  // Employees view it read-only via employeeToClient's contractUrl
+  // (already returned by GET /employees/me and GET /employees/:id).
+  uploadContract: async (req, res) => {
+    try {
+      if (!isCloudinaryConfigured()) {
+        throw new Error(
+          "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        );
+      }
+      if (!req.file) throw new Error("No contract file was uploaded.");
+
+      const employee = await EmployeeModel.findById(req.params.id);
+      if (!employee) throw new Error("Employee not found.");
+
+      const result = await uploadBufferToCloudinary(req.file.buffer, {
+        folder: "hrms/contracts",
+        public_id: `employee_${employee._id}_contract`,
+        overwrite: true,
+        resource_type: "raw",
+        format: "pdf",
+      });
+
+      employee.contractUrl = result.secure_url;
+      employee.contractUploadedAt = new Date();
+      await employee.save();
+      await employee.populate("department", "name");
+
+      await logAction(req, {
+        action: "updated",
+        resource: "employee",
+        resourceId: employee._id,
+        label: `${employee.name} (${employee.employeeId}) — contract uploaded`,
+      });
+
+      res.json({ success: true, data: employeeToClient(employee) });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
 };
 
 export default employeeController;

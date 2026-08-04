@@ -224,6 +224,38 @@ function MyProfileEditSection() {
         ))}
       </div>
 
+      {/* Task 1.4 — My Contract. Read-only here: only HR/Admin can upload
+          (see ContractCard in ViewEmployee.jsx). */}
+      <div style={{
+        padding: 'var(--sp-5)',
+        background: 'var(--bg-surface-alt)',
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--bdr-subtle)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        gap: 'var(--sp-3)', flexWrap: 'wrap',
+      }}>
+        <div>
+          <h4 style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)', margin: 0 }}>
+            My Contract
+          </h4>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)', marginTop: '4px' }}>
+            {profile.contractUrl
+              ? `Uploaded ${new Date(profile.contractUploadedAt).toLocaleDateString()}`
+              : "HR hasn't uploaded your contract yet."}
+          </p>
+        </div>
+        {profile.contractUrl && (
+          <a
+            href={profile.contractUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary btn-sm"
+          >
+            View Contract (PDF)
+          </a>
+        )}
+      </div>
+
       {/* Edit form */}
       {isEditing && !hasPending && (
         <div style={{

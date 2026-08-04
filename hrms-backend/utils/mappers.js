@@ -133,6 +133,10 @@ export function employeeToClient(doc) {
     // unlike gender/contractType/status above.
     positionLevel: o.positionLevel ?? null,
     levelStartDate: o.levelStartDate ?? null,
+    // Task 1.4 — contract PDF, set only via uploadContract() below (not
+    // carried in employeeFromClient — see model/Employee.js's comment).
+    contractUrl: o.contractUrl ?? null,
+    contractUploadedAt: o.contractUploadedAt ?? null,
     createdAt: o.createdAt,
   };
 }
@@ -153,6 +157,8 @@ export function employeeFromClient(body = {}) {
   carry(body, "salary", out, "annualSalary", (v) => Number(v) || 0);
   carry(body, "avatar", out, "avatar");
   carry(body, "positionLevel", out, "positionLevel");
+  // contractUrl/contractUploadedAt intentionally NOT carried here — see
+  // model/Employee.js's comment. Only uploadContract() may set them.
   return out;
 }
 

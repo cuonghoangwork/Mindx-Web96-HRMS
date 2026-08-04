@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import Badge, { StatusBadge, TypeBadge } from "../components/Badge";
 import { idsMatch } from "../utils/id";
@@ -23,10 +24,14 @@ const EMPLOYEE_STATUSES = ["Active", "On Leave", "Terminated"];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // keep in sync with hrms-backend/middleware/upload.js
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+// Task 1.4 — keep in sync with hrms-backend/middleware/upload.js's uploadPdf
+const MAX_CONTRACT_BYTES = 10 * 1024 * 1024;
+
 function ViewEmployee() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employees, attendance, updateEmployee, uploadEmployeeAvatar } = useStore();
+  const { employees, attendance, updateEmployee, uploadEmployeeAvatar, uploadEmployeeContract } = useStore();
+  const { isHR } = useAuth();
   const [pendingChange, setPendingChange] = useState(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -226,6 +231,8 @@ function ViewEmployee() {
 
       <AttendanceReportCard employee={employee} attendance={attendance} navigate={navigate} />
 
+      <ContractCard employee={employee} isHR={isHR} uploadEmployeeContract={uploadEmployeeContract} />
+
       {pendingChange && (
         <ConfirmChangeModal
           change={pendingChange}
@@ -352,6 +359,102 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
             </button>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function ContractCard({ employee, isHR, uploadEmployeeContract }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handlePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    if (file.size > MAX_CONTRACT_BYTES) {
+      setError("Contract must be 10MB or smaller.");
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    try {
+      await uploadEmployeeContract(employee.id, file);
+    } catch (err) {
+      setError(err.message || "Failed to upload contract.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="content-card" style={{ marginTop: "20px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--sp-3)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            Contract
+          </h3>
+          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            {employee.contractUrl
+              ? `Uploaded ${new Date(employee.contractUploadedAt).toLocaleDateString()}`
+              : "No contract on file yet."}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+          {employee.contractUrl && (
+            <a
+              href={employee.contractUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+            >
+              View Contract
+            </a>
+          )}
+          {isHR && (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handlePick}
+                disabled={uploading}
+              >
+                {uploading ? "Uploading…" : employee.contractUrl ? "Replace Contract" : "Upload Contract"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p style={{ color: "var(--txt-danger)", fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {error}
+        </p>
       )}
     </div>
   );

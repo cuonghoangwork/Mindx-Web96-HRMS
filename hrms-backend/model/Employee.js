@@ -33,6 +33,16 @@ const employeeSchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "on-leave", "terminated"], default: "active" },
     annualSalary: { type: Number, default: 0 },
     avatar: { type: String },
+    // Task 1.4 — contract PDF. HR/Admin-uploaded only (see
+    // controller/employeeController.js uploadContract) — deliberately not
+    // exposed through the generic update endpoint (employeeFromClient
+    // doesn't carry it), so an employee or a plain PUT can't overwrite it
+    // with an arbitrary URL. A single current contract per employee, not a
+    // versioned collection — re-uploading overwrites the Cloudinary asset
+    // in place (see HRMS_IMPROVEMENT_TASKS.md 1.4's "or a versioned
+    // Contract collection" note — out of scope for this effort size).
+    contractUrl: { type: String, default: null },
+    contractUploadedAt: { type: Date, default: null },
     // Back-link to the User account that belongs to this employee (optional 1:1)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },

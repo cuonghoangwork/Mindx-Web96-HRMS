@@ -37,6 +37,13 @@ export const EmployeesAPI = {
     form.append("avatar", file);
     return apiFetch(`/employees/${id}/avatar`, { method: "POST", body: form });
   },
+  // Task 1.4 — HR/Admin uploads a contract PDF for an employee (unlike
+  // avatars, this is not self-serve — see router/employeeRouter.js).
+  uploadContract: (id, file) => {
+    const form = new FormData();
+    form.append("contract", file);
+    return apiFetch(`/employees/${id}/contract`, { method: "POST", body: form });
+  },
 };
 
 export const DepartmentsAPI = {
