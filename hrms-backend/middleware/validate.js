@@ -169,6 +169,23 @@ const departmentUpdate = makeValidator([
 /* ══════════════════════════════════════════════════
    JOB
 ══════════════════════════════════════════════════ */
+// Task 5.1 — expanded Job fields. maxLength()/minLength() only run on strings
+// (see their definitions above), so they're safe no-ops against the
+// requirements/benefits arrays without special-casing them here.
+const isNonNegativeNumber = (field, label) => (body) =>
+  body[field] !== undefined && body[field] !== "" && body[field] !== null &&
+  (isNaN(Number(body[field])) || Number(body[field]) < 0)
+    ? `${label} must be a non-negative number.`
+    : null;
+
+const salaryRangeIsOrdered = (body) => {
+  if (body.salaryMin === undefined || body.salaryMax === undefined) return null;
+  if (body.salaryMin === "" || body.salaryMax === "" || body.salaryMin === null || body.salaryMax === null) return null;
+  return Number(body.salaryMin) > Number(body.salaryMax)
+    ? "Minimum salary cannot be greater than maximum salary."
+    : null;
+};
+
 const jobCreate = makeValidator([
   required("title", "Job title"),
   minLength("title", "Job title", 2),
@@ -179,6 +196,14 @@ const jobCreate = makeValidator([
 
   isOneOf("status", "Job status", VALID_JOB_STATUSES),
   isOneOf("type", "Employment type", VALID_TYPES),
+
+  maxLength("description", "Job description", 5000),
+  maxLength("companyInfo", "Company info", 3000),
+  maxLength("applicationInstructions", "Application instructions", 1000),
+  isNonNegativeNumber("salaryMin", "Minimum salary"),
+  isNonNegativeNumber("salaryMax", "Maximum salary"),
+  salaryRangeIsOrdered,
+  isDateString("deadline", "Application deadline"),
 ]);
 
 const jobUpdate = makeValidator([
@@ -188,6 +213,14 @@ const jobUpdate = makeValidator([
 
   isOneOf("status", "Job status", VALID_JOB_STATUSES),
   isOneOf("type", "Employment type", VALID_TYPES),
+
+  maxLength("description", "Job description", 5000),
+  maxLength("companyInfo", "Company info", 3000),
+  maxLength("applicationInstructions", "Application instructions", 1000),
+  isNonNegativeNumber("salaryMin", "Minimum salary"),
+  isNonNegativeNumber("salaryMax", "Maximum salary"),
+  salaryRangeIsOrdered,
+  isDateString("deadline", "Application deadline"),
 ]);
 
 /* ══════════════════════════════════════════════════

@@ -11,6 +11,7 @@ import auditLogRouter from "./auditLogRouter.js";
 import profileEditRequestRouter from "./profileEditRequestRouter.js";
 import leaveRequestRouter from "./leaveRequestRouter.js";
 import promotionRequestRouter from "./promotionRequestRouter.js";
+import noShowReviewRouter from "./noShowReviewRouter.js";
 import payrollRouter from "./payrollRouter.js";
 import positionLevelRouter from "./positionLevelRouter.js";
 
@@ -28,6 +29,7 @@ rootRouter.use("/audit-log", auditLogRouter);
 rootRouter.use("/profile-edit-requests", profileEditRequestRouter);
 rootRouter.use("/leave-requests", leaveRequestRouter);
 rootRouter.use("/promotion-requests", promotionRequestRouter);
+rootRouter.use("/no-show-reviews", noShowReviewRouter);
 rootRouter.use("/payroll", payrollRouter);
 rootRouter.use("/position-levels", positionLevelRouter);
 

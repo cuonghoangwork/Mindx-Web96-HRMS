@@ -2,6 +2,7 @@ import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
 import HolidayModel from "../model/Holiday.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
+import NoShowReviewModel from "../model/NoShowReview.js";
 import { logAction } from "../utils/auditLog.js";
 import { notifyHR } from "../controller/notificationController.js";
 import { getRemainingPaidDays } from "../utils/leaveBalance.js";
@@ -106,7 +107,7 @@ async function markNoShow(dateKey, date) {
     { status: "active", createdAt: { $lte: endOfUtcDay(dateKey) } },
     "_id",
   );
-  if (!employees.length) return 0;
+  if (!employees.length) return { count: 0, employeeIds: [] };
 
   const existing = await AttendanceModel.find(
     {
@@ -144,11 +145,17 @@ async function markNoShow(dateKey, date) {
       status: "no-show",
     }));
 
-  if (!toInsert.length) return 0;
+  if (!toInsert.length) return { count: 0, employeeIds: [] };
+
+  // Captured before the insert (not derived from its result) so task 4.7's
+  // flag check still runs for an employee even if their own insert hit the
+  // duplicate-key race handled below — worst case it's a harmless no-op
+  // re-check, not a missed flag.
+  const employeeIds = toInsert.map((r) => r.employee);
 
   try {
     const inserted = await AttendanceModel.insertMany(toInsert, { ordered: false });
-    return inserted.length;
+    return { count: inserted.length, employeeIds };
   } catch (err) {
     const isDuplicateOnly =
       err?.code === 11000 ||
@@ -156,8 +163,66 @@ async function markNoShow(dateKey, date) {
         err.writeErrors.length > 0 &&
         err.writeErrors.every((w) => (w?.err?.code ?? w?.code) === 11000));
     if (!isDuplicateOnly) throw err;
-    return err.result?.insertedCount ?? err.insertedDocs?.length ?? 0;
+    return { count: err.result?.insertedCount ?? err.insertedDocs?.length ?? 0, employeeIds };
   }
+}
+
+/**
+ * Task 4.7: "5 no-shows -> flag for HR review (not auto-terminate)". After
+ * today's no-show records are written, check whether any of those
+ * employees have now accumulated a new multiple of 5 no-show days
+ * *all-time* and, if so, auto-create a pending NoShowReview (task 0.2's
+ * review-queue pattern — see model/NoShowReview.js) plus notify HR (task
+ * 4.8, via the same notifyHR() every other scheduled job already uses).
+ *
+ * Deliberately never touches Employee.status — flagging is the entire
+ * effect. Any consequence beyond that is a human decision made through the
+ * review queue (controller/noShowReviewController.js), not this job.
+ *
+ * Dedup: only scoped to employees marked no-show *today* (cheap — avoids a
+ * full-collection scan every run) and only re-flags once the employee's
+ * all-time count has grown by >= 5 since their last flag (pending or
+ * already reviewed), the same "flag once per threshold, don't refire every
+ * day the count sits still" rule checkPromotionEligibility.js uses.
+ */
+async function flagRepeatedNoShows(employeeIds) {
+  if (!employeeIds.length) return 0;
+
+  let flagged = 0;
+  for (const employeeId of employeeIds) {
+    const count = await AttendanceModel.countDocuments({ employee: employeeId, status: "no-show" });
+    if (count < 5) continue;
+
+    const lastFlag = await NoShowReviewModel.findOne({ employee: employeeId }).sort({ noShowCountAtFlag: -1 });
+    const lastFlaggedCount = lastFlag?.noShowCountAtFlag ?? 0;
+    if (count < lastFlaggedCount + 5) continue;
+
+    const alreadyPending = await NoShowReviewModel.findOne({ employee: employeeId, status: "pending" });
+    if (alreadyPending) continue;
+
+    const employee = await EmployeeModel.findById(employeeId, "name employeeId");
+    if (!employee) continue;
+
+    await NoShowReviewModel.create({
+      employee: employeeId,
+      requestedBy: null,
+      systemGenerated: true,
+      status: "pending",
+      noShowCountAtFlag: count,
+      reason: `Auto-flagged: ${count} no-show day(s) recorded to date.`,
+      flaggedAt: new Date(),
+    });
+    flagged += 1;
+
+    await notifyHR({
+      title: "No-show pattern flagged for review",
+      message: `${employee.name} (${employee.employeeId}) has ${count} no-show day(s) on record and needs HR review.`,
+      category: "employee",
+      link: "/settings",
+      linkLabel: "Review no-show flags",
+    });
+  }
+  return flagged;
 }
 
 export async function closeAttendanceDay({ dateKey } = {}) {
@@ -169,11 +234,18 @@ export async function closeAttendanceDay({ dateKey } = {}) {
   let markedLate = 0;
   let markedLateUnpaid = 0;
   let markedNoShow = 0;
+  let flaggedForReview = 0;
   if (!reason) {
     const lateResult = await markLate(date);
     markedLate = lateResult.count;
     markedLateUnpaid = lateResult.unpaidCount;
-    markedNoShow = await markNoShow(dateKey, date);
+
+    const noShowResult = await markNoShow(dateKey, date);
+    markedNoShow = noShowResult.count;
+    // Task 4.7/4.8 — only worth checking employees actually marked no-show
+    // today (see flagRepeatedNoShows() header for why this is scoped, not
+    // a full-collection sweep).
+    flaggedForReview = await flagRepeatedNoShows(noShowResult.employeeIds);
   }
 
   const total = autoCheckedOut + markedLate + markedNoShow;
@@ -189,13 +261,14 @@ export async function closeAttendanceDay({ dateKey } = {}) {
           markedLate: { from: 0, to: markedLate },
           markedLateUnpaid: { from: 0, to: markedLateUnpaid },
           markedNoShow: { from: 0, to: markedNoShow },
+          flaggedForReview: { from: 0, to: flaggedForReview },
         },
       },
     );
 
     await notifyHR({
       title: `Attendance closed for ${dateKey}`,
-      message: `${autoCheckedOut} auto checked out, ${markedLate} marked late (${markedLateUnpaid} unpaid), ${markedNoShow} marked no-show.`,
+      message: `${autoCheckedOut} auto checked out, ${markedLate} marked late (${markedLateUnpaid} unpaid), ${markedNoShow} marked no-show${flaggedForReview > 0 ? `, ${flaggedForReview} flagged for no-show review` : ""}.`,
       category: "system",
       link: "/attendance",
       linkLabel: "View attendance",
@@ -210,6 +283,7 @@ export async function closeAttendanceDay({ dateKey } = {}) {
     markedLate,
     markedLateUnpaid,
     markedNoShow,
+    flaggedForReview,
   };
 }
 

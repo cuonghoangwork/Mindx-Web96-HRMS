@@ -18,6 +18,16 @@ function formatDate(dateStr) {
   });
 }
 
+// Task 5.1 — pay range shown on the job card / details panel.
+function formatSalaryRange(job) {
+  const { salaryMin, salaryMax, salaryCurrency } = job;
+  if (!salaryMin && !salaryMax) return null;
+  const currency = salaryCurrency || "USD";
+  const fmt = (n) => `${currency} ${Number(n).toLocaleString()}`;
+  if (salaryMin && salaryMax && salaryMin !== salaryMax) return `${fmt(salaryMin)} – ${fmt(salaryMax)}`;
+  return fmt(salaryMin || salaryMax);
+}
+
 function Jobs() {
   const navigate = useNavigate();
   const { departments, jobs, addJob, updateJob, removeJob, getApplicantCount } =
@@ -32,6 +42,7 @@ function Jobs() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [expandedId, setExpandedId] = useState(null); // task 5.1 — details expand/collapse
 
   const stats = useMemo(() => {
     const open = jobs.filter((j) => j.status === "Open");
@@ -248,6 +259,12 @@ function Jobs() {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
             {filteredJobs.map((job) => {
               const applicantCount = getApplicantCount(job.id);
+              const salaryRange = formatSalaryRange(job);
+              const hasDetails = Boolean(
+                job.description || job.requirements?.length || job.benefits?.length ||
+                job.companyInfo || job.applicationInstructions || salaryRange || job.deadline,
+              );
+              const isExpanded = expandedId === job.id;
               return (
                 <div
                   key={job.id}
@@ -256,77 +273,142 @@ function Jobs() {
                     background: "var(--bg-surface-alt)",
                     borderRadius: "var(--radius-lg)",
                     border: "1px solid var(--bdr-subtle)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "var(--sp-4)",
-                    flexWrap: "wrap",
                   }}
                 >
-                  <div style={{ minWidth: "200px" }}>
-                    <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)" }}>
-                      {job.title}
-                    </h3>
-                    <p
-                      style={{
-                        fontSize: "var(--fs-sm)",
-                        color: "var(--txt-secondary)",
-                        marginTop: "var(--sp-1)",
-                      }}
-                    >
-                      {job.department} • {job.location} • Posted {formatDate(job.postedDate)}
-                    </p>
-                    <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)" }}>
-                      <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>
-                        {job.status}
-                      </Badge>
-                      <TypeBadge type={job.type} size="sm" />
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                    <div>
-                      <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-                        {applicantCount}
-                      </div>
-                      <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-                        applicant{applicantCount === 1 ? "" : "s"}
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
-                        onClick={() => navigate(`/candidates?job=${job.id}`)}
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    gap: "var(--sp-4)", flexWrap: "wrap",
+                  }}>
+                    <div style={{ minWidth: "200px" }}>
+                      <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)" }}>
+                        {job.title}
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: "var(--fs-sm)",
+                          color: "var(--txt-secondary)",
+                          marginTop: "var(--sp-1)",
+                        }}
                       >
-                        View Applicants
-                      </button>
-                      <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                        {job.department} • {job.location} • Posted {formatDate(job.postedDate)}
+                        {job.deadline ? ` • Apply by ${formatDate(job.deadline)}` : ""}
+                      </p>
+                      <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                        <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>
+                          {job.status}
+                        </Badge>
+                        <TypeBadge type={job.type} size="sm" />
+                        {salaryRange && <Badge variant="info" size="sm">{salaryRange}</Badge>}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                      <div>
+                        <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
+                          {applicantCount}
+                        </div>
+                        <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                          applicant{applicantCount === 1 ? "" : "s"}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
                         <button
                           className="btn btn-secondary"
                           style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
-                          onClick={() => {
-                            setEditingJob(job);
-                            setModalOpen(true);
-                          }}
+                          onClick={() => navigate(`/candidates?job=${job.id}`)}
                         >
-                          Edit
+                          View Applicants
                         </button>
-                        <button
-                          className="btn btn-secondary"
-                          style={{
-                            padding: "8px 16px",
-                            fontSize: "var(--fs-xs)",
-                            color: "var(--txt-danger)",
-                          }}
-                          onClick={() => handleDelete(job.id)}
-                        >
-                          Delete
-                        </button>
+                        <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                          {hasDetails && (
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                              onClick={() => setExpandedId(isExpanded ? null : job.id)}
+                            >
+                              {isExpanded ? "Hide Details" : "Details"}
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                            onClick={() => {
+                              setEditingJob(job);
+                              setModalOpen(true);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            style={{
+                              padding: "8px 16px",
+                              fontSize: "var(--fs-xs)",
+                              color: "var(--txt-danger)",
+                            }}
+                            onClick={() => handleDelete(job.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {isExpanded && (
+                    <div style={{
+                      marginTop: "var(--sp-4)", paddingTop: "var(--sp-4)",
+                      borderTop: "1px solid var(--bdr-subtle)",
+                      display: "flex", flexDirection: "column", gap: "var(--sp-3)",
+                      fontSize: "var(--fs-sm)", color: "var(--txt-secondary)",
+                    }}>
+                      {job.description && (
+                        <div>
+                          <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
+                            Job Description
+                          </div>
+                          <p style={{ whiteSpace: "pre-wrap" }}>{job.description}</p>
+                        </div>
+                      )}
+                      {job.requirements?.length > 0 && (
+                        <div>
+                          <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
+                            Requirements
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                            {job.requirements.map((r, i) => <li key={i}>{r}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {job.benefits?.length > 0 && (
+                        <div>
+                          <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
+                            Pay &amp; Benefits
+                          </div>
+                          <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                            {job.benefits.map((b, i) => <li key={i}>{b}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {job.companyInfo && (
+                        <div>
+                          <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
+                            About the Company
+                          </div>
+                          <p style={{ whiteSpace: "pre-wrap" }}>{job.companyInfo}</p>
+                        </div>
+                      )}
+                      {job.applicationInstructions && (
+                        <div>
+                          <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
+                            How to Apply
+                          </div>
+                          <p style={{ whiteSpace: "pre-wrap" }}>{job.applicationInstructions}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

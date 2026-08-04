@@ -264,7 +264,10 @@ function BreakdownPanel({ slip, currency, fxRate, period }) {
         borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-info)",
       }}>
         Period {period.label} · {period.standardWorkingDays} standard working days · FX rate locked at{" "}
-        {Number(period.fxRate).toLocaleString()} VND/USD · {slip.unpaidLeaveDays} unpaid leave day
+        {Number(period.fxRate).toLocaleString()} VND/USD
+        {period.fxRateSource && period.fxRateSource !== "manual"
+          ? ` (${period.fxRateSource === "api" ? "live" : "fallback"} rate)`
+          : ""} · {slip.unpaidLeaveDays} unpaid leave day
         {slip.unpaidLeaveDays === 1 ? "" : "s"} · {slip.absentDays} absent day
         {slip.absentDays === 1 ? "" : "s"} · assumes 0 registered dependents.
       </div>
@@ -292,6 +295,13 @@ function Payroll() {
     year: now.getFullYear(),
     fxRate: 25000,
   });
+  // Task 3.8: last fetched FX snapshot for the New Period form's "Fetch live
+  // rate" button — cleared whenever the target month/year changes so a
+  // stale rate/source combo is never shown against a different month.
+  const [fxPreview, setFxPreview] = useState(null);
+  const [fxPreviewLoading, setFxPreviewLoading] = useState(false);
+  // Task 3.9: manual trigger for the same job the scheduler runs on the 1st.
+  const [draftBusy, setDraftBusy] = useState(false);
 
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -311,6 +321,11 @@ function Payroll() {
     const id = setTimeout(() => setToast(""), 4000);
     return () => clearTimeout(id);
   }, [toast]);
+
+  // A fetched preview is only valid for the month/year it was fetched for.
+  useEffect(() => {
+    setFxPreview(null);
+  }, [newPeriod.month, newPeriod.year]);
 
   const loadPeriods = useCallback(async (preferId) => {
     setLoadingPeriods(true);
@@ -478,6 +493,51 @@ function Payroll() {
     setBusy(false);
   };
 
+  // Task 3.8: pulls the get-or-create-once-per-month FX snapshot for the
+  // month/year currently selected in the form and prefills the fxRate
+  // field with it. Does not create a PayrollPeriod.
+  const handleFetchLiveRate = async () => {
+    setFxPreviewLoading(true);
+    try {
+      const res = await PayrollAPI.fxRatePreview(Number(newPeriod.year), Number(newPeriod.month));
+      setFxPreview(res.data);
+      setNewPeriod((p) => ({ ...p, fxRate: res.data.rateVndPerUsd }));
+      if (res.data.source !== "api") {
+        setToast("Live FX provider was unreachable — using the fallback rate. You can still edit it manually.");
+      }
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setFxPreviewLoading(false);
+  };
+
+  // Task 3.9: same job the scheduler runs on the 1st of the month, exposed
+  // here for demos and for hosts where the scheduler is off. No-op (with a
+  // clear toast) if this month's period already exists.
+  const handleGenerateMonthlyDraft = async () => {
+    setDraftBusy(true);
+    try {
+      const res = await PayrollAPI.generateMonthlyDraft();
+      if (res.data.skipped) {
+        const reasonText = {
+          "already-drafted": "This month already has an auto-drafted period.",
+          "already-exists": "This month already has a manually-created period.",
+          "no-payable-employees": "No active employees to pay this month.",
+        }[res.data.reason] ?? "Nothing to generate.";
+        setToast(reasonText);
+      } else {
+        setToast(
+          `${res.data.generated} draft payslip${res.data.generated === 1 ? "" : "s"} auto-generated ` +
+            `at ${res.data.fxRate.toLocaleString()} VND/USD (${res.data.fxRateSource === "api" ? "live" : "fallback"} rate).`,
+        );
+        await loadPeriods(res.data.periodId);
+      }
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setDraftBusy(false);
+  };
+
   const handleStatus = async (status, confirmText) => {
     if (confirmText && !window.confirm(confirmText)) return;
     setBusy(true);
@@ -575,8 +635,26 @@ function Payroll() {
           )}
 
           {period && <StatusPill status={period.status} />}
+          {period?.systemGenerated && (
+            <span title={`FX rate source: ${period.fxRateSource === "api" ? "live" : "fallback"}`} style={{
+              display: "inline-flex", alignItems: "center", gap: "5px",
+              padding: "3px 10px", borderRadius: "var(--radius-full)",
+              fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
+              background: "var(--bg-info-subtle)", color: "var(--txt-info)",
+              border: "1px solid var(--bdr-info)",
+            }}>
+              Auto-drafted · {period.fxRateSource === "api" ? "live rate" : "fallback rate"}
+            </span>
+          )}
 
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+            {isAdmin && (
+              <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy}
+                onClick={handleGenerateMonthlyDraft}
+                title="Runs the same start-of-month job the scheduler runs automatically">
+                {draftBusy ? "Generating…" : "Generate this month's draft"}
+              </button>
+            )}
             {isHR && (
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowNewForm((v) => !v)}>
                 {showNewForm ? "Cancel" : "+ New period"}
@@ -651,9 +729,19 @@ function Payroll() {
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" htmlFor="np-fx">FX rate (VND per USD)</label>
-              <input id="np-fx" type="number" min="1" step="100" value={newPeriod.fxRate}
-                onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
-              <span className="form-hint">Locked once the period is created.</span>
+              <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
+                <input id="np-fx" type="number" min="1" step="any" value={newPeriod.fxRate}
+                  onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
+                <button type="button" className="btn btn-secondary btn-sm" disabled={fxPreviewLoading}
+                  onClick={handleFetchLiveRate}>
+                  {fxPreviewLoading ? "Fetching…" : "Fetch live rate"}
+                </button>
+              </div>
+              <span className="form-hint">
+                {fxPreview
+                  ? `${fxPreview.source === "api" ? "Live" : "Fallback"} rate as of ${new Date(fxPreview.fetchedAt).toLocaleString()} — locked once the period is created.`
+                  : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
+              </span>
             </div>
             <button type="submit" className="btn btn-primary" disabled={busy}>
               {busy ? "Generating…" : "Create & generate drafts"}

@@ -260,6 +260,33 @@ describe("validate.job.create", () => {
   it("rejects invalid employment type", async () => {
     expect(await failsWith(v, { ...valid, type: "Freelance" }, "Employment type")).toBe(true);
   });
+
+  // Task 5.1 — expanded Job fields
+  it("passes with the full set of expanded fields", async () => {
+    expect(await passes(v, {
+      ...valid,
+      description: "Build things.",
+      requirements: "3+ years React\nOwns ambiguity",
+      benefits: "Health insurance\nRemote-friendly",
+      salaryMin: 50000,
+      salaryMax: 70000,
+      companyInfo: "We build HR software.",
+      applicationInstructions: "Apply via careers@example.com",
+      deadline: "2026-09-01",
+    })).toBe(true);
+  });
+
+  it("rejects a negative salaryMin", async () => {
+    expect(await failsWith(v, { ...valid, salaryMin: -100 }, "Minimum salary")).toBe(true);
+  });
+
+  it("rejects salaryMin greater than salaryMax", async () => {
+    expect(await failsWith(v, { ...valid, salaryMin: 90000, salaryMax: 50000 }, "Minimum salary")).toBe(true);
+  });
+
+  it("rejects an invalid deadline", async () => {
+    expect(await failsWith(v, { ...valid, deadline: "not-a-date" }, "Application deadline")).toBe(true);
+  });
 });
 
 // ══════════════════════════════════════════════════════════

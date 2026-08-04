@@ -107,6 +107,17 @@ export const PayrollAPI = {
     apiFetch(`/payroll/payslips/${id}/recompute-deduction`, { method: "POST" }),
 };
 
+export const NoShowReviewsAPI = {
+  /** HR/Admin only — list system-flagged repeated no-show reviews */
+  list: (params = {}) => apiFetch(`/no-show-reviews${qs(params)}`),
+  /** HR/Admin: decision = "approved" | "rejected", reviewNote optional */
+  review: (id, decision, reviewNote = "") =>
+    apiFetch(`/no-show-reviews/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
+};
+
 export const ProfileEditRequestsAPI = {
   /** Employee submits a request: changes = { name, phone, address, age, sex } (only changed fields) */
   create: (changes) => apiFetch("/profile-edit-requests", { method: "POST", body: { changes } }),

@@ -165,6 +165,28 @@ describe("jobToClient", () => {
   it("defaults applicantCount to 0 when absent", () => {
     expect(jobToClient(fakeMongo({})).applicantCount).toBe(0);
   });
+
+  // Task 5.1 — expanded Job fields
+  it("passes through requirements/benefits arrays, defaulting to []", () => {
+    expect(jobToClient(fakeMongo({})).requirements).toEqual([]);
+    expect(jobToClient(fakeMongo({})).benefits).toEqual([]);
+    const doc = fakeMongo({ requirements: ["3+ years React"], benefits: ["Health insurance"] });
+    expect(jobToClient(doc).requirements).toEqual(["3+ years React"]);
+    expect(jobToClient(doc).benefits).toEqual(["Health insurance"]);
+  });
+
+  it("defaults salaryCurrency to USD and leaves min/max null when absent", () => {
+    const client = jobToClient(fakeMongo({}));
+    expect(client.salaryCurrency).toBe("USD");
+    expect(client.salaryMin).toBeNull();
+    expect(client.salaryMax).toBeNull();
+  });
+
+  it("formats deadline as YYYY-MM-DD, null when absent", () => {
+    expect(jobToClient(fakeMongo({})).deadline).toBeNull();
+    const doc = fakeMongo({ deadline: new Date("2026-09-01T00:00:00Z") });
+    expect(jobToClient(doc).deadline).toBe("2026-09-01");
+  });
 });
 
 describe("jobFromClient", () => {
@@ -181,6 +203,36 @@ describe("jobFromClient", () => {
   it("parses postedDate string to Date", () => {
     const result = jobFromClient({ postedDate: "2026-06-01" });
     expect(result.postedDate).toBeInstanceOf(Date);
+  });
+
+  // Task 5.1 — expanded Job fields
+  it("splits a newline-separated requirements/benefits textarea value into a trimmed string array", () => {
+    const result = jobFromClient({
+      requirements: "3+ years React\n\nOwns ambiguity\n  Excellent communication  ",
+      benefits: "Health insurance\nRemote-friendly",
+    });
+    expect(result.requirements).toEqual(["3+ years React", "Owns ambiguity", "Excellent communication"]);
+    expect(result.benefits).toEqual(["Health insurance", "Remote-friendly"]);
+  });
+
+  it("accepts requirements/benefits already as arrays", () => {
+    const result = jobFromClient({ requirements: ["A", " B "], benefits: [] });
+    expect(result.requirements).toEqual(["A", "B"]);
+    expect(result.benefits).toEqual([]);
+  });
+
+  it("coerces salaryMin/salaryMax to numbers, empty string to null", () => {
+    expect(jobFromClient({ salaryMin: "50000", salaryMax: "70000" })).toMatchObject({
+      salaryMin: 50000,
+      salaryMax: 70000,
+    });
+    expect(jobFromClient({ salaryMin: "" }).salaryMin).toBeNull();
+  });
+
+  it("parses deadline string to Date, empty/null to null", () => {
+    expect(jobFromClient({ deadline: "2026-09-01" }).deadline).toBeInstanceOf(Date);
+    expect(jobFromClient({ deadline: "" }).deadline).toBeNull();
+    expect(jobFromClient({ deadline: null }).deadline).toBeNull();
   });
 });
 

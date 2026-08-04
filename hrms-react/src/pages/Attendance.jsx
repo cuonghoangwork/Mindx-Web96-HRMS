@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
@@ -578,12 +579,18 @@ function Attendance() {
   const { attendance, employees, getAppNow, clockIn, clockOut } = useStore();
   const { user: currentUser } = useAuth();
 
+  // Task 4.3: per-employee attendance report — ViewEmployee.jsx links here
+  // as `/attendance?employee=<id>` so HR can jump straight into that
+  // employee's table view instead of manually filtering.
+  const [searchParams] = useSearchParams();
+  const linkedEmployeeId = searchParams.get("employee");
+
   const today = getAppNow();
   const [viewYear, setViewYear] = useState(2026);
   const [viewMonth, setViewMonth] = useState(0);
-  const [view, setView] = useState("calendar");
+  const [view, setView] = useState(linkedEmployeeId ? "table" : "calendar");
   const [selectedDay, setSelectedDay] = useState(null);
-  const [empFilter, setEmpFilter] = useState("all");
+  const [empFilter, setEmpFilter] = useState(linkedEmployeeId ?? "all");
 
   /* ── Enrich attendance with employee names + Late status ── */
   const enriched = useMemo(() => attendance.map((r) => {

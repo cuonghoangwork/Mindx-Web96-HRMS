@@ -119,9 +119,18 @@ Open job positions posted by a department.
 | `_id` | ObjectId | auto | |
 | `title` | String | ✅ | |
 | `department` | ObjectId | — | Ref → `departments._id` |
+| `location` | String | — | Not in the original doc, but the frontend has always collected it |
 | `status` | String | — | `open` \| `filled` \| `closed` |
 | `type` | String | — | `full-time` \| `part-time` \| `contract` \| `intern` |
-| `description` | String | — | |
+| `description` | String | — | Job description (JD) |
+| `requirements` | String[] | — | Task 5.1 — one entry per bullet. Default `[]` |
+| `benefits` | String[] | — | Task 5.1 — one entry per bullet. Default `[]` |
+| `salaryMin` | Number | — | Task 5.1 — optional, `null` if unset |
+| `salaryMax` | Number | — | Task 5.1 — optional, `null` if unset |
+| `salaryCurrency` | String | — | Task 5.1 — default `"USD"` |
+| `companyInfo` | String | — | Task 5.1 — default `""` |
+| `applicationInstructions` | String | — | Task 5.1 — where/how to apply (URL, email, or free text). Default `""` |
+| `deadline` | Date | — | Task 5.1 — informational only; nothing auto-closes the posting when it passes |
 | `postedDate` | Date | — | Default `now` |
 | `createdAt` | Date | auto | |
 | `updatedAt` | Date | auto | |

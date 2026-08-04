@@ -199,9 +199,29 @@ export function jobToClient(doc) {
     status: toClient(JOB_STATUS_REV, o.status),
     type: toClient(CONTRACT_TYPE_REV, o.type),
     description: o.description ?? "",
+    // Task 5.1 — requirements/benefits stay arrays client-side (one bullet
+    // per entry); the frontend joins them with "\n" for a textarea and
+    // splits back on submit via jobFromClient below.
+    requirements: Array.isArray(o.requirements) ? o.requirements : [],
+    benefits: Array.isArray(o.benefits) ? o.benefits : [],
+    salaryMin: o.salaryMin ?? null,
+    salaryMax: o.salaryMax ?? null,
+    salaryCurrency: o.salaryCurrency ?? "USD",
+    companyInfo: o.companyInfo ?? "",
+    applicationInstructions: o.applicationInstructions ?? "",
+    deadline: dateOnly(o.deadline),
     postedDate: dateOnly(o.postedDate),
     applicantCount: o.applicantCount ?? 0,
   };
+}
+
+/** "one per line" textarea value (or an already-split array) -> trimmed, non-empty string[]. */
+function toBulletList(value) {
+  if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter(Boolean);
+  return String(value ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function jobFromClient(body = {}) {
@@ -211,6 +231,14 @@ export function jobFromClient(body = {}) {
   carry(body, "status", out, "status", (v) => toDb(JOB_STATUS, v));
   carry(body, "type", out, "type", (v) => toDb(CONTRACT_TYPE, v));
   carry(body, "description", out, "description");
+  carry(body, "requirements", out, "requirements", toBulletList);
+  carry(body, "benefits", out, "benefits", toBulletList);
+  carry(body, "salaryMin", out, "salaryMin", (v) => (v === "" || v === null ? null : Number(v)));
+  carry(body, "salaryMax", out, "salaryMax", (v) => (v === "" || v === null ? null : Number(v)));
+  carry(body, "salaryCurrency", out, "salaryCurrency");
+  carry(body, "companyInfo", out, "companyInfo");
+  carry(body, "applicationInstructions", out, "applicationInstructions");
+  carry(body, "deadline", out, "deadline", (v) => (v ? new Date(v) : null));
   carry(body, "postedDate", out, "postedDate", (v) => new Date(v));
   // department handled separately by resolveDepartmentRef() in the controller
   return out;
