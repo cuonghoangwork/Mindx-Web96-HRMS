@@ -1,5 +1,6 @@
 import Avatar from "./Avatar";
 import { CandidateStageBadge } from "./Badge";
+import Button from "./Button";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 
@@ -131,9 +132,8 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
         </div>
 
         <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             style={{ color: "var(--txt-danger)" }}
             onClick={() => {
               onDelete(candidate.id);
@@ -141,10 +141,10 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
             }}
           >
             Remove Candidate
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onClose}>
+          </Button>
+          <Button variant="primary" onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useState } from "react";
 import AddDepartmentModal from "../components/AddDepartmentModal";
+import Button from "../components/Button";
 
 function AllDepartments() {
   const {
@@ -64,30 +65,34 @@ function AllDepartments() {
             {formatBudget(totalBudget)}
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           onClick={() => setShowAddModal(true)}
         >
           + Add Department
-        </button>
+        </Button>
       </div>
 
       {departments.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">🏢</div>
+          <div className="empty-state-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="4" y="2" width="16" height="20" rx="1" />
+              <path d="M9 22v-4h6v4" />
+              <path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" />
+            </svg>
+          </div>
           <h3 className="empty-state-title">No departments yet</h3>
           <p className="empty-state-description">
             Create your first department to get started with organizing your
             workforce.
           </p>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => setShowAddModal(true)}
           >
             + Add Department
-          </button>
+          </Button>
         </div>
       ) : (
         <table className="data-table">

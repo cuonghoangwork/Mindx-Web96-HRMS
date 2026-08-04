@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { PayrollAPI } from "../api";
 import Avatar from "../components/Avatar";
 import { TypeBadge } from "../components/Badge";
+import Button from "../components/Button";
 
 const PAYROLL_PER_PAGE = 10;
 
@@ -649,44 +650,60 @@ function Payroll() {
 
           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
             {isAdmin && (
-              <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy}
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={draftBusy}
                 onClick={handleGenerateMonthlyDraft}
-                title="Runs the same start-of-month job the scheduler runs automatically">
+                title="Runs the same start-of-month job the scheduler runs automatically"
+              >
                 {draftBusy ? "Generating…" : "Generate this month's draft"}
-              </button>
+              </Button>
             )}
             {isHR && (
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowNewForm((v) => !v)}>
+              <Button variant="primary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
                 {showNewForm ? "Cancel" : "+ New period"}
-              </button>
+              </Button>
             )}
             {period && isDraft && isHR && (
               <>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={handleRegenerate}>
+                <Button variant="secondary" size="sm" disabled={busy} onClick={handleRegenerate}>
                   Regenerate drafts
-                </button>
-                <button type="button" className="btn btn-success btn-sm" disabled={busy}
-                  onClick={() => handleStatus("approved")}>
+                </Button>
+                <Button
+                  variant="success"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => handleStatus("approved")}
+                >
                   Approve payroll
-                </button>
+                </Button>
               </>
             )}
             {period && isDraft && isAdmin && (
-              <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={handleDeletePeriod}>
+              <Button variant="danger" size="sm" disabled={busy} onClick={handleDeletePeriod}>
                 Delete period
-              </button>
+              </Button>
             )}
             {period?.status === "approved" && isHR && (
-              <button type="button" className="btn btn-success btn-sm" disabled={busy}
-                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}>
+              <Button
+                variant="success"
+                size="sm"
+                disabled={busy}
+                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}
+              >
                 Mark as paid
-              </button>
+              </Button>
             )}
             {period?.status === "approved" && isAdmin && (
-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
-                onClick={() => handleStatus("draft")}>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={busy}
+                onClick={() => handleStatus("draft")}
+              >
                 Reopen to draft
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -732,10 +749,14 @@ function Payroll() {
               <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
                 <input id="np-fx" type="number" min="1" step="any" value={newPeriod.fxRate}
                   onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
-                <button type="button" className="btn btn-secondary btn-sm" disabled={fxPreviewLoading}
-                  onClick={handleFetchLiveRate}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={fxPreviewLoading}
+                  onClick={handleFetchLiveRate}
+                >
                   {fxPreviewLoading ? "Fetching…" : "Fetch live rate"}
-                </button>
+                </Button>
               </div>
               <span className="form-hint">
                 {fxPreview
@@ -743,9 +764,9 @@ function Payroll() {
                   : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
               </span>
             </div>
-            <button type="submit" className="btn btn-primary" disabled={busy}>
+            <Button variant="primary" type="submit" disabled={busy}>
               {busy ? "Generating…" : "Create & generate drafts"}
-            </button>
+            </Button>
           </form>
         )}
       </div>
@@ -775,7 +796,13 @@ function Payroll() {
       ) : periods.length === 0 ? (
         <div className="content-card">
           <div className="empty-state">
-            <div className="empty-state-icon">💰</div>
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+              </svg>
+            </div>
             <div className="empty-state-title">No pay periods yet</div>
             <div className="empty-state-description">
               Create your first pay period to generate draft payslips for every employee.
@@ -856,10 +883,14 @@ function Payroll() {
                   >{c}</button>
                 ))}
               </div>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={exportCSV}
-                title="CSV export is always raw VND, regardless of the display currency above.">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={exportCSV}
+                title="CSV export is always raw VND, regardless of the display currency above."
+              >
                 ↓ Export CSV
-              </button>
+              </Button>
             </div>
 
             {loadingSlips ? (
@@ -868,7 +899,13 @@ function Payroll() {
               </div>
             ) : payslips.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-state-icon">📄</div>
+                <div className="empty-state-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <path d="M14 2v6h6" />
+                    <path d="M9 13h6M9 17h6M9 9h1" />
+                  </svg>
+                </div>
                 <div className="empty-state-title">No payslips in this period</div>
                 <div className="empty-state-description">
                   {isDraft && isHR ? "Use Regenerate drafts to build them." : "This period has no payslips."}
@@ -876,7 +913,12 @@ function Payroll() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="empty-state">
-                <div className="empty-state-icon">💰</div>
+                <div className="empty-state-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </div>
                 <div className="empty-state-title">No results</div>
                 <div className="empty-state-description">Try adjusting your search or filters.</div>
               </div>
@@ -1001,8 +1043,11 @@ function Payroll() {
                       Showing {startIndex + 1}–{Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length)} of {filtered.length}
                     </div>
                     <div className="pagination-controls">
-                      <button type="button" className="page-btn" disabled={safePage === 1}
-                        onClick={() => setCurrentPage(safePage - 1)}>‹</button>
+                      <Button
+                        disabled={safePage === 1}
+                        onClick={() => setCurrentPage(safePage - 1)}
+                        className="page-btn"
+                      >‹</Button>
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                         <button
                           key={n}
@@ -1011,8 +1056,11 @@ function Payroll() {
                           onClick={() => setCurrentPage(n)}
                         >{n}</button>
                       ))}
-                      <button type="button" className="page-btn" disabled={safePage === totalPages}
-                        onClick={() => setCurrentPage(safePage + 1)}>›</button>
+                      <Button
+                        disabled={safePage === totalPages}
+                        onClick={() => setCurrentPage(safePage + 1)}
+                        className="page-btn"
+                      >›</Button>
                     </div>
                   </div>
                 )}

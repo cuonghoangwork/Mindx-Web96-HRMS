@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useStore } from "../context/StoreContext";
+import Button from "./Button";
 
 function EmployeeModal({ onClose }) {
   const { addEmployee, departments } = useStore();
@@ -302,16 +303,15 @@ function EmployeeModal({ onClose }) {
           </div>
 
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
+            </Button>
+            <Button variant="primary" type="submit">
               Add Employee
-            </button>
+            </Button>
           </div>
         </form>
       </div>

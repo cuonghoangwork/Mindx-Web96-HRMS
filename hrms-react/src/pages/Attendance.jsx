@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import { idsMatch, compareIds, numericSeed } from "../utils/id";
+import Button from "../components/Button";
 
 /* ─── helpers ─── */
 const fmt = (v) => {
@@ -443,9 +444,8 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
 
         {/* Action buttons */}
         <div style={{ display: "flex", gap: "var(--sp-3)", flexShrink: 0 }}>
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={handleClockIn}
             disabled={loading !== null || hasCheckedIn || !selectedEmpId}
             title={hasCheckedIn ? "Already clocked in today" : "Clock in now"}
@@ -459,11 +459,10 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
               </svg>
             )}
             {loading === "in" ? "Clocking…" : "Clock In"}
-          </button>
+          </Button>
 
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={handleClockOut}
             disabled={loading !== null || !hasCheckedIn || hasCheckedOut || !selectedEmpId}
             title={
@@ -482,7 +481,7 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
               </svg>
             )}
             {loading === "out" ? "Clocking…" : "Clock Out"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -670,11 +669,11 @@ function Attendance() {
 
           {/* Month nav */}
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={prevMonth}>‹</button>
+            <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
             <span style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", minWidth: "140px", textAlign: "center" }}>
               {MONTHS[viewMonth]} {viewYear}
             </span>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={nextMonth}>›</button>
+            <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
           </div>
 
           {/* View toggle */}

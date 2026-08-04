@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import SideMenu from "./SideMenu";
 import Header from "./Header";
 import { useStore } from "../context/StoreContext";
+import Button from "./Button";
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,13 +43,13 @@ function Layout() {
             }}
           >
             <span>Couldn't load data: {storeError}</span>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={refreshAll}
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : loadingStore ? (
           <div

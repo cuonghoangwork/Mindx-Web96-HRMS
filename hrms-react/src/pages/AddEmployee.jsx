@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
 import FormField from "../components/FormField";
+import Button from "../components/Button";
 
 /* ─────────────────────────────────
    Step config
@@ -418,14 +419,13 @@ function SuccessScreen({ name, account, onDone }) {
             </span>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={onDone}
-            className="btn btn-primary"
             style={{ marginTop: "var(--sp-6)" }}
           >
             Done
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -834,12 +834,12 @@ function AddEmployee() {
         {/* ── Navigation ── */}
         {!submitted && (
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button
-              type="button" className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={step === 1 ? () => navigate("/employees") : goBack}
             >
               {step === 1 ? "Cancel" : "← Back"}
-            </button>
+            </Button>
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
               {/* Dot indicator */}
@@ -857,13 +857,13 @@ function AddEmployee() {
               </div>
 
               {step < STEPS.length ? (
-                <button type="button" className="btn btn-primary" onClick={goNext}>
+                <Button variant="primary" onClick={goNext}>
                   Next →
-                </button>
+                </Button>
               ) : (
-                <button type="button" className="btn btn-success" onClick={handleSubmit}>
+                <Button variant="success" onClick={handleSubmit}>
                   ✓ Create Employee
-                </button>
+                </Button>
               )}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { NotificationsAPI } from "../api";
+import Button from "./Button";
 
 const TITLE_MAX = 120;
 const MESSAGE_MAX = 2000;
@@ -282,16 +283,16 @@ function AddNotificationModal({ onClose, onSend }) {
           )}
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
               type="submit"
-              className="btn btn-primary"
               disabled={submitting || titleOverLimit || messageOverLimit}
             >
               {submitting ? "Sending…" : "Send Notice"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

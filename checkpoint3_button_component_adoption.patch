@@ -1,0 +1,1793 @@
+diff --git a/hrms-react/src/components/AddDepartmentModal.jsx b/hrms-react/src/components/AddDepartmentModal.jsx
+index 36fc610..e32c626 100644
+--- a/hrms-react/src/components/AddDepartmentModal.jsx
++++ b/hrms-react/src/components/AddDepartmentModal.jsx
+@@ -1,5 +1,6 @@
+ import { useState } from "react";
+ import { useStore } from "../context/StoreContext";
++import Button from "./Button";
+ 
+ function AddDepartmentModal({ onClose }) {
+   const { departments, addDepartment } = useStore();
+@@ -98,16 +99,15 @@ function AddDepartmentModal({ onClose }) {
+           </div>
+ 
+           <div className="modal-actions">
+-            <button
+-              type="button"
+-              className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={onClose}
+             >
+               Cancel
+-            </button>
+-            <button type="submit" className="btn btn-primary">
++            </Button>
++            <Button variant="primary" type="submit">
+               Add Department
+-            </button>
++            </Button>
+           </div>
+         </form>
+       </div>
+diff --git a/hrms-react/src/components/AddHolidayModal.jsx b/hrms-react/src/components/AddHolidayModal.jsx
+index 97ea8d0..f96284f 100644
+--- a/hrms-react/src/components/AddHolidayModal.jsx
++++ b/hrms-react/src/components/AddHolidayModal.jsx
+@@ -1,4 +1,5 @@
+ import { useState } from "react";
++import Button from "./Button";
+ 
+ /**
+  * AddHolidayModal — Add or edit a holiday entry
+@@ -127,16 +128,15 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
+           </div>
+ 
+           <div className="modal-actions">
+-            <button
+-              type="button"
+-              className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={onClose}
+             >
+               Cancel
+-            </button>
+-            <button type="submit" className="btn btn-primary">
++            </Button>
++            <Button variant="primary" type="submit">
+               {isEdit ? "Save Changes" : "Add Holiday"}
+-            </button>
++            </Button>
+           </div>
+         </form>
+       </div>
+diff --git a/hrms-react/src/components/AddJobModal.jsx b/hrms-react/src/components/AddJobModal.jsx
+index 0d76094..14b7f7f 100644
+--- a/hrms-react/src/components/AddJobModal.jsx
++++ b/hrms-react/src/components/AddJobModal.jsx
+@@ -1,4 +1,5 @@
+ import { useState } from "react";
++import Button from "./Button";
+ 
+ /**
+  * AddJobModal — Add or edit a job opening
+@@ -323,16 +324,15 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
+           </div>
+ 
+           <div className="modal-actions">
+-            <button
+-              type="button"
+-              className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={onClose}
+             >
+               Cancel
+-            </button>
+-            <button type="submit" className="btn btn-primary">
++            </Button>
++            <Button variant="primary" type="submit">
+               {isEdit ? "Save Changes" : "Post Job"}
+-            </button>
++            </Button>
+           </div>
+         </form>
+       </div>
+diff --git a/hrms-react/src/components/AddNotificationModal.jsx b/hrms-react/src/components/AddNotificationModal.jsx
+index 13ee56d..1cf26bf 100644
+--- a/hrms-react/src/components/AddNotificationModal.jsx
++++ b/hrms-react/src/components/AddNotificationModal.jsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect, useMemo } from "react";
+ import { NotificationsAPI } from "../api";
++import Button from "./Button";
+ 
+ const TITLE_MAX = 120;
+ const MESSAGE_MAX = 2000;
+@@ -282,16 +283,16 @@ function AddNotificationModal({ onClose, onSend }) {
+           )}
+ 
+           <div className="modal-actions">
+-            <button type="button" className="btn btn-secondary" onClick={onClose}>
++            <Button variant="secondary" onClick={onClose}>
+               Cancel
+-            </button>
+-            <button
++            </Button>
++            <Button
++              variant="primary"
+               type="submit"
+-              className="btn btn-primary"
+               disabled={submitting || titleOverLimit || messageOverLimit}
+             >
+               {submitting ? "Sending…" : "Send Notice"}
+-            </button>
++            </Button>
+           </div>
+         </form>
+       </div>
+diff --git a/hrms-react/src/components/CandidateSidePanel.jsx b/hrms-react/src/components/CandidateSidePanel.jsx
+index 212a929..b6c6825 100644
+--- a/hrms-react/src/components/CandidateSidePanel.jsx
++++ b/hrms-react/src/components/CandidateSidePanel.jsx
+@@ -1,5 +1,6 @@
+ import Avatar from "./Avatar";
+ import { CandidateStageBadge } from "./Badge";
++import Button from "./Button";
+ 
+ const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
+ 
+@@ -131,9 +132,8 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
+         </div>
+ 
+         <div className="modal-actions">
+-          <button
+-            type="button"
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             style={{ color: "var(--txt-danger)" }}
+             onClick={() => {
+               onDelete(candidate.id);
+@@ -141,10 +141,10 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
+             }}
+           >
+             Remove Candidate
+-          </button>
+-          <button type="button" className="btn btn-primary" onClick={onClose}>
++          </Button>
++          <Button variant="primary" onClick={onClose}>
+             Done
+-          </button>
++          </Button>
+         </div>
+       </div>
+     </div>
+diff --git a/hrms-react/src/components/EmployeeModal.jsx b/hrms-react/src/components/EmployeeModal.jsx
+index 577d858..aa78402 100644
+--- a/hrms-react/src/components/EmployeeModal.jsx
++++ b/hrms-react/src/components/EmployeeModal.jsx
+@@ -1,5 +1,6 @@
+ import { useState, useEffect } from "react";
+ import { useStore } from "../context/StoreContext";
++import Button from "./Button";
+ 
+ function EmployeeModal({ onClose }) {
+   const { addEmployee, departments } = useStore();
+@@ -302,16 +303,15 @@ function EmployeeModal({ onClose }) {
+           </div>
+ 
+           <div className="modal-actions">
+-            <button
+-              type="button"
+-              className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={onClose}
+             >
+               Cancel
+-            </button>
+-            <button type="submit" className="btn btn-primary">
++            </Button>
++            <Button variant="primary" type="submit">
+               Add Employee
+-            </button>
++            </Button>
+           </div>
+         </form>
+       </div>
+diff --git a/hrms-react/src/components/HeaderDateTime.jsx b/hrms-react/src/components/HeaderDateTime.jsx
+index f7f9551..9bbe9a6 100644
+--- a/hrms-react/src/components/HeaderDateTime.jsx
++++ b/hrms-react/src/components/HeaderDateTime.jsx
+@@ -1,5 +1,6 @@
+ import { useEffect, useState } from "react";
+ import { useStore } from "../context/StoreContext";
++import Button from "./Button";
+ 
+ function toDateInputValue(date) {
+   const y = date.getFullYear();
+@@ -114,16 +115,15 @@ function HeaderDateTime() {
+               />
+             </div>
+             <div className="header-datetime-actions">
+-              <button
+-                type="button"
+-                className="btn btn-secondary"
++              <Button
++                variant="secondary"
+                 onClick={handleReset}
+               >
+                 Reset to now
+-              </button>
+-              <button type="submit" className="btn btn-primary">
++              </Button>
++              <Button variant="primary" type="submit">
+                 Apply
+-              </button>
++              </Button>
+             </div>
+           </form>
+         </>
+diff --git a/hrms-react/src/components/Layout.jsx b/hrms-react/src/components/Layout.jsx
+index 66bdf1a..fcf182a 100644
+--- a/hrms-react/src/components/Layout.jsx
++++ b/hrms-react/src/components/Layout.jsx
+@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
+ import SideMenu from "./SideMenu";
+ import Header from "./Header";
+ import { useStore } from "../context/StoreContext";
++import Button from "./Button";
+ 
+ function Layout() {
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+@@ -42,13 +43,13 @@ function Layout() {
+             }}
+           >
+             <span>Couldn't load data: {storeError}</span>
+-            <button
+-              type="button"
+-              className="btn btn-secondary btn-sm"
++            <Button
++              variant="secondary"
++              size="sm"
+               onClick={refreshAll}
+             >
+               Retry
+-            </button>
++            </Button>
+           </div>
+         ) : loadingStore ? (
+           <div
+diff --git a/hrms-react/src/pages/AddEmployee.jsx b/hrms-react/src/pages/AddEmployee.jsx
+index ee82a13..a61e9ef 100644
+--- a/hrms-react/src/pages/AddEmployee.jsx
++++ b/hrms-react/src/pages/AddEmployee.jsx
+@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
+ import Avatar from "../components/Avatar";
+ import { StatusBadge, TypeBadge } from "../components/Badge";
+ import FormField from "../components/FormField";
++import Button from "../components/Button";
+ 
+ /* ─────────────────────────────────
+    Step config
+@@ -418,14 +419,13 @@ function SuccessScreen({ name, account, onDone }) {
+             </span>
+           </div>
+ 
+-          <button
+-            type="button"
++          <Button
++            variant="primary"
+             onClick={onDone}
+-            className="btn btn-primary"
+             style={{ marginTop: "var(--sp-6)" }}
+           >
+             Done
+-          </button>
++          </Button>
+         </>
+       )}
+     </div>
+@@ -834,12 +834,12 @@ function AddEmployee() {
+         {/* ── Navigation ── */}
+         {!submitted && (
+           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+-            <button
+-              type="button" className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={step === 1 ? () => navigate("/employees") : goBack}
+             >
+               {step === 1 ? "Cancel" : "← Back"}
+-            </button>
++            </Button>
+ 
+             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+               {/* Dot indicator */}
+@@ -857,13 +857,13 @@ function AddEmployee() {
+               </div>
+ 
+               {step < STEPS.length ? (
+-                <button type="button" className="btn btn-primary" onClick={goNext}>
++                <Button variant="primary" onClick={goNext}>
+                   Next →
+-                </button>
++                </Button>
+               ) : (
+-                <button type="button" className="btn btn-success" onClick={handleSubmit}>
++                <Button variant="success" onClick={handleSubmit}>
+                   ✓ Create Employee
+-                </button>
++                </Button>
+               )}
+             </div>
+           </div>
+diff --git a/hrms-react/src/pages/AllDepartments.jsx b/hrms-react/src/pages/AllDepartments.jsx
+index 042e829..355918f 100644
+--- a/hrms-react/src/pages/AllDepartments.jsx
++++ b/hrms-react/src/pages/AllDepartments.jsx
+@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
+ import { useStore } from "../context/StoreContext";
+ import { useState } from "react";
+ import AddDepartmentModal from "../components/AddDepartmentModal";
++import Button from "../components/Button";
+ 
+ function AllDepartments() {
+   const {
+@@ -64,13 +65,12 @@ function AllDepartments() {
+             {formatBudget(totalBudget)}
+           </div>
+         </div>
+-        <button
+-          type="button"
+-          className="btn btn-primary"
++        <Button
++          variant="primary"
+           onClick={() => setShowAddModal(true)}
+         >
+           + Add Department
+-        </button>
++        </Button>
+       </div>
+ 
+       {departments.length === 0 ? (
+@@ -87,13 +87,12 @@ function AllDepartments() {
+             Create your first department to get started with organizing your
+             workforce.
+           </p>
+-          <button
+-            type="button"
+-            className="btn btn-primary"
++          <Button
++            variant="primary"
+             onClick={() => setShowAddModal(true)}
+           >
+             + Add Department
+-          </button>
++          </Button>
+         </div>
+       ) : (
+         <table className="data-table">
+diff --git a/hrms-react/src/pages/AllEmployees.jsx b/hrms-react/src/pages/AllEmployees.jsx
+index 6908ce8..a4038e4 100644
+--- a/hrms-react/src/pages/AllEmployees.jsx
++++ b/hrms-react/src/pages/AllEmployees.jsx
+@@ -5,6 +5,7 @@ import FilterModal from "../components/FilterModal";
+ import SearchBar from "../components/SearchBar";
+ import Avatar from "../components/Avatar";
+ import { StatusBadge, TypeBadge } from "../components/Badge";
++import Button from "../components/Button";
+ 
+ const EMPLOYEES_PER_PAGE = 10;
+ 
+@@ -169,13 +170,12 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange }) {
+           >
+             View Full Profile
+           </Link>
+-          <button
+-            type="button"
+-            className="btn btn-danger"
++          <Button
++            variant="danger"
+             onClick={() => onDelete(employee.id)}
+           >
+             Delete
+-          </button>
++          </Button>
+         </div>
+       </div>
+     </>
+@@ -200,23 +200,27 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear }) {
+         {count} selected
+       </span>
+ 
+-      <button type="button" className="btn btn-secondary btn-sm" onClick={onExport}>
++      <Button variant="secondary" size="sm" onClick={onExport}>
+         ↓ Export CSV
+-      </button>
++      </Button>
+ 
+       <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
+         <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Set status:</span>
+         {["Active", "On Leave", "Terminated"].map((s) => (
+-          <button key={s} type="button" className="btn btn-secondary btn-sm" onClick={() => onStatusChange(s)}>
++          <Button variant="secondary" size="sm" key={s} onClick={() => onStatusChange(s)}>
+             {s}
+-          </button>
++          </Button>
+         ))}
+       </div>
+ 
+-      <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}
+-        style={{ marginLeft: "auto" }}>
++      <Button
++        variant="danger"
++        size="sm"
++        onClick={onDelete}
++        style={{ marginLeft: "auto" }}
++      >
+         Delete selected
+-      </button>
++      </Button>
+ 
+       <button
+         type="button" onClick={onClear}
+@@ -368,15 +372,21 @@ function AllEmployees() {
+             onSearch={handleSearch}
+             placeholder="Search by name, employee ID, department..."
+           />
+-          <button type="button" className="btn btn-secondary toolbar-filter-btn"
+-            onClick={() => openModal("filter")}>
++          <Button
++            variant="secondary"
++            onClick={() => openModal("filter")}
++            className="toolbar-filter-btn"
++          >
+             Filter
+             {hasActiveFilters && <span className="toolbar-filter-dot" />}
+-          </button>
+-          <button type="button" className="btn btn-secondary"
+-            onClick={handleReset} disabled={!hasActiveSearchOrFilters}>
++          </Button>
++          <Button
++            variant="secondary"
++            onClick={handleReset}
++            disabled={!hasActiveSearchOrFilters}
++          >
+             Reset
+-          </button>
++          </Button>
+           <Link to="/employees/add" className="btn btn-primary" style={{ marginLeft: "auto" }}>
+             + Add Employee
+           </Link>
+@@ -458,13 +468,13 @@ function AllEmployees() {
+ 
+                     {/* Actions */}
+                     <td onClick={(e) => e.stopPropagation()}>
+-                      <button
+-                        type="button"
+-                        className="btn btn-secondary btn-sm"
++                      <Button
++                        variant="secondary"
++                        size="sm"
+                         onClick={(e) => openPanel(employee, e)}
+                       >
+                         Details
+-                      </button>
++                      </Button>
+                       <Link
+                         to={`/employees/${employee.id}`}
+                         className="btn btn-secondary btn-sm"
+@@ -472,14 +482,14 @@ function AllEmployees() {
+                       >
+                         Edit
+                       </Link>
+-                      <button
+-                        type="button"
+-                        className="btn btn-danger btn-sm"
++                      <Button
++                        variant="danger"
++                        size="sm"
+                         style={{ marginLeft: "6px" }}
+                         onClick={() => handleDelete(employee.id)}
+                       >
+                         ✕
+-                      </button>
++                      </Button>
+                     </td>
+                   </tr>
+                 );
+@@ -504,9 +514,9 @@ function AllEmployees() {
+                 : "Get started by adding your first employee."}
+             </p>
+             {hasActiveSearchOrFilters && (
+-              <button type="button" className="btn btn-secondary" onClick={handleReset}>
++              <Button variant="secondary" onClick={handleReset}>
+                 Clear filters
+-              </button>
++              </Button>
+             )}
+             {!hasActiveSearchOrFilters && (
+               <Link to="/employees/add" className="btn btn-primary">+ Add Employee</Link>
+@@ -531,13 +541,13 @@ function AllEmployees() {
+               )}
+             </div>
+             <div className="pagination-controls">
+-              <button className="page-btn" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
++              <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="page-btn">‹</Button>
+               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                 <button key={page} className={`page-btn ${currentPage === page ? "active" : ""}`} onClick={() => setCurrentPage(page)}>
+                   {page}
+                 </button>
+               ))}
+-              <button className="page-btn" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
++              <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="page-btn">›</Button>
+             </div>
+           </div>
+         )}
+diff --git a/hrms-react/src/pages/Attendance.jsx b/hrms-react/src/pages/Attendance.jsx
+index 49b8dc5..23e44d6 100644
+--- a/hrms-react/src/pages/Attendance.jsx
++++ b/hrms-react/src/pages/Attendance.jsx
+@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
+ import Avatar from "../components/Avatar";
+ import Badge from "../components/Badge";
+ import { idsMatch, compareIds, numericSeed } from "../utils/id";
++import Button from "../components/Button";
+ 
+ /* ─── helpers ─── */
+ const fmt = (v) => {
+@@ -443,9 +444,8 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
+ 
+         {/* Action buttons */}
+         <div style={{ display: "flex", gap: "var(--sp-3)", flexShrink: 0 }}>
+-          <button
+-            type="button"
+-            className="btn btn-primary"
++          <Button
++            variant="primary"
+             onClick={handleClockIn}
+             disabled={loading !== null || hasCheckedIn || !selectedEmpId}
+             title={hasCheckedIn ? "Already clocked in today" : "Clock in now"}
+@@ -459,11 +459,10 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
+               </svg>
+             )}
+             {loading === "in" ? "Clocking…" : "Clock In"}
+-          </button>
++          </Button>
+ 
+-          <button
+-            type="button"
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             onClick={handleClockOut}
+             disabled={loading !== null || !hasCheckedIn || hasCheckedOut || !selectedEmpId}
+             title={
+@@ -482,7 +481,7 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
+               </svg>
+             )}
+             {loading === "out" ? "Clocking…" : "Clock Out"}
+-          </button>
++          </Button>
+         </div>
+       </div>
+ 
+@@ -670,11 +669,11 @@ function Attendance() {
+ 
+           {/* Month nav */}
+           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+-            <button type="button" className="btn btn-secondary btn-sm" onClick={prevMonth}>‹</button>
++            <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
+             <span style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", minWidth: "140px", textAlign: "center" }}>
+               {MONTHS[viewMonth]} {viewYear}
+             </span>
+-            <button type="button" className="btn btn-secondary btn-sm" onClick={nextMonth}>›</button>
++            <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
+           </div>
+ 
+           {/* View toggle */}
+diff --git a/hrms-react/src/pages/Candidates.jsx b/hrms-react/src/pages/Candidates.jsx
+index 52f7989..761b582 100644
+--- a/hrms-react/src/pages/Candidates.jsx
++++ b/hrms-react/src/pages/Candidates.jsx
+@@ -5,6 +5,7 @@ import Avatar from "../components/Avatar";
+ import { CandidateStageBadge } from "../components/Badge";
+ import CandidateSidePanel from "../components/CandidateSidePanel";
+ import { idsMatch } from "../utils/id";
++import Button from "../components/Button";
+ 
+ const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
+ 
+@@ -198,15 +199,14 @@ function Candidates() {
+             </div>
+           )}
+ 
+-          <button
+-            type="button"
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             onClick={handleReset}
+             disabled={!hasActiveFilters}
+             title="Reset search and filters"
+           >
+             Reset
+-          </button>
++          </Button>
+         </div>
+ 
+         {filteredCandidates.length === 0 ? (
+@@ -224,13 +224,12 @@ function Candidates() {
+                 : "Candidates will appear here once they apply to a job opening."}
+             </div>
+             {hasActiveFilters && (
+-              <button
+-                type="button"
+-                className="btn btn-secondary"
++              <Button
++                variant="secondary"
+                 onClick={handleReset}
+               >
+                 Clear filters
+-              </button>
++              </Button>
+             )}
+           </div>
+         ) : (
+@@ -265,13 +264,13 @@ function Candidates() {
+                     </td>
+                     <td>{candidate.appliedDate}</td>
+                     <td>
+-                      <button
+-                        className="btn btn-secondary"
++                      <Button
++                        variant="secondary"
+                         style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                         onClick={() => setSelectedCandidateId(candidate.id)}
+                       >
+                         View
+-                      </button>
++                      </Button>
+                     </td>
+                   </tr>
+                 );
+diff --git a/hrms-react/src/pages/ChangePassword.jsx b/hrms-react/src/pages/ChangePassword.jsx
+index 966deab..6a98301 100644
+--- a/hrms-react/src/pages/ChangePassword.jsx
++++ b/hrms-react/src/pages/ChangePassword.jsx
+@@ -1,6 +1,7 @@
+ import { useState } from "react";
+ import { useNavigate } from "react-router-dom";
+ import { useAuth } from "../context/AuthContext";
++import Button from "../components/Button";
+ 
+ function ChangePassword() {
+   const navigate = useNavigate();
+@@ -116,14 +117,14 @@ function ChangePassword() {
+             />
+           </div>
+ 
+-          <button
++          <Button
++            variant="primary"
+             type="submit"
+-            className="btn btn-primary"
+             style={{ width: "100%" }}
+             disabled={isSaving}
+           >
+             {isSaving ? "Saving..." : "Update password"}
+-          </button>
++          </Button>
+         </form>
+ 
+         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
+diff --git a/hrms-react/src/pages/EnterOTP.jsx b/hrms-react/src/pages/EnterOTP.jsx
+index f79317c..27b6c8e 100644
+--- a/hrms-react/src/pages/EnterOTP.jsx
++++ b/hrms-react/src/pages/EnterOTP.jsx
+@@ -1,5 +1,6 @@
+ import { useState } from 'react'
+ import { useNavigate } from 'react-router-dom'
++import Button from "../components/Button";
+ 
+ function EnterOTP() {
+   const navigate = useNavigate()
+@@ -52,9 +53,9 @@ function EnterOTP() {
+             />
+           </div>
+ 
+-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
++          <Button variant="primary" type="submit" style={{ width: '100%' }}>
+             Verify
+-          </button>
++          </Button>
+         </form>
+ 
+         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--text-muted)' }}>
+diff --git a/hrms-react/src/pages/ForgotPassword.jsx b/hrms-react/src/pages/ForgotPassword.jsx
+index 4df6696..735382d 100644
+--- a/hrms-react/src/pages/ForgotPassword.jsx
++++ b/hrms-react/src/pages/ForgotPassword.jsx
+@@ -1,5 +1,6 @@
+ import { useState } from 'react'
+ import { Link, useNavigate } from 'react-router-dom'
++import Button from "../components/Button";
+ 
+ function ForgotPassword() {
+   const navigate = useNavigate()
+@@ -50,9 +51,9 @@ function ForgotPassword() {
+             />
+           </div>
+ 
+-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
++          <Button variant="primary" type="submit" style={{ width: '100%' }}>
+             Send Reset Link
+-          </button>
++          </Button>
+         </form>
+ 
+         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px' }}>
+diff --git a/hrms-react/src/pages/Holidays.jsx b/hrms-react/src/pages/Holidays.jsx
+index 64b708a..88654fa 100644
+--- a/hrms-react/src/pages/Holidays.jsx
++++ b/hrms-react/src/pages/Holidays.jsx
+@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
+ import { useStore } from "../context/StoreContext";
+ import Badge from "../components/Badge";
+ import AddHolidayModal from "../components/AddHolidayModal";
++import Button from "../components/Button";
+ 
+ const HOLIDAY_TYPE_VARIANT = {
+   Public: "success",
+@@ -102,15 +103,15 @@ function Holidays() {
+     <div>
+       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
+         <h2 style={{ flex: 1 }}>Holidays</h2>
+-        <button
+-          className="btn btn-primary"
++        <Button
++          variant="primary"
+           onClick={() => {
+             setEditingHoliday(null);
+             setModalOpen(true);
+           }}
+         >
+           + Add Holiday
+-        </button>
++        </Button>
+       </div>
+ 
+       {actionError && (
+@@ -173,12 +174,12 @@ function Holidays() {
+             <div className="empty-state-description">
+               Add a holiday to start building the 2026 calendar.
+             </div>
+-            <button
+-              className="btn btn-primary"
++            <Button
++              variant="primary"
+               onClick={() => setModalOpen(true)}
+             >
+               + Add Holiday
+-            </button>
++            </Button>
+           </div>
+         ) : (
+           <table className="data-table">
+@@ -226,24 +227,22 @@ function Holidays() {
+                               color: "var(--txt-primary)",
+                             }}
+                           />
+-                          <button
+-                            type="button"
+-                            className="btn btn-primary"
++                          <Button
++                            variant="primary"
+                             style={{ padding: "4px 10px", fontSize: "var(--fs-xs)" }}
+                             onClick={() => confirmEditDate(holiday.id)}
+                             aria-label="Confirm date"
+                           >
+                             ✓
+-                          </button>
+-                          <button
+-                            type="button"
+-                            className="btn btn-secondary"
++                          </Button>
++                          <Button
++                            variant="secondary"
+                             style={{ padding: "4px 10px", fontSize: "var(--fs-xs)" }}
+                             onClick={cancelEditDate}
+                             aria-label="Cancel"
+                           >
+                             ×
+-                          </button>
++                          </Button>
+                         </div>
+                       ) : (
+                         <button
+@@ -278,8 +277,8 @@ function Holidays() {
+                     </td>
+                     <td>
+                       <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+-                        <button
+-                          className="btn btn-secondary"
++                        <Button
++                          variant="secondary"
+                           style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                           onClick={() => {
+                             setEditingHoliday(holiday);
+@@ -287,9 +286,9 @@ function Holidays() {
+                           }}
+                         >
+                           Edit
+-                        </button>
+-                        <button
+-                          className="btn btn-secondary"
++                        </Button>
++                        <Button
++                          variant="secondary"
+                           style={{
+                             padding: "8px 16px",
+                             fontSize: "var(--fs-xs)",
+@@ -298,7 +297,7 @@ function Holidays() {
+                           onClick={() => handleDelete(holiday.id)}
+                         >
+                           Delete
+-                        </button>
++                        </Button>
+                       </div>
+                     </td>
+                   </tr>
+diff --git a/hrms-react/src/pages/Jobs.jsx b/hrms-react/src/pages/Jobs.jsx
+index 1b6c741..d4198a4 100644
+--- a/hrms-react/src/pages/Jobs.jsx
++++ b/hrms-react/src/pages/Jobs.jsx
+@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
+ import { useStore } from "../context/StoreContext";
+ import Badge, { TypeBadge } from "../components/Badge";
+ import AddJobModal from "../components/AddJobModal";
++import Button from "../components/Button";
+ 
+ const STATUS_VARIANT = {
+   Open: "success",
+@@ -116,15 +117,15 @@ function Jobs() {
+       )}
+       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
+         <h2 style={{ flex: 1 }}>Job Openings</h2>
+-        <button
+-          className="btn btn-primary"
++        <Button
++          variant="primary"
+           onClick={() => {
+             setEditingJob(null);
+             setModalOpen(true);
+           }}
+         >
+           + Post New Job
+-        </button>
++        </Button>
+       </div>
+ 
+       <div
+@@ -210,15 +211,14 @@ function Jobs() {
+             ))}
+           </select>
+ 
+-          <button
+-            type="button"
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             onClick={handleReset}
+             disabled={!hasActiveFilters}
+             title="Reset search and filters"
+           >
+             Reset
+-          </button>
++          </Button>
+         </div>
+ 
+         {filteredJobs.length === 0 ? (
+@@ -238,21 +238,19 @@ function Jobs() {
+                 : "Post a new job to start building your hiring pipeline."}
+             </div>
+             {hasActiveFilters ? (
+-              <button
+-                type="button"
+-                className="btn btn-secondary"
++              <Button
++                variant="secondary"
+                 onClick={handleReset}
+               >
+                 Clear filters
+-              </button>
++              </Button>
+             ) : (
+-              <button
+-                type="button"
+-                className="btn btn-primary"
++              <Button
++                variant="primary"
+                 onClick={() => setModalOpen(true)}
+               >
+                 + Post New Job
+-              </button>
++              </Button>
+             )}
+           </div>
+         ) : (
+@@ -313,25 +311,25 @@ function Jobs() {
+                       </div>
+ 
+                       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+-                        <button
+-                          className="btn btn-secondary"
++                        <Button
++                          variant="secondary"
+                           style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                           onClick={() => navigate(`/candidates?job=${job.id}`)}
+                         >
+                           View Applicants
+-                        </button>
++                        </Button>
+                         <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                           {hasDetails && (
+-                            <button
+-                              className="btn btn-secondary"
++                            <Button
++                              variant="secondary"
+                               style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                               onClick={() => setExpandedId(isExpanded ? null : job.id)}
+                             >
+                               {isExpanded ? "Hide Details" : "Details"}
+-                            </button>
++                            </Button>
+                           )}
+-                          <button
+-                            className="btn btn-secondary"
++                          <Button
++                            variant="secondary"
+                             style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                             onClick={() => {
+                               setEditingJob(job);
+@@ -339,9 +337,9 @@ function Jobs() {
+                             }}
+                           >
+                             Edit
+-                          </button>
+-                          <button
+-                            className="btn btn-secondary"
++                          </Button>
++                          <Button
++                            variant="secondary"
+                             style={{
+                               padding: "8px 16px",
+                               fontSize: "var(--fs-xs)",
+@@ -350,7 +348,7 @@ function Jobs() {
+                             onClick={() => handleDelete(job.id)}
+                           >
+                             Delete
+-                          </button>
++                          </Button>
+                         </div>
+                       </div>
+                     </div>
+diff --git a/hrms-react/src/pages/Login.jsx b/hrms-react/src/pages/Login.jsx
+index f5080b3..199e1bc 100644
+--- a/hrms-react/src/pages/Login.jsx
++++ b/hrms-react/src/pages/Login.jsx
+@@ -1,6 +1,7 @@
+ import { useState } from "react";
+ import { Link, useNavigate, useLocation } from "react-router-dom";
+ import { useAuth } from "../context/AuthContext";
++import Button from "../components/Button";
+ 
+ function Login() {
+   const navigate = useNavigate();
+@@ -98,14 +99,14 @@ function Login() {
+             </Link>
+           </div>
+ 
+-          <button
++          <Button
++            variant="primary"
+             type="submit"
+-            className="btn btn-primary"
+             style={{ width: "100%" }}
+             disabled={isLoading}
+           >
+             {isLoading ? "Signing In..." : "Sign In"}
+-          </button>
++          </Button>
+         </form>
+ 
+         {!configLoading && publicRegistration && (
+diff --git a/hrms-react/src/pages/LoginSuccessful.jsx b/hrms-react/src/pages/LoginSuccessful.jsx
+index 08cbbde..02704e8 100644
+--- a/hrms-react/src/pages/LoginSuccessful.jsx
++++ b/hrms-react/src/pages/LoginSuccessful.jsx
+@@ -1,4 +1,5 @@
+ import { useNavigate } from 'react-router-dom'
++import Button from "../components/Button";
+ 
+ function LoginSuccessful() {
+   const navigate = useNavigate()
+@@ -38,13 +39,13 @@ function LoginSuccessful() {
+           You have successfully signed in to your account.
+         </p>
+ 
+-        <button 
+-          className="btn btn-primary" 
++        <Button
++          variant="primary"
+           style={{ width: '100%' }}
+           onClick={() => navigate('/dashboard')}
+         >
+           Go to Dashboard
+-        </button>
++        </Button>
+       </div>
+     </div>
+   )
+diff --git a/hrms-react/src/pages/Notifications.jsx b/hrms-react/src/pages/Notifications.jsx
+index c684676..9c321b3 100644
+--- a/hrms-react/src/pages/Notifications.jsx
++++ b/hrms-react/src/pages/Notifications.jsx
+@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
+ import { useStore } from "../context/StoreContext";
+ import { useAuth } from "../context/AuthContext";
+ import AddNotificationModal from "../components/AddNotificationModal";
++import Button from "../components/Button";
+ 
+ const CATEGORY_CONFIG = {
+   leave: {
+@@ -159,27 +160,27 @@ function Notifications() {
+       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
+         <h2 style={{ flex: 1 }}>Notifications</h2>
+         {isHR && (
+-          <button
+-            className="btn btn-primary"
++          <Button
++            variant="primary"
+             onClick={() => setComposeOpen(true)}
+           >
+             + Send Notice
+-          </button>
++          </Button>
+         )}
+-        <button
+-          className="btn btn-secondary"
++        <Button
++          variant="secondary"
+           onClick={markAllNotificationsRead}
+           disabled={!hasUnread}
+         >
+           Mark all as read
+-        </button>
+-        <button
+-          className="btn btn-secondary"
++        </Button>
++        <Button
++          variant="secondary"
+           onClick={clearReadNotifications}
+           disabled={!hasRead}
+         >
+           Clear read
+-        </button>
++        </Button>
+       </div>
+ 
+       <div
+@@ -214,10 +215,9 @@ function Notifications() {
+           {FILTERS.map((f) => {
+             const isActive = filter === f.key;
+             return (
+-              <button
++              <Button
++                variant="secondary"
+                 key={f.key}
+-                type="button"
+-                className="btn btn-secondary"
+                 onClick={() => setFilter(f.key)}
+                 style={
+                   isActive
+@@ -230,7 +230,7 @@ function Notifications() {
+                 }
+               >
+                 {f.label}
+-              </button>
++              </Button>
+             );
+           })}
+         </div>
+@@ -250,13 +250,12 @@ function Notifications() {
+                 : "Nothing here for this filter."}
+             </div>
+             {filter !== "all" && (
+-              <button
+-                type="button"
+-                className="btn btn-secondary"
++              <Button
++                variant="secondary"
+                 onClick={() => setFilter("all")}
+               >
+                 View all notifications
+-              </button>
++              </Button>
+             )}
+           </div>
+         ) : (
+@@ -356,22 +355,22 @@ function Notifications() {
+ 
+                   <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                     {!notification.read && (
+-                      <button
+-                        className="btn btn-secondary"
++                      <Button
++                        variant="secondary"
+                         style={{ padding: "8px 12px", fontSize: "var(--fs-xs)" }}
+                         onClick={() => markNotificationRead(notification.id)}
+                       >
+                         Mark read
+-                      </button>
++                      </Button>
+                     )}
+-                    <button
+-                      className="btn btn-secondary"
++                    <Button
++                      variant="secondary"
+                       style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--txt-danger)" }}
+                       onClick={() => removeNotification(notification.id)}
+                       aria-label="Dismiss notification"
+                     >
+                       Dismiss
+-                    </button>
++                    </Button>
+                   </div>
+                 </div>
+               );
+diff --git a/hrms-react/src/pages/Payroll.jsx b/hrms-react/src/pages/Payroll.jsx
+index f0d3fb9..6511c46 100644
+--- a/hrms-react/src/pages/Payroll.jsx
++++ b/hrms-react/src/pages/Payroll.jsx
+@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
+ import { PayrollAPI } from "../api";
+ import Avatar from "../components/Avatar";
+ import { TypeBadge } from "../components/Badge";
++import Button from "../components/Button";
+ 
+ const PAYROLL_PER_PAGE = 10;
+ 
+@@ -649,44 +650,60 @@ function Payroll() {
+ 
+           <div style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+             {isAdmin && (
+-              <button type="button" className="btn btn-secondary btn-sm" disabled={draftBusy}
++              <Button
++                variant="secondary"
++                size="sm"
++                disabled={draftBusy}
+                 onClick={handleGenerateMonthlyDraft}
+-                title="Runs the same start-of-month job the scheduler runs automatically">
++                title="Runs the same start-of-month job the scheduler runs automatically"
++              >
+                 {draftBusy ? "Generating…" : "Generate this month's draft"}
+-              </button>
++              </Button>
+             )}
+             {isHR && (
+-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setShowNewForm((v) => !v)}>
++              <Button variant="primary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
+                 {showNewForm ? "Cancel" : "+ New period"}
+-              </button>
++              </Button>
+             )}
+             {period && isDraft && isHR && (
+               <>
+-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={handleRegenerate}>
++                <Button variant="secondary" size="sm" disabled={busy} onClick={handleRegenerate}>
+                   Regenerate drafts
+-                </button>
+-                <button type="button" className="btn btn-success btn-sm" disabled={busy}
+-                  onClick={() => handleStatus("approved")}>
++                </Button>
++                <Button
++                  variant="success"
++                  size="sm"
++                  disabled={busy}
++                  onClick={() => handleStatus("approved")}
++                >
+                   Approve payroll
+-                </button>
++                </Button>
+               </>
+             )}
+             {period && isDraft && isAdmin && (
+-              <button type="button" className="btn btn-danger btn-sm" disabled={busy} onClick={handleDeletePeriod}>
++              <Button variant="danger" size="sm" disabled={busy} onClick={handleDeletePeriod}>
+                 Delete period
+-              </button>
++              </Button>
+             )}
+             {period?.status === "approved" && isHR && (
+-              <button type="button" className="btn btn-success btn-sm" disabled={busy}
+-                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}>
++              <Button
++                variant="success"
++                size="sm"
++                disabled={busy}
++                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}
++              >
+                 Mark as paid
+-              </button>
++              </Button>
+             )}
+             {period?.status === "approved" && isAdmin && (
+-              <button type="button" className="btn btn-secondary btn-sm" disabled={busy}
+-                onClick={() => handleStatus("draft")}>
++              <Button
++                variant="secondary"
++                size="sm"
++                disabled={busy}
++                onClick={() => handleStatus("draft")}
++              >
+                 Reopen to draft
+-              </button>
++              </Button>
+             )}
+           </div>
+         </div>
+@@ -732,10 +749,14 @@ function Payroll() {
+               <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
+                 <input id="np-fx" type="number" min="1" step="any" value={newPeriod.fxRate}
+                   onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
+-                <button type="button" className="btn btn-secondary btn-sm" disabled={fxPreviewLoading}
+-                  onClick={handleFetchLiveRate}>
++                <Button
++                  variant="secondary"
++                  size="sm"
++                  disabled={fxPreviewLoading}
++                  onClick={handleFetchLiveRate}
++                >
+                   {fxPreviewLoading ? "Fetching…" : "Fetch live rate"}
+-                </button>
++                </Button>
+               </div>
+               <span className="form-hint">
+                 {fxPreview
+@@ -743,9 +764,9 @@ function Payroll() {
+                   : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
+               </span>
+             </div>
+-            <button type="submit" className="btn btn-primary" disabled={busy}>
++            <Button variant="primary" type="submit" disabled={busy}>
+               {busy ? "Generating…" : "Create & generate drafts"}
+-            </button>
++            </Button>
+           </form>
+         )}
+       </div>
+@@ -862,10 +883,14 @@ function Payroll() {
+                   >{c}</button>
+                 ))}
+               </div>
+-              <button type="button" className="btn btn-secondary btn-sm" onClick={exportCSV}
+-                title="CSV export is always raw VND, regardless of the display currency above.">
++              <Button
++                variant="secondary"
++                size="sm"
++                onClick={exportCSV}
++                title="CSV export is always raw VND, regardless of the display currency above."
++              >
+                 ↓ Export CSV
+-              </button>
++              </Button>
+             </div>
+ 
+             {loadingSlips ? (
+@@ -1018,8 +1043,11 @@ function Payroll() {
+                       Showing {startIndex + 1}–{Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length)} of {filtered.length}
+                     </div>
+                     <div className="pagination-controls">
+-                      <button type="button" className="page-btn" disabled={safePage === 1}
+-                        onClick={() => setCurrentPage(safePage - 1)}>‹</button>
++                      <Button
++                        disabled={safePage === 1}
++                        onClick={() => setCurrentPage(safePage - 1)}
++                        className="page-btn"
++                      >‹</Button>
+                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                         <button
+                           key={n}
+@@ -1028,8 +1056,11 @@ function Payroll() {
+                           onClick={() => setCurrentPage(n)}
+                         >{n}</button>
+                       ))}
+-                      <button type="button" className="page-btn" disabled={safePage === totalPages}
+-                        onClick={() => setCurrentPage(safePage + 1)}>›</button>
++                      <Button
++                        disabled={safePage === totalPages}
++                        onClick={() => setCurrentPage(safePage + 1)}
++                        className="page-btn"
++                      >›</Button>
+                     </div>
+                   </div>
+                 )}
+diff --git a/hrms-react/src/pages/Register.jsx b/hrms-react/src/pages/Register.jsx
+index 8dc19a2..cf0a1be 100644
+--- a/hrms-react/src/pages/Register.jsx
++++ b/hrms-react/src/pages/Register.jsx
+@@ -2,6 +2,7 @@ import { useState } from "react";
+ import { Link, useNavigate } from "react-router-dom";
+ import FormField from "../components/FormField";
+ import { useAuth } from "../context/AuthContext";
++import Button from "../components/Button";
+ 
+ /* ─────────────────────────────────
+    Validation rules
+@@ -279,14 +280,14 @@ function Register() {
+             )}
+           </div>
+ 
+-          <button
++          <Button
++            variant="primary"
+             type="submit"
+-            className="btn btn-primary"
+             style={{ width: "100%" }}
+             disabled={isLoading}
+           >
+             {isLoading ? "Creating Account..." : "Create Account"}
+-          </button>
++          </Button>
+         </form>
+ 
+         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
+diff --git a/hrms-react/src/pages/Settings.jsx b/hrms-react/src/pages/Settings.jsx
+index c4e8b11..ce86421 100644
+--- a/hrms-react/src/pages/Settings.jsx
++++ b/hrms-react/src/pages/Settings.jsx
+@@ -5,6 +5,7 @@ import { useStore } from '../context/StoreContext'
+ import { apiFetch } from '../api/client'
+ import { ProfileEditRequestsAPI, EmployeesAPI, PromotionRequestsAPI, NoShowReviewsAPI } from '../api'
+ import { getRoleLabel } from '../utils/roles'
++import Button from "../components/Button";
+ 
+ /* ─────────────────────────────────────────────
+    Shared helpers / sub-components
+@@ -190,13 +191,13 @@ function MyProfileEditSection() {
+             Current Profile
+           </h4>
+           {!isEditing && !hasPending && (
+-            <button
+-              type="button"
+-              className="btn btn-primary btn-sm"
++            <Button
++              variant="primary"
++              size="sm"
+               onClick={() => { setIsEditing(true); setError(''); setSuccess('') }}
+             >
+               Request Edit
+-            </button>
++            </Button>
+           )}
+           {hasPending && (
+             <StatusBadge status="pending" />
+@@ -350,21 +351,19 @@ function MyProfileEditSection() {
+           )}
+ 
+           <div style={{ display: 'flex', gap: 'var(--sp-3)', justifyContent: 'flex-end', marginTop: 'var(--sp-4)' }}>
+-            <button
+-              type="button"
+-              className="btn btn-secondary"
++            <Button
++              variant="secondary"
+               onClick={() => { setIsEditing(false); setError('') }}
+             >
+               Cancel
+-            </button>
+-            <button
+-              type="button"
+-              className="btn btn-primary"
++            </Button>
++            <Button
++              variant="primary"
+               disabled={submitting}
+               onClick={handleSubmit}
+             >
+               {submitting ? 'Submitting…' : 'Submit Request'}
+-            </button>
++            </Button>
+           </div>
+         </div>
+       )}
+@@ -584,9 +583,9 @@ function PromotionProposeSection() {
+           </div>
+         </div>
+ 
+-        <button type="submit" className="btn btn-primary" disabled={submitting}>
++        <Button variant="primary" type="submit" disabled={submitting}>
+           {submitting ? 'Submitting…' : 'Submit proposal'}
+-        </button>
++        </Button>
+       </form>
+ 
+       <div style={{ marginTop: 'var(--sp-6)' }}>
+@@ -700,7 +699,7 @@ function PromotionReviewPanel() {
+             >{s}</button>
+           ))}
+         </div>
+-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>Refresh</button>
++        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
+         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
+           {requests.length} proposal{requests.length === 1 ? '' : 's'}
+         </span>
+@@ -774,11 +773,11 @@ function PromotionReviewPanel() {
+                   )}
+                   <StatusBadge status={req.status} />
+                   {req.status === 'pending' && (
+-                    <button
+-                      type="button"
+-                      className="btn btn-secondary btn-sm"
++                    <Button
++                      variant="secondary"
++                      size="sm"
+                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
+-                    >{isOpen ? 'Close' : 'Review'}</button>
++                    >{isOpen ? 'Close' : 'Review'}</Button>
+                   )}
+                 </div>
+ 
+@@ -822,18 +821,16 @@ function PromotionReviewPanel() {
+                           />
+                         </div>
+                         <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+-                          <button
+-                            type="button"
+-                            className="btn btn-success"
++                          <Button
++                            variant="success"
+                             disabled={actionLoading !== null}
+                             onClick={() => handleReview(req.id, 'approved')}
+-                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</button>
+-                          <button
+-                            type="button"
+-                            className="btn btn-danger"
++                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</Button>
++                          <Button
++                            variant="danger"
+                             disabled={actionLoading !== null}
+                             onClick={() => handleReview(req.id, 'rejected')}
+-                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
++                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</Button>
+                         </div>
+                       </>
+                     )}
+@@ -920,7 +917,7 @@ function NoShowReviewPanel() {
+             >{s}</button>
+           ))}
+         </div>
+-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>Refresh</button>
++        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
+         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
+           {requests.length} flag{requests.length === 1 ? '' : 's'}
+         </span>
+@@ -978,11 +975,11 @@ function NoShowReviewPanel() {
+                   </div>
+                   <StatusBadge status={req.status} />
+                   {req.status === 'pending' && (
+-                    <button
+-                      type="button"
+-                      className="btn btn-secondary btn-sm"
++                    <Button
++                      variant="secondary"
++                      size="sm"
+                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
+-                    >{isOpen ? 'Close' : 'Review'}</button>
++                    >{isOpen ? 'Close' : 'Review'}</Button>
+                   )}
+                 </div>
+ 
+@@ -1015,18 +1012,16 @@ function NoShowReviewPanel() {
+                       />
+                     </div>
+                     <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
+-                      <button
+-                        type="button"
+-                        className="btn btn-success"
++                      <Button
++                        variant="success"
+                         disabled={actionLoading !== null}
+                         onClick={() => handleReview(req.id, 'approved')}
+-                      >{actionLoading === 'approved' ? 'Saving…' : 'Confirm Pattern'}</button>
+-                      <button
+-                        type="button"
+-                        className="btn btn-danger"
++                      >{actionLoading === 'approved' ? 'Saving…' : 'Confirm Pattern'}</Button>
++                      <Button
++                        variant="danger"
+                         disabled={actionLoading !== null}
+                         onClick={() => handleReview(req.id, 'rejected')}
+-                      >{actionLoading === 'rejected' ? 'Saving…' : 'Dismiss'}</button>
++                      >{actionLoading === 'rejected' ? 'Saving…' : 'Dismiss'}</Button>
+                     </div>
+                   </div>
+                 )}
+@@ -1114,9 +1109,9 @@ function ProfileEditReviewPanel() {
+             </button>
+           ))}
+         </div>
+-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>
++        <Button variant="secondary" size="sm" onClick={loadRequests}>
+           Refresh
+-        </button>
++        </Button>
+         <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginLeft: 'auto' }}>
+           {requests.length} request{requests.length !== 1 ? 's' : ''}
+         </span>
+@@ -1189,13 +1184,13 @@ function ProfileEditReviewPanel() {
+                   </div>
+                   <StatusBadge status={req.status} />
+                   {req.status === 'pending' && (
+-                    <button
+-                      type="button"
+-                      className="btn btn-secondary btn-sm"
++                    <Button
++                      variant="secondary"
++                      size="sm"
+                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
+                     >
+                       {isOpen ? 'Close' : 'Review'}
+-                    </button>
++                    </Button>
+                   )}
+                 </div>
+ 
+@@ -1226,9 +1221,8 @@ function ProfileEditReviewPanel() {
+                     </div>
+ 
+                     <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
+-                      <button
+-                        type="button"
+-                        className="btn btn-success"
++                      <Button
++                        variant="success"
+                         disabled={actionLoading !== null}
+                         onClick={() => handleReview(req.id, 'approved')}
+                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
+@@ -1241,10 +1235,9 @@ function ProfileEditReviewPanel() {
+                             Approve & Apply
+                           </>
+                         )}
+-                      </button>
+-                      <button
+-                        type="button"
+-                        className="btn btn-danger"
++                      </Button>
++                      <Button
++                        variant="danger"
+                         disabled={actionLoading !== null}
+                         onClick={() => handleReview(req.id, 'rejected')}
+                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
+@@ -1257,7 +1250,7 @@ function ProfileEditReviewPanel() {
+                             Reject
+                           </>
+                         )}
+-                      </button>
++                      </Button>
+                     </div>
+                   </div>
+                 )}
+@@ -1325,7 +1318,7 @@ function PromoteUsersPanel() {
+   if (loading) return <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>Loading accounts…</div>
+   if (error) return (
+     <div style={{ padding: 'var(--sp-4)', background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)', borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+-      {error}<button className="btn btn-secondary btn-sm" onClick={fetchUsers}>Retry</button>
++      {error}<Button variant="secondary" size="sm" onClick={fetchUsers}>Retry</Button>
+     </div>
+   )
+ 
+@@ -1371,22 +1364,22 @@ function PromoteUsersPanel() {
+               {!isSelf && (
+                 <div style={{ display: 'flex', gap: 'var(--sp-2)', flexShrink: 0 }}>
+                   {isAdminAcc ? (
+-                    <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
++                    <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
+                       {isLoading ? '…' : 'Demote to HR'}
+-                    </button>
++                    </Button>
+                   ) : isManager ? (
+                     <>
+-                      <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
++                      <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
+                         {isLoading ? '…' : 'Demote'}
+-                      </button>
+-                      <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
++                      </Button>
++                      <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
+                         {isLoading ? '…' : 'Make Admin'}
+-                      </button>
++                      </Button>
+                     </>
+                   ) : (
+-                    <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
++                    <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
+                       {isLoading ? '…' : 'Promote to HR'}
+-                    </button>
++                    </Button>
+                   )}
+                 </div>
+               )}
+diff --git a/hrms-react/src/pages/ViewDepartment.jsx b/hrms-react/src/pages/ViewDepartment.jsx
+index 176e950..a317c1c 100644
+--- a/hrms-react/src/pages/ViewDepartment.jsx
++++ b/hrms-react/src/pages/ViewDepartment.jsx
+@@ -1,6 +1,7 @@
+ import { Link, useParams, useNavigate } from "react-router-dom";
+ import { useStore } from "../context/StoreContext";
+ import { idsMatch } from "../utils/id";
++import Button from "../components/Button";
+ 
+ function formatBudget(amount) {
+   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+@@ -19,13 +20,13 @@ function ViewDepartment() {
+     return (
+       <div className="content-card">
+         <h2>Department Not Found</h2>
+-        <button
+-          className="btn btn-primary"
++        <Button
++          variant="primary"
+           style={{ marginTop: "20px" }}
+           onClick={() => navigate("/departments")}
+         >
+           Back to Departments
+-        </button>
++        </Button>
+       </div>
+     );
+   }
+@@ -35,13 +36,13 @@ function ViewDepartment() {
+ 
+   return (
+     <div className="content-card">
+-      <button
+-        className="btn btn-secondary"
++      <Button
++        variant="secondary"
+         style={{ marginBottom: "20px" }}
+         onClick={() => navigate("/departments")}
+       >
+         ← Back
+-      </button>
++      </Button>
+ 
+       <h2>{department.name}</h2>
+       <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>
+diff --git a/hrms-react/src/pages/ViewEmployee.jsx b/hrms-react/src/pages/ViewEmployee.jsx
+index 92f6e11..8706a97 100644
+--- a/hrms-react/src/pages/ViewEmployee.jsx
++++ b/hrms-react/src/pages/ViewEmployee.jsx
+@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
+ import Avatar from "../components/Avatar";
+ import Badge, { StatusBadge, TypeBadge } from "../components/Badge";
+ import { idsMatch } from "../utils/id";
++import Button from "../components/Button";
+ 
+ // Task 4.3: per-employee attendance log/report view. Data already exists in
+ // the attendance collection (via StoreContext); this maps each recorded
+@@ -46,13 +47,13 @@ function ViewEmployee() {
+         <p style={{ color: "var(--text-muted)", marginTop: "12px" }}>
+           The employee you are looking for does not exist.
+         </p>
+-        <button
+-          className="btn btn-primary"
++        <Button
++          variant="primary"
+           style={{ marginTop: "20px" }}
+           onClick={() => navigate("/employees")}
+         >
+           Back to Employees
+-        </button>
++        </Button>
+       </div>
+     );
+   }
+@@ -179,12 +180,12 @@ function ViewEmployee() {
+             )}
+           </div>
+ 
+-          <button
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             onClick={() => navigate("/employees")}
+           >
+             Back
+-          </button>
++          </Button>
+         </div>
+ 
+         <div className="employee-detail-grid">
+@@ -291,13 +292,13 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
+             {rate !== null ? ` · ${rate}% attendance rate` : ""}
+           </p>
+         </div>
+-        <button
+-          type="button"
+-          className="btn btn-secondary btn-sm"
++        <Button
++          variant="secondary"
++          size="sm"
+           onClick={() => navigate(`/attendance?employee=${employee.id}`)}
+         >
+           Open full calendar
+-        </button>
++        </Button>
+       </div>
+ 
+       {total === 0 ? (
+@@ -349,14 +350,14 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
+           </div>
+ 
+           {records.length > 10 && (
+-            <button
+-              type="button"
+-              className="btn btn-secondary btn-sm"
++            <Button
++              variant="secondary"
++              size="sm"
+               style={{ marginTop: "var(--sp-4)" }}
+               onClick={() => setShowAll((v) => !v)}
+             >
+               {showAll ? "Show recent only" : `Show all ${records.length} records`}
+-            </button>
++            </Button>
+           )}
+         </>
+       )}
+@@ -431,14 +432,14 @@ function ContractCard({ employee, isHR, uploadEmployeeContract }) {
+           )}
+           {isHR && (
+             <>
+-              <button
+-                type="button"
+-                className="btn btn-primary btn-sm"
++              <Button
++                variant="primary"
++                size="sm"
+                 onClick={handlePick}
+                 disabled={uploading}
+               >
+                 {uploading ? "Uploading…" : employee.contractUrl ? "Replace Contract" : "Upload Contract"}
+-              </button>
++              </Button>
+               <input
+                 ref={fileInputRef}
+                 type="file"
+@@ -527,16 +528,15 @@ function ConfirmChangeModal({ change, employeeName, onConfirm, onCancel }) {
+         </div>
+ 
+         <div className="modal-actions">
+-          <button
+-            type="button"
+-            className="btn btn-secondary"
++          <Button
++            variant="secondary"
+             onClick={onCancel}
+           >
+             Cancel
+-          </button>
+-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
++          </Button>
++          <Button variant="primary" onClick={onConfirm}>
+             Confirm
+-          </button>
++          </Button>
+         </div>
+       </div>
+     </div>

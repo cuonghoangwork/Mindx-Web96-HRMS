@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../context/StoreContext";
+import Button from "./Button";
 
 function AddDepartmentModal({ onClose }) {
   const { departments, addDepartment } = useStore();
@@ -98,16 +99,15 @@ function AddDepartmentModal({ onClose }) {
           </div>
 
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
+            </Button>
+            <Button variant="primary" type="submit">
               Add Department
-            </button>
+            </Button>
           </div>
         </form>
       </div>

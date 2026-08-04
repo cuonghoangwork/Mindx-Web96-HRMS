@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import Badge, { StatusBadge, TypeBadge } from "../components/Badge";
 import { idsMatch } from "../utils/id";
+import Button from "../components/Button";
 
 // Task 4.3: per-employee attendance log/report view. Data already exists in
 // the attendance collection (via StoreContext); this maps each recorded
@@ -46,13 +47,13 @@ function ViewEmployee() {
         <p style={{ color: "var(--text-muted)", marginTop: "12px" }}>
           The employee you are looking for does not exist.
         </p>
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           style={{ marginTop: "20px" }}
           onClick={() => navigate("/employees")}
         >
           Back to Employees
-        </button>
+        </Button>
       </div>
     );
   }
@@ -130,7 +131,7 @@ function ViewEmployee() {
                 border: "none",
                 cursor: avatarUploading ? "default" : "pointer",
                 background: "rgba(0,0,0,0.45)",
-                color: "#fff",
+                color: "var(--txt-inverse)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -179,12 +180,12 @@ function ViewEmployee() {
             )}
           </div>
 
-          <button
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={() => navigate("/employees")}
           >
             Back
-          </button>
+          </Button>
         </div>
 
         <div className="employee-detail-grid">
@@ -291,13 +292,13 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
             {rate !== null ? ` · ${rate}% attendance rate` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-secondary btn-sm"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => navigate(`/attendance?employee=${employee.id}`)}
         >
           Open full calendar
-        </button>
+        </Button>
       </div>
 
       {total === 0 ? (
@@ -349,14 +350,14 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
           </div>
 
           {records.length > 10 && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
+            <Button
+              variant="secondary"
+              size="sm"
               style={{ marginTop: "var(--sp-4)" }}
               onClick={() => setShowAll((v) => !v)}
             >
               {showAll ? "Show recent only" : `Show all ${records.length} records`}
-            </button>
+            </Button>
           )}
         </>
       )}
@@ -431,14 +432,14 @@ function ContractCard({ employee, isHR, uploadEmployeeContract }) {
           )}
           {isHR && (
             <>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handlePick}
                 disabled={uploading}
               >
                 {uploading ? "Uploading…" : employee.contractUrl ? "Replace Contract" : "Upload Contract"}
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -527,16 +528,15 @@ function ConfirmChangeModal({ change, employeeName, onConfirm, onCancel }) {
         </div>
 
         <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={onCancel}
           >
             Cancel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
+          </Button>
+          <Button variant="primary" onClick={onConfirm}>
             Confirm
-          </button>
+          </Button>
         </div>
       </div>
     </div>
