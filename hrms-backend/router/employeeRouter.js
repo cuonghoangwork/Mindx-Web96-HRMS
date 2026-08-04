@@ -1,7 +1,7 @@
 import { Router } from "express";
 import employeeController from "../controller/employeeController.js";
 import { verifyToken, authorize } from "../middleware/auth.js";
-import { uploadImage } from "../middleware/upload.js";
+import { uploadImage, uploadPdf, handleUploadErrors } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
 
 const router = Router();
@@ -33,11 +33,24 @@ router.put(
 router.delete("/:id", verifyToken, authorize("ADMIN"), employeeController.remove);
 
 // Avatar upload: all authenticated users can upload (controller restricts EMPLOYEE to own avatar)
+// handleUploadErrors wraps multer so a bad mimetype/oversized file resolves to a clean
+// 400 (err.message) instead of an uncaught 500 from the app's generic error handler.
 router.post(
   "/:id/avatar",
   verifyToken,
-  uploadImage.single("avatar"),
+  handleUploadErrors(uploadImage.single("avatar")),
   employeeController.uploadAvatar,
+);
+
+// Contract PDF upload (task 1.4) — HR (MANAGER) and ADMIN only, unlike the
+// avatar route above. Employees view their own contract read-only via
+// GET /employees/me (contractUrl is already in employeeToClient's shape).
+router.post(
+  "/:id/contract",
+  verifyToken,
+  authorize("ADMIN", "MANAGER"),
+  handleUploadErrors(uploadPdf.single("contract")),
+  employeeController.uploadContract,
 );
 
 export default router;

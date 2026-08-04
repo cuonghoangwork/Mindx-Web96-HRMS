@@ -1,30 +1,12 @@
 import PayrollPeriodModel, { PAYROLL_PERIOD_STATUSES } from "../model/PayrollPeriod.js";
 import PayslipModel from "../model/Payslip.js";
-import EmployeeModel from "../model/Employee.js";
-import AttendanceModel from "../model/Attendance.js";
-import LeaveRequestModel from "../model/LeaveRequest.js";
-import HolidayModel from "../model/Holiday.js";
-import {
-  DEFAULT_FX_RATE_VND_PER_USD,
-  autoDeductionVnd,
-  computePayslip,
-  seedBaseSalaryVnd,
-  standardWorkingDaysInMonth,
-} from "../utils/payrollEngine.js";
-import {
-  collectAbsentKeys,
-  collectLeaveKeys,
-  collectOnLeaveCoverageKeys,
-  groupByEmployee,
-  holidayKeySet,
-  monthQueryWindowUtc,
-  periodEndUtc,
-} from "../utils/payrollPeriod.js";
+import { DEFAULT_FX_RATE_VND_PER_USD, autoDeductionVnd, computePayslip, standardWorkingDaysInMonth } from "../utils/payrollEngine.js";
+import { buildPayslipRows, insertPayslips, periodLabel } from "../utils/payrollGeneration.js";
+import { generateMonthlyPayrollDraft } from "../jobs/generateMonthlyPayrollDraft.js";
+import { getOrCreateMonthlyFxRate } from "../utils/exchangeRate.js";
 import { logAction } from "../utils/auditLog.js";
 import { notifyHR } from "./notificationController.js";
 import NotificationModel from "../model/Notification.js";
-
-const PAYABLE_EMPLOYEE_STATUSES = ["active", "on-leave"];
 
 const CONTRACT_TYPE_LABELS = {
   "full-time": "Full-time",
@@ -34,8 +16,6 @@ const CONTRACT_TYPE_LABELS = {
 };
 
 const providedVnd = (value) => value !== undefined && value !== null && value !== "";
-
-const periodLabel = (p) => `${p.year}-${String(p.month).padStart(2, "0")}`;
 
 function periodToClient(doc, totals) {
   if (!doc) return doc;
@@ -63,6 +43,8 @@ function periodToClient(doc, totals) {
       netPay: t.netPay ?? 0,
     },
     createdBy: o.createdBy ? String(o.createdBy._id ?? o.createdBy) : null,
+    systemGenerated: Boolean(o.systemGenerated),
+    fxRateSource: o.fxRateSource ?? "manual",
     approvedBy: o.approvedBy ? String(o.approvedBy._id ?? o.approvedBy) : null,
     approvedAt: o.approvedAt ?? null,
     paidBy: o.paidBy ? String(o.paidBy._id ?? o.paidBy) : null,
@@ -128,106 +110,6 @@ async function totalsByPeriod(periodIds) {
     },
   ]);
   return new Map(rows.map((r) => [String(r._id), r]));
-}
-
-async function loadMonthDayCounts(year, month) {
-  const { lo, hi } = monthQueryWindowUtc(year, month);
-
-  const [leaves, absences, onLeaveRows, holidays] = await Promise.all([
-    LeaveRequestModel.find(
-      { status: "approved", startDate: { $lte: hi }, endDate: { $gte: lo } },
-      "employee startDate endDate type",
-    ),
-    AttendanceModel.find({ status: "absent", date: { $gte: lo, $lte: hi } }, "employee date"),
-    AttendanceModel.find({ status: "on-leave", date: { $gte: lo, $lte: hi } }, "employee date"),
-    HolidayModel.find({ date: { $gte: lo, $lte: hi } }, "date"),
-  ]);
-
-  const holidayKeys = holidayKeySet(holidays);
-  const leavesByEmp = groupByEmployee(leaves);
-  const absencesByEmp = groupByEmployee(absences);
-  const onLeaveByEmp = groupByEmployee(onLeaveRows);
-
-  return (employeeId) => {
-    const id = String(employeeId);
-    const rows = leavesByEmp.get(id) ?? [];
-
-    const unpaidSet = collectLeaveKeys(
-      rows.filter((r) => r.type === "unpaid"),
-      year,
-      month,
-      holidayKeys,
-    );
-
-    const leaveCovered = collectLeaveKeys(rows, year, month, holidayKeys);
-    for (const key of collectOnLeaveCoverageKeys(onLeaveByEmp.get(id) ?? [], year, month)) {
-      leaveCovered.add(key);
-    }
-
-    const absentSet = collectAbsentKeys(absencesByEmp.get(id) ?? [], year, month, leaveCovered);
-
-    return { unpaidLeaveDays: unpaidSet.size, absentDays: absentSet.size };
-  };
-}
-
-async function buildPayslipRows(period) {
-  const employees = await EmployeeModel.find(
-    {
-      status: { $in: PAYABLE_EMPLOYEE_STATUSES },
-      createdAt: { $lte: periodEndUtc(period.year, period.month) },
-    },
-    "employeeId name department designation contractType annualSalary",
-  ).populate("department", "name");
-
-  if (!employees.length) return [];
-
-  const dayCountsFor = await loadMonthDayCounts(period.year, period.month);
-
-  return employees.map((emp) => {
-    const baseSalary = seedBaseSalaryVnd(emp.annualSalary, period.fxRate);
-    const { unpaidLeaveDays, absentDays } = dayCountsFor(emp._id);
-    const autoDeduction = autoDeductionVnd({
-      baseSalary,
-      bonus: 0,
-      allowance: 0,
-      unpaidLeaveDays,
-      absentDays,
-      standardWorkingDays: period.standardWorkingDays,
-    });
-
-    return {
-      period: period._id,
-      employee: emp._id,
-      employeeCode: emp.employeeId ?? "",
-      employeeName: emp.name ?? "",
-      departmentId: emp.department?._id ?? null,
-      departmentName: emp.department?.name ?? null,
-      designation: emp.designation ?? null,
-      contractType: emp.contractType ?? null,
-      annualSalaryUsd: emp.annualSalary ?? 0,
-      unpaidLeaveDays,
-      absentDays,
-      autoDeduction,
-      deductionOverridden: false,
-      ...computePayslip({ baseSalary, bonus: 0, allowance: 0, deduction: autoDeduction }),
-    };
-  });
-}
-
-async function insertPayslips(rows) {
-  if (!rows.length) return 0;
-  try {
-    const inserted = await PayslipModel.insertMany(rows, { ordered: false });
-    return inserted.length;
-  } catch (err) {
-    const isDuplicateOnly =
-      err?.code === 11000 ||
-      (Array.isArray(err?.writeErrors) &&
-        err.writeErrors.length > 0 &&
-        err.writeErrors.every((w) => (w?.err?.code ?? w?.code) === 11000));
-    if (!isDuplicateOnly) throw err;
-    return err.result?.insertedCount ?? err.insertedDocs?.length ?? 0;
-  }
 }
 
 const payrollController = {
@@ -607,6 +489,57 @@ const payrollController = {
       });
 
       res.json({ success: true, message: "Payroll period deleted." });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Tasks 3.8/3.9: manual trigger for the same job the scheduler runs on the
+  // 1st of the month (jobs/generateMonthlyPayrollDraft.js). Mirrors
+  // attendanceController.closeDay's pattern — useful for demos, and for
+  // hosts where the scheduler is disabled (e.g. a free-tier host that sleeps
+  // when idle, same caveat already documented for CRON_CLOSE_ATTENDANCE).
+  // Optional { year, month } body lets HR backfill/regenerate a specific
+  // month; defaults to the current month otherwise. A no-op (skipped: true)
+  // if that month's period already exists.
+  generateMonthlyDraft: async (req, res) => {
+    try {
+      const { year, month } = req.body ?? {};
+      const asOf =
+        year && month ? new Date(Number(year), Number(month) - 1, 1) : new Date();
+
+      const result = await generateMonthlyPayrollDraft({ asOf });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Task 3.8, frontend support: lets the "New period" form show HR the
+  // current month's FX snapshot (fetching/persisting it on first ask, same
+  // get-or-create-once-per-month contract the scheduled job uses) so they
+  // can prefill the manual fxRate field with a live number instead of
+  // typing one from memory. Read-only from the caller's point of view - it
+  // never creates a PayrollPeriod, only (at most) an ExchangeRate snapshot.
+  previewFxRate: async (req, res) => {
+    try {
+      const year = Number(req.params.year);
+      const month = Number(req.params.month);
+      if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ success: false, message: "Invalid year/month." });
+      }
+
+      const snapshot = await getOrCreateMonthlyFxRate({ year, month });
+      res.json({
+        success: true,
+        data: {
+          year,
+          month,
+          rateVndPerUsd: snapshot.rateVndPerUsd,
+          source: snapshot.source,
+          fetchedAt: snapshot.fetchedAt,
+        },
+      });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }

@@ -3,6 +3,7 @@ import EmployeeModel from "../model/Employee.js";
 import DepartmentModel from "../model/Department.js";
 import UserModel from "../model/User.js";
 import NotificationModel from "../model/Notification.js";
+import { POSITION_LEVELS } from "../model/PositionLevel.js";
 import { createReviewRequestController } from "../utils/reviewQueue.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { logAction } from "../utils/auditLog.js";
@@ -21,6 +22,7 @@ function changedFieldNames(doc) {
     doc.proposedDesignation ? "designation" : null,
     doc.proposedDepartment ? "department" : null,
     typeof doc.proposedAnnualSalary === "number" ? "salary" : null,
+    doc.proposedPositionLevel ? "positionLevel" : null,
   ].filter(Boolean);
 }
 
@@ -38,12 +40,15 @@ function toClientRequest(doc) {
       designation: o.currentDesignation ?? null,
       department: o.currentDepartmentName ?? null,
       salary: o.currentAnnualSalary ?? null,
+      positionLevel: o.currentPositionLevel ?? null,
     },
     proposed: {
       designation: o.proposedDesignation ?? null,
       department: o.proposedDepartmentName ?? null,
       salary: o.proposedAnnualSalary ?? null,
+      positionLevel: o.proposedPositionLevel ?? null,
     },
+    systemGenerated: Boolean(o.systemGenerated),
     effectiveDate: dateOnly(o.effectiveDate),
     reason: o.reason ?? "",
     status: o.status,
@@ -66,24 +71,46 @@ const { list, review: factoryReview } = createReviewRequestController({
     if (typeof request.proposedAnnualSalary === "number") {
       updates.annualSalary = request.proposedAnnualSalary;
     }
+    if (request.proposedPositionLevel) {
+      updates.positionLevel = request.proposedPositionLevel;
+      // Reset the tenure clock — they just started at this level, so the
+      // next eligibility check (task 2.4) should measure from now, not
+      // from whenever they entered the level they're leaving.
+      updates.levelStartDate = new Date();
+    }
     if (!Object.keys(updates).length) return;
     await EmployeeModel.findByIdAndUpdate(request.employee._id ?? request.employee, updates, {
       runValidators: true,
     });
   },
-  notifyEmployee: (decision, request) => ({
-    title: decision === "approved" ? "Promotion approved" : "Promotion request rejected",
-    message:
-      decision === "approved"
-        ? `Your promotion has been approved${request.proposedDesignation ? ` — new title: ${request.proposedDesignation}` : ""}. Your HR record has been updated.`
-        : `Your promotion request was not approved.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
-  }),
+  notifyEmployee: (decision, request) => {
+    if (decision !== "approved") {
+      return {
+        title: "Promotion request rejected",
+        message: `Your promotion request was not approved.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+      };
+    }
+    const parts = [];
+    if (request.proposedPositionLevel) parts.push(`new level: ${request.proposedPositionLevel}`);
+    if (request.proposedDesignation) parts.push(`new title: ${request.proposedDesignation}`);
+    return {
+      title: "Promotion approved",
+      message: `Your promotion has been approved${parts.length ? ` — ${parts.join(", ")}` : ""}. Your HR record has been updated.`,
+    };
+  },
 });
 
 const promotionRequestController = {
   create: async (req, res) => {
     try {
-      const { employeeId, designation, department, salary, effectiveDate, reason } = req.body;
+      const { employeeId, designation, department, salary, positionLevel, effectiveDate, reason } = req.body;
+
+      if (positionLevel !== undefined && positionLevel !== "" && !POSITION_LEVELS.includes(positionLevel)) {
+        return res.status(400).json({
+          success: false,
+          message: `positionLevel must be one of: ${POSITION_LEVELS.join(", ")}.`,
+        });
+      }
 
       const employee = await EmployeeModel.findById(employeeId).populate("department", "name");
       if (!employee) {
@@ -110,10 +137,12 @@ const promotionRequestController = {
         currentDesignation: employee.designation ?? null,
         currentDepartmentName,
         currentAnnualSalary: employee.annualSalary ?? 0,
+        currentPositionLevel: employee.positionLevel ?? null,
         proposedDesignation: null,
         proposedDepartment: null,
         proposedDepartmentName: null,
         proposedAnnualSalary: null,
+        proposedPositionLevel: null,
         effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
         reason: reason ?? "",
         appliedAt: new Date(),
@@ -132,6 +161,9 @@ const promotionRequestController = {
         Number(salary) !== Number(employee.annualSalary ?? 0)
       ) {
         doc.proposedAnnualSalary = Number(salary);
+      }
+      if (positionLevel && positionLevel !== employee.positionLevel) {
+        doc.proposedPositionLevel = positionLevel;
       }
 
       if (!changedFieldNames(doc).length) {

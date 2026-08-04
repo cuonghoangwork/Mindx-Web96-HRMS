@@ -8,6 +8,13 @@ import { useState } from "react";
  *   onSave       — (job) => void, called with the new/updated job
  *   job          — optional existing job to edit (presence => edit mode)
  *   departments  — array of department names for the select
+ *
+ * Task 5.1: expanded beyond title/department/location/type/status to also
+ * collect the JD, requirements, benefits, pay range, company info,
+ * application instructions and deadline. requirements/benefits are edited
+ * as one-per-line textareas and sent to the backend as newline-separated
+ * text — jobFromClient() on the server splits them into an array (see
+ * hrms-backend/utils/mappers.js toBulletList()).
  */
 function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
   const isEdit = Boolean(job);
@@ -18,6 +25,15 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
     location: job?.location ?? "",
     type: job?.type ?? "Full-time",
     status: job?.status ?? "Open",
+    description: job?.description ?? "",
+    requirements: (job?.requirements ?? []).join("\n"),
+    benefits: (job?.benefits ?? []).join("\n"),
+    salaryMin: job?.salaryMin ?? "",
+    salaryMax: job?.salaryMax ?? "",
+    salaryCurrency: job?.salaryCurrency ?? "USD",
+    companyInfo: job?.companyInfo ?? "",
+    applicationInstructions: job?.applicationInstructions ?? "",
+    deadline: job?.deadline ?? "",
   });
   const [error, setError] = useState("");
 
@@ -43,6 +59,14 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       setError("Location is required.");
       return;
     }
+    if (
+      formData.salaryMin !== "" &&
+      formData.salaryMax !== "" &&
+      Number(formData.salaryMin) > Number(formData.salaryMax)
+    ) {
+      setError("Minimum salary cannot be greater than maximum salary.");
+      return;
+    }
 
     onSave({
       id: job?.id,
@@ -51,6 +75,15 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       location,
       type: formData.type,
       status: formData.status,
+      description: formData.description.trim(),
+      requirements: formData.requirements,
+      benefits: formData.benefits,
+      salaryMin: formData.salaryMin === "" ? "" : Number(formData.salaryMin),
+      salaryMax: formData.salaryMax === "" ? "" : Number(formData.salaryMax),
+      salaryCurrency: formData.salaryCurrency.trim() || "USD",
+      companyInfo: formData.companyInfo.trim(),
+      applicationInstructions: formData.applicationInstructions.trim(),
+      deadline: formData.deadline || null,
       postedDate: job?.postedDate ?? new Date().toISOString().split("T")[0],
     });
     onClose();
@@ -58,7 +91,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
         <div className="modal-header">
           <h2>{isEdit ? "Edit Job" : "Post New Job"}</h2>
           <button
@@ -122,37 +155,171 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="job-type">
-              Employment Type
-            </label>
-            <select
-              id="job-type"
-              name="type"
-              value={formData.type}
-              onChange={handleChange}
-            >
-              <option value="Full-time">Full-time</option>
-              <option value="Part-time">Part-time</option>
-              <option value="Contract">Contract</option>
-              <option value="Intern">Intern</option>
-            </select>
+          <div style={{ display: "flex", gap: "12px" }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="job-type">
+                Employment Type
+              </label>
+              <select
+                id="job-type"
+                name="type"
+                value={formData.type}
+                onChange={handleChange}
+              >
+                <option value="Full-time">Full-time</option>
+                <option value="Part-time">Part-time</option>
+                <option value="Contract">Contract</option>
+                <option value="Intern">Intern</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="job-status">
+                Status
+              </label>
+              <select
+                id="job-status"
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+              >
+                <option value="Open">Open</option>
+                <option value="Filled">Filled</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="job-status">
-              Status
+            <label className="form-label" htmlFor="job-description">
+              Job Description
             </label>
-            <select
-              id="job-status"
-              name="status"
-              value={formData.status}
+            <textarea
+              id="job-description"
+              name="description"
+              rows={3}
+              value={formData.description}
               onChange={handleChange}
-            >
-              <option value="Open">Open</option>
-              <option value="Filled">Filled</option>
-              <option value="Closed">Closed</option>
-            </select>
+              placeholder="What this role does day-to-day…"
+              style={{ resize: "vertical" }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="job-requirements">
+              Requirements <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(one per line)</span>
+            </label>
+            <textarea
+              id="job-requirements"
+              name="requirements"
+              rows={3}
+              value={formData.requirements}
+              onChange={handleChange}
+              placeholder={"3+ years of relevant experience\nStrong communication skills"}
+              style={{ resize: "vertical" }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="job-benefits">
+              Pay &amp; Benefits <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(one per line)</span>
+            </label>
+            <textarea
+              id="job-benefits"
+              name="benefits"
+              rows={3}
+              value={formData.benefits}
+              onChange={handleChange}
+              placeholder={"Health insurance\n13th-month bonus"}
+              style={{ resize: "vertical" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: "12px" }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="job-salary-min">
+                Min Salary
+              </label>
+              <input
+                type="number"
+                id="job-salary-min"
+                name="salaryMin"
+                min="0"
+                value={formData.salaryMin}
+                onChange={handleChange}
+                placeholder="e.g. 50000"
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label" htmlFor="job-salary-max">
+                Max Salary
+              </label>
+              <input
+                type="number"
+                id="job-salary-max"
+                name="salaryMax"
+                min="0"
+                value={formData.salaryMax}
+                onChange={handleChange}
+                placeholder="e.g. 70000"
+              />
+            </div>
+            <div className="form-group" style={{ flex: "0 0 100px" }}>
+              <label className="form-label" htmlFor="job-salary-currency">
+                Currency
+              </label>
+              <input
+                type="text"
+                id="job-salary-currency"
+                name="salaryCurrency"
+                value={formData.salaryCurrency}
+                onChange={handleChange}
+                placeholder="USD"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="job-deadline">
+              Application Deadline
+            </label>
+            <input
+              type="date"
+              id="job-deadline"
+              name="deadline"
+              value={formData.deadline}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="job-company-info">
+              Company Info
+            </label>
+            <textarea
+              id="job-company-info"
+              name="companyInfo"
+              rows={2}
+              value={formData.companyInfo}
+              onChange={handleChange}
+              placeholder="A short blurb about the company shown on the posting…"
+              style={{ resize: "vertical" }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="job-application-instructions">
+              How to Apply
+            </label>
+            <textarea
+              id="job-application-instructions"
+              name="applicationInstructions"
+              rows={2}
+              value={formData.applicationInstructions}
+              onChange={handleChange}
+              placeholder="Application link, email, or instructions…"
+              style={{ resize: "vertical" }}
+            />
           </div>
 
           <div className="modal-actions">

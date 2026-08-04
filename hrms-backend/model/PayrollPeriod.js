@@ -13,7 +13,14 @@ const payrollPeriodSchema = new mongoose.Schema(
     status: { type: String, enum: PAYROLL_PERIOD_STATUSES, default: "draft" },
     note: { type: String, default: "" },
 
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    // createdBy is required for HR-initiated periods (POST /payroll/periods)
+    // but null for periods auto-drafted by the scheduled monthly job (task
+    // 3.9) — same "no human to attribute it to" pattern already used by
+    // PromotionRequest.requestedBy / systemGenerated (utils/reviewQueue.js).
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    systemGenerated: { type: Boolean, default: false },
+    fxRateSource: { type: String, enum: ["manual", "api", "fallback"], default: "manual" },
+
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     approvedAt: { type: Date, default: null },
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
@@ -24,5 +31,6 @@ const payrollPeriodSchema = new mongoose.Schema(
 
 payrollPeriodSchema.index({ year: 1, month: 1 }, { unique: true });
 payrollPeriodSchema.index({ status: 1, year: -1, month: -1 });
+payrollPeriodSchema.index({ systemGenerated: 1 });
 
 export default mongoose.model("PayrollPeriod", payrollPeriodSchema, "payrollPeriods");

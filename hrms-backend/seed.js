@@ -21,6 +21,7 @@ import CandidateModel from "./model/Candidate.js";
 import HolidayModel from "./model/Holiday.js";
 import AttendanceModel from "./model/Attendance.js";
 import NotificationModel from "./model/Notification.js";
+import PositionLevelModel, { POSITION_LEVELS } from "./model/PositionLevel.js";
 
 const SALT_ROUNDS = 10;
 
@@ -229,6 +230,65 @@ async function seedAttendance(employees) {
   console.log("✓ Seeded attendance for", employees.length, "employees on 2026-01-15");
 }
 
+/* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
+async function seedPositionLevels() {
+  // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
+  // above). HR can adjust baseSalary later via PATCH /position-levels/:level;
+  // order and level are structural and aren't meant to change at runtime.
+  const defs = [
+    { level: "Intern", order: 0, baseSalary: 20000 },
+    { level: "Full-time", order: 1, baseSalary: 60000 },
+    { level: "Senior", order: 2, baseSalary: 90000 },
+    { level: "Manager", order: 3, baseSalary: 130000 },
+  ];
+  const definedLevels = defs.map((d) => d.level);
+  const missing = POSITION_LEVELS.filter((l) => !definedLevels.includes(l));
+  if (missing.length) {
+    throw new Error(`seedPositionLevels is missing seed data for: ${missing.join(", ")}`);
+  }
+  for (const def of defs) {
+    const exists = await PositionLevelModel.findOne({ level: def.level });
+    if (!exists) {
+      await PositionLevelModel.create(def);
+      console.log("✓ Created position level:", def.level, `($${def.baseSalary})`);
+    }
+  }
+}
+
+/**
+ * One-time backfill for employees created before positionLevel/levelStartDate
+ * existed on the schema. New employees get these defaulted automatically by
+ * Employee.js's pre("validate") hook, but that hook only fires on document
+ * creation — it can't retroactively fill in already-existing documents.
+ * Safe to re-run: only touches documents where the field is still unset.
+ */
+async function backfillEmployeePositionLadder() {
+  const missingLevel = await EmployeeModel.updateMany(
+    { positionLevel: { $exists: false } },
+    { $set: { positionLevel: "Full-time" } },
+  );
+  if (missingLevel.modifiedCount > 0) {
+    console.log(`✓ Backfilled positionLevel on ${missingLevel.modifiedCount} existing employee(s)`);
+  }
+
+  // levelStartDate: prefer the employee's own startDate (best available proxy
+  // for "when they entered their current level") over "now", since defaulting
+  // to now would reset every existing employee's promotion-eligibility clock
+  // to zero and delay real promotions that should already be due.
+  const employeesMissingDate = await EmployeeModel.find({
+    $or: [{ levelStartDate: { $exists: false } }, { levelStartDate: null }],
+  });
+  let backfilledDates = 0;
+  for (const emp of employeesMissingDate) {
+    emp.levelStartDate = emp.startDate || emp.createdAt || new Date();
+    await emp.save({ validateBeforeSave: false });
+    backfilledDates += 1;
+  }
+  if (backfilledDates > 0) {
+    console.log(`✓ Backfilled levelStartDate on ${backfilledDates} existing employee(s)`);
+  }
+}
+
 /* ── Notifications ── */
 async function seedNotifications() {
   const defs = [
@@ -258,6 +318,9 @@ async function main() {
   const deptByName = await seedDepartments();
   const employees  = await seedEmployees(deptByName);
   const jobs       = await seedJobs(deptByName);
+
+  await seedPositionLevels();
+  await backfillEmployeePositionLadder();
 
   await seedCandidates(jobs);
   await seedHolidays();

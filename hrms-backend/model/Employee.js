@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { POSITION_LEVELS } from "./PositionLevel.js";
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -17,9 +18,31 @@ const employeeSchema = new mongoose.Schema(
       enum: ["full-time", "part-time", "contract", "intern"],
       default: "full-time",
     },
+    // Position Ladder (tasks 2.1/2.2) — deliberately separate from
+    // contractType (see DECISION_2.6_Manager_Level.md): contractType is
+    // employment terms (e.g. a part-time Senior is representable), while
+    // positionLevel is seniority/pay-grade on the ladder. levelStartDate
+    // tracks tenure-in-level so eligibility (task 2.4) is computed, not
+    // guessed from createdAt.
+    positionLevel: {
+      type: String,
+      enum: POSITION_LEVELS,
+      default: "Full-time",
+    },
+    levelStartDate: { type: Date, default: null },
     status: { type: String, enum: ["active", "on-leave", "terminated"], default: "active" },
     annualSalary: { type: Number, default: 0 },
     avatar: { type: String },
+    // Task 1.4 — contract PDF. HR/Admin-uploaded only (see
+    // controller/employeeController.js uploadContract) — deliberately not
+    // exposed through the generic update endpoint (employeeFromClient
+    // doesn't carry it), so an employee or a plain PUT can't overwrite it
+    // with an arbitrary URL. A single current contract per employee, not a
+    // versioned collection — re-uploading overwrites the Cloudinary asset
+    // in place (see HRMS_IMPROVEMENT_TASKS.md 1.4's "or a versioned
+    // Contract collection" note — out of scope for this effort size).
+    contractUrl: { type: String, default: null },
+    contractUploadedAt: { type: Date, default: null },
     // Back-link to the User account that belongs to this employee (optional 1:1)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
@@ -27,5 +50,18 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ department: 1, status: 1 });
+employeeSchema.index({ positionLevel: 1, levelStartDate: 1 });
+
+// Default levelStartDate to startDate (or now, if startDate wasn't given)
+// on creation, so a brand-new employee's tenure clock starts from the
+// moment that's actually true rather than whenever this field happened to
+// be added to the schema. Existing employees are backfilled separately —
+// see utils/backfillPositionLadder.js.
+employeeSchema.pre("validate", function setDefaultLevelStartDate(next) {
+  if (this.isNew && !this.levelStartDate) {
+    this.levelStartDate = this.startDate || new Date();
+  }
+  next();
+});
 
 export default mongoose.model("Employee", employeeSchema, "employees");

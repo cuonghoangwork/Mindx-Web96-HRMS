@@ -1,9 +1,21 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
-import { StatusBadge, TypeBadge } from "../components/Badge";
+import Badge, { StatusBadge, TypeBadge } from "../components/Badge";
 import { idsMatch } from "../utils/id";
+
+// Task 4.3: per-employee attendance log/report view. Data already exists in
+// the attendance collection (via StoreContext); this maps each recorded
+// status to the Badge variant used elsewhere (Attendance.jsx's variantMap).
+const ATTENDANCE_STATUS_VARIANT = {
+  Present: "success",
+  Late: "warning",
+  "On Leave": "info",
+  Absent: "danger",
+  "No-show": "danger",
+};
 
 const EMPLOYEE_TYPES = ["Full-time", "Part-time", "Contract", "Intern"];
 
@@ -12,10 +24,14 @@ const EMPLOYEE_STATUSES = ["Active", "On Leave", "Terminated"];
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // keep in sync with hrms-backend/middleware/upload.js
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+// Task 1.4 — keep in sync with hrms-backend/middleware/upload.js's uploadPdf
+const MAX_CONTRACT_BYTES = 10 * 1024 * 1024;
+
 function ViewEmployee() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { employees, updateEmployee, uploadEmployeeAvatar } = useStore();
+  const { employees, attendance, updateEmployee, uploadEmployeeAvatar, uploadEmployeeContract } = useStore();
+  const { isHR } = useAuth();
   const [pendingChange, setPendingChange] = useState(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -177,6 +193,10 @@ function ViewEmployee() {
           <div className="employee-detail-grid-span">
             <InfoItem label="Designation" value={employee.designation} />
           </div>
+          <InfoItem
+            label="Position Level"
+            value={employee.positionLevel || "—"}
+          />
           <EditableSelect
             label="Employment Type"
             id="employee-type"
@@ -209,6 +229,10 @@ function ViewEmployee() {
         </div>
       </div>
 
+      <AttendanceReportCard employee={employee} attendance={attendance} navigate={navigate} />
+
+      <ContractCard employee={employee} isHR={isHR} uploadEmployeeContract={uploadEmployeeContract} />
+
       {pendingChange && (
         <ConfirmChangeModal
           change={pendingChange}
@@ -218,6 +242,221 @@ function ViewEmployee() {
         />
       )}
     </>
+  );
+}
+
+function AttendanceReportCard({ employee, attendance, navigate }) {
+  const [showAll, setShowAll] = useState(false);
+
+  const records = useMemo(
+    () =>
+      attendance
+        .filter((r) => idsMatch(r.employeeId, employee.id))
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [attendance, employee.id],
+  );
+
+  const counts = useMemo(() => {
+    const c = {};
+    records.forEach((r) => {
+      c[r.status] = (c[r.status] ?? 0) + 1;
+    });
+    return c;
+  }, [records]);
+
+  const total = records.length;
+  const presentLike = (counts["Present"] ?? 0) + (counts["Late"] ?? 0);
+  const rate = total > 0 ? Math.round((presentLike / total) * 100) : null;
+  const visible = showAll ? records : records.slice(0, 10);
+
+  return (
+    <div className="content-card" style={{ marginTop: "20px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--sp-3)",
+          flexWrap: "wrap",
+          marginBottom: "var(--sp-4)",
+        }}
+      >
+        <div>
+          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            Attendance Report
+          </h3>
+          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            {total} record{total === 1 ? "" : "s"} on file
+            {rate !== null ? ` · ${rate}% attendance rate` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => navigate(`/attendance?employee=${employee.id}`)}
+        >
+          Open full calendar
+        </button>
+      </div>
+
+      {total === 0 ? (
+        <div
+          style={{
+            padding: "var(--sp-6)",
+            textAlign: "center",
+            color: "var(--txt-secondary)",
+            fontSize: "var(--fs-sm)",
+          }}
+        >
+          No attendance records for this employee yet.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
+            {Object.entries(counts).map(([label, count]) => (
+              <Badge key={label} variant={ATTENDANCE_STATUS_VARIANT[label] ?? "neutral"} dot>
+                {count} {label}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((r) => (
+                  <tr key={r.date}>
+                    <td>{r.date}</td>
+                    <td>{r.checkIn ?? "—"}</td>
+                    <td>{r.checkOut ?? "—"}</td>
+                    <td>
+                      <Badge variant={ATTENDANCE_STATUS_VARIANT[r.status] ?? "neutral"} size="sm">
+                        {r.status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {records.length > 10 && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: "var(--sp-4)" }}
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll ? "Show recent only" : `Show all ${records.length} records`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ContractCard({ employee, isHR, uploadEmployeeContract }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handlePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    if (file.size > MAX_CONTRACT_BYTES) {
+      setError("Contract must be 10MB or smaller.");
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    try {
+      await uploadEmployeeContract(employee.id, file);
+    } catch (err) {
+      setError(err.message || "Failed to upload contract.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="content-card" style={{ marginTop: "20px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "var(--sp-3)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            Contract
+          </h3>
+          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            {employee.contractUrl
+              ? `Uploaded ${new Date(employee.contractUploadedAt).toLocaleDateString()}`
+              : "No contract on file yet."}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+          {employee.contractUrl && (
+            <a
+              href={employee.contractUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+            >
+              View Contract
+            </a>
+          )}
+          {isHR && (
+            <>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={handlePick}
+                disabled={uploading}
+              >
+                {uploading ? "Uploading…" : employee.contractUrl ? "Replace Contract" : "Upload Contract"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p style={{ color: "var(--txt-danger)", fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

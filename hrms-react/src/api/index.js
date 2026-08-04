@@ -37,6 +37,13 @@ export const EmployeesAPI = {
     form.append("avatar", file);
     return apiFetch(`/employees/${id}/avatar`, { method: "POST", body: form });
   },
+  // Task 1.4 — HR/Admin uploads a contract PDF for an employee (unlike
+  // avatars, this is not self-serve — see router/employeeRouter.js).
+  uploadContract: (id, file) => {
+    const form = new FormData();
+    form.append("contract", file);
+    return apiFetch(`/employees/${id}/contract`, { method: "POST", body: form });
+  },
 };
 
 export const DepartmentsAPI = {
@@ -105,6 +112,17 @@ export const PayrollAPI = {
   updatePayslip: (id, body) => apiFetch(`/payroll/payslips/${id}`, { method: "PATCH", body }),
   recomputeDeduction: (id) =>
     apiFetch(`/payroll/payslips/${id}/recompute-deduction`, { method: "POST" }),
+};
+
+export const NoShowReviewsAPI = {
+  /** HR/Admin only — list system-flagged repeated no-show reviews */
+  list: (params = {}) => apiFetch(`/no-show-reviews${qs(params)}`),
+  /** HR/Admin: decision = "approved" | "rejected", reviewNote optional */
+  review: (id, decision, reviewNote = "") =>
+    apiFetch(`/no-show-reviews/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
 };
 
 export const ProfileEditRequestsAPI = {

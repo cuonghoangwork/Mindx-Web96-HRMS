@@ -152,6 +152,15 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
+  // Task 1.4 — HR/Admin uploads a contract PDF for an employee.
+  const uploadEmployeeContract = useCallback(async (id, file) => {
+    const res = await EmployeesAPI.uploadContract(id, file);
+    setEmployees((prev) =>
+      prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
+    );
+    return res.data;
+  }, []);
+
   const selectEmployee = useCallback((employee) => {
     setSelectedEmployee(employee);
   }, []);
@@ -384,6 +393,7 @@ export function StoreProvider({ children }) {
     removeEmployee,
     updateEmployee,
     uploadEmployeeAvatar,
+    uploadEmployeeContract,
     selectEmployee,
     openModal,
     closeModal,
