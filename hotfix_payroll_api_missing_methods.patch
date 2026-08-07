@@ -1,0 +1,16 @@
+diff --git a/hrms-react/src/api/index.js b/hrms-react/src/api/index.js
+index 0f76591..94529d6 100644
+--- a/hrms-react/src/api/index.js
++++ b/hrms-react/src/api/index.js
+@@ -112,6 +112,11 @@ export const PayrollAPI = {
+   updatePayslip: (id, body) => apiFetch(`/payroll/payslips/${id}`, { method: "PATCH", body }),
+   recomputeDeduction: (id) =>
+     apiFetch(`/payroll/payslips/${id}/recompute-deduction`, { method: "POST" }),
++  // Tasks 3.8/3.9: manual trigger for the start-of-month FX snapshot + draft
++  // generation job, and a read-only preview of the live FX rate for a given
++  // year/month used by the "New period" form's "Fetch live rate" button.
++  generateMonthlyDraft: () => apiFetch("/payroll/generate-monthly-draft", { method: "POST" }),
++  fxRatePreview: (year, month) => apiFetch(`/payroll/fx-rate/${year}/${month}`),
+ };
+ 
+ export const NoShowReviewsAPI = {
