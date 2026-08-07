@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import Badge, { TypeBadge } from "../components/Badge";
 import AddJobModal from "../components/AddJobModal";
+import Button from "../components/Button";
 
 const STATUS_VARIANT = {
   Open: "success",
@@ -116,15 +117,15 @@ function Jobs() {
       )}
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>Job Openings</h2>
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           onClick={() => {
             setEditingJob(null);
             setModalOpen(true);
           }}
         >
           + Post New Job
-        </button>
+        </Button>
       </div>
 
       <div
@@ -210,15 +211,14 @@ function Jobs() {
             ))}
           </select>
 
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={handleReset}
             disabled={!hasActiveFilters}
             title="Reset search and filters"
           >
             Reset
-          </button>
+          </Button>
         </div>
 
         {filteredJobs.length === 0 ? (
@@ -238,21 +238,19 @@ function Jobs() {
                 : "Post a new job to start building your hiring pipeline."}
             </div>
             {hasActiveFilters ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={handleReset}
               >
                 Clear filters
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
+              <Button
+                variant="primary"
                 onClick={() => setModalOpen(true)}
               >
                 + Post New Job
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -313,25 +311,25 @@ function Jobs() {
                       </div>
 
                       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-                        <button
-                          className="btn btn-secondary"
+                        <Button
+                          variant="secondary"
                           style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
                           onClick={() => navigate(`/candidates?job=${job.id}`)}
                         >
                           View Applicants
-                        </button>
+                        </Button>
                         <div style={{ display: "flex", gap: "var(--sp-2)" }}>
                           {hasDetails && (
-                            <button
-                              className="btn btn-secondary"
+                            <Button
+                              variant="secondary"
                               style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
                               onClick={() => setExpandedId(isExpanded ? null : job.id)}
                             >
                               {isExpanded ? "Hide Details" : "Details"}
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            className="btn btn-secondary"
+                          <Button
+                            variant="secondary"
                             style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
                             onClick={() => {
                               setEditingJob(job);
@@ -339,9 +337,9 @@ function Jobs() {
                             }}
                           >
                             Edit
-                          </button>
-                          <button
-                            className="btn btn-secondary"
+                          </Button>
+                          <Button
+                            variant="secondary"
                             style={{
                               padding: "8px 16px",
                               fontSize: "var(--fs-xs)",
@@ -350,7 +348,7 @@ function Jobs() {
                             onClick={() => handleDelete(job.id)}
                           >
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>

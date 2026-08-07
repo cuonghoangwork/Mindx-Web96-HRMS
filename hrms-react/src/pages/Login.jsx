@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import Button from "../components/Button";
 
 function Login() {
   const navigate = useNavigate();
@@ -98,14 +99,14 @@ function Login() {
             </Link>
           </div>
 
-          <button
+          <Button
+            variant="primary"
             type="submit"
-            className="btn btn-primary"
             style={{ width: "100%" }}
             disabled={isLoading}
           >
             {isLoading ? "Signing In..." : "Sign In"}
-          </button>
+          </Button>
         </form>
 
         {!configLoading && publicRegistration && (

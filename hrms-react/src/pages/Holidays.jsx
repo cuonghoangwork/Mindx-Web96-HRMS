@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "../context/StoreContext";
 import Badge from "../components/Badge";
 import AddHolidayModal from "../components/AddHolidayModal";
+import Button from "../components/Button";
 
 const HOLIDAY_TYPE_VARIANT = {
   Public: "success",
@@ -102,15 +103,15 @@ function Holidays() {
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>Holidays</h2>
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           onClick={() => {
             setEditingHoliday(null);
             setModalOpen(true);
           }}
         >
           + Add Holiday
-        </button>
+        </Button>
       </div>
 
       {actionError && (
@@ -173,12 +174,12 @@ function Holidays() {
             <div className="empty-state-description">
               Add a holiday to start building the 2026 calendar.
             </div>
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => setModalOpen(true)}
             >
               + Add Holiday
-            </button>
+            </Button>
           </div>
         ) : (
           <table className="data-table">
@@ -226,24 +227,22 @@ function Holidays() {
                               color: "var(--txt-primary)",
                             }}
                           />
-                          <button
-                            type="button"
-                            className="btn btn-primary"
+                          <Button
+                            variant="primary"
                             style={{ padding: "4px 10px", fontSize: "var(--fs-xs)" }}
                             onClick={() => confirmEditDate(holiday.id)}
                             aria-label="Confirm date"
                           >
                             ✓
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
+                          </Button>
+                          <Button
+                            variant="secondary"
                             style={{ padding: "4px 10px", fontSize: "var(--fs-xs)" }}
                             onClick={cancelEditDate}
                             aria-label="Cancel"
                           >
                             ×
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <button
@@ -278,8 +277,8 @@ function Holidays() {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "var(--sp-2)" }}>
-                        <button
-                          className="btn btn-secondary"
+                        <Button
+                          variant="secondary"
                           style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
                           onClick={() => {
                             setEditingHoliday(holiday);
@@ -287,9 +286,9 @@ function Holidays() {
                           }}
                         >
                           Edit
-                        </button>
-                        <button
-                          className="btn btn-secondary"
+                        </Button>
+                        <Button
+                          variant="secondary"
                           style={{
                             padding: "8px 16px",
                             fontSize: "var(--fs-xs)",
@@ -298,7 +297,7 @@ function Holidays() {
                           onClick={() => handleDelete(holiday.id)}
                         >
                           Delete
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>

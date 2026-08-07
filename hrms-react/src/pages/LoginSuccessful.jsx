@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import Button from "../components/Button";
 
 function LoginSuccessful() {
   const navigate = useNavigate()
@@ -38,13 +39,13 @@ function LoginSuccessful() {
           You have successfully signed in to your account.
         </p>
 
-        <button 
-          className="btn btn-primary" 
+        <Button
+          variant="primary"
           style={{ width: '100%' }}
           onClick={() => navigate('/dashboard')}
         >
           Go to Dashboard
-        </button>
+        </Button>
       </div>
     </div>
   )

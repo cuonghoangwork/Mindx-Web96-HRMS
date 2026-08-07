@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import Button from "../components/Button";
 
 function ChangePassword() {
   const navigate = useNavigate();
@@ -116,14 +117,14 @@ function ChangePassword() {
             />
           </div>
 
-          <button
+          <Button
+            variant="primary"
             type="submit"
-            className="btn btn-primary"
             style={{ width: "100%" }}
             disabled={isSaving}
           >
             {isSaving ? "Saving..." : "Update password"}
-          </button>
+          </Button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>

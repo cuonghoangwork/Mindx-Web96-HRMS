@@ -5,6 +5,7 @@ import { useStore } from '../context/StoreContext'
 import { apiFetch } from '../api/client'
 import { ProfileEditRequestsAPI, EmployeesAPI, PromotionRequestsAPI, NoShowReviewsAPI } from '../api'
 import { getRoleLabel } from '../utils/roles'
+import Button from "../components/Button";
 
 /* ─────────────────────────────────────────────
    Shared helpers / sub-components
@@ -190,13 +191,13 @@ function MyProfileEditSection() {
             Current Profile
           </h4>
           {!isEditing && !hasPending && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => { setIsEditing(true); setError(''); setSuccess('') }}
             >
               Request Edit
-            </button>
+            </Button>
           )}
           {hasPending && (
             <StatusBadge status="pending" />
@@ -350,21 +351,19 @@ function MyProfileEditSection() {
           )}
 
           <div style={{ display: 'flex', gap: 'var(--sp-3)', justifyContent: 'flex-end', marginTop: 'var(--sp-4)' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={() => { setIsEditing(false); setError('') }}
             >
               Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
+            </Button>
+            <Button
+              variant="primary"
               disabled={submitting}
               onClick={handleSubmit}
             >
               {submitting ? 'Submitting…' : 'Submit Request'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -584,9 +583,9 @@ function PromotionProposeSection() {
           </div>
         </div>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <Button variant="primary" type="submit" disabled={submitting}>
           {submitting ? 'Submitting…' : 'Submit proposal'}
-        </button>
+        </Button>
       </form>
 
       <div style={{ marginTop: 'var(--sp-6)' }}>
@@ -700,7 +699,7 @@ function PromotionReviewPanel() {
             >{s}</button>
           ))}
         </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>Refresh</button>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
           {requests.length} proposal{requests.length === 1 ? '' : 's'}
         </span>
@@ -753,7 +752,7 @@ function PromotionReviewPanel() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                    background: 'var(--bg-primary)', color: '#fff', display: 'grid',
+                    background: 'var(--bg-primary)', color: 'var(--txt-on-brand)', display: 'grid',
                     placeItems: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)',
                   }}>{req.employeeName?.[0]?.toUpperCase() ?? '?'}</div>
                   <div style={{ flex: 1, minWidth: '180px' }}>
@@ -774,11 +773,11 @@ function PromotionReviewPanel() {
                   )}
                   <StatusBadge status={req.status} />
                   {req.status === 'pending' && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
-                    >{isOpen ? 'Close' : 'Review'}</button>
+                    >{isOpen ? 'Close' : 'Review'}</Button>
                   )}
                 </div>
 
@@ -822,18 +821,16 @@ function PromotionReviewPanel() {
                           />
                         </div>
                         <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
-                          <button
-                            type="button"
-                            className="btn btn-success"
+                          <Button
+                            variant="success"
                             disabled={actionLoading !== null}
                             onClick={() => handleReview(req.id, 'approved')}
-                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</button>
-                          <button
-                            type="button"
-                            className="btn btn-danger"
+                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</Button>
+                          <Button
+                            variant="danger"
                             disabled={actionLoading !== null}
                             onClick={() => handleReview(req.id, 'rejected')}
-                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</button>
+                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</Button>
                         </div>
                       </>
                     )}
@@ -920,7 +917,7 @@ function NoShowReviewPanel() {
             >{s}</button>
           ))}
         </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>Refresh</button>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
           {requests.length} flag{requests.length === 1 ? '' : 's'}
         </span>
@@ -965,7 +962,7 @@ function NoShowReviewPanel() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                    background: 'var(--bg-danger, var(--clr-danger-500))', color: '#fff', display: 'grid',
+                    background: 'var(--bg-danger, var(--clr-danger-500))', color: 'var(--txt-on-brand)', display: 'grid',
                     placeItems: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)',
                   }}>{req.employeeName?.[0]?.toUpperCase() ?? '?'}</div>
                   <div style={{ flex: 1, minWidth: '180px' }}>
@@ -978,11 +975,11 @@ function NoShowReviewPanel() {
                   </div>
                   <StatusBadge status={req.status} />
                   {req.status === 'pending' && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
-                    >{isOpen ? 'Close' : 'Review'}</button>
+                    >{isOpen ? 'Close' : 'Review'}</Button>
                   )}
                 </div>
 
@@ -1015,18 +1012,16 @@ function NoShowReviewPanel() {
                       />
                     </div>
                     <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-success"
+                      <Button
+                        variant="success"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'approved')}
-                      >{actionLoading === 'approved' ? 'Saving…' : 'Confirm Pattern'}</button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
+                      >{actionLoading === 'approved' ? 'Saving…' : 'Confirm Pattern'}</Button>
+                      <Button
+                        variant="danger"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'rejected')}
-                      >{actionLoading === 'rejected' ? 'Saving…' : 'Dismiss'}</button>
+                      >{actionLoading === 'rejected' ? 'Saving…' : 'Dismiss'}</Button>
                     </div>
                   </div>
                 )}
@@ -1114,9 +1109,9 @@ function ProfileEditReviewPanel() {
             </button>
           ))}
         </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={loadRequests}>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>
           Refresh
-        </button>
+        </Button>
         <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginLeft: 'auto' }}>
           {requests.length} request{requests.length !== 1 ? 's' : ''}
         </span>
@@ -1171,7 +1166,7 @@ function ProfileEditReviewPanel() {
                   {/* Avatar initial */}
                   <div style={{
                     width: '36px', height: '36px', borderRadius: '50%',
-                    background: 'var(--bg-primary)', color: '#fff',
+                    background: 'var(--bg-primary)', color: 'var(--txt-on-brand)',
                     display: 'grid', placeItems: 'center',
                     fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)',
                     flexShrink: 0,
@@ -1189,13 +1184,13 @@ function ProfileEditReviewPanel() {
                   </div>
                   <StatusBadge status={req.status} />
                   {req.status === 'pending' && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
                     >
                       {isOpen ? 'Close' : 'Review'}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -1226,9 +1221,8 @@ function ProfileEditReviewPanel() {
                     </div>
 
                     <div style={{ display: 'flex', gap: 'var(--sp-3)' }}>
-                      <button
-                        type="button"
-                        className="btn btn-success"
+                      <Button
+                        variant="success"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'approved')}
                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
@@ -1241,10 +1235,9 @@ function ProfileEditReviewPanel() {
                             Approve & Apply
                           </>
                         )}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
+                      </Button>
+                      <Button
+                        variant="danger"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'rejected')}
                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
@@ -1257,7 +1250,7 @@ function ProfileEditReviewPanel() {
                             Reject
                           </>
                         )}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1325,7 +1318,7 @@ function PromoteUsersPanel() {
   if (loading) return <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>Loading accounts…</div>
   if (error) return (
     <div style={{ padding: 'var(--sp-4)', background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)', borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      {error}<button className="btn btn-secondary btn-sm" onClick={fetchUsers}>Retry</button>
+      {error}<Button variant="secondary" size="sm" onClick={fetchUsers}>Retry</Button>
     </div>
   )
 
@@ -1355,7 +1348,7 @@ function PromoteUsersPanel() {
               border: `1px solid ${isSelf ? 'rgba(113,82,243,0.2)' : 'var(--bdr-subtle)'}`,
               borderRadius: 'var(--radius-md)',
             }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: 'var(--bg-primary)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0, background: 'var(--bg-primary)', color: 'var(--txt-on-brand)', display: 'grid', placeItems: 'center', fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-semibold)' }}>
                 {u.name?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1371,22 +1364,22 @@ function PromoteUsersPanel() {
               {!isSelf && (
                 <div style={{ display: 'flex', gap: 'var(--sp-2)', flexShrink: 0 }}>
                   {isAdminAcc ? (
-                    <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
+                    <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
                       {isLoading ? '…' : 'Demote to HR'}
-                    </button>
+                    </Button>
                   ) : isManager ? (
                     <>
-                      <button type="button" className="btn btn-secondary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
+                      <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
                         {isLoading ? '…' : 'Demote'}
-                      </button>
-                      <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
+                      </Button>
+                      <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
                         {isLoading ? '…' : 'Make Admin'}
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button type="button" className="btn btn-primary btn-sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
+                    <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
                       {isLoading ? '…' : 'Promote to HR'}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -1464,7 +1457,7 @@ function Settings() {
       }}>
         <div style={{
           width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0,
-          background: 'var(--bg-primary)', color: '#fff',
+          background: 'var(--bg-primary)', color: 'var(--txt-on-brand)',
           display: 'grid', placeItems: 'center',
           fontSize: '18px', fontWeight: '600',
         }}>

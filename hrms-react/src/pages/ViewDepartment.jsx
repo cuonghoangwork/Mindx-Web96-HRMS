@@ -1,6 +1,7 @@
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { idsMatch } from "../utils/id";
+import Button from "../components/Button";
 
 function formatBudget(amount) {
   if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
@@ -19,13 +20,13 @@ function ViewDepartment() {
     return (
       <div className="content-card">
         <h2>Department Not Found</h2>
-        <button
-          className="btn btn-primary"
+        <Button
+          variant="primary"
           style={{ marginTop: "20px" }}
           onClick={() => navigate("/departments")}
         >
           Back to Departments
-        </button>
+        </Button>
       </div>
     );
   }
@@ -35,13 +36,13 @@ function ViewDepartment() {
 
   return (
     <div className="content-card">
-      <button
-        className="btn btn-secondary"
+      <Button
+        variant="secondary"
         style={{ marginBottom: "20px" }}
         onClick={() => navigate("/departments")}
       >
         ← Back
-      </button>
+      </Button>
 
       <h2>{department.name}</h2>
       <p style={{ color: "var(--text-muted)", marginTop: "8px" }}>

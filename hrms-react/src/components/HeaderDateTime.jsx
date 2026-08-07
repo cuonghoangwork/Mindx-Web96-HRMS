@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../context/StoreContext";
+import Button from "./Button";
 
 function toDateInputValue(date) {
   const y = date.getFullYear();
@@ -114,16 +115,15 @@ function HeaderDateTime() {
               />
             </div>
             <div className="header-datetime-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={handleReset}
               >
                 Reset to now
-              </button>
-              <button type="submit" className="btn btn-primary">
+              </Button>
+              <Button variant="primary" type="submit">
                 Apply
-              </button>
+              </Button>
             </div>
           </form>
         </>

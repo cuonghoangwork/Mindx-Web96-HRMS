@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Button from "./Button";
 
 /**
  * AddJobModal — Add or edit a job opening
@@ -323,16 +324,15 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
           </div>
 
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
+            </Button>
+            <Button variant="primary" type="submit">
               {isEdit ? "Save Changes" : "Post Job"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

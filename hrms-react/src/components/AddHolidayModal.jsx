@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Button from "./Button";
 
 /**
  * AddHolidayModal — Add or edit a holiday entry
@@ -127,16 +128,15 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
           </div>
 
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
+            <Button
+              variant="secondary"
               onClick={onClose}
             >
               Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
+            </Button>
+            <Button variant="primary" type="submit">
               {isEdit ? "Save Changes" : "Add Holiday"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

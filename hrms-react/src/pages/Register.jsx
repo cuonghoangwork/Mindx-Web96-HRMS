@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FormField from "../components/FormField";
 import { useAuth } from "../context/AuthContext";
+import Button from "../components/Button";
 
 /* ─────────────────────────────────
    Validation rules
@@ -279,14 +280,14 @@ function Register() {
             )}
           </div>
 
-          <button
+          <Button
+            variant="primary"
             type="submit"
-            className="btn btn-primary"
             style={{ width: "100%" }}
             disabled={isLoading}
           >
             {isLoading ? "Creating Account..." : "Create Account"}
-          </button>
+          </Button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>

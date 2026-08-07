@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import AddNotificationModal from "../components/AddNotificationModal";
+import Button from "../components/Button";
 
 const CATEGORY_CONFIG = {
   leave: {
@@ -159,27 +160,27 @@ function Notifications() {
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>Notifications</h2>
         {isHR && (
-          <button
-            className="btn btn-primary"
+          <Button
+            variant="primary"
             onClick={() => setComposeOpen(true)}
           >
             + Send Notice
-          </button>
+          </Button>
         )}
-        <button
-          className="btn btn-secondary"
+        <Button
+          variant="secondary"
           onClick={markAllNotificationsRead}
           disabled={!hasUnread}
         >
           Mark all as read
-        </button>
-        <button
-          className="btn btn-secondary"
+        </Button>
+        <Button
+          variant="secondary"
           onClick={clearReadNotifications}
           disabled={!hasRead}
         >
           Clear read
-        </button>
+        </Button>
       </div>
 
       <div
@@ -214,10 +215,9 @@ function Notifications() {
           {FILTERS.map((f) => {
             const isActive = filter === f.key;
             return (
-              <button
+              <Button
+                variant="secondary"
                 key={f.key}
-                type="button"
-                className="btn btn-secondary"
                 onClick={() => setFilter(f.key)}
                 style={
                   isActive
@@ -230,7 +230,7 @@ function Notifications() {
                 }
               >
                 {f.label}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -250,13 +250,12 @@ function Notifications() {
                 : "Nothing here for this filter."}
             </div>
             {filter !== "all" && (
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={() => setFilter("all")}
               >
                 View all notifications
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -356,22 +355,22 @@ function Notifications() {
 
                   <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                     {!notification.read && (
-                      <button
-                        className="btn btn-secondary"
+                      <Button
+                        variant="secondary"
                         style={{ padding: "8px 12px", fontSize: "var(--fs-xs)" }}
                         onClick={() => markNotificationRead(notification.id)}
                       >
                         Mark read
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      className="btn btn-secondary"
+                    <Button
+                      variant="secondary"
                       style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--txt-danger)" }}
                       onClick={() => removeNotification(notification.id)}
                       aria-label="Dismiss notification"
                     >
                       Dismiss
-                    </button>
+                    </Button>
                   </div>
                 </div>
               );

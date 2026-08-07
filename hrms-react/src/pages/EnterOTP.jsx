@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Button from "../components/Button";
 
 function EnterOTP() {
   const navigate = useNavigate()
@@ -52,9 +53,9 @@ function EnterOTP() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+          <Button variant="primary" type="submit" style={{ width: '100%' }}>
             Verify
-          </button>
+          </Button>
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--text-muted)' }}>

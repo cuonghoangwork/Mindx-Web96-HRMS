@@ -5,6 +5,7 @@ import Avatar from "../components/Avatar";
 import { CandidateStageBadge } from "../components/Badge";
 import CandidateSidePanel from "../components/CandidateSidePanel";
 import { idsMatch } from "../utils/id";
+import Button from "../components/Button";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 
@@ -198,20 +199,24 @@ function Candidates() {
             </div>
           )}
 
-          <button
-            type="button"
-            className="btn btn-secondary"
+          <Button
+            variant="secondary"
             onClick={handleReset}
             disabled={!hasActiveFilters}
             title="Reset search and filters"
           >
             Reset
-          </button>
+          </Button>
         </div>
 
         {filteredCandidates.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-icon">🧑‍💼</div>
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
+              </svg>
+            </div>
             <div className="empty-state-title">No candidates found</div>
             <div className="empty-state-description">
               {hasActiveFilters
@@ -219,13 +224,12 @@ function Candidates() {
                 : "Candidates will appear here once they apply to a job opening."}
             </div>
             {hasActiveFilters && (
-              <button
-                type="button"
-                className="btn btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={handleReset}
               >
                 Clear filters
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -260,13 +264,13 @@ function Candidates() {
                     </td>
                     <td>{candidate.appliedDate}</td>
                     <td>
-                      <button
-                        className="btn btn-secondary"
+                      <Button
+                        variant="secondary"
                         style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
                         onClick={() => setSelectedCandidateId(candidate.id)}
                       >
                         View
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );

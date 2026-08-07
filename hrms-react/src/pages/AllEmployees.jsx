@@ -5,6 +5,7 @@ import FilterModal from "../components/FilterModal";
 import SearchBar from "../components/SearchBar";
 import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
+import Button from "../components/Button";
 
 const EMPLOYEES_PER_PAGE = 10;
 
@@ -169,13 +170,12 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange }) {
           >
             View Full Profile
           </Link>
-          <button
-            type="button"
-            className="btn btn-danger"
+          <Button
+            variant="danger"
             onClick={() => onDelete(employee.id)}
           >
             Delete
-          </button>
+          </Button>
         </div>
       </div>
     </>
@@ -200,23 +200,27 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear }) {
         {count} selected
       </span>
 
-      <button type="button" className="btn btn-secondary btn-sm" onClick={onExport}>
+      <Button variant="secondary" size="sm" onClick={onExport}>
         ↓ Export CSV
-      </button>
+      </Button>
 
       <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Set status:</span>
         {["Active", "On Leave", "Terminated"].map((s) => (
-          <button key={s} type="button" className="btn btn-secondary btn-sm" onClick={() => onStatusChange(s)}>
+          <Button variant="secondary" size="sm" key={s} onClick={() => onStatusChange(s)}>
             {s}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <button type="button" className="btn btn-danger btn-sm" onClick={onDelete}
-        style={{ marginLeft: "auto" }}>
+      <Button
+        variant="danger"
+        size="sm"
+        onClick={onDelete}
+        style={{ marginLeft: "auto" }}
+      >
         Delete selected
-      </button>
+      </Button>
 
       <button
         type="button" onClick={onClear}
@@ -368,15 +372,21 @@ function AllEmployees() {
             onSearch={handleSearch}
             placeholder="Search by name, employee ID, department..."
           />
-          <button type="button" className="btn btn-secondary toolbar-filter-btn"
-            onClick={() => openModal("filter")}>
+          <Button
+            variant="secondary"
+            onClick={() => openModal("filter")}
+            className="toolbar-filter-btn"
+          >
             Filter
             {hasActiveFilters && <span className="toolbar-filter-dot" />}
-          </button>
-          <button type="button" className="btn btn-secondary"
-            onClick={handleReset} disabled={!hasActiveSearchOrFilters}>
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleReset}
+            disabled={!hasActiveSearchOrFilters}
+          >
             Reset
-          </button>
+          </Button>
           <Link to="/employees/add" className="btn btn-primary" style={{ marginLeft: "auto" }}>
             + Add Employee
           </Link>
@@ -458,13 +468,13 @@ function AllEmployees() {
 
                     {/* Actions */}
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={(e) => openPanel(employee, e)}
                       >
                         Details
-                      </button>
+                      </Button>
                       <Link
                         to={`/employees/${employee.id}`}
                         className="btn btn-secondary btn-sm"
@@ -472,14 +482,14 @@ function AllEmployees() {
                       >
                         Edit
                       </Link>
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
+                      <Button
+                        variant="danger"
+                        size="sm"
                         style={{ marginLeft: "6px" }}
                         onClick={() => handleDelete(employee.id)}
                       >
                         ✕
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -491,7 +501,12 @@ function AllEmployees() {
         {/* ── Empty state ── */}
         {filteredEmployees.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </div>
             <h3 className="empty-state-title">No employees found</h3>
             <p className="empty-state-description">
               {hasActiveSearchOrFilters
@@ -499,9 +514,9 @@ function AllEmployees() {
                 : "Get started by adding your first employee."}
             </p>
             {hasActiveSearchOrFilters && (
-              <button type="button" className="btn btn-secondary" onClick={handleReset}>
+              <Button variant="secondary" onClick={handleReset}>
                 Clear filters
-              </button>
+              </Button>
             )}
             {!hasActiveSearchOrFilters && (
               <Link to="/employees/add" className="btn btn-primary">+ Add Employee</Link>
@@ -526,13 +541,13 @@ function AllEmployees() {
               )}
             </div>
             <div className="pagination-controls">
-              <button className="page-btn" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
+              <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="page-btn">‹</Button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                 <button key={page} className={`page-btn ${currentPage === page ? "active" : ""}`} onClick={() => setCurrentPage(page)}>
                   {page}
                 </button>
               ))}
-              <button className="page-btn" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
+              <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="page-btn">›</Button>
             </div>
           </div>
         )}
