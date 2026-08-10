@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
+import { formatDate } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
 import { useStore } from '../context/StoreContext'
 import { apiFetch } from '../api/client'
@@ -32,10 +33,11 @@ function RolePill({ role }) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation()
   const cfg = {
-    pending:  { bg: 'var(--bg-warning-subtle)', color: 'var(--txt-warning)', border: 'var(--bdr-warning)', label: 'Pending' },
-    approved: { bg: 'var(--bg-success-subtle)', color: 'var(--txt-success)', border: 'var(--bdr-success)', label: 'Approved' },
-    rejected: { bg: 'var(--bg-danger-subtle)',  color: 'var(--txt-danger)',  border: 'var(--bdr-danger)',  label: 'Rejected' },
+    pending:  { bg: 'var(--bg-warning-subtle)', color: 'var(--txt-warning)', border: 'var(--bdr-warning)', label: t('settings.status.pending') },
+    approved: { bg: 'var(--bg-success-subtle)', color: 'var(--txt-success)', border: 'var(--bdr-success)', label: t('settings.status.approved') },
+    rejected: { bg: 'var(--bg-danger-subtle)',  color: 'var(--txt-danger)',  border: 'var(--bdr-danger)',  label: t('settings.status.rejected') },
   }[status] ?? { bg: 'var(--bg-surface-alt)', color: 'var(--txt-secondary)', border: 'var(--bdr-default)', label: status }
   return (
     <span style={{
@@ -67,14 +69,18 @@ function FieldRow({ label, from, to }) {
   )
 }
 
-const FIELD_LABELS = {
-  name: 'Full Name', phone: 'Phone', address: 'Address', age: 'Age', sex: 'Gender',
+const FIELD_LABEL_KEYS = {
+  name: 'settings.fields.fullName', phone: 'settings.fields.phone', address: 'settings.fields.address',
+  age: 'settings.fields.age', sex: 'settings.fields.gender',
 }
+const fieldLabel = (t, field) => t(FIELD_LABEL_KEYS[field] ?? field, { defaultValue: field })
 
 /* ─────────────────────────────────────────────
    Employee: My Profile Edit section
 ───────────────────────────────────────────── */
 function MyProfileEditSection() {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
   const [profile, setProfile]         = useState(null)
   const [editForm, setEditForm]       = useState({})
   const [pendingRequest, setPending]  = useState(null)
@@ -129,7 +135,7 @@ function MyProfileEditSection() {
   const handleSubmit = async () => {
     setError('')
     setSuccess('')
-    if (!profile) { setError('No employee profile linked to your account.'); return }
+    if (!profile) { setError(t('settings.myProfile.noLinkedProfile')); return }
 
     // Build the diff (only changed fields)
     const changes = {}
@@ -140,18 +146,18 @@ function MyProfileEditSection() {
     if (editForm.sex     !== (profile.sex     ?? ''))      changes.sex     = editForm.sex
 
     if (Object.keys(changes).length === 0) {
-      setError('No changes detected.')
+      setError(t('settings.myProfile.noChanges'))
       return
     }
 
     setSubmitting(true)
     try {
       await ProfileEditRequestsAPI.create(changes)
-      setSuccess('Your profile edit request has been submitted and is pending HR approval.')
+      setSuccess(t('settings.myProfile.submitSuccess'))
       setIsEditing(false)
       loadRequests()
     } catch (err) {
-      setError(err.message || 'Failed to submit request.')
+      setError(err.message || t('settings.myProfile.submitFailed'))
     }
     setSubmitting(false)
   }
@@ -159,7 +165,7 @@ function MyProfileEditSection() {
   if (loadingProfile) {
     return (
       <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-        Loading your profile…
+        {t('settings.myProfile.loadingProfile')}
       </div>
     )
   }
@@ -171,7 +177,7 @@ function MyProfileEditSection() {
         border: '1px solid var(--bdr-warning)', borderRadius: 'var(--radius-md)',
         color: 'var(--txt-warning)', fontSize: 'var(--fs-sm)',
       }}>
-        No employee profile is linked to your account yet. Contact HR to have your profile linked.
+        {t('settings.myProfile.noProfileLinked')}
       </div>
     )
   }
@@ -190,7 +196,7 @@ function MyProfileEditSection() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
           <h4 style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)', margin: 0 }}>
-            Current Profile
+            {t('settings.myProfile.currentProfile')}
           </h4>
           {!isEditing && !hasPending && (
             <Button
@@ -198,7 +204,7 @@ function MyProfileEditSection() {
               size="sm"
               onClick={() => { setIsEditing(true); setError(''); setSuccess('') }}
             >
-              Request Edit
+              {t('settings.myProfile.requestEdit')}
             </Button>
           )}
           {hasPending && (
@@ -207,14 +213,14 @@ function MyProfileEditSection() {
         </div>
 
         {[
-          { label: 'Full Name',   value: profile.name },
-          { label: 'Employee ID', value: profile.employeeId },
-          { label: 'Department',  value: profile.department },
-          { label: 'Designation', value: profile.designation },
-          { label: 'Phone',       value: profile.phone || '—' },
-          { label: 'Address',     value: profile.address || '—' },
-          { label: 'Age',         value: profile.age || '—' },
-          { label: 'Gender',      value: profile.sex || '—' },
+          { label: t('settings.fields.fullName'),   value: profile.name },
+          { label: t('settings.fields.employeeId'), value: profile.employeeId },
+          { label: t('settings.fields.department'), value: profile.department },
+          { label: t('settings.fields.designation'), value: profile.designation },
+          { label: t('settings.fields.phone'),       value: profile.phone || '—' },
+          { label: t('settings.fields.address'),     value: profile.address || '—' },
+          { label: t('settings.fields.age'),         value: profile.age || '—' },
+          { label: t('settings.fields.gender'),      value: profile.sex || '—' },
         ].map((row) => (
           <div key={row.label} style={{
             display: 'flex', gap: 'var(--sp-4)',
@@ -239,12 +245,12 @@ function MyProfileEditSection() {
       }}>
         <div>
           <h4 style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)', margin: 0 }}>
-            My Contract
+            {t('settings.myProfile.myContract')}
           </h4>
           <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)', marginTop: '4px' }}>
             {profile.contractUrl
-              ? `Uploaded ${new Date(profile.contractUploadedAt).toLocaleDateString()}`
-              : "HR hasn't uploaded your contract yet."}
+              ? t('settings.myProfile.contractUploaded', { date: formatDate(profile.contractUploadedAt, language) })
+              : t('settings.myProfile.contractNotUploaded')}
           </p>
         </div>
         {profile.contractUrl && (
@@ -254,7 +260,7 @@ function MyProfileEditSection() {
             rel="noopener noreferrer"
             className="btn btn-primary btn-sm"
           >
-            View Contract (PDF)
+            {t('settings.myProfile.viewContract')}
           </a>
         )}
       </div>
@@ -280,17 +286,17 @@ function MyProfileEditSection() {
             </span>
             <div>
               <div style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)' }}>
-                Request Profile Edit
+                {t('settings.myProfile.requestProfileEdit')}
               </div>
               <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
-                Changes are sent to HR for approval. HR-managed fields (department, salary, status) cannot be self-edited.
+                {t('settings.myProfile.requestEditHint')}
               </div>
             </div>
           </div>
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-name">Full Name</label>
+              <label className="form-label" htmlFor="edit-name">{t('settings.fields.fullName')}</label>
               <input
                 id="edit-name"
                 type="text"
@@ -300,7 +306,7 @@ function MyProfileEditSection() {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-phone">Phone</label>
+              <label className="form-label" htmlFor="edit-phone">{t('settings.fields.phone')}</label>
               <input
                 id="edit-phone"
                 type="tel"
@@ -311,7 +317,7 @@ function MyProfileEditSection() {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-age">Age</label>
+              <label className="form-label" htmlFor="edit-age">{t('settings.fields.age')}</label>
               <input
                 id="edit-age"
                 type="number"
@@ -323,21 +329,21 @@ function MyProfileEditSection() {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-sex">Gender</label>
+              <label className="form-label" htmlFor="edit-sex">{t('settings.fields.gender')}</label>
               <select
                 id="edit-sex"
                 value={editForm.sex}
                 onChange={(e) => setEditForm((p) => ({ ...p, sex: e.target.value }))}
               >
-                <option value="">Select…</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
+                <option value="">{t('settings.myProfile.selectEllipsis')}</option>
+                <option value="Male">{t('settings.fields.genderOptions.male')}</option>
+                <option value="Female">{t('settings.fields.genderOptions.female')}</option>
+                <option value="Other">{t('settings.fields.genderOptions.other')}</option>
               </select>
             </div>
 
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label" htmlFor="edit-address">Address</label>
+              <label className="form-label" htmlFor="edit-address">{t('settings.fields.address')}</label>
               <input
                 id="edit-address"
                 type="text"
@@ -357,14 +363,14 @@ function MyProfileEditSection() {
               variant="secondary"
               onClick={() => { setIsEditing(false); setError('') }}
             >
-              Cancel
+              {t('settings.myProfile.cancel')}
             </Button>
             <Button
               variant="primary"
               disabled={submitting}
               onClick={handleSubmit}
             >
-              {submitting ? 'Submitting…' : 'Submit Request'}
+              {submitting ? t('settings.myProfile.submitting') : t('settings.myProfile.submitRequest')}
             </Button>
           </div>
         </div>
@@ -390,7 +396,7 @@ function MyProfileEditSection() {
       {!loadingReqs && myRequests.length > 0 && (
         <div>
           <h4 style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)', marginBottom: 'var(--sp-3)' }}>
-            Request History
+            {t('settings.myProfile.requestHistory')}
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
             {myRequests.slice(0, 5).map((req) => (
@@ -402,16 +408,16 @@ function MyProfileEditSection() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-3)' }}>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
-                    {new Date(req.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {formatDate(req.createdAt, language)}
                   </span>
                   <StatusBadge status={req.status} />
                 </div>
                 {Object.entries(req.changes).map(([field, { from, to }]) => (
-                  <FieldRow key={field} label={FIELD_LABELS[field] ?? field} from={from} to={to} />
+                  <FieldRow key={field} label={fieldLabel(t, field)} from={from} to={to} />
                 ))}
                 {req.reviewNote && (
                   <div style={{ marginTop: 'var(--sp-2)', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', fontStyle: 'italic' }}>
-                    HR note: {req.reviewNote}
+                    {t('settings.myProfile.hrNote', { note: req.reviewNote })}
                   </div>
                 )}
               </div>
@@ -427,7 +433,7 @@ function MyProfileEditSection() {
    HR/Admin: Review pending profile edit requests
 ───────────────────────────────────────────── */
 const usd = (n) =>
-  n === null || n === undefined || n === '' ? '—' : `$${Number(n).toLocaleString()}`
+  n === null || n === undefined || n === '' ? '—' : `$${Number(n).toLocaleString('en-US')}`
 
 // Position Ladder (task 2.1) — mirrors model/PositionLevel.js's POSITION_LEVELS.
 // Kept as a local constant (no shared constants module exists yet in this
@@ -435,6 +441,7 @@ const usd = (n) =>
 const POSITION_LEVELS = ['Intern', 'Full-time', 'Senior', 'Manager']
 
 function PromotionProposeSection() {
+  const { t } = useTranslation()
   const { employees, departments } = useStore()
   const [form, setForm] = useState({
     employeeId: '', designation: '', department: '', salary: '', positionLevel: '', effectiveDate: '', reason: '',
@@ -457,10 +464,10 @@ function PromotionProposeSection() {
       setMine(res.items ?? [])
       setError('')
     } catch (err) {
-      setError(err.message || 'Failed to load proposals.')
+      setError(err.message || t('settings.proposePromotion.loadFailed'))
     }
     setLoading(false)
-  }, [])
+  }, [t])
 
   useEffect(() => { loadMine() }, [loadMine])
 
@@ -478,7 +485,7 @@ function PromotionProposeSection() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!form.employeeId) { setError('Pick an employee first.'); return }
+    if (!form.employeeId) { setError(t('settings.proposePromotion.pickEmployeeFirst')); return }
     setSubmitting(true)
     try {
       const body = { employeeId: form.employeeId }
@@ -489,11 +496,11 @@ function PromotionProposeSection() {
       if (form.effectiveDate) body.effectiveDate = form.effectiveDate
       if (form.reason.trim()) body.reason = form.reason.trim()
       await PromotionRequestsAPI.create(body)
-      setToast('Promotion proposal submitted for Administrator review.')
+      setToast(t('settings.proposePromotion.submitSuccess'))
       setForm({ employeeId: '', designation: '', department: '', salary: '', positionLevel: '', effectiveDate: '', reason: '' })
       loadMine()
     } catch (err) {
-      setError(err.message || 'Failed to submit proposal.')
+      setError(err.message || t('settings.proposePromotion.submitFailed'))
     }
     setSubmitting(false)
   }
@@ -518,9 +525,9 @@ function PromotionProposeSection() {
       <form onSubmit={handleSubmit}>
         <div className="form-grid">
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-employee">Employee <span className="required">*</span></label>
+            <label className="form-label" htmlFor="promo-employee">{t('settings.fields.employee')} <span className="required">*</span></label>
             <select id="promo-employee" name="employeeId" value={form.employeeId} onChange={handleChange}>
-              <option value="">Select an employee…</option>
+              <option value="">{t('settings.proposePromotion.selectEmployee')}</option>
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>{e.name} ({e.employeeId})</option>
               ))}
@@ -528,65 +535,65 @@ function PromotionProposeSection() {
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-effective">Effective date</label>
+            <label className="form-label" htmlFor="promo-effective">{t('settings.proposePromotion.effectiveDate')}</label>
             <input id="promo-effective" name="effectiveDate" type="date"
               value={form.effectiveDate} onChange={handleChange} />
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-designation">New designation</label>
+            <label className="form-label" htmlFor="promo-designation">{t('settings.proposePromotion.newDesignation')}</label>
             <input id="promo-designation" name="designation" value={form.designation}
               onChange={handleChange} placeholder={selected?.designation || 'Senior Developer'} />
             {selected && (
-              <span className="form-hint">Currently: {selected.designation || '—'}</span>
+              <span className="form-hint">{t('settings.proposePromotion.currently', { value: selected.designation || '—' })}</span>
             )}
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-department">New department</label>
+            <label className="form-label" htmlFor="promo-department">{t('settings.proposePromotion.newDepartment')}</label>
             <select id="promo-department" name="department" value={form.department} onChange={handleChange}>
-              <option value="">Leave unchanged</option>
+              <option value="">{t('settings.proposePromotion.leaveUnchanged')}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.name}>{d.name}</option>
               ))}
             </select>
             {selected && (
-              <span className="form-hint">Currently: {selected.department || '—'}</span>
+              <span className="form-hint">{t('settings.proposePromotion.currently', { value: selected.department || '—' })}</span>
             )}
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-position-level">New position level</label>
+            <label className="form-label" htmlFor="promo-position-level">{t('settings.proposePromotion.newPositionLevel')}</label>
             <select id="promo-position-level" name="positionLevel" value={form.positionLevel} onChange={handleChange}>
-              <option value="">Leave unchanged</option>
+              <option value="">{t('settings.proposePromotion.leaveUnchanged')}</option>
               {POSITION_LEVELS.map((lvl) => (
                 <option key={lvl} value={lvl}>{lvl}</option>
               ))}
             </select>
             {selected && (
-              <span className="form-hint">Currently: {selected.positionLevel || '—'}</span>
+              <span className="form-hint">{t('settings.proposePromotion.currently', { value: selected.positionLevel || '—' })}</span>
             )}
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-salary">New annual salary (USD)</label>
+            <label className="form-label" htmlFor="promo-salary">{t('settings.proposePromotion.newSalary')}</label>
             <input id="promo-salary" name="salary" type="number" min="0" step="1000"
               value={form.salary} onChange={handleChange} placeholder={selected?.salary ?? '75000'} />
             {selected && (
-              <span className="form-hint">Currently: {usd(selected.salary)}</span>
+              <span className="form-hint">{t('settings.proposePromotion.currently', { value: usd(selected.salary) })}</span>
             )}
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="promo-reason">Reason</label>
+            <label className="form-label" htmlFor="promo-reason">{t('settings.fields.reason')}</label>
             <textarea id="promo-reason" name="reason" rows={2} value={form.reason}
-              onChange={handleChange} placeholder="Why this promotion is justified…"
+              onChange={handleChange} placeholder={t('settings.proposePromotion.reasonPlaceholder')}
               style={{ resize: 'vertical' }} />
           </div>
         </div>
 
         <Button variant="primary" type="submit" disabled={submitting}>
-          {submitting ? 'Submitting…' : 'Submit proposal'}
+          {submitting ? t('settings.proposePromotion.submitting') : t('settings.proposePromotion.submitProposal')}
         </Button>
       </form>
 
@@ -594,11 +601,11 @@ function PromotionProposeSection() {
         <div style={{
           fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-semibold)', textTransform: 'uppercase',
           letterSpacing: '0.08em', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-3)',
-        }}>Recent proposals</div>
+        }}>{t('settings.proposePromotion.recentProposals')}</div>
         {loading ? (
-          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>Loading…</div>
+          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>{t('settings.loadingEllipsis')}</div>
         ) : mine.length === 0 ? (
-          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>No proposals yet.</div>
+          <div style={{ color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>{t('settings.proposePromotion.noProposalsYet')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
             {mine.slice(0, 5).map((r) => (
@@ -613,10 +620,10 @@ function PromotionProposeSection() {
                 </span>
                 <span style={{ color: 'var(--txt-secondary)', flex: 1, minWidth: '160px' }}>
                   {[
-                    r.proposed.positionLevel && `level → ${r.proposed.positionLevel}`,
-                    r.proposed.designation && `title → ${r.proposed.designation}`,
-                    r.proposed.department && `dept → ${r.proposed.department}`,
-                    r.proposed.salary !== null && `salary → ${usd(r.proposed.salary)}`,
+                    r.proposed.positionLevel && `${t('settings.proposePromotion.diff.level')} → ${r.proposed.positionLevel}`,
+                    r.proposed.designation && `${t('settings.proposePromotion.diff.title')} → ${r.proposed.designation}`,
+                    r.proposed.department && `${t('settings.proposePromotion.diff.dept')} → ${r.proposed.department}`,
+                    r.proposed.salary !== null && `${t('settings.proposePromotion.diff.salary')} → ${usd(r.proposed.salary)}`,
                   ].filter(Boolean).join(' · ') || '—'}
                 </span>
                 {r.systemGenerated && (
@@ -624,7 +631,7 @@ function PromotionProposeSection() {
                     fontSize: 'var(--fs-xs)', padding: '2px 8px', borderRadius: 'var(--radius-full, 999px)',
                     background: 'var(--bg-info-subtle, var(--bg-surface-alt))', color: 'var(--txt-info, var(--txt-secondary))',
                     border: '1px solid var(--bdr-subtle)',
-                  }}>Auto-flagged</span>
+                  }}>{t('settings.autoFlagged')}</span>
                 )}
                 <StatusBadge status={r.status} />
               </div>
@@ -637,6 +644,8 @@ function PromotionProposeSection() {
 }
 
 function PromotionReviewPanel() {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
@@ -653,10 +662,10 @@ function PromotionReviewPanel() {
       const res = await PromotionRequestsAPI.list({ status: filterStatus })
       setRequests(res.items ?? [])
     } catch (err) {
-      setError(err.message || 'Failed to load proposals.')
+      setError(err.message || t('settings.proposePromotion.loadFailed'))
     }
     setLoading(false)
-  }, [filterStatus])
+  }, [filterStatus, t])
 
   useEffect(() => { loadRequests() }, [loadRequests])
 
@@ -670,7 +679,7 @@ function PromotionReviewPanel() {
     setActionL(decision)
     try {
       await PromotionRequestsAPI.review(requestId, decision, note)
-      setToast(decision === 'approved' ? 'Promotion approved and applied.' : 'Proposal rejected.')
+      setToast(decision === 'approved' ? t('settings.promotionReview.approveSuccess') : t('settings.promotionReview.rejectSuccess'))
       setReviewingId(null)
       setNote('')
       loadRequests()
@@ -698,12 +707,12 @@ function PromotionReviewPanel() {
                 boxShadow: filterStatus === s ? 'var(--shadow-xs)' : 'none',
                 textTransform: 'capitalize',
               }}
-            >{s}</button>
+            >{t(`settings.statusFilter.${s}`)}</button>
           ))}
         </div>
-        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>{t('settings.refresh')}</Button>
         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
-          {requests.length} proposal{requests.length === 1 ? '' : 's'}
+          {t('settings.promotionReview.proposalCount', { count: requests.length })}
         </span>
       </div>
 
@@ -727,11 +736,13 @@ function PromotionReviewPanel() {
 
       {loading ? (
         <div style={{ padding: 'var(--sp-6)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          Loading proposals…
+          {t('settings.promotionReview.loadingProposals')}
         </div>
       ) : requests.length === 0 ? (
         <div style={{ padding: 'var(--sp-8)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          No {filterStatus !== 'all' ? filterStatus : ''} proposals.
+          {filterStatus !== 'all'
+            ? t('settings.promotionReview.noProposalsFiltered', { status: t(`settings.statusFilter.${filterStatus}`) })
+            : t('settings.promotionReview.noProposals')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
@@ -739,10 +750,10 @@ function PromotionReviewPanel() {
             const isOpen = reviewingId === req.id
             const isMine = String(req.requestedBy) === String(user?.id)
             const rows = [
-              ['Position Level', req.current.positionLevel, req.proposed.positionLevel],
-              ['Designation', req.current.designation, req.proposed.designation],
-              ['Department', req.current.department, req.proposed.department],
-              ['Annual Salary', usd(req.current.salary), req.proposed.salary === null ? null : usd(req.proposed.salary)],
+              [t('settings.fields.positionLevel'), req.current.positionLevel, req.proposed.positionLevel],
+              [t('settings.fields.designation'), req.current.designation, req.proposed.designation],
+              [t('settings.fields.department'), req.current.department, req.proposed.department],
+              [t('settings.fields.annualSalary'), usd(req.current.salary), req.proposed.salary === null ? null : usd(req.proposed.salary)],
             ].filter(([, , to]) => to !== null && to !== undefined)
 
             return (
@@ -762,8 +773,8 @@ function PromotionReviewPanel() {
                       {req.employeeName} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>({req.employeeCode})</span>
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
-                      {req.systemGenerated ? 'Auto-flagged by system' : `Proposed by ${req.requestedByName ?? 'HR'}`} · {new Date(req.createdAt).toLocaleDateString()}
-                      {req.effectiveDate ? ` · effective ${req.effectiveDate}` : ''}
+                      {req.systemGenerated ? t('settings.promotionReview.autoFlaggedBySystem') : t('settings.promotionReview.proposedBy', { name: req.requestedByName ?? 'HR' })} · {formatDate(req.createdAt, language)}
+                      {req.effectiveDate ? ` · ${t('settings.promotionReview.effective', { date: req.effectiveDate })}` : ''}
                     </div>
                   </div>
                   {req.systemGenerated && (
@@ -771,7 +782,7 @@ function PromotionReviewPanel() {
                       fontSize: 'var(--fs-xs)', padding: '2px 8px', borderRadius: 'var(--radius-full, 999px)',
                       background: 'var(--bg-info-subtle, var(--bg-surface-alt))', color: 'var(--txt-info, var(--txt-secondary))',
                       border: '1px solid var(--bdr-subtle)',
-                    }}>Auto-flagged</span>
+                    }}>{t('settings.autoFlagged')}</span>
                   )}
                   <StatusBadge status={req.status} />
                   {req.status === 'pending' && (
@@ -779,7 +790,7 @@ function PromotionReviewPanel() {
                       variant="secondary"
                       size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
-                    >{isOpen ? 'Close' : 'Review'}</Button>
+                    >{isOpen ? t('settings.close') : t('settings.review')}</Button>
                   )}
                 </div>
 
@@ -788,14 +799,14 @@ function PromotionReviewPanel() {
                     <div style={{
                       fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-semibold)', textTransform: 'uppercase',
                       letterSpacing: '0.08em', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-2)',
-                    }}>Proposed changes</div>
+                    }}>{t('settings.promotionReview.proposedChanges')}</div>
                     {rows.map(([label, from, to]) => (
                       <FieldRow key={label} label={label} from={from} to={to} />
                     ))}
 
                     {req.reason && (
                       <div style={{ marginTop: 'var(--sp-3)', fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)' }}>
-                        <strong style={{ color: 'var(--txt-primary)' }}>Reason:</strong> {req.reason}
+                        <strong style={{ color: 'var(--txt-primary)' }}>{t('settings.reasonLabel')}</strong> {req.reason}
                       </div>
                     )}
 
@@ -805,20 +816,20 @@ function PromotionReviewPanel() {
                         background: 'var(--bg-warning-subtle)', border: '1px solid var(--bdr-warning)',
                         borderRadius: 'var(--radius-md)', color: 'var(--txt-warning)', fontSize: 'var(--fs-sm)',
                       }}>
-                        You created this proposal — another Administrator must review it.
+                        {t('settings.promotionReview.selfCreatedWarning')}
                       </div>
                     ) : (
                       <>
                         <div className="form-group" style={{ marginTop: 'var(--sp-4)' }}>
                           <label className="form-label" htmlFor={`promo-note-${req.id}`}>
-                            Review Note <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>(optional)</span>
+                            {t('settings.reviewNoteLabel')} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>{t('settings.optional')}</span>
                           </label>
                           <textarea
                             id={`promo-note-${req.id}`}
                             rows={2}
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
-                            placeholder="Add a note for the employee…"
+                            placeholder={t('settings.notePlaceholderEmployee')}
                             style={{ resize: 'vertical' }}
                           />
                         </div>
@@ -827,12 +838,12 @@ function PromotionReviewPanel() {
                             variant="success"
                             disabled={actionLoading !== null}
                             onClick={() => handleReview(req.id, 'approved')}
-                          >{actionLoading === 'approved' ? 'Approving…' : 'Approve & Apply'}</Button>
+                          >{actionLoading === 'approved' ? t('settings.approvingEllipsis') : t('settings.promotionReview.approveAndApply')}</Button>
                           <Button
                             variant="danger"
                             disabled={actionLoading !== null}
                             onClick={() => handleReview(req.id, 'rejected')}
-                          >{actionLoading === 'rejected' ? 'Rejecting…' : 'Reject'}</Button>
+                          >{actionLoading === 'rejected' ? t('settings.rejectingEllipsis') : t('settings.reject')}</Button>
                         </div>
                       </>
                     )}
@@ -844,7 +855,7 @@ function PromotionReviewPanel() {
                     marginTop: 'var(--sp-3)', paddingTop: 'var(--sp-3)',
                     borderTop: '1px solid var(--bdr-subtle)', fontStyle: 'italic',
                     fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)',
-                  }}>Admin note: {req.reviewNote}</div>
+                  }}>{t('settings.adminNote', { note: req.reviewNote })}</div>
                 )}
               </div>
             )
@@ -856,6 +867,8 @@ function PromotionReviewPanel() {
 }
 
 function NoShowReviewPanel() {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -871,10 +884,10 @@ function NoShowReviewPanel() {
       const res = await NoShowReviewsAPI.list({ status: filterStatus })
       setRequests(res.items ?? [])
     } catch (err) {
-      setError(err.message || 'Failed to load no-show reviews.')
+      setError(err.message || t('settings.noShowReview.loadFailed'))
     }
     setLoading(false)
-  }, [filterStatus])
+  }, [filterStatus, t])
 
   useEffect(() => { loadRequests() }, [loadRequests])
 
@@ -888,7 +901,7 @@ function NoShowReviewPanel() {
     setActionL(decision)
     try {
       await NoShowReviewsAPI.review(requestId, decision, note)
-      setToast(decision === 'approved' ? 'Marked as reviewed — pattern confirmed.' : 'Marked as reviewed — no action needed.')
+      setToast(decision === 'approved' ? t('settings.noShowReview.confirmSuccess') : t('settings.noShowReview.dismissSuccess'))
       setReviewingId(null)
       setNote('')
       loadRequests()
@@ -916,12 +929,12 @@ function NoShowReviewPanel() {
                 boxShadow: filterStatus === s ? 'var(--shadow-xs)' : 'none',
                 textTransform: 'capitalize',
               }}
-            >{s}</button>
+            >{t(`settings.statusFilter.${s}`)}</button>
           ))}
         </div>
-        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>{t('settings.refresh')}</Button>
         <span style={{ marginLeft: 'auto', fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>
-          {requests.length} flag{requests.length === 1 ? '' : 's'}
+          {t('settings.noShowReview.flagCount', { count: requests.length })}
         </span>
       </div>
 
@@ -945,11 +958,13 @@ function NoShowReviewPanel() {
 
       {loading ? (
         <div style={{ padding: 'var(--sp-6)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          Loading flags…
+          {t('settings.noShowReview.loadingFlags')}
         </div>
       ) : requests.length === 0 ? (
         <div style={{ padding: 'var(--sp-8)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          No {filterStatus !== 'all' ? filterStatus : ''} no-show flags.
+          {filterStatus !== 'all'
+            ? t('settings.noShowReview.noFlagsFiltered', { status: t(`settings.statusFilter.${filterStatus}`) })
+            : t('settings.noShowReview.noFlags')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
@@ -972,7 +987,7 @@ function NoShowReviewPanel() {
                       {req.employeeName} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>({req.employeeCode})</span>
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
-                      {req.noShowCount} no-show day{req.noShowCount === 1 ? '' : 's'} on record · flagged {new Date(req.flaggedAt ?? req.createdAt).toLocaleDateString()}
+                      {t('settings.noShowReview.recordLine', { count: req.noShowCount, date: formatDate(req.flaggedAt ?? req.createdAt, language) })}
                     </div>
                   </div>
                   <StatusBadge status={req.status} />
@@ -981,7 +996,7 @@ function NoShowReviewPanel() {
                       variant="secondary"
                       size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
-                    >{isOpen ? 'Close' : 'Review'}</Button>
+                    >{isOpen ? t('settings.close') : t('settings.review')}</Button>
                   )}
                 </div>
 
@@ -989,7 +1004,7 @@ function NoShowReviewPanel() {
                   <div style={{ marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-4)', borderTop: '1px solid var(--bdr-subtle)' }}>
                     {req.reason && (
                       <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-3)' }}>
-                        <strong style={{ color: 'var(--txt-primary)' }}>Reason:</strong> {req.reason}
+                        <strong style={{ color: 'var(--txt-primary)' }}>{t('settings.reasonLabel')}</strong> {req.reason}
                       </div>
                     )}
                     <div style={{
@@ -997,19 +1012,19 @@ function NoShowReviewPanel() {
                       background: 'var(--bg-warning-subtle)', border: '1px solid var(--bdr-warning)',
                       borderRadius: 'var(--radius-md)', color: 'var(--txt-warning)', fontSize: 'var(--fs-sm)',
                     }}>
-                      This never changes the employee&rsquo;s status automatically. Use this to record that HR reviewed the pattern and note any follow-up taken outside the system.
+                      {t('settings.noShowReview.autoStatusWarning')}
                     </div>
 
                     <div className="form-group">
                       <label className="form-label" htmlFor={`noshow-note-${req.id}`}>
-                        Review Note <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>(optional)</span>
+                        {t('settings.reviewNoteLabel')} <span style={{ color: 'var(--txt-secondary)', fontWeight: 'var(--fw-regular)' }}>{t('settings.optional')}</span>
                       </label>
                       <textarea
                         id={`noshow-note-${req.id}`}
                         rows={2}
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
-                        placeholder="What did HR decide or follow up on?"
+                        placeholder={t('settings.noShowReview.notePlaceholder')}
                         style={{ resize: 'vertical' }}
                       />
                     </div>
@@ -1018,12 +1033,12 @@ function NoShowReviewPanel() {
                         variant="success"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'approved')}
-                      >{actionLoading === 'approved' ? 'Saving…' : 'Confirm Pattern'}</Button>
+                      >{actionLoading === 'approved' ? t('settings.savingEllipsis') : t('settings.noShowReview.confirmPattern')}</Button>
                       <Button
                         variant="danger"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, 'rejected')}
-                      >{actionLoading === 'rejected' ? 'Saving…' : 'Dismiss'}</Button>
+                      >{actionLoading === 'rejected' ? t('settings.savingEllipsis') : t('settings.noShowReview.dismiss')}</Button>
                     </div>
                   </div>
                 )}
@@ -1033,7 +1048,7 @@ function NoShowReviewPanel() {
                     marginTop: 'var(--sp-3)', paddingTop: 'var(--sp-3)',
                     borderTop: '1px solid var(--bdr-subtle)', fontStyle: 'italic',
                     fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)',
-                  }}>Admin note: {req.reviewNote}</div>
+                  }}>{t('settings.adminNote', { note: req.reviewNote })}</div>
                 )}
               </div>
             )
@@ -1045,6 +1060,8 @@ function NoShowReviewPanel() {
 }
 
 function ProfileEditReviewPanel() {
+  const { t } = useTranslation()
+  const { language } = useLanguage()
   const [requests, setRequests]       = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState('')
@@ -1060,10 +1077,10 @@ function ProfileEditReviewPanel() {
       const res = await ProfileEditRequestsAPI.list({ status: filterStatus })
       setRequests(res.items ?? [])
     } catch (err) {
-      setError(err.message || 'Failed to load requests.')
+      setError(err.message || t('settings.profileEditReview.loadFailed'))
     }
     setLoading(false)
-  }, [filterStatus])
+  }, [filterStatus, t])
 
   useEffect(() => { loadRequests() }, [loadRequests])
 
@@ -1077,7 +1094,7 @@ function ProfileEditReviewPanel() {
     setActionL(decision)
     try {
       await ProfileEditRequestsAPI.review(requestId, decision, note)
-      setToast(decision === 'approved' ? 'Profile update approved and applied.' : 'Request rejected.')
+      setToast(decision === 'approved' ? t('settings.profileEditReview.approveSuccess') : t('settings.profileEditReview.rejectSuccess'))
       setReviewingId(null)
       setNote('')
       loadRequests()
@@ -1107,15 +1124,15 @@ function ProfileEditReviewPanel() {
                 textTransform: 'capitalize',
               }}
             >
-              {s}
+              {t(`settings.statusFilter.${s}`)}
             </button>
           ))}
         </div>
         <Button variant="secondary" size="sm" onClick={loadRequests}>
-          Refresh
+          {t('settings.refresh')}
         </Button>
         <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginLeft: 'auto' }}>
-          {requests.length} request{requests.length !== 1 ? 's' : ''}
+          {t('settings.profileEditReview.requestCount', { count: requests.length })}
         </span>
       </div>
 
@@ -1140,11 +1157,13 @@ function ProfileEditReviewPanel() {
 
       {loading ? (
         <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          Loading requests…
+          {t('settings.profileEditReview.loadingRequests')}
         </div>
       ) : requests.length === 0 ? (
         <div style={{ padding: 'var(--sp-8)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
-          No {filterStatus !== 'all' ? filterStatus : ''} requests.
+          {filterStatus !== 'all'
+            ? t('settings.profileEditReview.noRequestsFiltered', { status: t(`settings.statusFilter.${filterStatus}`) })
+            : t('settings.profileEditReview.noRequests')}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
@@ -1177,11 +1196,11 @@ function ProfileEditReviewPanel() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-medium)', color: 'var(--txt-primary)' }}>
-                      {req.employeeName ?? 'Unknown employee'}
+                      {req.employeeName ?? t('settings.profileEditReview.unknownEmployee')}
                     </div>
                     <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>
-                      {Object.keys(req.changes).map((f) => FIELD_LABELS[f] ?? f).join(', ')} ·{' '}
-                      {new Date(req.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                      {Object.keys(req.changes).map((f) => fieldLabel(t, f)).join(', ')} ·{' '}
+                      {formatDate(req.createdAt, language)}
                     </div>
                   </div>
                   <StatusBadge status={req.status} />
@@ -1191,7 +1210,7 @@ function ProfileEditReviewPanel() {
                       size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote('') }}
                     >
-                      {isOpen ? 'Close' : 'Review'}
+                      {isOpen ? t('settings.close') : t('settings.review')}
                     </Button>
                   )}
                 </div>
@@ -1201,23 +1220,23 @@ function ProfileEditReviewPanel() {
                   <div style={{ padding: 'var(--sp-5)', borderTop: '1px solid var(--bdr-subtle)' }}>
                     <div style={{ marginBottom: 'var(--sp-4)' }}>
                       <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-semibold)', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--txt-secondary)', marginBottom: 'var(--sp-2)' }}>
-                        Requested Changes
+                        {t('settings.profileEditReview.requestedChanges')}
                       </div>
                       {Object.entries(req.changes).map(([field, { from, to }]) => (
-                        <FieldRow key={field} label={FIELD_LABELS[field] ?? field} from={from} to={to} />
+                        <FieldRow key={field} label={fieldLabel(t, field)} from={from} to={to} />
                       ))}
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--sp-4)' }}>
                       <label className="form-label" htmlFor={`note-${req.id}`}>
-                        Review Note <span style={{ fontWeight: 'var(--fw-regular)', color: 'var(--txt-secondary)' }}>(optional)</span>
+                        {t('settings.reviewNoteLabel')} <span style={{ fontWeight: 'var(--fw-regular)', color: 'var(--txt-secondary)' }}>{t('settings.optional')}</span>
                       </label>
                       <textarea
                         id={`note-${req.id}`}
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         rows={2}
-                        placeholder="Add a note for the employee…"
+                        placeholder={t('settings.notePlaceholderEmployee')}
                         style={{ resize: 'vertical' }}
                       />
                     </div>
@@ -1229,12 +1248,12 @@ function ProfileEditReviewPanel() {
                         onClick={() => handleReview(req.id, 'approved')}
                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
                       >
-                        {actionLoading === 'approved' ? 'Approving…' : (
+                        {actionLoading === 'approved' ? t('settings.approvingEllipsis') : (
                           <>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <polyline points="20 6 9 17 4 12"/>
                             </svg>
-                            Approve & Apply
+                            {t('settings.promotionReview.approveAndApply')}
                           </>
                         )}
                       </Button>
@@ -1244,12 +1263,12 @@ function ProfileEditReviewPanel() {
                         onClick={() => handleReview(req.id, 'rejected')}
                         style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}
                       >
-                        {actionLoading === 'rejected' ? 'Rejecting…' : (
+                        {actionLoading === 'rejected' ? t('settings.rejectingEllipsis') : (
                           <>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                             </svg>
-                            Reject
+                            {t('settings.reject')}
                           </>
                         )}
                       </Button>
@@ -1264,7 +1283,7 @@ function ProfileEditReviewPanel() {
                     borderTop: '1px solid var(--bdr-subtle)',
                     fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', fontStyle: 'italic',
                   }}>
-                    HR note: {req.reviewNote}
+                    {t('settings.myProfile.hrNote', { note: req.reviewNote })}
                   </div>
                 )}
               </div>
@@ -1280,6 +1299,7 @@ function ProfileEditReviewPanel() {
    Admin-only: Promote Users panel
 ───────────────────────────────────────────── */
 function PromoteUsersPanel() {
+  const { t } = useTranslation()
   const { user: currentUser } = useAuth()
   const [users, setUsers]       = useState([])
   const [loading, setLoading]   = useState(true)
@@ -1293,10 +1313,10 @@ function PromoteUsersPanel() {
       const res = await apiFetch('/auth/users')
       setUsers(res.items || [])
     } catch (err) {
-      setError(err.message || 'Failed to load users.')
+      setError(err.message || t('settings.promoteUsers.loadFailed'))
     }
     setLoading(false)
-  }, [])
+  }, [t])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
   useEffect(() => {
@@ -1309,7 +1329,7 @@ function PromoteUsersPanel() {
     setPromoting(userId)
     try {
       const res = await apiFetch(`/auth/users/${userId}/promote`, { method: 'PATCH', body: { role: newRole } })
-      setToast(res.message || 'Role updated.')
+      setToast(res.message || t('settings.promoteUsers.roleUpdated'))
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
     } catch (err) {
       setToast(`Error: ${err.message}`)
@@ -1317,10 +1337,10 @@ function PromoteUsersPanel() {
     setPromoting(null)
   }
 
-  if (loading) return <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>Loading accounts…</div>
+  if (loading) return <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>{t('settings.promoteUsers.loadingAccounts')}</div>
   if (error) return (
     <div style={{ padding: 'var(--sp-4)', background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)', borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      {error}<Button variant="secondary" size="sm" onClick={fetchUsers}>Retry</Button>
+      {error}<Button variant="secondary" size="sm" onClick={fetchUsers}>{t('settings.retry')}</Button>
     </div>
   )
 
@@ -1355,45 +1375,45 @@ function PromoteUsersPanel() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-medium)', color: 'var(--txt-primary)', display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', flexWrap: 'wrap' }}>
-                  {u.name}{isSelf && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>(you)</span>}
+                  {u.name}{isSelf && <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)' }}>{t('settings.promoteUsers.youSuffix')}</span>}
                 </div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '2px' }}>{u.email}</div>
               </div>
               <RolePill role={u.role} />
               {u.mustChangePassword && (
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', flexShrink: 0 }}>Not activated</span>
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', flexShrink: 0 }}>{t('settings.promoteUsers.notActivated')}</span>
               )}
               {!isSelf && (
                 <div style={{ display: 'flex', gap: 'var(--sp-2)', flexShrink: 0 }}>
                   {isAdminAcc ? (
                     <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
-                      {isLoading ? '…' : 'Demote to HR'}
+                      {isLoading ? '…' : t('settings.promoteUsers.demoteToHr')}
                     </Button>
                   ) : isManager ? (
                     <>
                       <Button variant="secondary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'EMPLOYEE')}>
-                        {isLoading ? '…' : 'Demote'}
+                        {isLoading ? '…' : t('settings.promoteUsers.demote')}
                       </Button>
                       <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'ADMIN')}>
-                        {isLoading ? '…' : 'Make Admin'}
+                        {isLoading ? '…' : t('settings.promoteUsers.makeAdmin')}
                       </Button>
                     </>
                   ) : (
                     <Button variant="primary" size="sm" disabled={isLoading} onClick={() => handlePromote(u.id, 'MANAGER')}>
-                      {isLoading ? '…' : 'Promote to HR'}
+                      {isLoading ? '…' : t('settings.promoteUsers.promoteToHr')}
                     </Button>
                   )}
                 </div>
               )}
               {isSelf && (
-                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-disabled)', flexShrink: 0 }}>Cannot change own role</span>
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-disabled)', flexShrink: 0 }}>{t('settings.promoteUsers.cannotChangeOwnRole')}</span>
               )}
             </div>
           )
         })}
       </div>
       <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: 'var(--sp-4)' }}>
-        Accounts are created through the Add Employee flow. Promote grants full HR/Manager access; Demote returns the account to Employee read-only mode. You cannot change your own role.
+        {t('settings.promoteUsers.footerHint')}
       </p>
     </div>
   )

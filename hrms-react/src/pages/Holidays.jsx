@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../context/StoreContext";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDate as formatDateLocalized } from "../utils/format";
 import Badge from "../components/Badge";
 import AddHolidayModal from "../components/AddHolidayModal";
 import Button from "../components/Button";
@@ -11,9 +13,10 @@ const HOLIDAY_TYPE_VARIANT = {
 };
 
 
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", {
+// Task 6.6 — was previously pinned to "en-US" regardless of the app's
+// language toggle; now delegates to utils/format.js.
+function formatDate(dateStr, language) {
+  return formatDateLocalized(dateStr, language, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -22,6 +25,7 @@ function formatDate(dateStr) {
 }
 
 function Holidays() {
+  const { language } = useLanguage();
   const { getAppNow, holidays, addHoliday, updateHoliday, removeHoliday } = useStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingHoliday, setEditingHoliday] = useState(null);
@@ -155,7 +159,7 @@ function Holidays() {
             {stats.next ? stats.next.name : "—"}
           </div>
           <div className="stat-card-hint">
-            {stats.next ? formatDate(stats.next.date) : "No upcoming holidays"}
+            {stats.next ? formatDate(stats.next.date, language) : "No upcoming holidays"}
           </div>
         </div>
       </div>
@@ -259,7 +263,7 @@ function Holidays() {
                           }}
                           title="Click to edit date"
                         >
-                          {formatDate(holiday.date)}
+                          {formatDate(holiday.date, language)}
                         </button>
                       )}
                     </td>

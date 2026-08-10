@@ -2,6 +2,8 @@ import { useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDate } from "../utils/format";
 import Avatar from "../components/Avatar";
 import Badge, { StatusBadge, TypeBadge } from "../components/Badge";
 import { idsMatch } from "../utils/id";
@@ -223,7 +225,7 @@ function ViewEmployee() {
             <InfoItem
               label="Salary"
               value={
-                employee.salary ? `$${employee.salary.toLocaleString()}` : "—"
+                employee.salary ? `$${employee.salary.toLocaleString("en-US")}` : "—"
               }
             />
           </div>
@@ -366,6 +368,7 @@ function AttendanceReportCard({ employee, attendance, navigate }) {
 }
 
 function ContractCard({ employee, isHR, uploadEmployeeContract }) {
+  const { language } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
@@ -414,7 +417,7 @@ function ContractCard({ employee, isHR, uploadEmployeeContract }) {
           </h3>
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
             {employee.contractUrl
-              ? `Uploaded ${new Date(employee.contractUploadedAt).toLocaleDateString()}`
+              ? `Uploaded ${formatDate(employee.contractUploadedAt, language)}`
               : "No contract on file yet."}
           </p>
         </div>

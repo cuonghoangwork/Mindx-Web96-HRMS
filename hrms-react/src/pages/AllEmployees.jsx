@@ -34,7 +34,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange }) {
     { label: "Email",       value: employee.email || "—" },
     { label: "Phone",       value: employee.phone || "—" },
     { label: "Address",     value: employee.address || "—" },
-    { label: "Salary",      value: employee.salary ? `$${employee.salary.toLocaleString()}/yr` : "—" },
+    { label: "Salary",      value: employee.salary ? `$${employee.salary.toLocaleString("en-US")}/yr` : "—" },
   ];
 
   return (
