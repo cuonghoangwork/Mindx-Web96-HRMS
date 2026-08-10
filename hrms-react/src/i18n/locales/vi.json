@@ -1,0 +1,175 @@
+{
+  "common": {
+    "days": ["CN", "Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7"],
+    "months": ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"]
+  },
+  "dashboard": {
+    "stats": {
+      "totalEmployees": { "title": "Tổng số nhân viên", "trend": "+3 trong tháng này", "hint": "{{count}} phòng ban" },
+      "attendanceRate": { "title": "Tỷ lệ đi làm", "trend": "+2% so với tuần trước", "hint": "{{present}}/{{total}} hôm nay" },
+      "onLeave": { "title": "Đang nghỉ phép", "trend": "3 sắp hết hạn trong tuần tới", "hint": "Đang chờ duyệt" },
+      "newHires": { "title": "Nhân viên mới", "trend": "+2 so với tháng trước", "hint": "Trong tháng này" }
+    },
+    "attendanceTrend": {
+      "title": "Tình hình đi làm — 7 ngày qua",
+      "subtitle": "% nhân viên có mặt mỗi ngày",
+      "viewDetails": "Xem chi tiết →",
+      "legend": { "good": "≥90% (Tốt)", "average": "≥75% (Trung bình)", "low": "<75% (Thấp)" }
+    },
+    "headcount": {
+      "title": "Số lượng nhân sự",
+      "subtitle": "Số nhân viên theo phòng ban",
+      "viewAll": "Xem tất cả →"
+    },
+    "contractTypes": { "title": "Loại hợp đồng" },
+    "recentEmployees": {
+      "title": "Nhân viên mới nhất",
+      "viewAll": "Xem tất cả →",
+      "table": { "employee": "Nhân viên", "department": "Phòng ban", "designation": "Chức danh", "status": "Trạng thái" }
+    },
+    "quickActions": {
+      "title": "Thao tác nhanh",
+      "addEmployee": "Thêm nhân viên",
+      "allEmployees": "Tất cả nhân viên",
+      "attendance": "Chấm công",
+      "payroll": "Bảng lương",
+      "departments": "Phòng ban",
+      "holidays": "Ngày lễ"
+    },
+    "recentActivity": {
+      "title": "Hoạt động gần đây",
+      "newEmployee": "{{name}} vừa được thêm vào hệ thống",
+      "defaultNewEmployee": "Nhân viên mới",
+      "onLeave": "{{count}} nhân viên đang nghỉ phép",
+      "payrollApproved": "Bảng lương tháng này đã được duyệt",
+      "attendanceToday": "Tỷ lệ đi làm hôm nay: {{rate}}%",
+      "pendingApprovals": "5 yêu cầu đang chờ duyệt",
+      "time": {
+        "minutesAgo": "2 phút trước",
+        "hourAgo": "1 giờ trước",
+        "hoursAgo": "3 giờ trước",
+        "today": "Hôm nay 8:00",
+        "yesterday": "Hôm qua"
+      }
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "Có mặt",
+      "late": "Đi muộn",
+      "onLeave": "Nghỉ phép",
+      "absent": "Vắng mặt"
+    },
+    "selectDatePrompt": "Chọn một ngày để xem chi tiết chấm công",
+    "dayPanel": {
+      "records": "{{count}} bản ghi",
+      "table": { "employee": "Nhân viên", "checkIn": "Giờ vào", "checkOut": "Giờ ra", "hours": "Số giờ", "status": "Trạng thái" }
+    },
+    "clockWidget": {
+      "title": "Chấm công vào/ra",
+      "todayPrefix": "Hôm nay",
+      "employeeLabel": "Nhân viên",
+      "loadingEmployees": "Đang tải danh sách nhân viên…",
+      "selectEmployeePlaceholder": "Chọn nhân viên…",
+      "youSuffix": "(bạn)",
+      "checkInLabel": "Giờ vào",
+      "checkOutLabel": "Giờ ra",
+      "statusLabel": "Trạng thái",
+      "noRecord": "Chưa có dữ liệu",
+      "clockingLabel": "Đang xử lý…",
+      "clockInButton": "Chấm công vào",
+      "clockOutButton": "Chấm công ra",
+      "alreadyClockedIn": "Đã chấm công vào hôm nay",
+      "clockInNow": "Chấm công vào ngay",
+      "mustClockInFirst": "Phải chấm công vào trước",
+      "alreadyClockedOut": "Đã chấm công ra hôm nay",
+      "clockOutNow": "Chấm công ra ngay",
+      "pleaseSelectEmployee": "Vui lòng chọn một nhân viên.",
+      "clockedInAt": "Đã chấm công vào lúc {{time}}",
+      "failedClockIn": "Chấm công vào không thành công. Máy chủ có đang chạy không?",
+      "clockedOutAt": "Đã chấm công ra lúc {{time}}",
+      "failedClockOut": "Chấm công ra không thành công. Máy chủ có đang chạy không?",
+      "activeSince": "● Đang làm việc từ {{time}}",
+      "shiftComplete": "Đã hoàn thành ca · {{duration}} đã làm"
+    },
+    "header": {
+      "title": "Chấm công",
+      "subtitle": "{{month}} {{year}} · {{workdays}} ngày làm việc · tỷ lệ trung bình {{rate}}%",
+      "viewToggle": { "calendar": "Lịch", "table": "Bảng" },
+      "clickToView": "Nhấp vào một ngày để xem chi tiết"
+    },
+    "calendar": {
+      "legend": { "present": "Có mặt", "late": "Đi muộn" }
+    },
+    "table": {
+      "allEmployees": "Tất cả nhân viên",
+      "recordsCount": "{{count}} bản ghi",
+      "headers": {
+        "employee": "Nhân viên",
+        "date": "Ngày",
+        "day": "Thứ",
+        "checkIn": "Giờ vào",
+        "checkOut": "Giờ ra",
+        "hours": "Số giờ",
+        "status": "Trạng thái"
+      },
+      "showingFirst": "Hiển thị 50 trong tổng số {{count}} bản ghi"
+    }
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "sendNotice": "+ Gửi thông báo",
+    "markAllRead": "Đánh dấu tất cả đã đọc",
+    "clearRead": "Xóa mục đã đọc",
+    "stats": {
+      "total": { "label": "Tổng cộng", "hint": "Tất cả thông báo" },
+      "unread": { "label": "Chưa đọc", "hint": "Cần bạn chú ý" },
+      "today": { "label": "Hôm nay", "hint": "Nhận được hôm nay" }
+    },
+    "filters": { "all": "Tất cả", "unread": "Chưa đọc" },
+    "categories": {
+      "leave": "Nghỉ phép",
+      "interview": "Tuyển dụng",
+      "payroll": "Lương",
+      "employee": "Nhân viên",
+      "holiday": "Ngày lễ",
+      "system": "Hệ thống",
+      "announcement": "Thông báo"
+    },
+    "empty": {
+      "title": "Không có thông báo",
+      "allCaughtUp": "Bạn đã xem hết. Thông báo mới sẽ xuất hiện ở đây.",
+      "noneForFilter": "Không có gì ở bộ lọc này.",
+      "viewAll": "Xem tất cả thông báo"
+    },
+    "item": {
+      "markRead": "Đánh dấu đã đọc",
+      "dismiss": "Bỏ qua",
+      "dismissAria": "Bỏ qua thông báo",
+      "from": "từ {{name}}",
+      "open": "Mở"
+    },
+    "timeAgo": {
+      "justNow": "Vừa xong",
+      "minutesAgo_other": "{{count}} phút trước",
+      "hoursAgo_other": "{{count}} giờ trước",
+      "yesterday": "Hôm qua",
+      "daysAgo": "{{count}} ngày trước"
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "subtitle": "Quản lý tùy chọn ứng dụng của bạn.",
+    "sections": {
+      "myProfile": { "title": "Hồ sơ của tôi", "description": "Xem hồ sơ nhân sự và yêu cầu thay đổi thông tin cá nhân. Thay đổi cần được HR phê duyệt." },
+      "profileEditRequests": { "title": "Yêu cầu chỉnh sửa hồ sơ", "description": "Xem xét và phê duyệt hoặc từ chối yêu cầu cập nhật thông tin cá nhân của nhân viên." },
+      "proposePromotion": { "title": "Đề xuất thăng chức", "description": "Đề xuất chức danh, phòng ban hoặc mức lương mới cho một nhân viên. Quản trị viên phải phê duyệt trước khi có hiệu lực." },
+      "promotionApprovalQueue": { "title": "Hàng chờ duyệt thăng chức", "description": "Phê duyệt hoặc từ chối các đề xuất thăng chức. Bạn không thể duyệt đề xuất do chính mình tạo." },
+      "noShowReviewQueue": { "title": "Hàng chờ xem xét vắng mặt", "description": "Nhân viên tự động bị gắn cờ sau 5 ngày vắng không phép. Việc gắn cờ không tự động thay đổi tình trạng làm việc — HR quyết định bước xử lý tiếp theo." },
+      "manageUserRoles": { "title": "Quản lý vai trò người dùng", "description": "Thăng cấp nhân viên lên HR/Quản lý hoặc hạ xuống lại Nhân viên." }
+    },
+    "darkMode": { "title": "Chế độ tối", "description": "Chuyển đổi giữa giao diện sáng và tối", "light": "☀ Sáng", "dark": "◐ Tối" },
+    "emailNotifications": { "title": "Thông báo qua email", "description": "Nhận cập nhật qua email về tài khoản của bạn" },
+    "language": { "title": "Ngôn ngữ", "description": "Chọn ngôn ngữ ưa thích của bạn", "english": "Tiếng Anh", "vietnamese": "Tiếng Việt" }
+  }
+}

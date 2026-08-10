@@ -1,8 +1,12 @@
+import { useRef, useState } from "react";
 import Avatar from "./Avatar";
 import { CandidateStageBadge } from "./Badge";
 import Button from "./Button";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
+// Task 5.3 — same 10MB cap as employee contract uploads (ViewEmployee.jsx's
+// ContractCard) for consistency; a CV is a comparably-sized PDF.
+const MAX_CV_BYTES = 10 * 1024 * 1024;
 
 function StarRating({ rating }) {
   const full = Math.round(rating);
@@ -23,7 +27,7 @@ function StarRating({ rating }) {
   );
 }
 
-function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDelete }) {
+function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDelete, onUploadCv }) {
   if (!candidate) return null;
 
   return (
@@ -88,14 +92,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
           <InfoRow
             label="Resume"
             value={
-              <a
-                href={candidate.resumeUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "var(--txt-primary-brand)" }}
-              >
-                View Resume
-              </a>
+              <ResumeField candidate={candidate} onUploadCv={onUploadCv} />
             }
           />
 
@@ -147,6 +144,86 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Task 5.3 — real PDF CV upload, wired the same way as ViewEmployee.jsx's
+// ContractCard (file input hidden behind a Button, 10MB/PDF-only client
+// check before hitting the server, inline error message on failure).
+function ResumeField({ candidate, onUploadCv }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+
+  const handlePick = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      setError("Please choose a PDF file.");
+      return;
+    }
+    if (file.size > MAX_CV_BYTES) {
+      setError("CV must be 10MB or smaller.");
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+    try {
+      await onUploadCv?.(candidate.id, file);
+    } catch (err) {
+      setError(err.message || "Failed to upload CV.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+        {candidate.resumeUploadedAt ? (
+          <a
+            href={candidate.resumeUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: "var(--txt-primary-brand)" }}
+          >
+            View Resume
+          </a>
+        ) : (
+          <span style={{ color: "var(--txt-secondary)" }}>No CV on file yet.</span>
+        )}
+
+        {onUploadCv && (
+          <>
+            <Button
+              variant="secondary"
+              style={{ padding: "4px 12px", fontSize: "var(--fs-xs)" }}
+              onClick={handlePick}
+              disabled={uploading}
+            >
+              {uploading ? "Uploading…" : candidate.resumeUploadedAt ? "Replace CV" : "Upload CV"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+          </>
+        )}
+      </div>
+      {error && (
+        <p style={{ color: "var(--txt-danger)", fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

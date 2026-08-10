@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
@@ -24,6 +25,17 @@ const resolveStatus = (record) => {
 
 const variantMap = (s) =>
   ({ Present: "success", Late: "warning", "On Leave": "info" })[s] ?? "danger";
+
+// Task 6.2 — status codes ("Present"/"Late"/"On Leave"/"Absent") stay in
+// English everywhere they're used as data (equality checks, variantMap
+// above, mock-data generation below); this only translates the label
+// actually shown to the user.
+const STATUS_LABEL_KEY = {
+  Present: "attendance.status.present",
+  Late: "attendance.status.late",
+  "On Leave": "attendance.status.onLeave",
+};
+const statusLabel = (t, status) => t(STATUS_LABEL_KEY[status] ?? "attendance.status.absent");
 
 /* ─── Generate rich mock attendance for a full month ─── */
 function buildMonthAttendance(year, month, employees, existing) {
@@ -71,11 +83,13 @@ function buildMonthAttendance(year, month, employees, existing) {
   return result;
 }
 
-/* ─── Month calendar grid ─── */
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
+/* ─── Month calendar grid ───
+   Day/month names come from the common.days / common.months i18n arrays
+   (task 6.2) rather than a module-level constant, since they need to be
+   locale-aware. */
 function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr }) {
+  const { t } = useTranslation();
+  const days = t("common.days", { returnObjects: true });
   const firstDow = new Date(year, month, 1).getDay();
   const daysCount = new Date(year, month + 1, 0).getDate();
   const cells = Array.from({ length: firstDow + daysCount }, (_, i) =>
@@ -86,7 +100,7 @@ function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", marginBottom: "4px" }}>
-        {DAYS.map((d) => (
+        {days.map((d) => (
           <div key={d} style={{
             textAlign: "center", fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
             color: "var(--txt-secondary)", padding: "4px 0",
@@ -178,18 +192,22 @@ function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr
 
 /* ─── Day detail panel ─── */
 function DayPanel({ dateStr, rows, onClose }) {
+  const { t } = useTranslation();
+  const days = t("common.days", { returnObjects: true });
+  const months = t("common.months", { returnObjects: true });
+
   if (!dateStr || rows.length === 0) return (
     <div style={{
       background: "var(--bg-surface-alt)", borderRadius: "var(--radius-md)",
       padding: "var(--sp-5)", textAlign: "center",
       color: "var(--txt-secondary)", fontSize: "var(--fs-sm)",
     }}>
-      Select a date to view attendance details
+      {t("attendance.selectDatePrompt")}
     </div>
   );
 
   const d = new Date(dateStr + "T00:00:00");
-  const label = `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  const label = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 
   return (
     <div style={{ background: "var(--bg-surface)", border: "1px solid var(--bdr-subtle)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
@@ -202,17 +220,17 @@ function DayPanel({ dateStr, rows, onClose }) {
         <div>
           <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>{label}</div>
           <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            {rows.length} records
+            {t("attendance.dayPanel.records", { count: rows.length })}
           </div>
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1 }}>×</button>
       </div>
 
       <div style={{ display: "flex", gap: "var(--sp-2)", padding: "var(--sp-3) var(--sp-5)", flexWrap: "wrap", borderBottom: "1px solid var(--bdr-subtle)" }}>
-        {[["Present","success"],["Late","warning"],["On Leave","info"],["Absent","danger"]].map(([s, v]) => {
-          const count = rows.filter((r) => r.status === s).length;
+        {[["Present","success"],["Late","warning"],["On Leave","info"],["Absent","danger"]].map(([statusCode, v]) => {
+          const count = rows.filter((r) => r.status === statusCode).length;
           return count > 0 && (
-            <Badge key={s} variant={v} dot size="sm">{count} {s}</Badge>
+            <Badge key={statusCode} variant={v} dot size="sm">{count} {statusLabel(t, statusCode)}</Badge>
           );
         })}
       </div>
@@ -221,11 +239,11 @@ function DayPanel({ dateStr, rows, onClose }) {
         <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
           <thead>
             <tr>
-              <th>Employee</th>
-              <th>Check In</th>
-              <th>Check Out</th>
-              <th>Hours</th>
-              <th>Status</th>
+              <th>{t("attendance.dayPanel.table.employee")}</th>
+              <th>{t("attendance.dayPanel.table.checkIn")}</th>
+              <th>{t("attendance.dayPanel.table.checkOut")}</th>
+              <th>{t("attendance.dayPanel.table.hours")}</th>
+              <th>{t("attendance.dayPanel.table.status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -251,7 +269,7 @@ function DayPanel({ dateStr, rows, onClose }) {
                   </td>
                   <td>{fmt(r.checkOut)}</td>
                   <td style={{ color: "var(--txt-secondary)" }}>{hours}</td>
-                  <td><Badge variant={variantMap(r.status)} size="sm">{r.status}</Badge></td>
+                  <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
                 </tr>
               );
             })}
@@ -275,6 +293,9 @@ function DayPanel({ dateStr, rows, onClose }) {
  * demo clock (HeaderDateTime).
  */
 function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut, currentUser }) {
+  const { t } = useTranslation();
+  const days = t("common.days", { returnObjects: true });
+  const months = t("common.months", { returnObjects: true });
   // Find the employee record linked to the logged-in user (match by email).
   const myEmployee = employees.find(
     (e) => e.email && currentUser?.email && e.email.toLowerCase() === currentUser.email.toLowerCase()
@@ -319,26 +340,26 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
   const selectedEmployee = employees.find((e) => idsMatch(e.id, selectedEmpId)) ?? null;
 
   const handleClockIn = async () => {
-    if (!selectedEmpId) { setError("Please select an employee."); return; }
+    if (!selectedEmpId) { setError(t("attendance.clockWidget.pleaseSelectEmployee")); return; }
     setLoading("in"); setError(""); setSuccess("");
     try {
       await clockIn(selectedEmpId, todayStr, currentTimeHHMM);
-      setSuccess(`Clocked in at ${fmt(currentTimeHHMM)}`);
+      setSuccess(t("attendance.clockWidget.clockedInAt", { time: fmt(currentTimeHHMM) }));
     } catch (err) {
-      setError(err.message || "Failed to clock in. Is the backend running?");
+      setError(err.message || t("attendance.clockWidget.failedClockIn"));
     } finally {
       setLoading(null);
     }
   };
 
   const handleClockOut = async () => {
-    if (!selectedEmpId) { setError("Please select an employee."); return; }
+    if (!selectedEmpId) { setError(t("attendance.clockWidget.pleaseSelectEmployee")); return; }
     setLoading("out"); setError(""); setSuccess("");
     try {
       await clockOut(selectedEmpId, todayStr, currentTimeHHMM);
-      setSuccess(`Clocked out at ${fmt(currentTimeHHMM)}`);
+      setSuccess(t("attendance.clockWidget.clockedOutAt", { time: fmt(currentTimeHHMM) }));
     } catch (err) {
-      setError(err.message || "Failed to clock out. Is the backend running?");
+      setError(err.message || t("attendance.clockWidget.failedClockOut"));
     } finally {
       setLoading(null);
     }
@@ -372,10 +393,10 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
         </span>
         <div>
           <div style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", lineHeight: 1 }}>
-            Clock In / Clock Out
+            {t("attendance.clockWidget.title")}
           </div>
           <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "3px" }}>
-            Today · {DAYS[now.getDay()]}, {MONTHS[now.getMonth()]} {now.getDate()}, {now.getFullYear()} · {fmt(currentTimeHHMM)}
+            {t("attendance.clockWidget.todayPrefix")} · {days[now.getDay()]}, {months[now.getMonth()]} {now.getDate()}, {now.getFullYear()} · {fmt(currentTimeHHMM)}
           </div>
         </div>
       </div>
@@ -386,11 +407,11 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
         {/* Employee selector */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)", minWidth: "200px", flex: 1, maxWidth: "320px" }}>
           <label style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            Employee
+            {t("attendance.clockWidget.employeeLabel")}
           </label>
           {employees.length === 0 ? (
             <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", padding: "10px var(--sp-4)", border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-md)" }}>
-              Loading employees…
+              {t("attendance.clockWidget.loadingEmployees")}
             </div>
           ) : (
             <select
@@ -408,10 +429,10 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
                 cursor: "pointer",
               }}
             >
-              <option value="">Select employee…</option>
+              <option value="">{t("attendance.clockWidget.selectEmployeePlaceholder")}</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name}{emp.email === currentUser?.email ? " (you)" : ""}
+                  {emp.name}{emp.email === currentUser?.email ? ` ${t("attendance.clockWidget.youSuffix")}` : ""}
                 </option>
               ))}
             </select>
@@ -429,15 +450,15 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
           alignItems: "center",
           minWidth: "240px",
         }}>
-          <RecordField label="Check In" value={todayRecord?.checkIn ? fmt(todayRecord.checkIn) : "—"} highlight={hasCheckedIn} />
+          <RecordField label={t("attendance.clockWidget.checkInLabel")} value={todayRecord?.checkIn ? fmt(todayRecord.checkIn) : "—"} highlight={hasCheckedIn} />
           <div style={{ width: "1px", height: "32px", background: "var(--bdr-subtle)", flexShrink: 0 }} />
-          <RecordField label="Check Out" value={todayRecord?.checkOut ? fmt(todayRecord.checkOut) : "—"} />
+          <RecordField label={t("attendance.clockWidget.checkOutLabel")} value={todayRecord?.checkOut ? fmt(todayRecord.checkOut) : "—"} />
           <div style={{ width: "1px", height: "32px", background: "var(--bdr-subtle)", flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>Status</span>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("attendance.clockWidget.statusLabel")}</span>
             {todayStatus
-              ? <Badge variant={variantMap(todayStatus)} size="sm" dot>{todayStatus}</Badge>
-              : <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-disabled)" }}>No record</span>
+              ? <Badge variant={variantMap(todayStatus)} size="sm" dot>{statusLabel(t, todayStatus)}</Badge>
+              : <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-disabled)" }}>{t("attendance.clockWidget.noRecord")}</span>
             }
           </div>
         </div>
@@ -448,7 +469,7 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
             variant="primary"
             onClick={handleClockIn}
             disabled={loading !== null || hasCheckedIn || !selectedEmpId}
-            title={hasCheckedIn ? "Already clocked in today" : "Clock in now"}
+            title={hasCheckedIn ? t("attendance.clockWidget.alreadyClockedIn") : t("attendance.clockWidget.clockInNow")}
             style={{ gap: "var(--sp-2)", minWidth: "110px" }}
           >
             {loading === "in" ? <Spinner /> : (
@@ -458,7 +479,7 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
                 <path d="M12 7v5l3 3" />
               </svg>
             )}
-            {loading === "in" ? "Clocking…" : "Clock In"}
+            {loading === "in" ? t("attendance.clockWidget.clockingLabel") : t("attendance.clockWidget.clockInButton")}
           </Button>
 
           <Button
@@ -466,9 +487,9 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
             onClick={handleClockOut}
             disabled={loading !== null || !hasCheckedIn || hasCheckedOut || !selectedEmpId}
             title={
-              !hasCheckedIn ? "Must clock in first"
-              : hasCheckedOut ? "Already clocked out today"
-              : "Clock out now"
+              !hasCheckedIn ? t("attendance.clockWidget.mustClockInFirst")
+              : hasCheckedOut ? t("attendance.clockWidget.alreadyClockedOut")
+              : t("attendance.clockWidget.clockOutNow")
             }
             style={{ gap: "var(--sp-2)", minWidth: "115px" }}
           >
@@ -480,7 +501,7 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
             )}
-            {loading === "out" ? "Clocking…" : "Clock Out"}
+            {loading === "out" ? t("attendance.clockWidget.clockingLabel") : t("attendance.clockWidget.clockOutButton")}
           </Button>
         </div>
       </div>
@@ -533,19 +554,19 @@ function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut,
           </div>
           {hasCheckedIn && !hasCheckedOut && (
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-success)", fontWeight: "var(--fw-medium)" }}>
-              ● Active since {fmt(todayRecord.checkIn)}
+              {t("attendance.clockWidget.activeSince", { time: fmt(todayRecord.checkIn) })}
             </span>
           )}
           {hasCheckedOut && (
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-              Shift complete · {
-                (() => {
+              {t("attendance.clockWidget.shiftComplete", {
+                duration: (() => {
                   const [h1, m1] = todayRecord.checkIn.split(":").map(Number);
                   const [h2, m2] = todayRecord.checkOut.split(":").map(Number);
                   const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-                  return `${Math.floor(diff / 60)}h ${diff % 60}m worked`;
-                })()
-              }
+                  return `${Math.floor(diff / 60)}h ${diff % 60}m`;
+                })(),
+              })}
             </span>
           )}
         </div>
@@ -575,6 +596,9 @@ function RecordField({ label, value, highlight }) {
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 function Attendance() {
+  const { t } = useTranslation();
+  const days = t("common.days", { returnObjects: true });
+  const months = t("common.months", { returnObjects: true });
   const { attendance, employees, getAppNow, clockIn, clockOut } = useStore();
   const { user: currentUser } = useAuth();
 
@@ -661,9 +685,9 @@ function Attendance() {
       <div className="content-card" style={{ padding: "var(--sp-4) var(--sp-6)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-4)", flexWrap: "wrap" }}>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Attendance</h2>
+            <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.header.title")}</h2>
             <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-              {MONTHS[viewMonth]} {viewYear} · {workdays} working days · {avgRate}% avg rate
+              {t("attendance.header.subtitle", { month: months[viewMonth], year: viewYear, workdays, rate: avgRate })}
             </p>
           </div>
 
@@ -671,14 +695,14 @@ function Attendance() {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
             <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
             <span style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", minWidth: "140px", textAlign: "center" }}>
-              {MONTHS[viewMonth]} {viewYear}
+              {months[viewMonth]} {viewYear}
             </span>
             <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
           </div>
 
           {/* View toggle */}
           <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
-            {[["calendar", "📅 Calendar"], ["table", "📋 Table"]].map(([v, label]) => (
+            {[["calendar", `📅 ${t("attendance.header.viewToggle.calendar")}`], ["table", `📋 ${t("attendance.header.viewToggle.table")}`]].map(([v, label]) => (
               <button key={v} type="button" onClick={() => setView(v)} style={{
                 padding: "5px 14px", borderRadius: "6px", border: "none",
                 background: view === v ? "var(--bg-surface)" : "transparent",
@@ -694,17 +718,17 @@ function Attendance() {
         {/* Summary chips */}
         <div style={{ display: "flex", gap: "var(--sp-3)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
           {[
-            { label: "Present", value: monthRecs.reduce((s, d) => s + d.present, 0), variant: "success" },
-            { label: "Late", value: monthRecs.reduce((s, d) => s + d.late, 0), variant: "warning" },
-            { label: "On Leave", value: monthRecs.reduce((s, d) => s + d.leave, 0), variant: "info" },
-            { label: "Absent", value: monthRecs.reduce((s, d) => s + d.absent, 0), variant: "danger" },
+            { label: statusLabel(t, "Present"), value: monthRecs.reduce((s, d) => s + d.present, 0), variant: "success" },
+            { label: statusLabel(t, "Late"), value: monthRecs.reduce((s, d) => s + d.late, 0), variant: "warning" },
+            { label: statusLabel(t, "On Leave"), value: monthRecs.reduce((s, d) => s + d.leave, 0), variant: "info" },
+            { label: statusLabel(t, "Absent"), value: monthRecs.reduce((s, d) => s + d.absent, 0), variant: "danger" },
           ].map((s) => (
             <Badge key={s.label} variant={s.variant} dot>
               {s.value} {s.label}
             </Badge>
           ))}
           <span style={{ marginLeft: "auto", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", alignSelf: "center" }}>
-            Click a date to view details
+            {t("attendance.header.clickToView")}
           </span>
         </div>
       </div>
@@ -727,11 +751,11 @@ function Attendance() {
               ))}
               <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--clr-success-500)", display: "inline-block" }} />
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Present</span>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("attendance.calendar.legend.present")}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--clr-warning-500)", display: "inline-block" }} />
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Late</span>
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("attendance.calendar.legend.late")}</span>
               </div>
             </div>
 
@@ -766,11 +790,11 @@ function Attendance() {
                 fontSize: "var(--fs-sm)", outline: "none", cursor: "pointer",
               }}
             >
-              <option value="all">All Employees</option>
+              <option value="all">{t("attendance.table.allEmployees")}</option>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
             <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginLeft: "auto" }}>
-              {tableRows.length} records
+              {t("attendance.table.recordsCount", { count: tableRows.length })}
             </span>
           </div>
 
@@ -778,13 +802,13 @@ function Attendance() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Date</th>
-                  <th>Day</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Hours</th>
-                  <th>Status</th>
+                  <th>{t("attendance.table.headers.employee")}</th>
+                  <th>{t("attendance.table.headers.date")}</th>
+                  <th>{t("attendance.table.headers.day")}</th>
+                  <th>{t("attendance.table.headers.checkIn")}</th>
+                  <th>{t("attendance.table.headers.checkOut")}</th>
+                  <th>{t("attendance.table.headers.hours")}</th>
+                  <th>{t("attendance.table.headers.status")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -807,13 +831,13 @@ function Attendance() {
                         </div>
                       </td>
                       <td style={{ fontSize: "var(--fs-sm)" }}>{r.date}</td>
-                      <td style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{DAYS[dow]}</td>
+                      <td style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{days[dow]}</td>
                       <td style={{ color: r.status === "Late" ? "var(--txt-warning)" : "var(--txt-primary)" }}>
                         {fmt(r.checkIn)}
                       </td>
                       <td>{fmt(r.checkOut)}</td>
                       <td style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{hours}</td>
-                      <td><Badge variant={variantMap(r.status)} size="sm">{r.status}</Badge></td>
+                      <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
                     </tr>
                   );
                 })}
@@ -823,7 +847,7 @@ function Attendance() {
 
           {tableRows.length > 50 && (
             <p style={{ textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "var(--sp-4)" }}>
-              Showing first 50 of {tableRows.length} records
+              {t("attendance.table.showingFirst", { count: tableRows.length })}
             </p>
           )}
         </div>

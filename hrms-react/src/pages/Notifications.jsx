@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import AddNotificationModal from "../components/AddNotificationModal";
@@ -7,7 +8,7 @@ import Button from "../components/Button";
 
 const CATEGORY_CONFIG = {
   leave: {
-    label: "Leave", color: "var(--clr-warning-500)", bg: "var(--bg-warning-subtle)",
+    labelKey: "notifications.categories.leave", color: "var(--clr-warning-500)", bg: "var(--bg-warning-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -17,7 +18,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   interview: {
-    label: "Hiring", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
+    labelKey: "notifications.categories.interview", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -28,7 +29,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   payroll: {
-    label: "Payroll", color: "var(--clr-success-500)", bg: "var(--bg-success-subtle)",
+    labelKey: "notifications.categories.payroll", color: "var(--clr-success-500)", bg: "var(--bg-success-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9" />
@@ -37,7 +38,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   employee: {
-    label: "Employee", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
+    labelKey: "notifications.categories.employee", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="8" r="4" />
@@ -46,7 +47,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   holiday: {
-    label: "Holiday", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
+    labelKey: "notifications.categories.holiday", color: "var(--clr-info-500)", bg: "var(--bg-info-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -56,7 +57,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   system: {
-    label: "System", color: "var(--txt-secondary)", bg: "var(--bg-surface-sub)",
+    labelKey: "notifications.categories.system", color: "var(--txt-secondary)", bg: "var(--bg-surface-sub)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="3" />
@@ -66,7 +67,7 @@ const CATEGORY_CONFIG = {
     ),
   },
   announcement: {
-    label: "Notice", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
+    labelKey: "notifications.categories.announcement", color: "var(--clr-primary-400)", bg: "var(--bg-primary-subtle)",
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M3 11l18-5v12L3 14v-3z" />
@@ -77,23 +78,23 @@ const CATEGORY_CONFIG = {
 };
 
 const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "unread", label: "Unread" },
-  ...Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => ({ key, label: cfg.label })),
+  { key: "all", labelKey: "notifications.filters.all" },
+  { key: "unread", labelKey: "notifications.filters.unread" },
+  ...Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => ({ key, labelKey: cfg.labelKey })),
 ];
 
-function timeAgo(timestamp, now) {
+function timeAgo(timestamp, now, t) {
   const then = new Date(timestamp);
   const diffMs = now - then;
   const minutes = Math.floor(diffMs / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  if (days === 1) return "Yesterday";
-  return `${days} days ago`;
+  if (minutes < 1) return t("notifications.timeAgo.justNow");
+  if (minutes < 60) return t("notifications.timeAgo.minutesAgo", { count: minutes });
+  if (hours < 24) return t("notifications.timeAgo.hoursAgo", { count: hours });
+  if (days === 1) return t("notifications.timeAgo.yesterday");
+  return t("notifications.timeAgo.daysAgo", { count: days });
 }
 
 function isToday(timestamp, now) {
@@ -102,6 +103,7 @@ function isToday(timestamp, now) {
 }
 
 function Notifications() {
+  const { t } = useTranslation();
   const {
     notifications,
     markNotificationRead,
@@ -158,13 +160,13 @@ function Notifications() {
   return (
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
-        <h2 style={{ flex: 1 }}>Notifications</h2>
+        <h2 style={{ flex: 1 }}>{t("notifications.title")}</h2>
         {isHR && (
           <Button
             variant="primary"
             onClick={() => setComposeOpen(true)}
           >
-            + Send Notice
+            {t("notifications.sendNotice")}
           </Button>
         )}
         <Button
@@ -172,14 +174,14 @@ function Notifications() {
           onClick={markAllNotificationsRead}
           disabled={!hasUnread}
         >
-          Mark all as read
+          {t("notifications.markAllRead")}
         </Button>
         <Button
           variant="secondary"
           onClick={clearReadNotifications}
           disabled={!hasRead}
         >
-          Clear read
+          {t("notifications.clearRead")}
         </Button>
       </div>
 
@@ -192,21 +194,21 @@ function Notifications() {
         }}
       >
         <div className="stat-card">
-          <div className="stat-card-label">Total</div>
+          <div className="stat-card-label">{t("notifications.stats.total.label")}</div>
           <div className="stat-card-value">{stats.total}</div>
-          <div className="stat-card-hint">All notifications</div>
+          <div className="stat-card-hint">{t("notifications.stats.total.hint")}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Unread</div>
+          <div className="stat-card-label">{t("notifications.stats.unread.label")}</div>
           <div className="stat-card-value" style={{ color: "var(--clr-danger-500)" }}>{stats.unread}</div>
-          <div className="stat-card-hint">Needs your attention</div>
+          <div className="stat-card-hint">{t("notifications.stats.unread.hint")}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Today</div>
+          <div className="stat-card-label">{t("notifications.stats.today.label")}</div>
           <div className="stat-card-value">{stats.today}</div>
-          <div className="stat-card-hint">Received today</div>
+          <div className="stat-card-hint">{t("notifications.stats.today.hint")}</div>
         </div>
       </div>
 
@@ -229,7 +231,7 @@ function Notifications() {
                     : undefined
                 }
               >
-                {f.label}
+                {t(f.labelKey)}
               </Button>
             );
           })}
@@ -243,18 +245,18 @@ function Notifications() {
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
             </div>
-            <div className="empty-state-title">No notifications</div>
+            <div className="empty-state-title">{t("notifications.empty.title")}</div>
             <div className="empty-state-description">
               {filter === "all"
-                ? "You're all caught up. New notifications will appear here."
-                : "Nothing here for this filter."}
+                ? t("notifications.empty.allCaughtUp")
+                : t("notifications.empty.noneForFilter")}
             </div>
             {filter !== "all" && (
               <Button
                 variant="secondary"
                 onClick={() => setFilter("all")}
               >
-                View all notifications
+                {t("notifications.empty.viewAll")}
               </Button>
             )}
           </div>
@@ -342,11 +344,11 @@ function Notifications() {
                         {notification.message}
                       </p>
                       <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)", display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-                        <span>{cfg.label} • {timeAgo(notification.timestamp, now)}</span>
-                        {notification.senderName && <span>· from {notification.senderName}</span>}
+                        <span>{t(cfg.labelKey)} • {timeAgo(notification.timestamp, now, t)}</span>
+                        {notification.senderName && <span>· {t("notifications.item.from", { name: notification.senderName })}</span>}
                         {notification.link && (
                           <span style={{ color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
-                            {notification.linkLabel || "Open"} →
+                            {notification.linkLabel || t("notifications.item.open")} →
                           </span>
                         )}
                       </div>
@@ -360,16 +362,16 @@ function Notifications() {
                         style={{ padding: "8px 12px", fontSize: "var(--fs-xs)" }}
                         onClick={() => markNotificationRead(notification.id)}
                       >
-                        Mark read
+                        {t("notifications.item.markRead")}
                       </Button>
                     )}
                     <Button
                       variant="secondary"
                       style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--txt-danger)" }}
                       onClick={() => removeNotification(notification.id)}
-                      aria-label="Dismiss notification"
+                      aria-label={t("notifications.item.dismissAria")}
                     >
-                      Dismiss
+                      {t("notifications.item.dismiss")}
                     </Button>
                   </div>
                 </div>

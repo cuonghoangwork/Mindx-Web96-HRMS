@@ -1,0 +1,177 @@
+{
+  "common": {
+    "days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  },
+  "dashboard": {
+    "stats": {
+      "totalEmployees": { "title": "Total Employees", "trend": "+3 this month", "hint": "{{count}} departments" },
+      "attendanceRate": { "title": "Attendance Rate", "trend": "+2% vs last week", "hint": "{{present}}/{{total}} today" },
+      "onLeave": { "title": "On Leave", "trend": "3 expiring next week", "hint": "Pending approval" },
+      "newHires": { "title": "New Hires", "trend": "+2 vs last month", "hint": "This month" }
+    },
+    "attendanceTrend": {
+      "title": "Attendance — Last 7 Days",
+      "subtitle": "% of employees present each day",
+      "viewDetails": "View details →",
+      "legend": { "good": "≥90% (Good)", "average": "≥75% (Average)", "low": "<75% (Low)" }
+    },
+    "headcount": {
+      "title": "Headcount",
+      "subtitle": "Number of employees by department",
+      "viewAll": "View all →"
+    },
+    "contractTypes": { "title": "Contract Types" },
+    "recentEmployees": {
+      "title": "Recent Employees",
+      "viewAll": "View all →",
+      "table": { "employee": "Employee", "department": "Department", "designation": "Designation", "status": "Status" }
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "addEmployee": "Add Employee",
+      "allEmployees": "All Employees",
+      "attendance": "Attendance",
+      "payroll": "Payroll",
+      "departments": "Departments",
+      "holidays": "Holidays"
+    },
+    "recentActivity": {
+      "title": "Recent Activity",
+      "newEmployee": "{{name}} was just added to the system",
+      "defaultNewEmployee": "New employee",
+      "onLeave": "{{count}} employees currently on leave",
+      "payrollApproved": "This month's payroll has been approved",
+      "attendanceToday": "Attendance rate today: {{rate}}%",
+      "pendingApprovals": "5 approval requests pending",
+      "time": {
+        "minutesAgo": "2 minutes ago",
+        "hourAgo": "1 hour ago",
+        "hoursAgo": "3 hours ago",
+        "today": "Today 8:00",
+        "yesterday": "Yesterday"
+      }
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "Present",
+      "late": "Late",
+      "onLeave": "On Leave",
+      "absent": "Absent"
+    },
+    "selectDatePrompt": "Select a date to view attendance details",
+    "dayPanel": {
+      "records": "{{count}} records",
+      "table": { "employee": "Employee", "checkIn": "Check In", "checkOut": "Check Out", "hours": "Hours", "status": "Status" }
+    },
+    "clockWidget": {
+      "title": "Clock In / Clock Out",
+      "todayPrefix": "Today",
+      "employeeLabel": "Employee",
+      "loadingEmployees": "Loading employees…",
+      "selectEmployeePlaceholder": "Select employee…",
+      "youSuffix": "(you)",
+      "checkInLabel": "Check In",
+      "checkOutLabel": "Check Out",
+      "statusLabel": "Status",
+      "noRecord": "No record",
+      "clockingLabel": "Clocking…",
+      "clockInButton": "Clock In",
+      "clockOutButton": "Clock Out",
+      "alreadyClockedIn": "Already clocked in today",
+      "clockInNow": "Clock in now",
+      "mustClockInFirst": "Must clock in first",
+      "alreadyClockedOut": "Already clocked out today",
+      "clockOutNow": "Clock out now",
+      "pleaseSelectEmployee": "Please select an employee.",
+      "clockedInAt": "Clocked in at {{time}}",
+      "failedClockIn": "Failed to clock in. Is the backend running?",
+      "clockedOutAt": "Clocked out at {{time}}",
+      "failedClockOut": "Failed to clock out. Is the backend running?",
+      "activeSince": "● Active since {{time}}",
+      "shiftComplete": "Shift complete · {{duration}} worked"
+    },
+    "header": {
+      "title": "Attendance",
+      "subtitle": "{{month}} {{year}} · {{workdays}} working days · {{rate}}% avg rate",
+      "viewToggle": { "calendar": "Calendar", "table": "Table" },
+      "clickToView": "Click a date to view details"
+    },
+    "calendar": {
+      "legend": { "present": "Present", "late": "Late" }
+    },
+    "table": {
+      "allEmployees": "All Employees",
+      "recordsCount": "{{count}} records",
+      "headers": {
+        "employee": "Employee",
+        "date": "Date",
+        "day": "Day",
+        "checkIn": "Check In",
+        "checkOut": "Check Out",
+        "hours": "Hours",
+        "status": "Status"
+      },
+      "showingFirst": "Showing first 50 of {{count}} records"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "sendNotice": "+ Send Notice",
+    "markAllRead": "Mark all as read",
+    "clearRead": "Clear read",
+    "stats": {
+      "total": { "label": "Total", "hint": "All notifications" },
+      "unread": { "label": "Unread", "hint": "Needs your attention" },
+      "today": { "label": "Today", "hint": "Received today" }
+    },
+    "filters": { "all": "All", "unread": "Unread" },
+    "categories": {
+      "leave": "Leave",
+      "interview": "Hiring",
+      "payroll": "Payroll",
+      "employee": "Employee",
+      "holiday": "Holiday",
+      "system": "System",
+      "announcement": "Notice"
+    },
+    "empty": {
+      "title": "No notifications",
+      "allCaughtUp": "You're all caught up. New notifications will appear here.",
+      "noneForFilter": "Nothing here for this filter.",
+      "viewAll": "View all notifications"
+    },
+    "item": {
+      "markRead": "Mark read",
+      "dismiss": "Dismiss",
+      "dismissAria": "Dismiss notification",
+      "from": "from {{name}}",
+      "open": "Open"
+    },
+    "timeAgo": {
+      "justNow": "Just now",
+      "minutesAgo_one": "{{count}} minute ago",
+      "minutesAgo_other": "{{count}} minutes ago",
+      "hoursAgo_one": "{{count}} hour ago",
+      "hoursAgo_other": "{{count}} hours ago",
+      "yesterday": "Yesterday",
+      "daysAgo": "{{count}} days ago"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your application preferences.",
+    "sections": {
+      "myProfile": { "title": "My Profile", "description": "View your HR profile and request changes to personal details. Changes require HR approval." },
+      "profileEditRequests": { "title": "Profile Edit Requests", "description": "Review and approve or reject employee requests to update their personal information." },
+      "proposePromotion": { "title": "Propose a Promotion", "description": "Propose a new designation, department or salary for an employee. An Administrator must approve it before it takes effect." },
+      "promotionApprovalQueue": { "title": "Promotion Approval Queue", "description": "Approve or reject promotion proposals. You cannot review a proposal you created yourself." },
+      "noShowReviewQueue": { "title": "No-show Review Queue", "description": "Employees auto-flagged after 5 no-show days on record. Flagging never changes employment status automatically — HR decides any follow-up." },
+      "manageUserRoles": { "title": "Manage User Roles", "description": "Promote employees to HR/Manager or demote them back to Employee." }
+    },
+    "darkMode": { "title": "Dark Mode", "description": "Toggle between light and dark themes", "light": "☀ Light", "dark": "◐ Dark" },
+    "emailNotifications": { "title": "Email Notifications", "description": "Receive email updates about your account" },
+    "language": { "title": "Language", "description": "Choose your preferred language", "english": "English", "vietnamese": "Vietnamese" }
+  }
+}

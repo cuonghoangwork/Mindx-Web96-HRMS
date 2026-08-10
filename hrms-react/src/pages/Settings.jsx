@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 import { useAuth } from '../context/AuthContext'
 import { useStore } from '../context/StoreContext'
 import { apiFetch } from '../api/client'
@@ -1430,7 +1432,9 @@ function SectionCard({ icon, title, description, accent = false, children }) {
    Main Settings page
 ───────────────────────────────────────────── */
 function Settings() {
+  const { t } = useTranslation()
   const { theme, toggleTheme } = useTheme()
+  const { language, setLanguage } = useLanguage()
   const { isAdmin, isHR, user } = useAuth()
 
   const onlyEmployee = !isHR  // true iff EMPLOYEE role (not HR, not Admin)
@@ -1445,8 +1449,8 @@ function Settings() {
 
   return (
     <div className="content-card">
-      <h2>Settings</h2>
-      <p style={{ color: 'var(--text-muted)', marginTop: '12px' }}>Manage your application preferences.</p>
+      <h2>{t("settings.title")}</h2>
+      <p style={{ color: 'var(--text-muted)', marginTop: '12px' }}>{t("settings.subtitle")}</p>
 
       {/* Current user info */}
       <div style={{
@@ -1482,8 +1486,8 @@ function Settings() {
                 <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
               </svg>
             }
-            title="My Profile"
-            description="View your HR profile and request changes to personal details. Changes require HR approval."
+            title={t("settings.sections.myProfile.title")}
+            description={t("settings.sections.myProfile.description")}
           >
             <MyProfileEditSection />
           </SectionCard>
@@ -1499,8 +1503,8 @@ function Settings() {
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
               </svg>
             }
-            title="Profile Edit Requests"
-            description="Review and approve or reject employee requests to update their personal information."
+            title={t("settings.sections.profileEditRequests.title")}
+            description={t("settings.sections.profileEditRequests.description")}
           >
             <ProfileEditReviewPanel />
           </SectionCard>
@@ -1516,8 +1520,8 @@ function Settings() {
                 <path d="M5 12l7-7 7 7"/>
               </svg>
             }
-            title="Propose a Promotion"
-            description="Propose a new designation, department or salary for an employee. An Administrator must approve it before it takes effect."
+            title={t("settings.sections.proposePromotion.title")}
+            description={t("settings.sections.proposePromotion.description")}
           >
             <PromotionProposeSection />
           </SectionCard>
@@ -1532,8 +1536,8 @@ function Settings() {
                 <path d="M20 6L9 17l-5-5"/>
               </svg>
             }
-            title="Promotion Approval Queue"
-            description="Approve or reject promotion proposals. You cannot review a proposal you created yourself."
+            title={t("settings.sections.promotionApprovalQueue.title")}
+            description={t("settings.sections.promotionApprovalQueue.description")}
           >
             <PromotionReviewPanel />
           </SectionCard>
@@ -1550,8 +1554,8 @@ function Settings() {
                 <path d="M12 16h.01"/>
               </svg>
             }
-            title="No-show Review Queue"
-            description="Employees auto-flagged after 5 no-show days on record. Flagging never changes employment status automatically — HR decides any follow-up."
+            title={t("settings.sections.noShowReviewQueue.title")}
+            description={t("settings.sections.noShowReviewQueue.description")}
           >
             <NoShowReviewPanel />
           </SectionCard>
@@ -1560,34 +1564,39 @@ function Settings() {
         {/* Dark mode */}
         <div style={cardStyle}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>Dark Mode</h3>
-            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Toggle between light and dark themes</p>
+            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>{t("settings.darkMode.title")}</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>{t("settings.darkMode.description")}</p>
           </div>
           <button onClick={toggleTheme} style={{ padding: '12px 24px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', fontSize: '14px' }}>
-            {theme === 'light' ? '☀ Light' : '◐ Dark'}
+            {theme === 'light' ? t("settings.darkMode.light") : t("settings.darkMode.dark")}
           </button>
         </div>
 
         {/* Email notifications */}
         <div style={cardStyle}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>Email Notifications</h3>
-            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Receive email updates about your account</p>
+            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>{t("settings.emailNotifications.title")}</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>{t("settings.emailNotifications.description")}</p>
           </div>
           <label style={{ width: '50px', height: '26px', background: 'var(--primary)', borderRadius: '13px', position: 'relative', cursor: 'pointer' }}>
             <span style={{ width: '22px', height: '22px', background: 'white', borderRadius: '50%', position: 'absolute', top: '2px', right: '2px' }} />
           </label>
         </div>
 
-        {/* Language */}
+        {/* Language — task 6.1: wired to LanguageContext (previously a
+            decorative, unwired <select>). */}
         <div style={cardStyle}>
           <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>Language</h3>
-            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>Choose your preferred language</p>
+            <h3 style={{ fontSize: '16px', fontWeight: '500' }}>{t("settings.language.title")}</h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '4px' }}>{t("settings.language.description")}</p>
           </div>
-          <select style={{ padding: '8px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}>
-            <option>English</option>
-            <option>Vietnamese</option>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={{ padding: '8px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface)' }}
+          >
+            <option value="en">{t("settings.language.english")}</option>
+            <option value="vi">{t("settings.language.vietnamese")}</option>
           </select>
         </div>
 
@@ -1601,8 +1610,8 @@ function Settings() {
                 <path d="M9 12l2 2 4-4"/>
               </svg>
             }
-            title="Manage User Roles"
-            description="Promote employees to HR/Manager or demote them back to Employee."
+            title={t("settings.sections.manageUserRoles.title")}
+            description={t("settings.sections.manageUserRoles.description")}
           >
             <PromoteUsersPanel />
           </SectionCard>

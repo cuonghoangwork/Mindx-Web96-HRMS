@@ -32,7 +32,7 @@ function Candidates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdParam = searchParams.get("job");
 
-  const { candidates, jobs, updateCandidate, removeCandidate, getJobById } = useStore();
+  const { candidates, jobs, updateCandidate, uploadCandidateCv, removeCandidate, getJobById } = useStore();
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
@@ -286,6 +286,7 @@ function Candidates() {
           jobTitle={getJobById(selectedCandidate.jobId)?.title}
           onClose={() => setSelectedCandidateId(null)}
           onStageChange={handleStageChange}
+          onUploadCv={uploadCandidateCv}
           onDelete={(id) => {
             handleDelete(id);
             setSelectedCandidateId(null);
