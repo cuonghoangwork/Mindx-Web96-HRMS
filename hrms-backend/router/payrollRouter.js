@@ -24,6 +24,8 @@ router.post(
   payrollController.generateMonthlyDraft,
 );
 
+router.post("/run-monthly", verifyToken, authorize("ADMIN"), payrollController.runMonthly);
+
 // Task 3.8, frontend support: HR-tier read of the current/target month's FX
 // snapshot, used by the "New period" form's "Fetch live rate" button.
 router.get("/fx-rate/:year/:month", ...hr, payrollController.previewFxRate);

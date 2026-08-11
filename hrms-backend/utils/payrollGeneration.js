@@ -31,7 +31,7 @@ export const PAYABLE_EMPLOYEE_STATUSES = ["active", "on-leave"];
 
 export const periodLabel = (p) => `${p.year}-${String(p.month).padStart(2, "0")}`;
 
-async function loadMonthDayCounts(year, month) {
+export async function loadMonthDayCounts(year, month) {
   const { lo, hi } = monthQueryWindowUtc(year, month);
 
   const [leaves, absences, onLeaveRows, holidays] = await Promise.all([
@@ -110,7 +110,13 @@ export async function buildPayslipRows(period) {
       absentDays,
       autoDeduction,
       deductionOverridden: false,
-      ...computePayslip({ baseSalary, bonus: 0, allowance: 0, deduction: autoDeduction }),
+      ...computePayslip({
+        baseSalary,
+        bonus: 0,
+        allowance: 0,
+        deduction: autoDeduction,
+        unpaidDays: unpaidLeaveDays + absentDays,
+      }),
     };
   });
 }

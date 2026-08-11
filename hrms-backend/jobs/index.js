@@ -2,6 +2,8 @@ import cron from "node-cron";
 import { closeAttendanceDay } from "./closeAttendanceDay.js";
 import { checkPromotionEligibility } from "./checkPromotionEligibility.js";
 import { generateMonthlyPayrollDraft } from "./generateMonthlyPayrollDraft.js";
+import { runMonthlyPayroll } from "./runMonthlyPayroll.js";
+import { annualSalaryRaise } from "./annualSalaryRaise.js";
 import { dateKeyInTz } from "../utils/workday.js";
 
 export const SCHEDULER_TZ = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
@@ -9,6 +11,8 @@ export const SCHEDULER_TZ = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
 let running = false;
 let promotionCheckRunning = false;
 let monthlyPayrollDraftRunning = false;
+let monthlyPayrollRunRunning = false;
+let annualRaiseRunning = false;
 
 async function runCloseAttendance() {
   if (running) {
@@ -59,6 +63,38 @@ async function runMonthlyPayrollDraft() {
   }
 }
 
+async function runMonthlyPayrollRun() {
+  if (monthlyPayrollRunRunning) {
+    console.log("[scheduler] runMonthlyPayroll skipped - previous run still in progress");
+    return;
+  }
+  monthlyPayrollRunRunning = true;
+  try {
+    const result = await runMonthlyPayroll({ asOf: new Date() });
+    console.log("[scheduler] runMonthlyPayroll", JSON.stringify(result));
+  } catch (err) {
+    console.error("[scheduler] runMonthlyPayroll failed:", err.message);
+  } finally {
+    monthlyPayrollRunRunning = false;
+  }
+}
+
+async function runAnnualSalaryRaise() {
+  if (annualRaiseRunning) {
+    console.log("[scheduler] annualSalaryRaise skipped - previous run still in progress");
+    return;
+  }
+  annualRaiseRunning = true;
+  try {
+    const result = await annualSalaryRaise({ asOf: new Date() });
+    console.log("[scheduler] annualSalaryRaise", JSON.stringify(result));
+  } catch (err) {
+    console.error("[scheduler] annualSalaryRaise failed:", err.message);
+  } finally {
+    annualRaiseRunning = false;
+  }
+}
+
 export function startScheduler() {
   if (process.env.ENABLE_SCHEDULER === "false" || process.env.NODE_ENV === "test") {
     console.log("[scheduler] disabled");
@@ -101,10 +137,36 @@ export function startScheduler() {
     );
   }
 
+  const monthlyPayrollRunExpression = process.env.CRON_MONTHLY_PAYROLL_RUN || "0 3 10 * *";
+  let monthlyPayrollRunTask = null;
+  if (!cron.validate(monthlyPayrollRunExpression)) {
+    console.error(`[scheduler] invalid cron expression: ${monthlyPayrollRunExpression} - monthly payroll run not started`);
+  } else {
+    monthlyPayrollRunTask = cron.schedule(monthlyPayrollRunExpression, runMonthlyPayrollRun, {
+      timezone: SCHEDULER_TZ,
+    });
+    console.log(
+      `[scheduler] runMonthlyPayroll scheduled "${monthlyPayrollRunExpression}" (${SCHEDULER_TZ})`,
+    );
+  }
+
+  const annualRaiseExpression = process.env.CRON_ANNUAL_RAISE || "0 4 * * *";
+  let annualRaiseTask = null;
+  if (!cron.validate(annualRaiseExpression)) {
+    console.error(`[scheduler] invalid cron expression: ${annualRaiseExpression} - annual salary raise not started`);
+  } else {
+    annualRaiseTask = cron.schedule(annualRaiseExpression, runAnnualSalaryRaise, {
+      timezone: SCHEDULER_TZ,
+    });
+    console.log(`[scheduler] annualSalaryRaise scheduled "${annualRaiseExpression}" (${SCHEDULER_TZ})`);
+  }
+
   return {
     closeAttendanceTask: task,
     promotionEligibilityTask: promotionTask,
     monthlyPayrollDraftTask,
+    monthlyPayrollRunTask,
+    annualRaiseTask,
   };
 }
 

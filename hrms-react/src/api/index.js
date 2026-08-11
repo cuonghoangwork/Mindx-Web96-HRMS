@@ -116,6 +116,7 @@ export const PayrollAPI = {
   // generation job, and a read-only preview of the live FX rate for a given
   // year/month used by the "New period" form's "Fetch live rate" button.
   generateMonthlyDraft: () => apiFetch("/payroll/generate-monthly-draft", { method: "POST" }),
+  runMonthly: () => apiFetch("/payroll/run-monthly", { method: "POST" }),
   fxRatePreview: (year, month) => apiFetch(`/payroll/fx-rate/${year}/${month}`),
 };
 

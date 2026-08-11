@@ -187,7 +187,8 @@ function MoneyInput({ value, disabled, onCommit }) {
     }
     setSaving(true);
     try {
-      await onCommit(Number(next));
+      const ok = await onCommit(Number(next));
+      if (!ok) setDraft(String(value ?? 0));
     } finally {
       setSaving(false);
     }
@@ -223,9 +224,9 @@ function BreakdownPanel({ slip, currency, fxRate, period }) {
     { label: "Allowance", value: slip.allowance, sign: 1 },
     { label: "Deduction", value: slip.deduction, sign: -1 },
     { label: "Gross pay", value: slip.grossPay, total: true },
-    { label: "Social insurance (BHXH 8%)", value: slip.bhxh, sign: -1 },
-    { label: "Health insurance (BHYT 1.5%)", value: slip.bhyt, sign: -1 },
-    { label: "Unemployment (BHTN 1%)", value: slip.bhtn, sign: -1 },
+    { label: `Social insurance (BHXH 8%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhxh, sign: -1 },
+    { label: `Health insurance (BHYT 1.5%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhyt, sign: -1 },
+    { label: `Unemployment (BHTN 1%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhtn, sign: -1 },
     { label: "Personal income tax", value: slip.pit, sign: -1 },
     { label: "Net pay", value: slip.netPay, total: true },
   ];
@@ -272,6 +273,17 @@ function BreakdownPanel({ slip, currency, fxRate, period }) {
         {slip.unpaidLeaveDays === 1 ? "" : "s"} · {slip.absentDays} absent day
         {slip.absentDays === 1 ? "" : "s"} · assumes 0 registered dependents.
       </div>
+
+      {slip.insuranceExempt && (
+        <div style={{
+          marginTop: "var(--sp-3)", padding: "var(--sp-3) var(--sp-4)",
+          background: "var(--bg-warning-subtle)", border: "1px solid var(--bdr-default)",
+          borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
+        }}>
+          No social, health or unemployment insurance is charged this period: {slip.unpaidLeaveDays + slip.absentDays} unpaid
+          working days reached the 14-day statutory exemption. Personal income tax still applies.
+        </div>
+      )}
     </div>
   );
 }
@@ -444,12 +456,16 @@ function Payroll() {
   };
 
   const patchPayslip = async (id, body) => {
+    const reason = window.prompt("Reason for this salary adjustment (recorded in the audit log):");
+    if (!reason || !reason.trim()) return false;
     try {
-      const res = await PayrollAPI.updatePayslip(id, body);
+      const res = await PayrollAPI.updatePayslip(id, { ...body, reason: reason.trim() });
       setPayslips((prev) => prev.map((p) => (p.id === id ? res.data : p)));
       await refreshPeriodTotals();
+      return true;
     } catch (err) {
       setToast(`Error: ${err.message}`);
+      return false;
     }
   };
 
@@ -533,6 +549,31 @@ function Payroll() {
         );
         await loadPeriods(res.data.periodId);
       }
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setDraftBusy(false);
+  };
+
+  const handleRunMonthly = async () => {
+    if (!window.confirm(
+      "Run last month's payroll now? Approved payslips are marked paid and can never be edited again.",
+    )) return;
+    setDraftBusy(true);
+    try {
+      const res = await PayrollAPI.runMonthly();
+      if (res.data.skipped) {
+        const reasonText = {
+          "no-period": "Last month has no payroll period. Create one first.",
+          "already-paid": "Last month's payroll has already been paid.",
+          "no-payslips": "Last month's period has no payslips, so nothing was paid.",
+        }[res.data.reason] ?? "Nothing to run.";
+        setToast(reasonText);
+      } else {
+        setToast(`${res.data.year}-${String(res.data.month).padStart(2, "0")} payroll paid — ${res.data.payslipCount} payslips.`);
+      }
+      await loadPeriods(res.data.periodId);
+      await loadPayslips(periodId);
     } catch (err) {
       setToast(`Error: ${err.message}`);
     }
@@ -658,6 +699,17 @@ function Payroll() {
                 title="Runs the same start-of-month job the scheduler runs automatically"
               >
                 {draftBusy ? "Generating…" : "Generate this month's draft"}
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={draftBusy}
+                onClick={handleRunMonthly}
+                title="Runs the same 10th-of-month job the scheduler runs automatically, for last month"
+              >
+                Run last month&rsquo;s payroll
               </Button>
             )}
             {isHR && (
@@ -992,7 +1044,18 @@ function Payroll() {
                               </div>
                             </td>
                             <td style={{ textAlign: "right", fontWeight: "var(--fw-medium)" }}>{fmtMoney(p.grossPay, currency, fxRate)}</td>
-                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>−{fmtMoney(p.insuranceTotal, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>
+                              {p.insuranceExempt ? (
+                                <span
+                                  title={`Exempt — ${p.unpaidLeaveDays + p.absentDays} unpaid working days reached the 14-day threshold`}
+                                  style={{ color: "var(--txt-secondary)" }}
+                                >
+                                  Exempt
+                                </span>
+                              ) : (
+                                `−${fmtMoney(p.insuranceTotal, currency, fxRate)}`
+                              )}
+                            </td>
                             <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>−{fmtMoney(p.pit, currency, fxRate)}</td>
                             <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)", color: "var(--txt-success)" }}>
                               {fmtMoney(p.netPay, currency, fxRate)}

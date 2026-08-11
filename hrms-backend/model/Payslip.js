@@ -25,6 +25,7 @@ const payslipSchema = new mongoose.Schema(
 
     grossPay: { type: Number, required: true, default: 0, min: 0 },
     insuranceBase: { type: Number, required: true, default: 0, min: 0 },
+    insuranceExempt: { type: Boolean, default: false },
     bhxh: { type: Number, required: true, default: 0, min: 0 },
     bhyt: { type: Number, required: true, default: 0, min: 0 },
     bhtn: { type: Number, required: true, default: 0, min: 0 },

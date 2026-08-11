@@ -411,3 +411,48 @@ describe("validate.attendance.checkOut", () => {
     expect(await failsWith(v, { employeeId: "abc123", date: "2026-01-15", checkOut: "6pm" }, "HH:MM")).toBe(true);
   });
 });
+
+describe("validate.payroll.updatePayslip", () => {
+  const v = validate.payroll.updatePayslip;
+
+  it("passes with one money field and a reason", async () => {
+    expect(await passes(v, { baseSalary: 9_000_000, reason: "Corrected base pay" })).toBe(true);
+  });
+
+  it("accepts zero as a money amount", async () => {
+    expect(await passes(v, { bonus: 0, reason: "Bonus withdrawn" })).toBe(true);
+  });
+
+  it("rejects a body with no money field at all", async () => {
+    expect(await failsWith(v, { reason: "Nothing to change" }, "at least one")).toBe(true);
+  });
+
+  it("rejects a missing reason", async () => {
+    expect(await failsWith(v, { baseSalary: 9_000_000 }, "Adjustment reason is required")).toBe(true);
+  });
+
+  it("rejects a blank reason", async () => {
+    expect(await failsWith(v, { baseSalary: 9_000_000, reason: "   " }, "Adjustment reason is required")).toBe(true);
+  });
+
+  it("rejects a reason longer than 300 characters", async () => {
+    expect(await failsWith(v, { baseSalary: 9_000_000, reason: "x".repeat(301) }, "at most 300")).toBe(true);
+  });
+
+  it("rejects a non-string reason with 400 rather than throwing", async () => {
+    expect(await failsWith(v, { baseSalary: 9_000_000, reason: 42 }, "Adjustment reason is required")).toBe(true);
+    expect(await failsWith(v, { baseSalary: 9_000_000, reason: { text: "hi" } }, "Adjustment reason is required")).toBe(true);
+  });
+
+  it("rejects a decimal VND amount", async () => {
+    expect(await failsWith(v, { baseSalary: 9_000_000.5, reason: "Rounding" }, "whole number")).toBe(true);
+  });
+
+  it("rejects a negative VND amount", async () => {
+    expect(await failsWith(v, { deduction: -1, reason: "Negative" }, "non-negative")).toBe(true);
+  });
+
+  it("treats an empty-string money field as not provided", async () => {
+    expect(await failsWith(v, { baseSalary: "", reason: "Blank" }, "at least one")).toBe(true);
+  });
+});
