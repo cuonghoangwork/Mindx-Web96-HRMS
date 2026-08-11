@@ -1,10 +1,16 @@
 import PayrollPeriodModel, { PAYROLL_PERIOD_STATUSES } from "../model/PayrollPeriod.js";
 import PayslipModel from "../model/Payslip.js";
 import { DEFAULT_FX_RATE_VND_PER_USD, autoDeductionVnd, computePayslip, standardWorkingDaysInMonth } from "../utils/payrollEngine.js";
-import { buildPayslipRows, insertPayslips, periodLabel } from "../utils/payrollGeneration.js";
+import {
+  buildPayslipRows,
+  insertPayslips,
+  loadMonthDayCounts,
+  periodLabel,
+} from "../utils/payrollGeneration.js";
 import { generateMonthlyPayrollDraft } from "../jobs/generateMonthlyPayrollDraft.js";
+import { runMonthlyPayroll } from "../jobs/runMonthlyPayroll.js";
 import { getOrCreateMonthlyFxRate } from "../utils/exchangeRate.js";
-import { logAction } from "../utils/auditLog.js";
+import { diffChanges, logAction } from "../utils/auditLog.js";
 import { notifyHR } from "./notificationController.js";
 import NotificationModel from "../model/Notification.js";
 
@@ -80,6 +86,7 @@ function payslipToClient(doc, period) {
     deductionOverridden: Boolean(o.deductionOverridden),
     grossPay: o.grossPay ?? 0,
     insuranceBase: o.insuranceBase ?? 0,
+    insuranceExempt: Boolean(o.insuranceExempt),
     bhxh: o.bhxh ?? 0,
     bhyt: o.bhyt ?? 0,
     bhtn: o.bhtn ?? 0,
@@ -281,6 +288,12 @@ const payrollController = {
 
       const body = req.body ?? {};
       const pick = (key) => (providedVnd(body[key]) ? Number(body[key]) : payslip[key]);
+      const before = {
+        baseSalary: payslip.baseSalary,
+        bonus: payslip.bonus,
+        allowance: payslip.allowance,
+        deduction: payslip.deduction,
+      };
       const merged = {
         baseSalary: pick("baseSalary"),
         bonus: pick("bonus"),
@@ -304,22 +317,24 @@ const payrollController = {
         standardWorkingDays: period.standardWorkingDays,
       });
       payslip.deductionOverridden = merged.deduction !== payslip.autoDeduction;
-      Object.assign(payslip, computePayslip(merged));
+      Object.assign(
+        payslip,
+        computePayslip({
+          ...merged,
+          unpaidDays: payslip.unpaidLeaveDays + payslip.absentDays,
+        }),
+      );
       await payslip.save();
+
+      const changes = diffChanges(before, merged) ?? {};
+      changes.reason = { from: null, to: body.reason.trim() };
 
       await logAction(req, {
         action: "updated",
         resource: "payroll",
         resourceId: payslip._id,
         label: `${payslip.employeeName} — ${periodLabel(period)}`,
-        changes: {
-          fields: {
-            from: null,
-            to: Object.keys(body)
-              .filter((k) => providedVnd(body[k]))
-              .join(", "),
-          },
-        },
+        changes,
       });
 
       res.json({ success: true, data: payslipToClient(payslip, period) });
@@ -368,6 +383,7 @@ const payrollController = {
           bonus: payslip.bonus,
           allowance: payslip.allowance,
           deduction: autoDeduction,
+          unpaidDays: unpaidLeaveDays + absentDays,
         }),
       );
       await payslip.save();
@@ -509,6 +525,15 @@ const payrollController = {
         year && month ? new Date(Number(year), Number(month) - 1, 1) : new Date();
 
       const result = await generateMonthlyPayrollDraft({ asOf });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  runMonthly: async (req, res) => {
+    try {
+      const result = await runMonthlyPayroll({});
       res.json({ success: true, data: result });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });

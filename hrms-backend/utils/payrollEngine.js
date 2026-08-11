@@ -10,6 +10,8 @@ export const BHTN_RATE = 0.01;
 
 export const PERSONAL_DEDUCTION_VND = 11_000_000;
 
+export const INSURANCE_EXEMPT_UNPAID_DAYS = 14;
+
 export const PIT_BRACKETS_VND = [
   { upTo: 5_000_000, rate: 0.05 },
   { upTo: 10_000_000, rate: 0.1 },
@@ -41,14 +43,21 @@ export function calcProgressivePitVnd(taxableIncomeVnd) {
   return tax;
 }
 
-export function computePayslip({ baseSalary = 0, bonus = 0, allowance = 0, deduction = 0 } = {}) {
+export function computePayslip({
+  baseSalary = 0,
+  bonus = 0,
+  allowance = 0,
+  deduction = 0,
+  unpaidDays = 0,
+} = {}) {
   const base = toVnd(baseSalary);
   const bon = toVnd(bonus);
   const allo = toVnd(allowance);
   const ded = toVnd(deduction);
 
   const grossPay = Math.max(0, base + bon + allo - ded);
-  const insuranceBase = Math.min(base + allo, grossPay);
+  const insuranceExempt = Number(unpaidDays) >= INSURANCE_EXEMPT_UNPAID_DAYS;
+  const insuranceBase = insuranceExempt ? 0 : Math.min(base + allo, grossPay);
 
   const bhxhBase = Math.min(insuranceBase, BHXH_BHYT_CAP_VND);
   const bhtnBase = Math.min(insuranceBase, BHTN_CAP_VND);
@@ -70,6 +79,7 @@ export function computePayslip({ baseSalary = 0, bonus = 0, allowance = 0, deduc
     deduction: ded,
     grossPay,
     insuranceBase,
+    insuranceExempt,
     bhxh,
     bhyt,
     bhtn,

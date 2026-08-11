@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   BHTN_CAP_VND,
   BHXH_BHYT_CAP_VND,
+  INSURANCE_EXEMPT_UNPAID_DAYS,
   PERSONAL_DEDUCTION_VND,
   autoDeductionVnd,
   calcProgressivePitVnd,
@@ -76,9 +77,10 @@ describe("computePayslip", () => {
     }
   });
 
-  it("returns integers for every field", () => {
+  it("returns integers for every numeric field", () => {
     for (const input of CASES) {
       for (const [key, value] of Object.entries(computePayslip(input))) {
+        if (typeof value !== "number") continue;
         expect(Number.isInteger(value), `${key} must be an integer`).toBe(true);
       }
     }
@@ -101,10 +103,13 @@ describe("computePayslip", () => {
       const bonus = Math.floor(rnd() * 100_000_000);
       const allowance = Math.floor(rnd() * 50_000_000);
       const deduction = Math.floor(rnd() * (baseSalary + bonus + allowance + 1));
-      const r = computePayslip({ baseSalary, bonus, allowance, deduction });
+      const unpaidDays = Math.floor(rnd() * 25);
+      const r = computePayslip({ baseSalary, bonus, allowance, deduction, unpaidDays });
       expect(r.grossPay).toBe(r.netPay + r.insuranceTotal + r.pit);
       expect(r.netPay).toBeGreaterThanOrEqual(0);
       expect(r.insuranceTotal).toBe(r.bhxh + r.bhyt + r.bhtn);
+      expect(r.insuranceExempt).toBe(unpaidDays >= INSURANCE_EXEMPT_UNPAID_DAYS);
+      if (r.insuranceExempt) expect(r.insuranceTotal).toBe(0);
     }
   });
 
@@ -153,6 +158,56 @@ describe("computePayslip", () => {
     expect(r.netPay).toBe(0);
     expect(r.insuranceTotal).toBe(0);
     expect(r.pit).toBe(0);
+  });
+});
+
+describe("computePayslip insurance exemption for 14+ unpaid days", () => {
+  const PAY = { baseSalary: 30_000_000, bonus: 5_000_000, allowance: 2_000_000 };
+
+  it("defaults to not exempt when unpaidDays is omitted", () => {
+    const r = computePayslip(PAY);
+    expect(r.insuranceExempt).toBe(false);
+    expect(r.insuranceTotal).toBeGreaterThan(0);
+  });
+
+  it("still charges insurance at one day below the threshold", () => {
+    const r = computePayslip({ ...PAY, unpaidDays: INSURANCE_EXEMPT_UNPAID_DAYS - 1 });
+    expect(r.insuranceExempt).toBe(false);
+    expect(r.insuranceTotal).toBeGreaterThan(0);
+  });
+
+  it("zeroes the insurance base and all three contributions at the threshold", () => {
+    const r = computePayslip({ ...PAY, unpaidDays: INSURANCE_EXEMPT_UNPAID_DAYS });
+    expect(r.insuranceExempt).toBe(true);
+    expect(r.insuranceBase).toBe(0);
+    expect(r.bhxh).toBe(0);
+    expect(r.bhyt).toBe(0);
+    expect(r.bhtn).toBe(0);
+    expect(r.insuranceTotal).toBe(0);
+  });
+
+  it("stays exempt above the threshold", () => {
+    const r = computePayslip({ ...PAY, unpaidDays: INSURANCE_EXEMPT_UNPAID_DAYS + 7 });
+    expect(r.insuranceExempt).toBe(true);
+    expect(r.insuranceTotal).toBe(0);
+  });
+
+  it("raises personal income tax but still raises net pay", () => {
+    const charged = computePayslip({ ...PAY, unpaidDays: 0 });
+    const exempt = computePayslip({ ...PAY, unpaidDays: INSURANCE_EXEMPT_UNPAID_DAYS });
+    expect(exempt.taxableIncome).toBeGreaterThan(charged.taxableIncome);
+    expect(exempt.pit).toBeGreaterThan(charged.pit);
+    expect(exempt.netPay).toBeGreaterThan(charged.netPay);
+  });
+
+  it("holds the reconciliation invariant while exempt", () => {
+    const r = computePayslip({ ...PAY, unpaidDays: INSURANCE_EXEMPT_UNPAID_DAYS });
+    expect(r.grossPay).toBe(r.netPay + r.insuranceTotal + r.pit);
+  });
+
+  it("ignores a non-numeric unpaidDays instead of exempting", () => {
+    expect(computePayslip({ ...PAY, unpaidDays: null }).insuranceExempt).toBe(false);
+    expect(computePayslip({ ...PAY, unpaidDays: "many" }).insuranceExempt).toBe(false);
   });
 });
 

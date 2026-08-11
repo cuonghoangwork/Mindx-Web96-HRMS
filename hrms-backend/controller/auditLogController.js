@@ -39,6 +39,7 @@ const auditLogController = {
       const limit = Math.min(Number(req.query.limit) || 10, 50);
 
       const items = await AuditLog.find()
+        .select("-changes")
         .sort({ createdAt: -1 })
         .limit(limit);
 

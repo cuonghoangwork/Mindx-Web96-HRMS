@@ -360,6 +360,12 @@ const isVndAmount = (field, label) => (body) => {
   return null;
 };
 
+const isRequiredText = (field, label, max) => (body) => {
+  const value = body[field];
+  if (typeof value !== "string" || !value.trim()) return `${label} is required.`;
+  return value.trim().length > max ? `${label} must be at most ${max} characters.` : null;
+};
+
 const isIntInRange = (field, label, min, max) => (body) => {
   const n = Number(body[field]);
   return Number.isInteger(n) && n >= min && n <= max
@@ -390,6 +396,7 @@ const payrollUpdatePayslip = makeValidator([
   isVndAmount("bonus", "Bonus"),
   isVndAmount("allowance", "Allowance"),
   isVndAmount("deduction", "Deduction"),
+  isRequiredText("reason", "Adjustment reason", 300),
 ]);
 
 /* ── Exports ── */
