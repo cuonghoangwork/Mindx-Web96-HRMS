@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDate as formatDateLocalized } from "../utils/format";
 import Badge, { TypeBadge } from "../components/Badge";
 import AddJobModal from "../components/AddJobModal";
 import Button from "../components/Button";
@@ -11,8 +13,11 @@ const STATUS_VARIANT = {
   Closed: "neutral",
 };
 
-function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+// Task 6.6 — was previously pinned to "en-US" regardless of the app's
+// language toggle; now delegates to utils/format.js so postings display
+// with the selected language's date convention.
+function formatDate(dateStr, language) {
+  return formatDateLocalized(dateStr, language, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -20,17 +25,22 @@ function formatDate(dateStr) {
 }
 
 // Task 5.1 — pay range shown on the job card / details panel.
+// Task 6.6 — currency grouping follows the posting's own currency (same
+// convention as Payroll.jsx's fmtMoney: VND groups the Vietnamese way,
+// everything else groups the US way), not the UI language toggle.
 function formatSalaryRange(job) {
   const { salaryMin, salaryMax, salaryCurrency } = job;
   if (!salaryMin && !salaryMax) return null;
   const currency = salaryCurrency || "USD";
-  const fmt = (n) => `${currency} ${Number(n).toLocaleString()}`;
+  const numberLocale = currency === "VND" ? "vi-VN" : "en-US";
+  const fmt = (n) => `${currency} ${Number(n).toLocaleString(numberLocale)}`;
   if (salaryMin && salaryMax && salaryMin !== salaryMax) return `${fmt(salaryMin)} – ${fmt(salaryMax)}`;
   return fmt(salaryMin || salaryMax);
 }
 
 function Jobs() {
   const navigate = useNavigate();
+  const { language } = useLanguage();
   const { departments, jobs, addJob, updateJob, removeJob, getApplicantCount } =
     useStore();
   const departmentNames = useMemo(
@@ -288,8 +298,8 @@ function Jobs() {
                           marginTop: "var(--sp-1)",
                         }}
                       >
-                        {job.department} • {job.location} • Posted {formatDate(job.postedDate)}
-                        {job.deadline ? ` • Apply by ${formatDate(job.deadline)}` : ""}
+                        {job.department} • {job.location} • Posted {formatDate(job.postedDate, language)}
+                        {job.deadline ? ` • Apply by ${formatDate(job.deadline, language)}` : ""}
                       </p>
                       <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                         <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>

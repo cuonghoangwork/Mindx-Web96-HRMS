@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { StatusBadge } from "../components/Badge";
@@ -186,6 +187,7 @@ function ActivityItem({ icon, bg, text, time }) {
    DASHBOARD
 ═══════════════════════════════════════════ */
 function Dashboard() {
+  const { t } = useTranslation();
   const { employees, attendance, departments, getEmployeeCountByDepartment, getAppNow } = useStore();
 
   // ── Stats ──
@@ -221,18 +223,18 @@ function Dashboard() {
 
   // ── Activity feed (mock) ──
   const activities = [
-    { icon: "✚", bg: "var(--bg-success-subtle)", text: `${employees[employees.length - 1]?.name || "New employee"} was just added to the system`, time: "2 minutes ago" },
-    { icon: "📋", bg: "var(--bg-warning-subtle)", text: `${onLeave} employees currently on leave`, time: "1 hour ago" },
-    { icon: "💰", bg: "var(--bg-primary-subtle)", text: "This month's payroll has been approved", time: "3 hours ago" },
-    { icon: "📊", bg: "var(--bg-info-subtle)", text: `Attendance rate today: ${attendanceRate}%`, time: "Today 8:00" },
-    { icon: "🔔", bg: "var(--bg-danger-subtle)", text: "5 approval requests pending", time: "Yesterday" },
+    { icon: "✚", bg: "var(--bg-success-subtle)", text: t("dashboard.recentActivity.newEmployee", { name: employees[employees.length - 1]?.name || t("dashboard.recentActivity.defaultNewEmployee") }), time: t("dashboard.recentActivity.time.minutesAgo") },
+    { icon: "📋", bg: "var(--bg-warning-subtle)", text: t("dashboard.recentActivity.onLeave", { count: onLeave }), time: t("dashboard.recentActivity.time.hourAgo") },
+    { icon: "💰", bg: "var(--bg-primary-subtle)", text: t("dashboard.recentActivity.payrollApproved"), time: t("dashboard.recentActivity.time.hoursAgo") },
+    { icon: "📊", bg: "var(--bg-info-subtle)", text: t("dashboard.recentActivity.attendanceToday", { rate: attendanceRate }), time: t("dashboard.recentActivity.time.today") },
+    { icon: "🔔", bg: "var(--bg-danger-subtle)", text: t("dashboard.recentActivity.pendingApprovals"), time: t("dashboard.recentActivity.time.yesterday") },
   ];
 
   // ── Quick links ──
   const quickLinks = [
     {
       to: "/employees/add",
-      label: "Add Employee",
+      label: t("dashboard.quickActions.addEmployee"),
       bg: "var(--bg-primary-subtle)",
       color: "var(--clr-primary-400)",
       icon: (
@@ -246,7 +248,7 @@ function Dashboard() {
     },
     {
       to: "/employees",
-      label: "All Employees",
+      label: t("dashboard.quickActions.allEmployees"),
       bg: "var(--bg-primary-subtle)",
       color: "var(--clr-primary-400)",
       icon: (
@@ -260,7 +262,7 @@ function Dashboard() {
     },
     {
       to: "/attendance",
-      label: "Attendance",
+      label: t("dashboard.quickActions.attendance"),
       bg: "var(--bg-info-subtle)",
       color: "var(--clr-info-500)",
       icon: (
@@ -272,7 +274,7 @@ function Dashboard() {
     },
     {
       to: "/payroll",
-      label: "Payroll",
+      label: t("dashboard.quickActions.payroll"),
       bg: "var(--bg-success-subtle)",
       color: "var(--clr-success-500)",
       icon: (
@@ -286,7 +288,7 @@ function Dashboard() {
     },
     {
       to: "/departments",
-      label: "Departments",
+      label: t("dashboard.quickActions.departments"),
       bg: "var(--bg-warning-subtle)",
       color: "var(--clr-warning-500)",
       icon: (
@@ -303,7 +305,7 @@ function Dashboard() {
     },
     {
       to: "/holidays",
-      label: "Holidays",
+      label: t("dashboard.quickActions.holidays"),
       bg: "var(--bg-danger-subtle)",
       color: "var(--clr-danger-500)",
       icon: (
@@ -328,36 +330,36 @@ function Dashboard() {
       {/* ── ROW 1: 4 Stat Cards ── */}
       <div className="stat-grid">
         <StatCard
-          title="Total Employees"
+          title={t("dashboard.stats.totalEmployees.title")}
           value={totalEmployees}
-          trend="+3 this month"
+          trend={t("dashboard.stats.totalEmployees.trend")}
           trendUp
-          hint={`${departments.length} departments`}
+          hint={t("dashboard.stats.totalEmployees.hint", { count: departments.length })}
           accentColor="var(--clr-primary-400)"
         />
         <StatCard
-          title="Attendance Rate"
+          title={t("dashboard.stats.attendanceRate.title")}
           value={`${attendanceRate}%`}
-          trend="+2% vs last week"
+          trend={t("dashboard.stats.attendanceRate.trend")}
           trendUp
-          hint={`${presentCount}/${attendance.length} today`}
+          hint={t("dashboard.stats.attendanceRate.hint", { present: presentCount, total: attendance.length })}
           sparkData={attendSpark}
           accentColor="var(--clr-success-600)"
         />
         <StatCard
-          title="On Leave"
+          title={t("dashboard.stats.onLeave.title")}
           value={onLeave}
-          trend="3 expiring next week"
+          trend={t("dashboard.stats.onLeave.trend")}
           trendUp={false}
-          hint="Pending approval"
+          hint={t("dashboard.stats.onLeave.hint")}
           accentColor="var(--clr-warning-600)"
         />
         <StatCard
-          title="New Hires"
+          title={t("dashboard.stats.newHires.title")}
           value={newHires}
-          trend="+2 vs last month"
+          trend={t("dashboard.stats.newHires.trend")}
           trendUp
-          hint="This month"
+          hint={t("dashboard.stats.newHires.hint")}
           sparkData={hireSpark}
           accentColor="var(--clr-info-600)"
         />
@@ -370,22 +372,22 @@ function Dashboard() {
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
-              <h3 className="section-title" style={{ margin: 0 }}>Attendance — Last 7 Days</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.attendanceTrend.title")}</h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                % of employees present each day
+                {t("dashboard.attendanceTrend.subtitle")}
               </p>
             </div>
             <Link to="/attendance" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}>
-              View details →
+              {t("dashboard.attendanceTrend.viewDetails")}
             </Link>
           </div>
           <AttendanceTrendChart attendance={attendance} totalStaff={totalEmployees} />
           {/* Legend */}
           <div style={{ display: "flex", gap: "var(--sp-4)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
             {[
-              { label: "≥90% (Good)", color: "var(--clr-success-400)" },
-              { label: "≥75% (Average)", color: "var(--clr-warning-400)" },
-              { label: "<75% (Low)", color: "var(--clr-danger-400)" },
+              { label: t("dashboard.attendanceTrend.legend.good"), color: "var(--clr-success-400)" },
+              { label: t("dashboard.attendanceTrend.legend.average"), color: "var(--clr-warning-400)" },
+              { label: t("dashboard.attendanceTrend.legend.low"), color: "var(--clr-danger-400)" },
             ].map((l) => (
               <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: l.color, display: "inline-block" }} />
@@ -399,13 +401,13 @@ function Dashboard() {
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
-              <h3 className="section-title" style={{ margin: 0 }}>Headcount</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.headcount.title")}</h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                Number of employees by department
+                {t("dashboard.headcount.subtitle")}
               </p>
             </div>
             <Link to="/departments" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}>
-              View all →
+              {t("dashboard.headcount.viewAll")}
             </Link>
           </div>
           <DeptBars departments={departments} getEmployeeCountByDepartment={getEmployeeCountByDepartment} />
@@ -413,7 +415,7 @@ function Dashboard() {
 
         {/* Contract type donut */}
         <div className="content-card">
-          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>Contract Types</h3>
+          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>{t("dashboard.contractTypes.title")}</h3>
           <DonutChart segments={contractSegs} total={totalEmployees} />
         </div>
       </div>
@@ -424,18 +426,18 @@ function Dashboard() {
         {/* Recent employees table */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--sp-5)" }}>
-            <h3 className="section-title" style={{ margin: 0 }}>Recent Employees</h3>
+            <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.recentEmployees.title")}</h3>
             <Link to="/employees" style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)" }}>
-              View all →
+              {t("dashboard.recentEmployees.viewAll")}
             </Link>
           </div>
           <table className="data-table">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Department</th>
-                <th>Designation</th>
-                <th>Status</th>
+                <th>{t("dashboard.recentEmployees.table.employee")}</th>
+                <th>{t("dashboard.recentEmployees.table.department")}</th>
+                <th>{t("dashboard.recentEmployees.table.designation")}</th>
+                <th>{t("dashboard.recentEmployees.table.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -470,7 +472,7 @@ function Dashboard() {
 
           {/* Quick links */}
           <div className="content-card">
-            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Quick Actions</h3>
+            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>{t("dashboard.quickActions.title")}</h3>
             <div className="quick-links">
               {quickLinks.map((link) => (
                 <Link key={link.to} to={link.to} className="quick-link">
@@ -489,7 +491,7 @@ function Dashboard() {
 
           {/* Activity feed */}
           <div className="content-card" style={{ flex: 1 }}>
-            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>Recent Activity</h3>
+            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>{t("dashboard.recentActivity.title")}</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
               {activities.map((a, i) => (
                 <ActivityItem key={i} {...a} />

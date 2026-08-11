@@ -211,8 +211,8 @@ function ReviewStep({ formData, onEdit, loginEmail }) {
     {
       title: "Finance", stepId: 3,
       rows: [
-        { label: "Annual Salary", value: formData.salary ? `$${Number(formData.salary).toLocaleString()}` : "" },
-        { label: "Monthly",       value: formData.salary ? `$${Math.round(formData.salary / 12).toLocaleString()}` : "" },
+        { label: "Annual Salary", value: formData.salary ? `$${Number(formData.salary).toLocaleString("en-US")}` : "" },
+        { label: "Monthly",       value: formData.salary ? `$${Math.round(formData.salary / 12).toLocaleString("en-US")}` : "" },
         { label: "Notes",         value: formData.notes },
       ],
     },
@@ -244,7 +244,7 @@ function ReviewStep({ formData, onEdit, loginEmail }) {
                 background: "var(--bg-success-subtle)", color: "var(--txt-success)",
                 border: "1px solid var(--bdr-success)",
               }}>
-                ${Number(formData.salary).toLocaleString()}/yr
+                ${Number(formData.salary).toLocaleString("en-US")}/yr
               </span>
             )}
           </div>
@@ -781,9 +781,9 @@ function AddEmployee() {
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--sp-3)", textAlign: "center" }}>
                     {[
-                      { label: "Annual",   value: `$${Number(form.salary).toLocaleString()}` },
-                      { label: "Monthly",  value: `$${Math.round(form.salary / 12).toLocaleString()}` },
-                      { label: "Weekly",   value: `$${Math.round(form.salary / 52).toLocaleString()}` },
+                      { label: "Annual",   value: `$${Number(form.salary).toLocaleString("en-US")}` },
+                      { label: "Monthly",  value: `$${Math.round(form.salary / 12).toLocaleString("en-US")}` },
+                      { label: "Weekly",   value: `$${Math.round(form.salary / 52).toLocaleString("en-US")}` },
                     ].map((item) => (
                       <div key={item.label} style={{
                         padding: "var(--sp-3)", background: "var(--bg-surface)",

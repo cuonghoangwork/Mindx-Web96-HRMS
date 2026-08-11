@@ -1,0 +1,422 @@
+{
+  "common": {
+    "days": [
+      "CN",
+      "T2",
+      "T3",
+      "T4",
+      "T5",
+      "T6",
+      "T7"
+    ],
+    "months": [
+      "Tháng 1",
+      "Tháng 2",
+      "Tháng 3",
+      "Tháng 4",
+      "Tháng 5",
+      "Tháng 6",
+      "Tháng 7",
+      "Tháng 8",
+      "Tháng 9",
+      "Tháng 10",
+      "Tháng 11",
+      "Tháng 12"
+    ]
+  },
+  "dashboard": {
+    "stats": {
+      "totalEmployees": {
+        "title": "Tổng số nhân viên",
+        "trend": "+3 trong tháng này",
+        "hint": "{{count}} phòng ban"
+      },
+      "attendanceRate": {
+        "title": "Tỷ lệ đi làm",
+        "trend": "+2% so với tuần trước",
+        "hint": "{{present}}/{{total}} hôm nay"
+      },
+      "onLeave": {
+        "title": "Đang nghỉ phép",
+        "trend": "3 sắp hết hạn trong tuần tới",
+        "hint": "Đang chờ duyệt"
+      },
+      "newHires": {
+        "title": "Nhân viên mới",
+        "trend": "+2 so với tháng trước",
+        "hint": "Trong tháng này"
+      }
+    },
+    "attendanceTrend": {
+      "title": "Tình hình đi làm — 7 ngày qua",
+      "subtitle": "% nhân viên có mặt mỗi ngày",
+      "viewDetails": "Xem chi tiết →",
+      "legend": {
+        "good": "≥90% (Tốt)",
+        "average": "≥75% (Trung bình)",
+        "low": "<75% (Thấp)"
+      }
+    },
+    "headcount": {
+      "title": "Số lượng nhân sự",
+      "subtitle": "Số nhân viên theo phòng ban",
+      "viewAll": "Xem tất cả →"
+    },
+    "contractTypes": {
+      "title": "Loại hợp đồng"
+    },
+    "recentEmployees": {
+      "title": "Nhân viên mới nhất",
+      "viewAll": "Xem tất cả →",
+      "table": {
+        "employee": "Nhân viên",
+        "department": "Phòng ban",
+        "designation": "Chức danh",
+        "status": "Trạng thái"
+      }
+    },
+    "quickActions": {
+      "title": "Thao tác nhanh",
+      "addEmployee": "Thêm nhân viên",
+      "allEmployees": "Tất cả nhân viên",
+      "attendance": "Chấm công",
+      "payroll": "Bảng lương",
+      "departments": "Phòng ban",
+      "holidays": "Ngày lễ"
+    },
+    "recentActivity": {
+      "title": "Hoạt động gần đây",
+      "newEmployee": "{{name}} vừa được thêm vào hệ thống",
+      "defaultNewEmployee": "Nhân viên mới",
+      "onLeave": "{{count}} nhân viên đang nghỉ phép",
+      "payrollApproved": "Bảng lương tháng này đã được duyệt",
+      "attendanceToday": "Tỷ lệ đi làm hôm nay: {{rate}}%",
+      "pendingApprovals": "5 yêu cầu đang chờ duyệt",
+      "time": {
+        "minutesAgo": "2 phút trước",
+        "hourAgo": "1 giờ trước",
+        "hoursAgo": "3 giờ trước",
+        "today": "Hôm nay 8:00",
+        "yesterday": "Hôm qua"
+      }
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "Có mặt",
+      "late": "Đi muộn",
+      "onLeave": "Nghỉ phép",
+      "absent": "Vắng mặt"
+    },
+    "selectDatePrompt": "Chọn một ngày để xem chi tiết chấm công",
+    "dayPanel": {
+      "records": "{{count}} bản ghi",
+      "table": {
+        "employee": "Nhân viên",
+        "checkIn": "Giờ vào",
+        "checkOut": "Giờ ra",
+        "hours": "Số giờ",
+        "status": "Trạng thái"
+      }
+    },
+    "clockWidget": {
+      "title": "Chấm công vào/ra",
+      "todayPrefix": "Hôm nay",
+      "employeeLabel": "Nhân viên",
+      "loadingEmployees": "Đang tải danh sách nhân viên…",
+      "selectEmployeePlaceholder": "Chọn nhân viên…",
+      "youSuffix": "(bạn)",
+      "checkInLabel": "Giờ vào",
+      "checkOutLabel": "Giờ ra",
+      "statusLabel": "Trạng thái",
+      "noRecord": "Chưa có dữ liệu",
+      "clockingLabel": "Đang xử lý…",
+      "clockInButton": "Chấm công vào",
+      "clockOutButton": "Chấm công ra",
+      "alreadyClockedIn": "Đã chấm công vào hôm nay",
+      "clockInNow": "Chấm công vào ngay",
+      "mustClockInFirst": "Phải chấm công vào trước",
+      "alreadyClockedOut": "Đã chấm công ra hôm nay",
+      "clockOutNow": "Chấm công ra ngay",
+      "pleaseSelectEmployee": "Vui lòng chọn một nhân viên.",
+      "clockedInAt": "Đã chấm công vào lúc {{time}}",
+      "failedClockIn": "Chấm công vào không thành công. Máy chủ có đang chạy không?",
+      "clockedOutAt": "Đã chấm công ra lúc {{time}}",
+      "failedClockOut": "Chấm công ra không thành công. Máy chủ có đang chạy không?",
+      "activeSince": "● Đang làm việc từ {{time}}",
+      "shiftComplete": "Đã hoàn thành ca · {{duration}} đã làm"
+    },
+    "header": {
+      "title": "Chấm công",
+      "subtitle": "{{month}} {{year}} · {{workdays}} ngày làm việc · tỷ lệ trung bình {{rate}}%",
+      "viewToggle": {
+        "calendar": "Lịch",
+        "table": "Bảng"
+      },
+      "clickToView": "Nhấp vào một ngày để xem chi tiết"
+    },
+    "calendar": {
+      "legend": {
+        "present": "Có mặt",
+        "late": "Đi muộn"
+      }
+    },
+    "table": {
+      "allEmployees": "Tất cả nhân viên",
+      "recordsCount": "{{count}} bản ghi",
+      "headers": {
+        "employee": "Nhân viên",
+        "date": "Ngày",
+        "day": "Thứ",
+        "checkIn": "Giờ vào",
+        "checkOut": "Giờ ra",
+        "hours": "Số giờ",
+        "status": "Trạng thái"
+      },
+      "showingFirst": "Hiển thị 50 trong tổng số {{count}} bản ghi"
+    }
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "sendNotice": "+ Gửi thông báo",
+    "markAllRead": "Đánh dấu tất cả đã đọc",
+    "clearRead": "Xóa mục đã đọc",
+    "stats": {
+      "total": {
+        "label": "Tổng cộng",
+        "hint": "Tất cả thông báo"
+      },
+      "unread": {
+        "label": "Chưa đọc",
+        "hint": "Cần bạn chú ý"
+      },
+      "today": {
+        "label": "Hôm nay",
+        "hint": "Nhận được hôm nay"
+      }
+    },
+    "filters": {
+      "all": "Tất cả",
+      "unread": "Chưa đọc"
+    },
+    "categories": {
+      "leave": "Nghỉ phép",
+      "interview": "Tuyển dụng",
+      "payroll": "Lương",
+      "employee": "Nhân viên",
+      "holiday": "Ngày lễ",
+      "system": "Hệ thống",
+      "announcement": "Thông báo"
+    },
+    "empty": {
+      "title": "Không có thông báo",
+      "allCaughtUp": "Bạn đã xem hết. Thông báo mới sẽ xuất hiện ở đây.",
+      "noneForFilter": "Không có gì ở bộ lọc này.",
+      "viewAll": "Xem tất cả thông báo"
+    },
+    "item": {
+      "markRead": "Đánh dấu đã đọc",
+      "dismiss": "Bỏ qua",
+      "dismissAria": "Bỏ qua thông báo",
+      "from": "từ {{name}}",
+      "open": "Mở"
+    },
+    "timeAgo": {
+      "justNow": "Vừa xong",
+      "minutesAgo_other": "{{count}} phút trước",
+      "hoursAgo_other": "{{count}} giờ trước",
+      "yesterday": "Hôm qua",
+      "daysAgo": "{{count}} ngày trước"
+    }
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "subtitle": "Quản lý tùy chọn ứng dụng của bạn.",
+    "sections": {
+      "myProfile": {
+        "title": "Hồ sơ của tôi",
+        "description": "Xem hồ sơ nhân sự và yêu cầu thay đổi thông tin cá nhân. Thay đổi cần được HR phê duyệt."
+      },
+      "profileEditRequests": {
+        "title": "Yêu cầu chỉnh sửa hồ sơ",
+        "description": "Xem xét và phê duyệt hoặc từ chối yêu cầu cập nhật thông tin cá nhân của nhân viên."
+      },
+      "proposePromotion": {
+        "title": "Đề xuất thăng chức",
+        "description": "Đề xuất chức danh, phòng ban hoặc mức lương mới cho một nhân viên. Quản trị viên phải phê duyệt trước khi có hiệu lực."
+      },
+      "promotionApprovalQueue": {
+        "title": "Hàng chờ duyệt thăng chức",
+        "description": "Phê duyệt hoặc từ chối các đề xuất thăng chức. Bạn không thể duyệt đề xuất do chính mình tạo."
+      },
+      "noShowReviewQueue": {
+        "title": "Hàng chờ xem xét vắng mặt",
+        "description": "Nhân viên tự động bị gắn cờ sau 5 ngày vắng không phép. Việc gắn cờ không tự động thay đổi tình trạng làm việc — HR quyết định bước xử lý tiếp theo."
+      },
+      "manageUserRoles": {
+        "title": "Quản lý vai trò người dùng",
+        "description": "Thăng cấp nhân viên lên HR/Quản lý hoặc hạ xuống lại Nhân viên."
+      }
+    },
+    "darkMode": {
+      "title": "Chế độ tối",
+      "description": "Chuyển đổi giữa giao diện sáng và tối",
+      "light": "☀ Sáng",
+      "dark": "◐ Tối"
+    },
+    "emailNotifications": {
+      "title": "Thông báo qua email",
+      "description": "Nhận cập nhật qua email về tài khoản của bạn"
+    },
+    "language": {
+      "title": "Ngôn ngữ",
+      "description": "Chọn ngôn ngữ ưa thích của bạn",
+      "english": "Tiếng Anh",
+      "vietnamese": "Tiếng Việt"
+    },
+    "status": {
+      "pending": "Chờ duyệt",
+      "approved": "Đã duyệt",
+      "rejected": "Đã từ chối"
+    },
+    "statusFilter": {
+      "pending": "Chờ duyệt",
+      "approved": "Đã duyệt",
+      "rejected": "Đã từ chối",
+      "all": "Tất cả"
+    },
+    "fields": {
+      "fullName": "Họ và tên",
+      "employeeId": "Mã nhân viên",
+      "department": "Phòng ban",
+      "designation": "Chức danh",
+      "phone": "Số điện thoại",
+      "address": "Địa chỉ",
+      "age": "Tuổi",
+      "gender": "Giới tính",
+      "genderOptions": {
+        "male": "Nam",
+        "female": "Nữ",
+        "other": "Khác"
+      },
+      "employee": "Nhân viên",
+      "positionLevel": "Cấp bậc",
+      "annualSalary": "Lương năm",
+      "reason": "Lý do"
+    },
+    "optional": "(không bắt buộc)",
+    "reviewNoteLabel": "Ghi chú xét duyệt",
+    "notePlaceholderEmployee": "Thêm ghi chú cho nhân viên…",
+    "reasonLabel": "Lý do:",
+    "refresh": "Làm mới",
+    "retry": "Thử lại",
+    "review": "Xem xét",
+    "close": "Đóng",
+    "reject": "Từ chối",
+    "autoFlagged": "Tự động gắn cờ",
+    "adminNote": "Ghi chú quản trị viên: {{note}}",
+    "approvingEllipsis": "Đang duyệt…",
+    "rejectingEllipsis": "Đang từ chối…",
+    "savingEllipsis": "Đang lưu…",
+    "loadingEllipsis": "Đang tải…",
+    "myProfile": {
+      "currentProfile": "Hồ sơ hiện tại",
+      "requestEdit": "Yêu cầu chỉnh sửa",
+      "loadingProfile": "Đang tải hồ sơ của bạn…",
+      "noProfileLinked": "Chưa có hồ sơ nhân viên liên kết với tài khoản của bạn. Liên hệ HR để được liên kết hồ sơ.",
+      "noLinkedProfile": "Không có hồ sơ nhân viên liên kết với tài khoản của bạn.",
+      "myContract": "Hợp đồng của tôi",
+      "contractUploaded": "Đã tải lên {{date}}",
+      "contractNotUploaded": "HR chưa tải lên hợp đồng của bạn.",
+      "viewContract": "Xem hợp đồng (PDF)",
+      "requestProfileEdit": "Yêu cầu chỉnh sửa hồ sơ",
+      "requestEditHint": "Thay đổi sẽ được gửi đến HR để phê duyệt. Các trường do HR quản lý (phòng ban, lương, trạng thái) không thể tự chỉnh sửa.",
+      "selectEllipsis": "Chọn…",
+      "cancel": "Hủy",
+      "submitting": "Đang gửi…",
+      "submitRequest": "Gửi yêu cầu",
+      "requestHistory": "Lịch sử yêu cầu",
+      "hrNote": "Ghi chú của HR: {{note}}",
+      "noChanges": "Không có thay đổi nào.",
+      "submitSuccess": "Yêu cầu chỉnh sửa hồ sơ của bạn đã được gửi và đang chờ HR phê duyệt.",
+      "submitFailed": "Gửi yêu cầu không thành công."
+    },
+    "proposePromotion": {
+      "pickEmployeeFirst": "Vui lòng chọn một nhân viên trước.",
+      "submitSuccess": "Đề xuất thăng chức đã được gửi để Quản trị viên xem xét.",
+      "submitFailed": "Gửi đề xuất không thành công.",
+      "loadFailed": "Tải danh sách đề xuất không thành công.",
+      "selectEmployee": "Chọn một nhân viên…",
+      "effectiveDate": "Ngày có hiệu lực",
+      "newDesignation": "Chức danh mới",
+      "currently": "Hiện tại: {{value}}",
+      "newDepartment": "Phòng ban mới",
+      "leaveUnchanged": "Giữ nguyên",
+      "newPositionLevel": "Cấp bậc mới",
+      "newSalary": "Lương năm mới (USD)",
+      "reasonPlaceholder": "Vì sao đề xuất thăng chức này hợp lý…",
+      "submitting": "Đang gửi…",
+      "submitProposal": "Gửi đề xuất",
+      "recentProposals": "Đề xuất gần đây",
+      "noProposalsYet": "Chưa có đề xuất nào.",
+      "diff": {
+        "level": "cấp bậc",
+        "title": "chức danh",
+        "dept": "phòng ban",
+        "salary": "lương"
+      }
+    },
+    "promotionReview": {
+      "approveSuccess": "Đã duyệt và áp dụng thăng chức.",
+      "rejectSuccess": "Đã từ chối đề xuất.",
+      "proposalCount_other": "{{count}} đề xuất",
+      "loadingProposals": "Đang tải đề xuất…",
+      "noProposals": "Không có đề xuất.",
+      "noProposalsFiltered": "Không có đề xuất {{status}}.",
+      "autoFlaggedBySystem": "Hệ thống tự động gắn cờ",
+      "proposedBy": "Đề xuất bởi {{name}}",
+      "effective": "hiệu lực {{date}}",
+      "proposedChanges": "Thay đổi đề xuất",
+      "selfCreatedWarning": "Bạn đã tạo đề xuất này — cần một Quản trị viên khác xem xét.",
+      "approveAndApply": "Duyệt & Áp dụng"
+    },
+    "noShowReview": {
+      "loadFailed": "Tải danh sách xem xét vắng mặt không thành công.",
+      "confirmSuccess": "Đã đánh dấu đã xem xét — xác nhận có mẫu vắng mặt lặp lại.",
+      "dismissSuccess": "Đã đánh dấu đã xem xét — không cần hành động.",
+      "flagCount_other": "{{count}} cờ cảnh báo",
+      "loadingFlags": "Đang tải danh sách cảnh báo…",
+      "noFlags": "Không có cờ cảnh báo vắng mặt.",
+      "noFlagsFiltered": "Không có cờ cảnh báo {{status}}.",
+      "recordLine_other": "{{count}} ngày vắng không phép trên hồ sơ · gắn cờ {{date}}",
+      "autoStatusWarning": "Việc này không tự động thay đổi trạng thái làm việc của nhân viên. Dùng để ghi lại rằng HR đã xem xét mẫu vắng mặt và ghi chú bước xử lý tiếp theo (nếu có) thực hiện ngoài hệ thống.",
+      "notePlaceholder": "HR đã quyết định hoặc xử lý như thế nào?",
+      "confirmPattern": "Xác nhận mẫu vắng mặt",
+      "dismiss": "Bỏ qua"
+    },
+    "profileEditReview": {
+      "loadFailed": "Tải danh sách yêu cầu không thành công.",
+      "approveSuccess": "Đã duyệt và áp dụng cập nhật hồ sơ.",
+      "rejectSuccess": "Đã từ chối yêu cầu.",
+      "requestCount_other": "{{count}} yêu cầu",
+      "loadingRequests": "Đang tải yêu cầu…",
+      "noRequests": "Không có yêu cầu.",
+      "noRequestsFiltered": "Không có yêu cầu {{status}}.",
+      "unknownEmployee": "Nhân viên không xác định",
+      "requestedChanges": "Thay đổi được yêu cầu"
+    },
+    "promoteUsers": {
+      "loadFailed": "Tải danh sách người dùng không thành công.",
+      "roleUpdated": "Đã cập nhật vai trò.",
+      "loadingAccounts": "Đang tải tài khoản…",
+      "notActivated": "Chưa kích hoạt",
+      "demoteToHr": "Hạ xuống HR",
+      "demote": "Hạ cấp",
+      "makeAdmin": "Đặt làm Quản trị viên",
+      "promoteToHr": "Thăng lên HR",
+      "cannotChangeOwnRole": "Không thể thay đổi vai trò của chính mình",
+      "footerHint": "Tài khoản được tạo qua quy trình Thêm nhân viên. Thăng cấp cấp toàn quyền truy cập HR/Quản lý; Hạ cấp đưa tài khoản về chế độ chỉ xem của Nhân viên. Bạn không thể thay đổi vai trò của chính mình.",
+      "youSuffix": "(bạn)"
+    }
+  }
+}

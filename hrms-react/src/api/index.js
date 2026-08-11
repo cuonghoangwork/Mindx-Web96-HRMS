@@ -65,6 +65,13 @@ export const CandidatesAPI = {
   create: (data) => apiFetch("/candidates", { method: "POST", body: data }),
   update: (id, data) => apiFetch(`/candidates/${id}`, { method: "PUT", body: data }),
   remove: (id) => apiFetch(`/candidates/${id}`, { method: "DELETE" }),
+  // Task 5.3 — HR/Admin uploads a real PDF CV/resume for a candidate
+  // (mirrors EmployeesAPI.uploadContract's shape).
+  uploadCv: (id, file) => {
+    const form = new FormData();
+    form.append("cv", file);
+    return apiFetch(`/candidates/${id}/cv`, { method: "POST", body: form });
+  },
 };
 
 export const HolidaysAPI = {

@@ -267,6 +267,7 @@ export function candidateToClient(doc) {
     phone: o.phone,
     appliedDate: dateOnly(o.appliedDate),
     resumeUrl: o.resumeUrl ?? "#",
+    resumeUploadedAt: o.resumeUploadedAt ?? null,
     notes: o.notes ?? "",
   };
 }

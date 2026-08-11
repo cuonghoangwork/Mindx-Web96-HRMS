@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDateTime } from "../utils/format";
 import { PayrollAPI } from "../api";
 import Avatar from "../components/Avatar";
 import { TypeBadge } from "../components/Badge";
@@ -34,10 +36,19 @@ function colorForName(name, palette) {
   return palette[Math.abs(hash) % palette.length];
 }
 
+// Task 6.6 — both branches now pin an explicit locale ("en-US" for USD,
+// "vi-VN" for VND) rather than the USD branch's previous bare
+// `.toLocaleString()`, which silently inherited whatever locale the
+// browser/OS happened to be set to. A USD figure rendered under a
+// Vietnamese-locale browser would otherwise group with periods instead of
+// commas (e.g. "$75.000" instead of "$75,000") — genuinely ambiguous, since
+// that reads like "seventy-five point zero zero". Currency grouping follows
+// the currency, not the in-app language toggle (VND already worked this way
+// before this task; USD just wasn't pinned down the same way).
 function fmtMoney(vnd, currency, fxRate) {
   const n = Number(vnd) || 0;
   if (currency === "USD" && fxRate > 0) {
-    return `$${Math.round(n / fxRate).toLocaleString()}`;
+    return `$${Math.round(n / fxRate).toLocaleString("en-US")}`;
   }
   return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
 }
@@ -266,7 +277,7 @@ function BreakdownPanel({ slip, currency, fxRate, period }) {
         borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-info)",
       }}>
         Period {period.label} · {period.standardWorkingDays} standard working days · FX rate locked at{" "}
-        {Number(period.fxRate).toLocaleString()} VND/USD
+        {Number(period.fxRate).toLocaleString("vi-VN")} VND/USD
         {period.fxRateSource && period.fxRateSource !== "manual"
           ? ` (${period.fxRateSource === "api" ? "live" : "fallback"} rate)`
           : ""} · {slip.unpaidLeaveDays} unpaid leave day
@@ -289,6 +300,7 @@ function BreakdownPanel({ slip, currency, fxRate, period }) {
 }
 
 function Payroll() {
+  const { language } = useLanguage();
   const { isAdmin, isHR } = useAuth();
 
   const [periods, setPeriods] = useState([]);
@@ -545,7 +557,7 @@ function Payroll() {
       } else {
         setToast(
           `${res.data.generated} draft payslip${res.data.generated === 1 ? "" : "s"} auto-generated ` +
-            `at ${res.data.fxRate.toLocaleString()} VND/USD (${res.data.fxRateSource === "api" ? "live" : "fallback"} rate).`,
+            `at ${res.data.fxRate.toLocaleString("vi-VN")} VND/USD (${res.data.fxRateSource === "api" ? "live" : "fallback"} rate).`,
         );
         await loadPeriods(res.data.periodId);
       }
@@ -812,7 +824,7 @@ function Payroll() {
               </div>
               <span className="form-hint">
                 {fxPreview
-                  ? `${fxPreview.source === "api" ? "Live" : "Fallback"} rate as of ${new Date(fxPreview.fetchedAt).toLocaleString()} — locked once the period is created.`
+                  ? `${fxPreview.source === "api" ? "Live" : "Fallback"} rate as of ${formatDateTime(fxPreview.fetchedAt, language)} — locked once the period is created.`
                   : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
               </span>
             </div>

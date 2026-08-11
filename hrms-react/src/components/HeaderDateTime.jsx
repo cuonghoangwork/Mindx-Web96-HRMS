@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../context/StoreContext";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDate, formatTime } from "../utils/format";
 import Button from "./Button";
 
 function toDateInputValue(date) {
@@ -15,8 +17,11 @@ function toTimeInputValue(date) {
   return `${h}:${m}`;
 }
 
-function formatDisplayDate(date) {
-  return date.toLocaleDateString(undefined, {
+// Task 6.6 — delegates to utils/format.js so these follow the in-app
+// language toggle (LanguageContext) instead of the browser/OS locale, which
+// is what `toLocaleDateString(undefined, ...)` was silently keying off before.
+function formatDisplayDate(date, language) {
+  return formatDate(date, language, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -24,8 +29,8 @@ function formatDisplayDate(date) {
   });
 }
 
-function formatDisplayTime(date) {
-  return date.toLocaleTimeString(undefined, {
+function formatDisplayTime(date, language) {
+  return formatTime(date, language, {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
@@ -35,6 +40,7 @@ function formatDisplayTime(date) {
 function HeaderDateTime() {
   const { getAppNow, setAppDateTime, resetAppDateTime, isClockAdjusted } =
     useStore();
+  const { language } = useLanguage();
   const [now, setNow] = useState(() => getAppNow());
   const [open, setOpen] = useState(false);
   const [dateValue, setDateValue] = useState(() => toDateInputValue(getAppNow()));
@@ -77,8 +83,8 @@ function HeaderDateTime() {
         aria-expanded={open}
         aria-label="Adjust date and time"
       >
-        <span className="header-datetime-date">{formatDisplayDate(now)}</span>
-        <span className="header-datetime-time">{formatDisplayTime(now)}</span>
+        <span className="header-datetime-date">{formatDisplayDate(now, language)}</span>
+        <span className="header-datetime-time">{formatDisplayTime(now, language)}</span>
         {isClockAdjusted && (
           <span className="header-datetime-badge">Adjusted</span>
         )}

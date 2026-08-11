@@ -247,6 +247,12 @@ export function StoreProvider({ children }) {
     const res = await CandidatesAPI.update(id, updates);
     setCandidates((prev) => prev.map((c) => (idsMatch(c.id, id) ? res.data : c)));
   }, []);
+  // Task 5.3 — HR/Admin uploads a real PDF CV/resume for a candidate.
+  const uploadCandidateCv = useCallback(async (id, file) => {
+    const res = await CandidatesAPI.uploadCv(id, file);
+    setCandidates((prev) => prev.map((c) => (idsMatch(c.id, id) ? res.data : c)));
+    return res.data;
+  }, []);
   const removeCandidate = useCallback(async (id) => {
     await CandidatesAPI.remove(id);
     setCandidates((prev) => prev.filter((c) => !idsMatch(c.id, id)));
@@ -417,6 +423,7 @@ export function StoreProvider({ children }) {
     removeJob,
     addCandidate,
     updateCandidate,
+    uploadCandidateCv,
     removeCandidate,
     getCandidatesByJob,
     getApplicantCount,

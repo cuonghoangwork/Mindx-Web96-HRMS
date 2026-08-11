@@ -1,6 +1,7 @@
 import CandidateModel from "../model/Candidate.js";
 import { candidateToClient, candidateFromClient } from "../utils/mappers.js";
 import { logAction } from "../utils/auditLog.js";
+import { isCloudinaryConfigured, uploadBufferToCloudinary } from "../utils/cloudinary.js";
 
 const candidateController = {
   getAll: async (req, res) => {
@@ -81,6 +82,49 @@ const candidateController = {
         changes:    isStageChange
           ? { stage: { from: beforeStage, to: data.stage } }
           : undefined,
+      });
+
+      res.json({ success: true, data: candidateToClient(candidate) });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Task 5.3 — real PDF CV upload for a candidate. Mirrors
+  // employeeController.uploadContract (task 1.4): memoryStorage buffer piped
+  // straight to Cloudinary as a "raw" resource, never written to local disk.
+  // HR/Admin only (same authorize() guard as create/update/remove below) —
+  // there's no candidate-facing self-service portal in this app.
+  uploadCv: async (req, res) => {
+    try {
+      if (!isCloudinaryConfigured()) {
+        throw new Error(
+          "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        );
+      }
+      if (!req.file) throw new Error("No CV/resume file was uploaded.");
+
+      const candidate = await CandidateModel.findById(req.params.id);
+      if (!candidate) throw new Error("Candidate not found.");
+
+      const result = await uploadBufferToCloudinary(req.file.buffer, {
+        folder: "hrms/candidate-resumes",
+        public_id: `candidate_${candidate._id}_resume`,
+        overwrite: true,
+        resource_type: "raw",
+        format: "pdf",
+      });
+
+      candidate.resumeUrl = result.secure_url;
+      candidate.resumeUploadedAt = new Date();
+      await candidate.save();
+      await candidate.populate("job", "title");
+
+      await logAction(req, {
+        action: "updated",
+        resource: "candidate",
+        resourceId: candidate._id,
+        label: `${candidate.name} → ${candidate.job?.title ?? "Unknown role"} — CV uploaded`,
       });
 
       res.json({ success: true, data: candidateToClient(candidate) });
