@@ -17,11 +17,11 @@ const attendanceSchema = new mongoose.Schema(
       enum: ["present", "late", "on-leave", "absent", "no-show"],
       default: "present",
     },
-    // Task 4.2: "late counts as half-day paid leave or half-day unpaid leave". Set only
-    // when status === "late", by the end-of-day closer (jobs/closeAttendanceDay.js),
-    // based on whether the employee had >= 0.5 paid-leave days remaining at close time.
+    // Task 4.2: "late counts as half-day Annual/PTO leave or half-day unpaid leave". Set
+    // only when status === "late", by the end-of-day closer (jobs/closeAttendanceDay.js),
+    // based on whether the employee had >= 0.5 Annual/PTO days remaining at close time.
     // null for every other status.
-    lateHalfDayType: { type: String, enum: ["paid", "unpaid"], default: null },
+    lateHalfDayType: { type: String, enum: ["annual", "unpaid"], default: null },
   },
   { timestamps: true },
 );

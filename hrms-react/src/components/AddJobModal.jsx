@@ -101,7 +101,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
             onClick={onClose}
             aria-label="Close"
           >
-            ×
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
 
@@ -208,7 +208,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-requirements">
-              Requirements <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(one per line)</span>
+              Requirements <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>(one per line)</span>
             </label>
             <textarea
               id="job-requirements"
@@ -223,7 +223,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-benefits">
-              Pay &amp; Benefits <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(one per line)</span>
+              Pay &amp; Benefits <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>(one per line)</span>
             </label>
             <textarea
               id="job-benefits"

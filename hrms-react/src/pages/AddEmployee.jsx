@@ -112,7 +112,7 @@ function StepperHeader({ step, completedSteps, onJump }) {
       <div style={{ position: "relative", height: "4px", background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)", marginBottom: "var(--sp-6)" }}>
         <div style={{
           position: "absolute", top: 0, left: 0, height: "4px",
-          background: "linear-gradient(90deg, var(--clr-primary-400), var(--clr-primary-300))",
+          background: "var(--clr-primary-400)",
           borderRadius: "var(--radius-full)",
           width: `${pct}%`,
           transition: "width 0.45s cubic-bezier(.4,0,.2,1)",
@@ -224,8 +224,8 @@ function ReviewStep({ formData, onEdit, loginEmail }) {
       <div style={{
         display: "flex", alignItems: "center", gap: "var(--sp-4)",
         padding: "var(--sp-5)", marginBottom: "var(--sp-6)",
-        background: "linear-gradient(135deg, var(--bg-primary-subtle), var(--bg-surface))",
-        border: "1px solid var(--bdr-brand)", borderRadius: "var(--radius-lg)",
+        background: "var(--bg-primary-subtle)",
+        border: "2px solid var(--bdr-brand)", borderRadius: "var(--radius-lg)",
       }}>
         <Avatar name={formData.name || "New Employee"} size="lg" status={formData.status === "Active" ? "active" : "leave"} />
         <div style={{ flex: 1 }}>
@@ -236,7 +236,7 @@ function ReviewStep({ formData, onEdit, loginEmail }) {
             {[formData.designation, formData.department, formData.employeeId].filter(Boolean).join(" · ") || "—"}
           </div>
           <div style={{ display: "flex", gap: "var(--sp-2)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
-            <StatusBadge status={formData.status} dot />
+            <StatusBadge status={formData.status} />
             <TypeBadge type={formData.type} />
             {formData.salary && (
               <span style={{
@@ -530,7 +530,7 @@ function AddEmployee() {
     borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
     color: "var(--txt-primary)", fontFamily: "var(--font-family)",
     fontSize: "var(--fs-md)", outline: "none", transition: "border-color 0.15s",
-    boxShadow: errors[field] && touched[field] ? "0 0 0 3px rgba(239,68,68,.12)" : "none",
+    boxShadow: errors[field] && touched[field] ? "0 0 0 3px rgba(163,61,61,.15)" : "none",
   });
 
   const fieldProps = (name) => ({
@@ -557,9 +557,13 @@ function AddEmployee() {
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-4)", marginBottom: "var(--sp-7)" }}>
           <button
             type="button" onClick={() => navigate("/employees")}
-            style={{ background: "none", border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1, padding: "6px 10px", transition: "all 0.15s" }}
+            style={{ background: "none", border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)", cursor: "pointer", color: "var(--txt-secondary)", lineHeight: 1, padding: "8px 10px", display: "inline-flex", alignItems: "center", transition: "all 0.15s" }}
             aria-label="Go back"
-          >←</button>
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
               Add New Employee
@@ -837,8 +841,13 @@ function AddEmployee() {
             <Button
               variant="secondary"
               onClick={step === 1 ? () => navigate("/employees") : goBack}
+              leftIcon={step === 1 ? undefined : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+              )}
             >
-              {step === 1 ? "Cancel" : "← Back"}
+              {step === 1 ? "Cancel" : "Back"}
             </Button>
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
@@ -857,12 +866,28 @@ function AddEmployee() {
               </div>
 
               {step < STEPS.length ? (
-                <Button variant="primary" onClick={goNext}>
-                  Next →
+                <Button
+                  variant="primary"
+                  onClick={goNext}
+                  rightIcon={
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  }
+                >
+                  Next
                 </Button>
               ) : (
-                <Button variant="success" onClick={handleSubmit}>
-                  ✓ Create Employee
+                <Button
+                  variant="success"
+                  onClick={handleSubmit}
+                  leftIcon={
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  }
+                >
+                  Create Employee
                 </Button>
               )}
             </div>
@@ -872,7 +897,11 @@ function AddEmployee() {
         {/* ── Toast ── */}
         {showToast && (
           <div className="toast toast-success" role="alert">
-            <span className="toast-icon">✓</span>
+            <span className="toast-icon" style={{ display: "inline-flex", color: "var(--txt-success)" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
             <span className="toast-message">Employee added successfully!</span>
           </div>
         )}

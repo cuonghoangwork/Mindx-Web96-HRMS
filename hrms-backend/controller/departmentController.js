@@ -4,6 +4,7 @@ import { departmentToClient, departmentFromClient } from "../utils/mappers.js";
 import { resolveManagerRef } from "../utils/refResolvers.js";
 import { logAction, diffChanges } from "../utils/auditLog.js";
 import { notifyHR } from "./notificationController.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const departmentController = {
   getAll: async (req, res) => {
@@ -26,10 +27,23 @@ const departmentController = {
     }
   },
 
+  // Reachable by MANAGER and EMPLOYEE via the "My Department" redirect
+  // (frontend routes MyDepartmentRedirect.jsx resolves their own department
+  // id then lands here) — so unlike getAll (unrestricted read, matches
+  // Holidays/Jobs/Candidates' existing "company-wide read visibility"
+  // pattern), this one enforces real own-department-only scoping for both.
   getDetail: async (req, res) => {
     try {
       const department = await DepartmentModel.findById(req.params.id).populate("manager", "name");
       if (!department) throw new Error("Department not found.");
+
+      if (req.user.role === "MANAGER" || req.user.role === "EMPLOYEE") {
+        const deptId = await getManagerDepartmentId(req);
+        if (String(department._id) !== String(deptId)) {
+          return res.status(403).json({ success: false, message: "Access denied." });
+        }
+      }
+
       const employeeDocs = await EmployeeModel.find({ department: department._id }).populate("department", "name");
       const employeeCount = employeeDocs.length;
       const totalSalary = employeeDocs.reduce((sum, e) => sum + (e.annualSalary || 0), 0);

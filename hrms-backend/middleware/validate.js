@@ -23,6 +23,10 @@ const VALID_GENDERS  = ["Male", "Female", "Other"];
 const VALID_JOB_STATUSES     = ["Open", "Filled", "Closed"];
 const VALID_CANDIDATE_STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 const VALID_HOLIDAY_TYPES    = ["Public", "Company", "Optional"];
+// Mirrors model/LeaveRequest.js's LEAVE_TYPES — kept as a literal list here
+// (like every other VALID_* above) rather than importing the model, since
+// this file stays framework/DB-free by convention.
+const VALID_LEAVE_TYPES      = ["annual", "sick", "parental", "bereavement", "unpaid"];
 
 /**
  * Build a middleware that runs a list of check functions against req.body.
@@ -327,6 +331,8 @@ const leaveRequestCreate = makeValidator([
   isDateString("startDate", "Start date"),
   required("endDate", "End date"),
   isDateString("endDate", "End date"),
+  required("type", "Leave type"),
+  isOneOf("type", "Leave type", VALID_LEAVE_TYPES),
   maxLength("reason", "Reason", 500),
 ]);
 

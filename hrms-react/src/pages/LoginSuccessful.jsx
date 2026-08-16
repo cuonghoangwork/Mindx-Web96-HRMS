@@ -1,51 +1,50 @@
 import { useNavigate } from 'react-router-dom'
 import Button from "../components/Button";
+import AuthBrandPanel from "../components/AuthBrandPanel";
+import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function LoginSuccessful() {
   const navigate = useNavigate()
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'grid',
-      placeItems: 'center',
-      background: 'var(--surface)'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        padding: '40px',
-        background: 'var(--surface)',
-        borderRadius: '20px',
-        border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow)',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          width: '80px',
-          height: '80px',
-          borderRadius: '50%',
-          background: 'rgba(34, 197, 94, 0.1)',
-          display: 'grid',
-          placeItems: 'center',
-          margin: '0 auto 24px',
-          fontSize: '40px'
-        }}>
-          ✓
-        </div>
-        
-        <h1 style={{ marginBottom: '8px' }}>Success!</h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '32px' }}>
-          You have successfully signed in to your account.
-        </p>
+    <div className="login-page">
+      <AuthBrandPanel />
 
-        <Button
-          variant="primary"
-          style={{ width: '100%' }}
-          onClick={() => navigate('/dashboard')}
-        >
-          Go to Dashboard
-        </Button>
+      <div className="login-form-panel">
+        <AuthThemeToggle />
+
+        <div className="login-card" style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: 'var(--bg-success-subtle)',
+            border: '2px solid var(--bdr-success)',
+            display: 'grid',
+            placeItems: 'center',
+            margin: '0 auto 24px',
+            color: 'var(--txt-success)',
+          }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+
+          <div className="login-header">
+            <h1>Success!</h1>
+          </div>
+          <p className="login-subtitle" style={{ marginBottom: 'var(--sp-6)' }}>
+            You have successfully signed in to your account.
+          </p>
+
+          <Button
+            variant="primary"
+            style={{ width: '100%' }}
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to Dashboard
+          </Button>
+        </div>
       </div>
     </div>
   )

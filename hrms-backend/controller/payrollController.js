@@ -13,6 +13,8 @@ import { getOrCreateMonthlyFxRate } from "../utils/exchangeRate.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
 import { notifyHR } from "./notificationController.js";
 import NotificationModel from "../model/Notification.js";
+import { resolveRequestingEmployee } from "../utils/reviewQueue.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const CONTRACT_TYPE_LABELS = {
   "full-time": "Full-time",
@@ -68,6 +70,8 @@ function payslipToClient(doc, period) {
     periodLabel: period ? periodLabel(period) : null,
     periodStatus: period ? period.status : null,
     fxRate: period ? period.fxRate : null,
+    standardWorkingDays: period ? period.standardWorkingDays : null,
+    fxRateSource: period ? period.fxRateSource : null,
     editable: period ? period.status === "draft" : false,
     employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
     employeeCode: o.employeeCode ?? "",
@@ -97,10 +101,15 @@ function payslipToClient(doc, period) {
   };
 }
 
-async function totalsByPeriod(periodIds) {
+// departmentId scopes the aggregate to one department's payslips — used for
+// MANAGER's read-only, department-scoped payroll view (Payslip.departmentId
+// is denormalized onto every payslip, so this needs no Employee join).
+async function totalsByPeriod(periodIds, departmentId = null) {
   if (!periodIds.length) return new Map();
+  const match = { period: { $in: periodIds } };
+  if (departmentId) match.departmentId = departmentId;
   const rows = await PayslipModel.aggregate([
-    { $match: { period: { $in: periodIds } } },
+    { $match: match },
     {
       $group: {
         _id: "$period",
@@ -120,6 +129,8 @@ async function totalsByPeriod(periodIds) {
 }
 
 const payrollController = {
+  // MANAGER gets read-only, department-scoped totals (own department's
+  // payslips only) — HR/ADMIN see the company-wide totals unscoped.
   listPeriods: async (req, res) => {
     try {
       const { status, year } = req.query;
@@ -130,7 +141,8 @@ const payrollController = {
       if (year) condition.year = Number(year);
 
       const periods = await PayrollPeriodModel.find(condition).sort({ year: -1, month: -1 });
-      const totals = await totalsByPeriod(periods.map((p) => p._id));
+      const departmentId = req.user.role === "MANAGER" ? await getManagerDepartmentId(req) : null;
+      const totals = await totalsByPeriod(periods.map((p) => p._id), departmentId);
 
       res.json({
         success: true,
@@ -256,8 +268,16 @@ const payrollController = {
       if (!period) {
         return res.status(404).json({ success: false, message: "Payroll period not found." });
       }
-      const payslips = await PayslipModel.find({ period: period._id }).sort({ employeeName: 1 });
-      const totals = await totalsByPeriod([period._id]);
+
+      const condition = { period: period._id };
+      let departmentId = null;
+      if (req.user.role === "MANAGER") {
+        departmentId = await getManagerDepartmentId(req);
+        condition.departmentId = departmentId;
+      }
+
+      const payslips = await PayslipModel.find(condition).sort({ employeeName: 1 });
+      const totals = await totalsByPeriod([period._id], departmentId);
 
       res.json({
         success: true,
@@ -537,6 +557,34 @@ const payrollController = {
       res.json({ success: true, data: result });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Task 10.8 — payroll self-service: any authenticated user gets their own
+  // payslips, resolved from their own Employee link (see
+  // utils/reviewQueue.js's resolveRequestingEmployee — same lookup every
+  // other self-service endpoint uses). Draft-period payslips are withheld:
+  // a draft's numbers are still subject to HR edits/recompute, so it isn't
+  // a real payslip yet from the employee's point of view.
+  myPayslips: async (req, res) => {
+    try {
+      const employee = await resolveRequestingEmployee(req);
+      if (!employee) {
+        return res.json({ success: true, items: [] });
+      }
+
+      const payslips = await PayslipModel.find({ employee: employee._id })
+        .populate("period")
+        .sort({ createdAt: -1 });
+
+      const visible = payslips.filter((p) => p.period && p.period.status !== "draft");
+
+      res.json({
+        success: true,
+        items: visible.map((p) => payslipToClient(p, p.period)),
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
     }
   },
 

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from "../components/Button";
+import AuthBrandPanel from "../components/AuthBrandPanel";
+import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function EnterOTP() {
   const navigate = useNavigate()
@@ -14,62 +16,51 @@ function EnterOTP() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'grid',
-      placeItems: 'center',
-      background: 'var(--surface)'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        padding: '40px',
-        background: 'var(--surface)',
-        borderRadius: '20px',
-        border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow)'
-      }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '8px' }}>Enter OTP</h1>
-        <p style={{ 
-          textAlign: 'center', 
-          color: 'var(--text-muted)', 
-          marginBottom: '32px' 
-        }}>
-          Enter the 6-digit code sent to your email
-        </p>
+    <div className="login-page">
+      <AuthBrandPanel />
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="otp">Verification Code</label>
-            <input
-              type="text"
-              id="otp"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="123456"
-              maxLength="6"
-              required
-              style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px' }}
-            />
+      <div className="login-form-panel">
+        <AuthThemeToggle />
+
+        <div className="login-card">
+          <div className="login-header">
+            <h1>Enter OTP</h1>
           </div>
+          <p className="login-subtitle">Enter the 6-digit code sent to your email</p>
 
-          <Button variant="primary" type="submit" style={{ width: '100%' }}>
-            Verify
-          </Button>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label htmlFor="otp">Verification Code</label>
+              <input
+                type="text"
+                id="otp"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                placeholder="123456"
+                maxLength="6"
+                required
+                style={{ textAlign: 'center', fontSize: '24px', letterSpacing: '8px' }}
+              />
+            </div>
 
-        <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--text-muted)' }}>
-          Didn't receive the code?{' '}
-          <button style={{ 
-            color: 'var(--primary)', 
-            background: 'none', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}>
-            Resend
-          </button>
-        </p>
+            <Button variant="primary" type="submit" style={{ width: '100%' }}>
+              Verify
+            </Button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--txt-secondary)' }}>
+            Didn't receive the code?{' '}
+            <button type="button" className="link-primary" style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+            }}>
+              Resend
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   )

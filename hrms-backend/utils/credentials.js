@@ -7,7 +7,10 @@ const SYMBOL = "!@#$%&*?";
 const ALL = UPPER + LOWER + DIGIT + SYMBOL;
 
 const ASSIGNABLE_BY_ROLE = {
-  ADMIN: ["EMPLOYEE", "MANAGER", "ADMIN"],
+  ADMIN: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"],
+  // HR can onboard plain employees and stand up department managers, but
+  // not mint peer HR or ADMIN accounts.
+  HR: ["EMPLOYEE", "MANAGER"],
   MANAGER: ["EMPLOYEE"],
 };
 

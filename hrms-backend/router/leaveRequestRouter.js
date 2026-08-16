@@ -8,16 +8,24 @@ const router = Router();
 // Any authenticated user can apply for leave and check their own balance
 // (HR/Admin can also pass ?employeeId= on /balance to check someone else's).
 router.get("/balance", verifyToken, leaveRequestController.balance);
+// MANAGER (own department)/HR/ADMIN — bulk per-employee balances, powers
+// the Holidays "Leave balances" panel.
+router.get(
+  "/balances",
+  verifyToken,
+  authorize("MANAGER", "HR", "ADMIN"),
+  leaveRequestController.balances,
+);
 router.post("/", verifyToken, validate.leaveRequest.create, leaveRequestController.create);
 
 // Any authenticated user can list; controller scopes EMPLOYEE to their own.
 router.get("/", verifyToken, leaveRequestController.list);
 
-// HR/Admin only to approve/reject.
+// MANAGER (own department)/HR/ADMIN to approve/reject.
 router.patch(
   "/:id/review",
   verifyToken,
-  authorize("MANAGER", "ADMIN"),
+  authorize("MANAGER", "HR", "ADMIN"),
   leaveRequestController.review,
 );
 

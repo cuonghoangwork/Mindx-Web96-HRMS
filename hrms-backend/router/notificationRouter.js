@@ -6,10 +6,11 @@ const router = Router();
 
 router.get("/", verifyToken, notificationController.getAll);
 
-// HR/Admin only: employee picker for the compose-notice modal
-router.get("/recipients", verifyToken, authorize("ADMIN", "MANAGER"), notificationController.listRecipients);
+// Company-wide broadcast composer — HR/Admin only, not MANAGER's
+// department-scoped remit: employee picker for the compose-notice modal.
+router.get("/recipients", verifyToken, authorize("ADMIN", "HR"), notificationController.listRecipients);
 
-router.post("/", verifyToken, authorize("ADMIN", "MANAGER"), notificationController.create);
+router.post("/", verifyToken, authorize("ADMIN", "HR"), notificationController.create);
 router.patch("/read-all", verifyToken, notificationController.markAllRead);
 router.patch("/:id/read", verifyToken, notificationController.markRead);
 router.delete("/clear-read", verifyToken, notificationController.clearRead);

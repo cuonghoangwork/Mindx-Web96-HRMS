@@ -28,6 +28,124 @@ function StarRating({ rating }) {
   );
 }
 
+/**
+ * KanbanBoard — 8.0e Day 9. Native HTML5 drag-and-drop across the existing
+ * STAGES values, no extra library. Dropping a card on a column calls the
+ * same handleStageChange(id, stage) the list view's actions already use.
+ */
+function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate }) {
+  const [dragOverStage, setDragOverStage] = useState(null);
+
+  const byStage = useMemo(() => {
+    const map = {};
+    STAGES.forEach((s) => { map[s] = []; });
+    candidates.forEach((c) => {
+      if (!map[c.stage]) map[c.stage] = [];
+      map[c.stage].push(c);
+    });
+    return map;
+  }, [candidates]);
+
+  const handleDrop = (e, stage) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    const id = e.dataTransfer.getData("text/plain");
+    if (id) onStageChange(id, stage);
+  };
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${STAGES.length}, minmax(220px, 1fr))`,
+        gap: "var(--sp-4)",
+        overflowX: "auto",
+        paddingBottom: "var(--sp-2)",
+      }}
+    >
+      {STAGES.map((stage) => {
+        const items = byStage[stage] || [];
+        const isOver = dragOverStage === stage;
+        return (
+          <div
+            key={stage}
+            onDragOver={(e) => { e.preventDefault(); setDragOverStage(stage); }}
+            onDragLeave={() => setDragOverStage((s) => (s === stage ? null : s))}
+            onDrop={(e) => handleDrop(e, stage)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--sp-3)",
+              minHeight: "120px",
+              padding: "var(--sp-3)",
+              borderRadius: "var(--radius-md)",
+              background: isOver ? "var(--bg-primary-subtle)" : "var(--bg-surface-alt)",
+              border: isOver ? "2px dashed var(--bdr-brand)" : "1px solid var(--bdr-subtle)",
+              transition: "background 0.15s, border-color 0.15s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+                {stage}
+              </span>
+              <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{items.length}</span>
+            </div>
+
+            {items.length === 0 ? (
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", textAlign: "center", padding: "var(--sp-4) 0" }}>
+                Drop here
+              </div>
+            ) : (
+              items.map((candidate) => {
+                const job = getJobById(candidate.jobId);
+                return (
+                  <div
+                    key={candidate.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", candidate.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onClick={() => onSelectCandidate(candidate.id)}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "6px",
+                      padding: "var(--sp-3)",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--bdr-default)",
+                      borderRadius: "var(--radius-md)",
+                      cursor: "grab",
+                      boxShadow: "var(--shadow-xs)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                      <Avatar name={candidate.name} size="sm" />
+                      <span style={{
+                        fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)",
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {candidate.name}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      {job ? job.title : "—"}
+                    </div>
+                    <StarRating rating={candidate.rating} />
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Candidates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdParam = searchParams.get("job");
@@ -37,6 +155,8 @@ function Candidates() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
+  // 8.0e Day 9 — Kanban board alongside the existing list view.
+  const [viewMode, setViewMode] = useState("list"); // "list" | "kanban"
 
   const jobFilterId = jobIdParam || null;
   const jobFilter = jobFilterId ? getJobById(jobFilterId) : null;
@@ -99,6 +219,28 @@ function Candidates() {
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>Candidates</h2>
+        <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
+          {[
+            {
+              v: "list", label: "List",
+              icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 10h18M9 4v16" /></svg>,
+            },
+            {
+              v: "kanban", label: "Kanban",
+              icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="5" height="13" rx="1" /></svg>,
+            },
+          ].map(({ v, label, icon }) => (
+            <button key={v} type="button" onClick={() => { setViewMode(v); if (v === "kanban") setStageFilter("all"); }} style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              padding: "5px 14px", borderRadius: "0", border: "none",
+              background: viewMode === v ? "var(--bg-surface)" : "transparent",
+              color: viewMode === v ? "var(--txt-primary)" : "var(--txt-secondary)",
+              fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", cursor: "pointer",
+              fontWeight: viewMode === v ? "var(--fw-medium)" : "var(--fw-regular)",
+              boxShadow: viewMode === v ? "var(--shadow-xs)" : "none", transition: "all 0.15s",
+            }}>{icon}{label}</button>
+          ))}
+        </div>
       </div>
 
       <div
@@ -144,26 +286,30 @@ function Candidates() {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <select
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            style={{
-              padding: "10px var(--sp-4)",
-              border: "1px solid var(--bdr-default)",
-              borderRadius: "var(--radius-md)",
-              background: "var(--bg-surface)",
-              color: "var(--txt-primary)",
-              fontFamily: "var(--font-family)",
-              fontSize: "var(--fs-md)",
-            }}
-          >
-            <option value="all">All Stages</option>
-            {STAGES.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
+          {/* Kanban already splits by stage via its columns, so the stage
+              filter only applies to the list view. */}
+          {viewMode === "list" && (
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              style={{
+                padding: "10px var(--sp-4)",
+                border: "1px solid var(--bdr-default)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--bg-surface)",
+                color: "var(--txt-primary)",
+                fontFamily: "var(--font-family)",
+                fontSize: "var(--fs-md)",
+              }}
+            >
+              <option value="all">All Stages</option>
+              {STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+          )}
 
           {jobFilterId && (
             <div
@@ -232,6 +378,13 @@ function Candidates() {
               </Button>
             )}
           </div>
+        ) : viewMode === "kanban" ? (
+          <KanbanBoard
+            candidates={filteredCandidates}
+            getJobById={getJobById}
+            onStageChange={handleStageChange}
+            onSelectCandidate={setSelectedCandidateId}
+          />
         ) : (
           <table className="data-table">
             <thead>
@@ -265,8 +418,7 @@ function Candidates() {
                     <td>{candidate.appliedDate}</td>
                     <td>
                       <Button
-                        variant="secondary"
-                        style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                        variant="link"
                         onClick={() => setSelectedCandidateId(candidate.id)}
                       >
                         View

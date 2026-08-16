@@ -5,12 +5,24 @@ import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
-const hr = [verifyToken, authorize("MANAGER", "ADMIN")];
+// Running/approving/editing payroll is company-wide HR territory, not part
+// of MANAGER's department-scoped remit — HR/ADMIN only for writes.
+const hr = [verifyToken, authorize("HR", "ADMIN")];
 
-router.get("/periods", ...hr, payrollController.listPeriods);
+// Viewing payroll: MANAGER also gets in, but read-only and scoped to their
+// own department by the controller (see utils/managerScope.js and
+// payrollController's departmentId filtering) — HR/ADMIN see everything.
+const managerRead = [verifyToken, authorize("MANAGER", "HR", "ADMIN")];
+
+// Task 10.8 — payroll self-service: any authenticated user, not HR-gated.
+// The controller resolves "my payslips" from the caller's own JWT-linked
+// Employee record, so nothing beyond that is reachable through this route.
+router.get("/my-payslips", verifyToken, payrollController.myPayslips);
+
+router.get("/periods", ...managerRead, payrollController.listPeriods);
 router.post("/periods", ...hr, validate.payroll.createPeriod, payrollController.createPeriod);
 router.post("/periods/:id/regenerate", ...hr, payrollController.regenerate);
-router.get("/periods/:id/payslips", ...hr, payrollController.listPayslips);
+router.get("/periods/:id/payslips", ...managerRead, payrollController.listPayslips);
 router.patch("/periods/:id/status", ...hr, payrollController.setPeriodStatus);
 router.delete("/periods/:id", verifyToken, authorize("ADMIN"), payrollController.removePeriod);
 

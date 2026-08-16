@@ -18,3 +18,7 @@ build/
 # Vite
 node_modules/
 .DS_Store
+*.timestamp-*.mjs
+
+# Stray FUSE-mount artifacts (harmless, safe to delete)
+.fuse_hidden*

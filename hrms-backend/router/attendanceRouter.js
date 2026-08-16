@@ -14,8 +14,8 @@ router.post("/check-out", verifyToken, attendanceController.checkOut);
 
 router.post("/close-day", verifyToken, authorize("ADMIN"), attendanceController.closeDay);
 
-// Manual record editing — HR/Admin only
-router.put("/:id", verifyToken, authorize("ADMIN", "MANAGER"), attendanceController.update);
-router.delete("/:id", verifyToken, authorize("ADMIN", "MANAGER"), attendanceController.remove);
+// Manual record editing — MANAGER (own department)/HR/ADMIN
+router.put("/:id", verifyToken, authorize("ADMIN", "MANAGER", "HR"), attendanceController.update);
+router.delete("/:id", verifyToken, authorize("ADMIN", "MANAGER", "HR"), attendanceController.remove);
 
 export default router;
