@@ -10,11 +10,11 @@ router.post("/", verifyToken, profileEditRequestController.create);
 // Any authenticated user can list; controller filters by role
 router.get("/", verifyToken, profileEditRequestController.list);
 
-// HR/Admin only to approve/reject
+// MANAGER (own department)/HR/ADMIN to approve/reject
 router.patch(
   "/:id/review",
   verifyToken,
-  authorize("MANAGER", "ADMIN"),
+  authorize("MANAGER", "HR", "ADMIN"),
   profileEditRequestController.review,
 );
 

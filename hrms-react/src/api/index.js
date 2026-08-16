@@ -98,6 +98,13 @@ export const NotificationsAPI = {
   remove: (id) => apiFetch(`/notifications/${id}`, { method: "DELETE" }),
 };
 
+export const AuditLogAPI = {
+  /** Any authenticated user — recent activity feed w/ precomputed title+category, no `changes` field */
+  recent: (params = {}) => apiFetch(`/audit-log/recent${qs(params)}`),
+  /** HR/Admin only — full log, filterable by resource/action/actorId (not resourceId) */
+  list: (params = {}) => apiFetch(`/audit-log${qs(params)}`),
+};
+
 export const PromotionRequestsAPI = {
   create: (data) => apiFetch("/promotion-requests", { method: "POST", body: data }),
   list: (params = {}) => apiFetch(`/promotion-requests${qs(params)}`),
@@ -109,6 +116,9 @@ export const PromotionRequestsAPI = {
 };
 
 export const PayrollAPI = {
+  // Self-service — any authenticated user, resolved server-side to their own
+  // Employee link. Only returns payslips from approved/paid periods.
+  myPayslips: () => apiFetch("/payroll/my-payslips"),
   listPeriods: (params = {}) => apiFetch(`/payroll/periods${qs(params)}`),
   createPeriod: (body) => apiFetch("/payroll/periods", { method: "POST", body }),
   regenerate: (id) => apiFetch(`/payroll/periods/${id}/regenerate`, { method: "POST" }),
@@ -133,6 +143,23 @@ export const NoShowReviewsAPI = {
   /** HR/Admin: decision = "approved" | "rejected", reviewNote optional */
   review: (id, decision, reviewNote = "") =>
     apiFetch(`/no-show-reviews/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
+};
+
+export const LeaveRequestsAPI = {
+  /** Own remaining/used paid-leave balance for the given year (defaults to current year) */
+  balance: (params = {}) => apiFetch(`/leave-requests/balance${qs(params)}`),
+  /** MANAGER (own department)/HR/ADMIN: every visible employee's per-type balance for the given year */
+  balances: (params = {}) => apiFetch(`/leave-requests/balances${qs(params)}`),
+  /** Employee applies for leave: { startDate, endDate, reason } */
+  create: (data) => apiFetch("/leave-requests", { method: "POST", body: data }),
+  /** List requests; EMPLOYEE gets only own, HR/Admin get all (optional ?status=) */
+  list: (params = {}) => apiFetch(`/leave-requests${qs(params)}`),
+  /** HR/Admin: decision = "approved" | "rejected", reviewNote optional */
+  review: (id, decision, reviewNote = "") =>
+    apiFetch(`/leave-requests/${id}/review`, {
       method: "PATCH",
       body: { decision, reviewNote },
     }),

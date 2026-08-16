@@ -63,7 +63,7 @@ export async function annualSalaryRaise({ asOf = new Date() } = {}) {
       title: "Annual raise awaiting review",
       message: `${employee.name} has completed ${years} year${years === 1 ? "" : "s"} of service. A ${Math.round(ANNUAL_RAISE_RATE * 100)}% raise has been proposed for review.`,
       category: "employee",
-      link: "/settings",
+      link: "/employees",
       linkLabel: "Review promotion queue",
     });
   }

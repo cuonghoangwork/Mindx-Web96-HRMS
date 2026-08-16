@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/Button";
+import AuthBrandPanel from "../components/AuthBrandPanel";
+import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function ChangePassword() {
   const navigate = useNavigate();
@@ -43,7 +45,12 @@ function ChangePassword() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
+      <AuthBrandPanel />
+
+      <div className="login-form-panel">
+        <AuthThemeToggle />
+
+        <div className="login-card">
         <div className="login-header">
           <h1>{mustChangePassword ? "Set your password" : "Change password"}</h1>
         </div>
@@ -143,6 +150,7 @@ function ChangePassword() {
             Sign out
           </button>
         </p>
+        </div>
       </div>
     </div>
   );

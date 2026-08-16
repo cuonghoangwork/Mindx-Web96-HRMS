@@ -2,8 +2,8 @@
  * closeAttendanceDay.integration.test.js
  *
  * Covers the Sprint 2 additions to jobs/closeAttendanceDay.js:
- *   - 4.2: a late check-in is marked "late" with lateHalfDayType "paid" while the
- *     employee still has paid-leave balance, and "unpaid" once it's exhausted.
+ *   - 4.2: a late check-in is marked "late" with lateHalfDayType "annual" while the
+ *     employee still has Annual/PTO balance, and "unpaid" once it's exhausted.
  *   - 4.6: an employee with no attendance record and no leave request on file is
  *     marked "no-show"; an employee with a pending LeaveRequest for that date is
  *     left alone (not flagged).
@@ -59,7 +59,7 @@ async function makeEmployee(overrides = {}) {
 }
 
 describe("closeAttendanceDay — late half-day (task 4.2)", () => {
-  it("marks a late check-in as paid when leave balance remains", async (ctx) => {
+  it("marks a late check-in as annual when leave balance remains", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const { default: AttendanceModel } = await import("../model/Attendance.js");
     const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
@@ -80,7 +80,7 @@ describe("closeAttendanceDay — late half-day (task 4.2)", () => {
 
     const record = await AttendanceModel.findOne({ employee: employee._id, date });
     expect(record.status).toBe("late");
-    expect(record.lateHalfDayType).toBe("paid");
+    expect(record.lateHalfDayType).toBe("annual");
   });
 
   it("marks a late check-in as unpaid once the 12-day balance is exhausted", async (ctx) => {
@@ -98,14 +98,14 @@ describe("closeAttendanceDay — late half-day (task 4.2)", () => {
       role: "MANAGER",
     });
 
-    // Burn the whole 12-day paid balance with one approved request earlier in the year.
+    // Burn the whole 12-day annual balance with one approved request earlier in the year.
     await LeaveRequestModel.create({
       employee: employee._id,
       requestedBy: hr._id,
       startDate: new Date("2026-01-05T00:00:00.000Z"),
       endDate: new Date("2026-01-16T00:00:00.000Z"), // 10 weekdays
       days: 12,
-      type: "paid",
+      type: "annual",
       status: "approved",
       appliedAt: new Date("2026-01-01T00:00:00.000Z"),
     });
@@ -187,7 +187,7 @@ describe("closeAttendanceDay — no-show status (task 4.6)", () => {
       startDate: date,
       endDate: date,
       days: 1,
-      type: "paid",
+      type: "annual",
       status: "pending",
       appliedAt: new Date(`${TEST_DATE_KEY}T08:00:00.000Z`),
     });

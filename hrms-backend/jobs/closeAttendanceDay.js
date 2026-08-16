@@ -5,7 +5,7 @@ import LeaveRequestModel from "../model/LeaveRequest.js";
 import NoShowReviewModel from "../model/NoShowReview.js";
 import { logAction } from "../utils/auditLog.js";
 import { notifyHR } from "../controller/notificationController.js";
-import { getRemainingPaidDays } from "../utils/leaveBalance.js";
+import { getRemainingDays } from "../utils/leaveBalance.js";
 import {
   WORKDAY_END,
   WORKDAY_LATE_AFTER,
@@ -49,16 +49,20 @@ async function autoCheckOut(date) {
 }
 
 /**
- * Task 4.2: "late count as half-day paid leave or half-day unpaid leave".
- * For each employee whose check-in is after WORKDAY_LATE_AFTER, mark the day
- * "late" and decide whether it draws from their paid leave balance (if they
- * have >= 0.5 remaining for the year) or is unpaid (once exhausted).
+ * Task 4.2: "late count as half-day Annual/PTO leave or half-day unpaid
+ * leave". For each employee whose check-in is after WORKDAY_LATE_AFTER, mark
+ * the day "late" and decide whether it draws from their Annual/PTO balance
+ * (if they have >= 0.5 remaining for the year) or is unpaid (once exhausted).
  *
- * Processed sequentially (not Promise.all) so that when the SAME employee has
- * multiple late days queued in one run, each check sees the previous one's
- * deduction already applied via getRemainingPaidDays — otherwise two late
- * days in the same batch could both read the same "before" balance and both
- * get marked "paid" even though only one 0.5-day slice was actually left.
+ * Grouped by employee and processed one employee at a time within each
+ * group, but the groups themselves run in parallel: when the SAME employee
+ * has multiple late days queued in one run, each of THEIR checks must see
+ * the previous one's deduction already applied via getRemainingDays —
+ * otherwise two late days in the same batch could both read the same
+ * "before" balance and both get marked "annual" even though only one
+ * 0.5-day slice was actually left. Different employees have no such
+ * dependency (the common case is one late record each), so serializing the
+ * whole batch behind that per-employee ordering wastes N-1 round trips.
  */
 async function markLate(date) {
   const candidates = await AttendanceModel.find({
@@ -77,19 +81,31 @@ async function markLate(date) {
   if (!lateRecords.length) return { count: 0, unpaidCount: 0 };
 
   const year = date.getUTCFullYear();
-  let unpaidCount = 0;
 
+  const byEmployee = new Map();
   for (const record of lateRecords) {
-    const remaining = await getRemainingPaidDays(record.employee, year);
-    const type = remaining >= 0.5 ? "paid" : "unpaid";
-    if (type === "unpaid") unpaidCount += 1;
-
-    record.status = "late";
-    record.lateHalfDayType = type;
-    await record.save();
+    const key = String(record.employee);
+    if (!byEmployee.has(key)) byEmployee.set(key, []);
+    byEmployee.get(key).push(record);
   }
 
-  return { count: lateRecords.length, unpaidCount };
+  const unpaidCounts = await Promise.all(
+    [...byEmployee.values()].map(async (records) => {
+      let unpaid = 0;
+      for (const record of records) {
+        const remaining = await getRemainingDays(record.employee, year, "annual");
+        const type = remaining >= 0.5 ? "annual" : "unpaid";
+        if (type === "unpaid") unpaid += 1;
+
+        record.status = "late";
+        record.lateHalfDayType = type;
+        await record.save();
+      }
+      return unpaid;
+    }),
+  );
+
+  return { count: lateRecords.length, unpaidCount: unpaidCounts.reduce((sum, n) => sum + n, 0) };
 }
 
 /**
@@ -218,7 +234,7 @@ async function flagRepeatedNoShows(employeeIds) {
       title: "No-show pattern flagged for review",
       message: `${employee.name} (${employee.employeeId}) has ${count} no-show day(s) on record and needs HR review.`,
       category: "employee",
-      link: "/settings",
+      link: "/attendance",
       linkLabel: "Review no-show flags",
     });
   }

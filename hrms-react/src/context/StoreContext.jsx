@@ -198,10 +198,27 @@ export function StoreProvider({ children }) {
     );
   }, []);
 
+  // Backend's manager field is resolved server-side from a plain name
+  // string (case-insensitive match against Employee.name — see
+  // utils/refResolvers.js), not an employeeId, so this takes/sends the
+  // manager's display name even though the caller is picking from a
+  // dropdown of employee objects.
+  const updateDepartmentManager = useCallback(async (id, managerName) => {
+    const res = await DepartmentsAPI.update(id, { manager: managerName ?? "" });
+    setDepartments((prev) =>
+      prev.map((dept) => (idsMatch(dept.id, id) ? res.data : dept)),
+    );
+  }, []);
+
   const addDepartment = useCallback(async (department) => {
     const res = await DepartmentsAPI.create(department);
     setDepartments((prev) => [...prev, res.data]);
     return res.data;
+  }, []);
+
+  const removeDepartment = useCallback(async (id) => {
+    await DepartmentsAPI.remove(id);
+    setDepartments((prev) => prev.filter((dept) => !idsMatch(dept.id, id)));
   }, []);
 
   const getEmployeesByDepartment = useCallback(
@@ -411,7 +428,9 @@ export function StoreProvider({ children }) {
     setActivePage,
     setDepartments,
     updateDepartmentBudget,
+    updateDepartmentManager,
     addDepartment,
+    removeDepartment,
     getEmployeesByDepartment,
     getEmployeeCountByDepartment,
     getTotalSalaryByDepartment,

@@ -1,0 +1,22 @@
+# Normalize line endings across platforms.
+# All text files are stored in the repo with LF; Git will handle
+# conversion on checkout per-platform as needed, so Windows and
+# Linux/Mac checkouts stay consistent and `git add` stops warning
+# about LF/CRLF conversion on every file.
+* text=auto eol=lf
+
+# Explicitly keep Windows batch/PowerShell scripts as CRLF if any exist.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Treat these as binary (no line-ending conversion).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

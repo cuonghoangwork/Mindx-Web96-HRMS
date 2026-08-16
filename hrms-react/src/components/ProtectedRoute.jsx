@@ -5,17 +5,19 @@ import { useAuth } from '../context/AuthContext'
  * ProtectedRoute — gates a route behind authentication (and optionally a role).
  *
  * Props:
- *   children     — the page component to render
- *   requireHR    — if true, only MANAGER + ADMIN can access; others see a 403 notice
- *   requireAdmin — if true, only ADMIN can access
+ *   children       — the page component to render
+ *   requireManager — if true, only MANAGER + HR + ADMIN can access (department-scoped-or-above)
+ *   requireHR      — if true, only HR + ADMIN can access (company-wide-or-above)
+ *   requireAdmin   — if true, only ADMIN can access
  *
  * Usage:
- *   <ProtectedRoute>               — any authenticated user
- *   <ProtectedRoute requireHR>     — MANAGER or ADMIN only
- *   <ProtectedRoute requireAdmin>  — ADMIN only
+ *   <ProtectedRoute>                  — any authenticated user
+ *   <ProtectedRoute requireManager>   — MANAGER, HR or ADMIN
+ *   <ProtectedRoute requireHR>        — HR or ADMIN only
+ *   <ProtectedRoute requireAdmin>     — ADMIN only
  */
-function ProtectedRoute({ children, requireHR = false, requireAdmin = false }) {
-  const { isAuthenticated, isHR, isAdmin, loading, mustChangePassword } = useAuth()
+function ProtectedRoute({ children, requireHR = false, requireManager = false, requireAdmin = false }) {
+  const { isAuthenticated, isHRTier, isManagerTier, isAdmin, loading, mustChangePassword } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -38,7 +40,11 @@ function ProtectedRoute({ children, requireHR = false, requireAdmin = false }) {
     return <AccessDenied />
   }
 
-  if (requireHR && !isHR) {
+  if (requireHR && !isHRTier) {
+    return <AccessDenied />
+  }
+
+  if (requireManager && !isManagerTier) {
     return <AccessDenied />
   }
 

@@ -1,5 +1,7 @@
 /**
- * EmployeeStatusBadge — HRMS Design System
+ * EmployeeStatusBadge — HRMS Design System v3 "Navy Signal Blue"
+ * (No structural changes needed for v3 — fully token-driven via var(--...)
+ * references, no hardcoded colors; reskin was a token-value swap only.)
  *
  * Dedicated status badge for employee records.
  * More opinionated than the generic Badge — includes

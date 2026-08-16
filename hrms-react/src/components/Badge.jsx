@@ -1,5 +1,7 @@
 /**
- * Badge — HRMS Design System
+ * Badge — HRMS Design System v3 "Navy Signal Blue"
+ * (No structural changes needed for v3 — fully token/class-driven via
+ * .badge/.badge-* in index.css; reskin was a token-value swap only.)
  *
  * Variants (semantic):
  *   status  : active | leave | remote | terminated | pending
@@ -32,11 +34,14 @@ const VARIANT_CLASS = {
   terminated:  "badge badge-terminated",
   pending:     "badge badge-pending",
 
-  // Contract type
+  // Contract type — matches mockup's typeTagStyleFor exactly: Full-time
+  // = accent tint, Part-time = purple, Contract = teal (same value as
+  // Info in the mockup's own token object), Intern falls into the
+  // neutral tint (its "else" branch).
   "full-time":  "badge badge-primary",
-  "part-time":  "badge badge-pending",
-  contract:     "badge badge-leave",
-  intern:       "badge badge-info",
+  "part-time":  "badge badge-purple",
+  contract:     "badge badge-info",
+  intern:       "badge badge-pending",
 
   // Generic semantic
   primary:  "badge badge-primary",
@@ -48,7 +53,7 @@ const VARIANT_CLASS = {
 };
 
 const SIZE_STYLE = {
-  sm: { fontSize: "var(--fs-2xs)", padding: "2px 8px" },
+  sm: { fontSize: "10px", padding: "2px 8px" },
   md: {},
   lg: { fontSize: "var(--fs-sm)",  padding: "5px 14px" },
 };
@@ -58,7 +63,7 @@ function Badge({
   size = "md",
   dot = false,
   icon,
-  pill = true,
+  pill = false,
   className = "",
   style,
   children,
@@ -70,7 +75,10 @@ function Badge({
     <span
       className={cls}
       style={{
-        borderRadius: pill ? "var(--radius-full)" : "var(--radius-sm)",
+        // mockup's status/type tags carry no border-radius at all (flat
+        // rectangular tags); `pill` stays available for any one-off
+        // caller that explicitly wants a rounded dot-style badge.
+        borderRadius: pill ? "var(--radius-full)" : "0",
         ...SIZE_STYLE[size],
         ...style,
       }}
@@ -99,7 +107,7 @@ function Badge({
 }
 
 /* ─── StatusBadge: auto-selects variant from status string ─── */
-export function StatusBadge({ status, size, dot = true, ...rest }) {
+export function StatusBadge({ status, size, dot = false, ...rest }) {
   const map = {
     "Active":     "active",
     "On Leave":   "leave",

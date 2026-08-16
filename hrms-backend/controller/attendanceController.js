@@ -3,6 +3,7 @@ import EmployeeModel from "../model/Employee.js";
 import { attendanceToClient, attendanceFromClient } from "../utils/mappers.js";
 import { closeAttendanceDay } from "../jobs/closeAttendanceDay.js";
 import { dateKeyInTz } from "../utils/workday.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const attendanceController = {
   getAll: async (req, res) => {
@@ -19,6 +20,18 @@ const attendanceController = {
         } else {
           // No linked employee — return empty
           return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
+        }
+      } else if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        const deptEmployees = await EmployeeModel.find({ department: deptId }, "_id");
+        const deptIds = deptEmployees.map((e) => String(e._id));
+        if (employeeId) {
+          if (!deptIds.includes(String(employeeId))) {
+            return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
+          }
+          condition.employee = employeeId;
+        } else {
+          condition.employee = { $in: deptEmployees.map((e) => e._id) };
         }
       } else {
         if (employeeId) condition.employee = employeeId;
@@ -63,6 +76,16 @@ const attendanceController = {
           return res.status(400).json({ success: false, message: "No employee profile linked to your account. Please ask an admin to link one." });
         }
         employeeId = String(myEmp._id); // override whatever was sent
+      } else if (req.user.role === "MANAGER") {
+        if (!employeeId) throw new Error("employeeId and date are required.");
+        const deptId = await getManagerDepartmentId(req);
+        const target = await EmployeeModel.findById(employeeId, "department");
+        if (!target || String(target.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only check in employees in your own department.",
+          });
+        }
       }
 
       if (!employeeId || !date) throw new Error("employeeId and date are required.");
@@ -91,6 +114,16 @@ const attendanceController = {
           return res.status(400).json({ success: false, message: "No employee profile linked to your account." });
         }
         employeeId = String(myEmp._id);
+      } else if (req.user.role === "MANAGER") {
+        if (!employeeId) throw new Error("employeeId and date are required.");
+        const deptId = await getManagerDepartmentId(req);
+        const target = await EmployeeModel.findById(employeeId, "department");
+        if (!target || String(target.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only check out employees in your own department.",
+          });
+        }
       }
 
       if (!employeeId || !date) throw new Error("employeeId and date are required.");
@@ -117,6 +150,20 @@ const attendanceController = {
   update: async (req, res) => {
     try {
       const data = attendanceFromClient(req.body);
+
+      if (req.user.role === "MANAGER") {
+        const existing = await AttendanceModel.findById(req.params.id, "employee");
+        if (!existing) throw new Error("Attendance record not found.");
+        const deptId = await getManagerDepartmentId(req);
+        const emp = await EmployeeModel.findById(existing.employee, "department");
+        if (!emp || String(emp.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only edit attendance for your own department.",
+          });
+        }
+      }
+
       const record = await AttendanceModel.findByIdAndUpdate(req.params.id, data, {
         new: true,
         runValidators: true,
@@ -130,6 +177,19 @@ const attendanceController = {
 
   remove: async (req, res) => {
     try {
+      if (req.user.role === "MANAGER") {
+        const existing = await AttendanceModel.findById(req.params.id, "employee");
+        if (!existing) throw new Error("Attendance record not found.");
+        const deptId = await getManagerDepartmentId(req);
+        const emp = await EmployeeModel.findById(existing.employee, "department");
+        if (!emp || String(emp.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only delete attendance for your own department.",
+          });
+        }
+      }
+
       const record = await AttendanceModel.findByIdAndDelete(req.params.id);
       if (!record) throw new Error("Attendance record not found.");
       res.json({ success: true, message: "Attendance record deleted." });

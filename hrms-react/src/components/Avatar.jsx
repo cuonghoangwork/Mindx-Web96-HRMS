@@ -1,5 +1,5 @@
 /**
- * Avatar — HRMS Design System
+ * Avatar — HRMS Design System v3 "Navy Signal Blue"
  *
  * Variants:
  *   initials  — auto-generates initials from name (default)
@@ -25,18 +25,16 @@
  *   <AvatarGroup avatars={employees.slice(0,4)} max={3} />
  */
 
-/* ─── Color palette (auto-picked by name hash) ─── */
+/* ─── Color palette (auto-picked by name hash) ───
+   v3 "Navy Signal Blue" — flat 5-color rotation lifted directly from
+   the redesign mockup's avatar-chip palette (no gradients, matches the
+   flat/border-forward aesthetic rather than v2's 10-color gradient set). */
 const PALETTE = [
-  ["linear-gradient(135deg,#7152f3,#9880f4)"],   // purple
-  ["linear-gradient(135deg,#10b981,#34d399)"],   // green
-  ["linear-gradient(135deg,#f59e0b,#fbbf24)"],   // amber
-  ["linear-gradient(135deg,#3b82f6,#60a5fa)"],   // blue
-  ["linear-gradient(135deg,#ef4444,#f87171)"],   // red
-  ["linear-gradient(135deg,#a78bfa,#c4b5fd)"],   // violet
-  ["linear-gradient(135deg,#0ea5e9,#38bdf8)"],   // sky
-  ["linear-gradient(135deg,#d946ef,#e879f9)"],   // fuchsia
-  ["linear-gradient(135deg,#f43f5e,#fb7185)"],   // rose
-  ["linear-gradient(135deg,#06b6d4,#22d3ee)"],   // cyan
+  ["#0b1f3a"],   // ink navy
+  ["#2f6fed"],   // signal blue
+  ["#4b5a6e"],   // slate
+  ["#1d3f8f"],   // deep blue
+  ["#334464"],   // navy-gray
 ];
 
 function hashName(name = "") {
@@ -67,10 +65,10 @@ const SIZE = {
 
 /* ─── Status dot color ─── */
 const DOT_COLOR = {
-  active:     "#10b981",
-  leave:      "#f59e0b",
-  remote:     "#3b82f6",
-  terminated: "#ef4444",
+  active:     "var(--clr-success-500)",
+  leave:      "var(--clr-warning-500)",
+  remote:     "var(--clr-info-500)",
+  terminated: "var(--clr-danger-500)",
 };
 
 /* ─── Avatar ─── */

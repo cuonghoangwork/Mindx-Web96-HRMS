@@ -66,22 +66,32 @@ describe("resolveAccountEmail", () => {
 
 describe("assignableRoles / assertCanAssignRole", () => {
   it("lets ADMIN assign every role", () => {
-    expect(assignableRoles("ADMIN")).toEqual(["EMPLOYEE", "MANAGER", "ADMIN"]);
+    expect(assignableRoles("ADMIN")).toEqual(["EMPLOYEE", "MANAGER", "HR", "ADMIN"]);
     expect(assertCanAssignRole("ADMIN", "EMPLOYEE")).toBe("EMPLOYEE");
     expect(assertCanAssignRole("ADMIN", "MANAGER")).toBe("MANAGER");
+    expect(assertCanAssignRole("ADMIN", "HR")).toBe("HR");
     expect(assertCanAssignRole("ADMIN", "ADMIN")).toBe("ADMIN");
+  });
+
+  it("lets HR assign EMPLOYEE and MANAGER but not HR or ADMIN", () => {
+    expect(assignableRoles("HR")).toEqual(["EMPLOYEE", "MANAGER"]);
+    expect(assertCanAssignRole("HR", "EMPLOYEE")).toBe("EMPLOYEE");
+    expect(assertCanAssignRole("HR", "MANAGER")).toBe("MANAGER");
+    expect(() => assertCanAssignRole("HR", "HR")).toThrow(/cannot create HR/);
+    expect(() => assertCanAssignRole("HR", "ADMIN")).toThrow(/cannot create ADMIN/);
   });
 
   it("limits MANAGER to EMPLOYEE", () => {
     expect(assignableRoles("MANAGER")).toEqual(["EMPLOYEE"]);
     expect(assertCanAssignRole("MANAGER", "EMPLOYEE")).toBe("EMPLOYEE");
     expect(() => assertCanAssignRole("MANAGER", "MANAGER")).toThrow(/cannot create MANAGER/);
+    expect(() => assertCanAssignRole("MANAGER", "HR")).toThrow(/cannot create HR/);
     expect(() => assertCanAssignRole("MANAGER", "ADMIN")).toThrow(/cannot create ADMIN/);
   });
 
   it("lets EMPLOYEE and unknown roles assign nothing", () => {
     expect(assignableRoles("EMPLOYEE")).toEqual([]);
-    ["EMPLOYEE", "MANAGER", "ADMIN"].forEach((role) => {
+    ["EMPLOYEE", "MANAGER", "HR", "ADMIN"].forEach((role) => {
       expect(() => assertCanAssignRole("EMPLOYEE", role)).toThrow();
       expect(() => assertCanAssignRole(undefined, role)).toThrow();
     });
