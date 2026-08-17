@@ -203,11 +203,16 @@ export function createReviewRequestController({
         request.reviewNote = reviewNote ?? "";
         request.reviewedBy = req.user.id;
         request.reviewedAt = new Date();
-        await request.save();
 
+        // Run the approval side effect before persisting the status change —
+        // if onApprove throws, the request must stay "pending" in the DB
+        // rather than being committed as "approved" with the side effect
+        // never having applied.
         if (decision === "approved" && typeof onApprove === "function") {
           await onApprove(request);
         }
+
+        await request.save();
 
         // Notify the employee of the outcome (best-effort — a missing linked
         // User account shouldn't fail the review itself).

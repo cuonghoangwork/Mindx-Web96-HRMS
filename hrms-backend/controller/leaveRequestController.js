@@ -127,6 +127,17 @@ const leaveRequestController = {
         throw new Error("The selected range contains no working days.");
       }
 
+      // Block if there's already a pending request for this employee — same
+      // rule profileEditRequestController.js and promotionRequestController.js
+      // apply for their own request types.
+      const existingPending = await LeaveRequestModel.findOne({ employee: employee._id, status: "pending" });
+      if (existingPending) {
+        return res.status(409).json({
+          success: false,
+          message: "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+        });
+      }
+
       if (type !== "unpaid") {
         const remaining = await getRemainingDays(employee._id, start.getFullYear(), type);
         if (days > remaining) {
@@ -184,7 +195,7 @@ const leaveRequestController = {
       await request.populate("employee", "name email employeeId");
 
       // Notify all HR/Admin users
-      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "ADMIN"] } }, "_id");
+      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
       await Promise.all(hrUsers.map((u) =>
         NotificationModel.create({
           user: u._id,

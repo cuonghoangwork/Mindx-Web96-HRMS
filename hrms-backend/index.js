@@ -9,6 +9,7 @@ dotenv.config({ path: `.env.${env}` });
 import { connectDB } from "./config/db.js";
 import rootRouter from "./router/index.js";
 import { startScheduler } from "./jobs/index.js";
+import { runStartupMigrations } from "./utils/startupMigrations.js";
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8080;
 
 connectDB()
+  .then(() => runStartupMigrations())
   .then(() => {
     startScheduler();
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

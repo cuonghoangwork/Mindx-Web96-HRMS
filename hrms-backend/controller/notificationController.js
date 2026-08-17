@@ -10,7 +10,7 @@ const notificationController = {
       const { category, read } = req.query;
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "MANAGER";
+      const isHR = role === "ADMIN" || role === "HR";
 
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       const condition = {
@@ -34,7 +34,7 @@ const notificationController = {
     }
   },
 
-  // ADMIN/MANAGER compose a custom notice. Body:
+  // ADMIN/HR compose a custom notice. Body:
   //   { title, message, category="announcement", link?, linkLabel?, recipientId? | recipientIds?: [], audience? }
   // - recipientId / recipientIds: send to one or more specific employees (resolved to their User ids)
   // - omit recipients entirely (or pass recipientId: "all"): broadcast per `audience`
@@ -100,7 +100,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "MANAGER";
+      const isHR = role === "ADMIN" || role === "HR";
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       await NotificationModel.updateMany(
         { $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }] },
@@ -116,7 +116,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "MANAGER";
+      const isHR = role === "ADMIN" || role === "HR";
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       await NotificationModel.deleteMany({
         $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }],

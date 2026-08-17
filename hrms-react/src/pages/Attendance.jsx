@@ -352,7 +352,7 @@ function Attendance() {
   const months = t("common.months", { returnObjects: true });
   const monthsShort = months.map((m) => m.slice(0, 3));
   const { attendance, employees, getAppNow, clockIn, clockOut } = useStore();
-  const { user: currentUser, isAdmin, isManager } = useAuth();
+  const { isManager, isHRTier, isManagerTier } = useAuth();
   const navigate = useNavigate();
 
   const [searchParams] = useSearchParams();
@@ -370,13 +370,13 @@ function Attendance() {
   }, []);
 
   const scopedEmployees = useMemo(() => {
-    if (isAdmin) return employees;
+    if (isHRTier) return employees;
     if (isManager && myEmployee?.department) {
       return employees.filter((e) => e.department === myEmployee.department);
     }
     if (myEmployee) return employees.filter((e) => idsMatch(e.id, myEmployee.id));
     return employees;
-  }, [employees, isAdmin, isManager, myEmployee]);
+  }, [employees, isHRTier, isManager, myEmployee]);
 
   const today = getAppNow();
   const todayStr = isoOf(today);
@@ -483,7 +483,7 @@ function Attendance() {
   const rosterRows = useMemo(() => {
     const records = selectedData?.records ?? [];
     const searchLower = search.trim().toLowerCase();
-    const canAct = (isAdmin || isManager) && selectedDay === todayStr;
+    const canAct = isManagerTier && selectedDay === todayStr;
     return records
       .map((r) => {
         const emp = scopedEmployees.find((e) => idsMatch(e.id, r.employeeId));
@@ -503,7 +503,7 @@ function Attendance() {
         r.designation.toLowerCase().includes(searchLower)
       )
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [selectedData, search, scopedEmployees, isAdmin, isManager, selectedDay, todayStr]);
+  }, [selectedData, search, scopedEmployees, isManagerTier, selectedDay, todayStr]);
 
   const handleInlineCheckIn = async (employeeId) => {
     setActionLoadingKey(`${employeeId}-in`);
@@ -554,7 +554,7 @@ function Attendance() {
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
       {/* ── Roster / No-show queue tabs (admin only) ── */}
-      {isAdmin && (
+      {isHRTier && (
         <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)", alignSelf: "flex-start" }}>
           {[
             { key: "roster", label: t("attendance.tabs.roster", { defaultValue: "Roster" }) },
@@ -581,7 +581,7 @@ function Attendance() {
               Showing your team{myEmployee?.department ? ` (${myEmployee.department})` : ""} — {scopedEmployees.length} employee{scopedEmployees.length === 1 ? "" : "s"}
             </p>
           )}
-          {!isAdmin && !isManager && (
+          {!isManagerTier && (
             <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", margin: 0 }}>
               Showing your own attendance
             </p>

@@ -118,7 +118,7 @@ const profileEditRequestController = {
       });
 
       // Notify all HR/Admin users
-      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "ADMIN"] } }, "_id");
+      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
       await Promise.all(hrUsers.map((u) =>
         NotificationModel.create({
           user: u._id,
