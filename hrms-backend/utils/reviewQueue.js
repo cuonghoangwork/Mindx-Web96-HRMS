@@ -39,6 +39,7 @@ import mongoose from "mongoose";
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
+import { getManagerDepartmentId } from "./managerScope.js";
 
 export const REVIEW_STATUSES = ["pending", "approved", "rejected"];
 
@@ -104,9 +105,19 @@ export async function resolveRequestingEmployee(req) {
  *   async side effect run once status flips to "approved" (e.g. apply
  *   profile field changes, credit a leave balance to attendance records).
  *   Runs before the employee is notified.
- * @param {(decision: 'approved'|'rejected', request: object) => {title: string, message: string}} [options.notifyEmployee] -
+ * @param {(decision: 'approved'|'rejected', request: object) => {title: string, message: string, link?: string, linkLabel?: string}} [options.notifyEmployee] -
  *   optional override for the outcome notification copy; defaults to
  *   generic "<resourceLabel> approved/rejected" text.
+ * @param {string|((request: object) => string)} [options.employeeLink] - where the
+ *   outcome notification sends the employee, e.g. "/attendance" or a function
+ *   of the (populated) request for a per-employee route like a profile page.
+ *   Used whenever `notifyEmployee`'s return doesn't set its own `link` —
+ *   most consumers send the employee to the same place on both approval and
+ *   rejection, so this is one place to say that instead of repeating it in
+ *   every branch of `notifyEmployee`. Omit if there's nowhere meaningful to
+ *   send the employee.
+ * @param {string} [options.employeeLinkLabel] - label for `employeeLink`,
+ *   same override rule as above.
  */
 export function createReviewRequestController({
   Model,
@@ -115,6 +126,8 @@ export function createReviewRequestController({
   toClient,
   onApprove,
   notifyEmployee,
+  employeeLink,
+  employeeLinkLabel,
 }) {
   function applyPopulate(query) {
     for (const [path, select] of populate) query.populate(path, select);
@@ -123,8 +136,9 @@ export function createReviewRequestController({
 
   return {
     /**
-     * GET /:resource — HR/Admin see every request (optionally filtered via
-     * ?status=pending|approved|rejected|all); Employees only ever see
+     * GET /:resource — Admin sees every request (optionally filtered via
+     * ?status=pending|approved|rejected|all); Manager sees only requests
+     * for employees in their own department; Employees only ever see
      * their own, regardless of query params.
      */
     list: async (req, res) => {
@@ -136,6 +150,10 @@ export function createReviewRequestController({
           const employee = await resolveRequestingEmployee(req);
           if (!employee) return res.json({ success: true, items: [] });
           condition.employee = employee._id;
+        } else if (req.user.role === "MANAGER") {
+          const deptId = await getManagerDepartmentId(req);
+          const deptEmployees = await EmployeeModel.find({ department: deptId }, "_id");
+          condition.employee = { $in: deptEmployees.map((e) => e._id) };
         }
 
         if (status && status !== "all") condition.status = status;
@@ -146,7 +164,7 @@ export function createReviewRequestController({
 
         res.json({ success: true, items: items.map(toClient) });
       } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        res.status(error.status || 500).json({ success: false, message: error.message });
       }
     },
 
@@ -167,6 +185,18 @@ export function createReviewRequestController({
         }
         if (request.status !== "pending") {
           return res.status(409).json({ success: false, message: "This request has already been reviewed." });
+        }
+
+        if (req.user.role === "MANAGER") {
+          const deptId = await getManagerDepartmentId(req);
+          const employeeId = request.employee?._id ?? request.employee;
+          const employeeDept = await EmployeeModel.findById(employeeId, "department");
+          if (!employeeDept || String(employeeDept.department) !== String(deptId)) {
+            return res.status(403).json({
+              success: false,
+              message: "You can only review requests for employees in your own department.",
+            });
+          }
         }
 
         request.status = decision;
@@ -193,12 +223,15 @@ export function createReviewRequestController({
             const copy = typeof notifyEmployee === "function"
               ? notifyEmployee(decision, request)
               : defaultNotificationCopy(decision, resourceLabel, request.reviewNote);
+            const resolvedLink = typeof employeeLink === "function" ? employeeLink(request) : employeeLink;
 
             await NotificationModel.create({
               user: employeeUser._id,
               category: "employee",
               title: copy.title,
               message: copy.message,
+              link: copy.link ?? resolvedLink ?? null,
+              linkLabel: copy.linkLabel ?? employeeLinkLabel ?? null,
               read: false,
             });
           }
@@ -206,7 +239,7 @@ export function createReviewRequestController({
 
         res.json({ success: true, data: toClient(request) });
       } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
+        res.status(error.status || 400).json({ success: false, message: error.message });
       }
     },
   };

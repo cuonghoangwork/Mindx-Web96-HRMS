@@ -113,7 +113,7 @@ function Notifications() {
     sendNotification,
     getAppNow,
   } = useStore();
-  const { isHR } = useAuth();
+  const { isHRTier } = useAuth();
   const navigate = useNavigate();
 
   const now = getAppNow();
@@ -161,7 +161,7 @@ function Notifications() {
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <h2 style={{ flex: 1 }}>{t("notifications.title")}</h2>
-        {isHR && (
+        {isHRTier && (
           <Button
             variant="primary"
             onClick={() => setComposeOpen(true)}
@@ -355,19 +355,18 @@ function Notifications() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", gap: "var(--sp-1)", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
                     {!notification.read && (
                       <Button
-                        variant="secondary"
-                        style={{ padding: "8px 12px", fontSize: "var(--fs-xs)" }}
+                        variant="link"
                         onClick={() => markNotificationRead(notification.id)}
                       >
                         {t("notifications.item.markRead")}
                       </Button>
                     )}
                     <Button
-                      variant="secondary"
-                      style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--txt-danger)" }}
+                      variant="link"
+                      className="btn-link-muted"
                       onClick={() => removeNotification(notification.id)}
                       aria-label={t("notifications.item.dismissAria")}
                     >

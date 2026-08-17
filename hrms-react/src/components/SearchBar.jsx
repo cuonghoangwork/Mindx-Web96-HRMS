@@ -28,18 +28,19 @@ function SearchBar({ value, onSearch, placeholder = "Search..." }) {
         style={{
           width: '100%',
           padding: '12px 40px 12px 16px',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
-          background: 'var(--surface)',
-          color: 'var(--text-main)',
-          fontFamily: 'inherit',
-          fontSize: '14px'
+          border: '1px solid var(--bdr-subtle)',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--bg-surface)',
+          color: 'var(--txt-primary)',
+          fontFamily: 'var(--font-family)',
+          fontSize: 'var(--fs-md)'
         }}
       />
       {localValue && (
         <button
           type="button"
           onClick={handleClear}
+          aria-label="Clear search"
           style={{
             position: 'absolute',
             right: '40px',
@@ -48,31 +49,38 @@ function SearchBar({ value, onSearch, placeholder = "Search..." }) {
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: 'var(--text-muted)',
-            fontSize: '16px',
+            color: 'var(--txt-secondary)',
+            display: 'inline-flex',
             padding: '4px'
           }}
         >
-          ×
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       )}
       <button
         type="submit"
+        aria-label="Search"
         style={{
           position: 'absolute',
           right: '8px',
           top: '50%',
           transform: 'translateY(-50%)',
-          background: 'var(--primary)',
+          background: 'var(--bg-primary)',
           border: 'none',
           cursor: 'pointer',
-          color: 'white',
-          fontSize: '14px',
-          padding: '6px 12px',
-          borderRadius: '6px'
+          color: 'var(--txt-on-brand)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          padding: '8px 10px',
+          borderRadius: 'var(--radius-sm)'
         }}
       >
-        🔍
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.35-4.35" />
+        </svg>
       </button>
     </form>
   )

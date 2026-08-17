@@ -115,8 +115,8 @@ function Tooltip({ x, y, data, svgW, svgH }) {
   return (
     <g>
       <rect x={tx} y={ty} width={W} height={H}
-        rx="8" fill="var(--bg-surface)" stroke="var(--bdr-default)" strokeWidth="0.5"
-        filter="drop-shadow(0 4px 12px rgba(0,0,0,0.10))" />
+        rx="2" fill="var(--bg-surface)" stroke="var(--bdr-default)" strokeWidth="0.5"
+        filter="drop-shadow(0 4px 12px rgba(11,31,58,0.14))" />
       <text x={tx + 10} y={ty + 18} fontSize="11" fontWeight="600" fill="var(--txt-primary)">
         {data.fullLabel}{data.isToday ? " (today)" : ""}
       </text>

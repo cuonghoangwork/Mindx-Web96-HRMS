@@ -1,25 +1,48 @@
-import { useState } from "react";
-import { useAuth } from "../context/AuthContext";
 import { useStore } from "../context/StoreContext";
-import { useLocation, Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCurrency } from "../context/CurrencyContext";
+import { useLocation, useMatch, Link } from "react-router-dom";
+import { idsMatch } from "../utils/id";
 import HeaderDateTime from "./HeaderDateTime";
-import { getRoleLabel } from "../utils/roles";
+import GlobalSearch from "./GlobalSearch";
+import ClockInAction from "./ClockInAction";
 
 function Header({ onMenuToggle }) {
-  const { user, logout } = useAuth();
-  const { unreadNotificationCount } = useStore();
+  const { unreadNotificationCount, employees } = useStore();
+  const { isHRTier, isManager, user } = useAuth();
+  const isPlainManager = isManager && !isHRTier;
+  // Mirrors SideMenu.jsx's isPlainEmployee — role is EMPLOYEE exactly.
+  const isPlainEmployee = !isManager && !isHRTier;
+  const { currency, toggleCurrency } = useCurrency();
   const location = useLocation();
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // /employees/:id also matches the literal "/employees/add" path (useMatch
+  // is pure pattern-matching against the URL, unaware of route priority),
+  // so explicitly exclude that id value below.
+  const employeeDetailMatch = useMatch("/employees/:id");
+  const viewingEmployeeId =
+    employeeDetailMatch && employeeDetailMatch.params.id !== "add"
+      ? employeeDetailMatch.params.id
+      : null;
+  const viewingEmployee = viewingEmployeeId
+    ? employees.find((e) => idsMatch(e.id, viewingEmployeeId))
+    : null;
+  const isOwnRecord = Boolean(
+    user?.email && viewingEmployee?.email && user.email.toLowerCase() === viewingEmployee.email.toLowerCase(),
+  );
 
   // Get page title from current route
   const getPageTitle = () => {
     const path = location.pathname;
     if (path === "/" || path === "/dashboard") return "Dashboard";
-    if (path === "/employees") return "All Employees";
+    if (path === "/employees") return isPlainManager || isPlainEmployee ? "Directory" : "All Employees";
     if (path.startsWith("/employees/add")) return "Add Employee";
+    if (viewingEmployee) return isOwnRecord ? "My Profile" : viewingEmployee.name;
     if (path.startsWith("/employees/")) return "Employee Details";
+    if (path === "/departments/me") return "My Department";
     if (path === "/departments") return "All Departments";
-    if (path.startsWith("/departments/")) return "Department Details";
+    if (path.startsWith("/departments/")) return isPlainManager || isPlainEmployee ? "My Department" : "Department Details";
+    if (path === "/org-chart") return "Org Chart";
     if (path === "/attendance") return "Attendance";
     if (path === "/payroll") return "Payroll";
     if (path === "/jobs") return "Jobs";
@@ -30,8 +53,22 @@ function Header({ onMenuToggle }) {
     return "Dashboard";
   };
 
-  const handleLogout = () => {
-    logout();
+  // Small uppercase "kicker" above the page title — matches mockup's
+  // topbarKickerStyle, which shows the nav group the current page
+  // belongs to (same grouping as SideMenu's numbered sections). Employee
+  // detail gets the mockup's compound "People / Profile" kicker instead
+  // of the plain group name.
+  const getPageKicker = () => {
+    const path = location.pathname;
+    const peopleKicker = isPlainManager || isPlainEmployee ? "My Info" : "People";
+    if (path === "/dashboard" || path === "/") return "Overview";
+    if (path.startsWith("/employees/add")) return "People / New";
+    if (viewingEmployee) return `${peopleKicker} / Profile`;
+    if (path.startsWith("/employees") || path.startsWith("/departments") || path === "/org-chart") return peopleKicker;
+    if (path === "/attendance" || path === "/payroll" || path === "/holidays") return "Time & Pay";
+    if (path === "/jobs" || path === "/candidates") return "Hiring";
+    if (path === "/settings" || path === "/notifications") return "System";
+    return "Overview";
   };
 
   return (
@@ -42,12 +79,31 @@ function Header({ onMenuToggle }) {
         aria-label="Open navigation menu"
         onClick={onMenuToggle}
       >
-        <span aria-hidden="true">☰</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
       </button>
       <div className="dash-title">
+        <div className="dash-title-sub">{getPageKicker()}</div>
         <div className="dash-title-main">{getPageTitle()}</div>
-        <div className="dash-title-sub">Human Resource Management System</div>
       </div>
+
+      {/* Global search matches the mockup's isAdminRole gate, which is
+          isSystemAdmin || isHrRole — i.e. HR (MANAGER) gets it too, same as
+          the rest of the full nav. Plain Employee gets the compact
+          self-service shell and doesn't need company-wide search. */}
+      {isHRTier && <GlobalSearch />}
+
+      <button
+        type="button"
+        className="currency-toggle-btn"
+        onClick={toggleCurrency}
+        title="Toggle payroll display currency"
+      >
+        {currency === "VND" ? "VND → USD" : "USD → VND"}
+      </button>
+
+      <ClockInAction />
 
       <HeaderDateTime />
 
@@ -87,87 +143,6 @@ function Header({ onMenuToggle }) {
         )}
       </Link>
 
-      <div style={{ position: "relative" }}>
-        <button
-          className="dash-profile"
-          type="button"
-          aria-label="My Profile"
-          onClick={() => setShowProfileMenu(!showProfileMenu)}
-          style={{ cursor: "pointer" }}
-        >
-          <span
-            className="dash-avatar"
-            aria-hidden="true"
-            style={{
-              display: "grid",
-              placeItems: "center",
-              fontSize: "14px",
-              fontWeight: "600",
-              color: "white",
-            }}
-          >
-            {user?.avatar || "AU"}
-          </span>
-          <span className="dash-profile-text">
-            <span className="dash-profile-name">
-              {user?.name || "Admin User"}
-            </span>
-            <span className="dash-profile-role">
-              {getRoleLabel(user?.role) || "Administrator"}
-            </span>
-          </span>
-          <span>⌄</span>
-        </button>
-
-        {showProfileMenu && (
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(100% + 8px)",
-              right: 0,
-              width: "180px",
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-              boxShadow: "var(--shadow)",
-              zIndex: 100,
-              overflow: "hidden",
-            }}
-          >
-            <Link
-              to="/settings"
-              style={{
-                display: "block",
-                padding: "12px 16px",
-                color: "var(--text-main)",
-                textDecoration: "none",
-                fontSize: "14px",
-                borderBottom: "1px solid var(--border)",
-              }}
-              onClick={() => setShowProfileMenu(false)}
-            >
-              ⚙️ Settings
-            </Link>
-            <button
-              onClick={handleLogout}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: "12px 16px",
-                background: "none",
-                border: "none",
-                color: "#dc2626",
-                cursor: "pointer",
-                fontSize: "14px",
-                textAlign: "left",
-                fontFamily: "inherit",
-              }}
-            >
-              🚪 Logout
-            </button>
-          </div>
-        )}
-      </div>
     </header>
   );
 }

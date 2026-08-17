@@ -162,18 +162,23 @@ function FormField({
         )}
       </label>
 
-      {/* Helper text */}
-      {hint && (
-        <span
-          id={`${fieldId}-hint`}
-          style={{
-            fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
-            marginTop: "-4px", lineHeight: 1.4,
-          }}
-        >
-          {hint}
-        </span>
-      )}
+      {/* Helper text — always reserves one line of vertical space, even
+          when this field has no hint, so its input stays aligned with a
+          sibling field in the same form-grid row that does have one (e.g.
+          AddEmployee's Email "Used for system login" vs. Address). Hidden
+          rather than omitted so the box height is kept but nothing is
+          announced to screen readers when empty. */}
+      <span
+        id={hint ? `${fieldId}-hint` : undefined}
+        aria-hidden={hint ? undefined : "true"}
+        style={{
+          fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
+          marginTop: "-4px", lineHeight: 1.4,
+          visibility: hint ? "visible" : "hidden",
+        }}
+      >
+        {hint || " "}
+      </span>
 
       {/* Input slot */}
       {child}

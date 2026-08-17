@@ -7,5 +7,18 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true
-  }
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.js'],
+    css: false,
+    // Matches hrms-backend/vitest.config.js — this sandbox's worker-pool
+    // threading is unreliable (same root cause as the backend's documented
+    // isolate/maxWorkers findings), so pin to a single fork.
+    pool: 'forks',
+    poolOptions: {
+      forks: { singleFork: true },
+    },
+  },
 })

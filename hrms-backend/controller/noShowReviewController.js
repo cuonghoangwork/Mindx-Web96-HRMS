@@ -59,6 +59,8 @@ const { list, review } = createReviewRequestController({
       message: `HR reviewed your attendance record. No further action was taken.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
     };
   },
+  employeeLink: "/attendance",
+  employeeLinkLabel: "View attendance",
 });
 
 const noShowReviewController = { list, review };

@@ -1,12 +1,16 @@
-import { useState, useMemo, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { EmployeesAPI, NoShowReviewsAPI } from "../api";
+import { formatDate } from "../utils/format";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
-import { idsMatch, compareIds, numericSeed } from "../utils/id";
 import Button from "../components/Button";
+import { idsMatch } from "../utils/id";
+import { resolveStatus, buildMonthAttendance, buildDayData } from "../utils/attendance";
 
 /* ─── helpers ─── */
 const fmt = (v) => {
@@ -15,21 +19,12 @@ const fmt = (v) => {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 };
 
-const resolveStatus = (record) => {
-  let s = record.status;
-  if (record.checkIn && s === "Present") {
-    if (Number(record.checkIn.split(":")[0]) >= 9) s = "Late";
-  }
-  return s;
-};
-
 const variantMap = (s) =>
   ({ Present: "success", Late: "warning", "On Leave": "info" })[s] ?? "danger";
 
 // Task 6.2 — status codes ("Present"/"Late"/"On Leave"/"Absent") stay in
 // English everywhere they're used as data (equality checks, variantMap
-// above, mock-data generation below); this only translates the label
-// actually shown to the user.
+// above); this only translates the label actually shown to the user.
 const STATUS_LABEL_KEY = {
   Present: "attendance.status.present",
   Late: "attendance.status.late",
@@ -37,557 +32,313 @@ const STATUS_LABEL_KEY = {
 };
 const statusLabel = (t, status) => t(STATUS_LABEL_KEY[status] ?? "attendance.status.absent");
 
-/* ─── Generate rich mock attendance for a full month ─── */
-function buildMonthAttendance(year, month, employees, existing) {
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const result = [...existing];
-  const existingKeys = new Set(existing.map((r) => `${r.employeeId}-${r.date}`));
+const isoOf = (d) => d.toISOString().split("T")[0];
 
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const dow = new Date(year, month, day).getDay();
-    if (dow === 0 || dow === 6) continue;
-
-    employees.forEach((emp) => {
-      const key = `${emp.id}-${date}`;
-      if (existingKeys.has(key)) return;
-
-      const seed = (numericSeed(emp.id) * 17 + day * 7) % 100;
-      let status, checkIn, checkOut;
-
-      if (seed < 5) {
-        status = "On Leave"; checkIn = null; checkOut = null;
-      } else if (seed < 10) {
-        status = seed < 7 ? "On Leave" : "Present";
-        if (status === "Present" && seed < 8) {
-          checkIn = null; checkOut = null;
-        } else {
-          const late = seed > 85;
-          const h = late ? 9 + Math.floor(seed / 30) : 8;
-          const m = (seed * 3) % 60;
-          checkIn = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-          checkOut = `${String(h + 8 + (seed % 2)).padStart(2, "0")}:${String((m + 15) % 60).padStart(2, "0")}`;
-        }
-      } else {
-        const late = seed > 82;
-        const h = late ? 9 + Math.floor((seed - 82) / 6) : 8 + ((seed % 2));
-        const m = (seed * 3) % 60;
-        checkIn = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-        checkOut = `${String(Math.min(h + 8 + (seed % 2), 20)).padStart(2, "0")}:${String((m + 15) % 60).padStart(2, "0")}`;
-        status = "Present";
-      }
-
-      result.push({ employeeId: emp.id, date, checkIn, checkOut, status });
-    });
-  }
-  return result;
-}
-
-/* ─── Month calendar grid ───
-   Day/month names come from the common.days / common.months i18n arrays
-   (task 6.2) rather than a module-level constant, since they need to be
-   locale-aware. */
-function CalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr }) {
-  const { t } = useTranslation();
-  const days = t("common.days", { returnObjects: true });
-  const firstDow = new Date(year, month, 1).getDay();
-  const daysCount = new Date(year, month + 1, 0).getDate();
-  const cells = Array.from({ length: firstDow + daysCount }, (_, i) =>
-    i < firstDow ? null : i - firstDow + 1
-  );
-  while (cells.length % 7 !== 0) cells.push(null);
-
+/* ═══════════════════════════════════════════
+   Weekly bar chart — % checked-in per day, click to select
+═══════════════════════════════════════════ */
+function WeeklyBars({ weekDates, dayData, selectedDay, onSelectDay, days }) {
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", marginBottom: "4px" }}>
-        {days.map((d) => (
-          <div key={d} style={{
-            textAlign: "center", fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
-            color: "var(--txt-secondary)", padding: "4px 0",
-          }}>{d}</div>
-        ))}
-      </div>
+    <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--sp-3)", height: "130px" }}>
+      {weekDates.map((date) => {
+        const dateStr = isoOf(date);
+        const dow = date.getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        const data = dayData[dateStr];
+        const pct = data ? Math.round(((data.present + data.late) / data.total) * 100) : 0;
+        const isSelected = dateStr === selectedDay;
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "3px" }}>
-        {cells.map((day, idx) => {
-          if (!day) return <div key={`empty-${idx}`} />;
-          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const dow = new Date(year, month, day).getDay();
-          const isWeekend = dow === 0 || dow === 6;
-          const isToday = dateStr === todayStr;
-          const isSelected = dateStr === selectedDay;
-          const data = dayData[dateStr];
-
-          const rate = data
-            ? Math.round(((data.present + data.late) / data.total) * 100)
-            : null;
-
-          const barColor = rate == null ? "transparent"
-            : rate >= 90 ? "var(--clr-success-500)"
-            : rate >= 75 ? "var(--clr-warning-500)"
-            : "var(--clr-danger-400)";
-
-          return (
-            <div
-              key={day}
-              onClick={() => !isWeekend && onSelectDay(isSelected ? null : dateStr)}
-              style={{
-                borderRadius: "var(--radius-sm)",
-                border: isSelected
-                  ? "2px solid var(--bdr-brand)"
-                  : isToday
-                  ? "2px solid var(--clr-primary-300)"
-                  : "1px solid var(--bdr-subtle)",
-                background: isSelected ? "var(--bg-primary-subtle)"
-                  : isToday ? "var(--bg-surface)"
-                  : "var(--bg-surface)",
-                cursor: isWeekend ? "default" : "pointer",
-                opacity: isWeekend ? 0.4 : 1,
-                padding: "5px 6px",
-                minHeight: "52px",
-                display: "flex", flexDirection: "column", gap: "3px",
-                transition: "border-color 0.15s",
-              }}
-            >
-              <div style={{
-                fontSize: "var(--fs-xs)", fontWeight: isToday ? "var(--fw-semibold)" : "var(--fw-regular)",
-                color: isSelected ? "var(--txt-primary-brand)"
-                  : isToday ? "var(--clr-primary-400)"
-                  : "var(--txt-primary)",
-                lineHeight: 1,
-              }}>{day}</div>
-
-              {data && !isWeekend && (
-                <>
-                  <div style={{
-                    height: "3px", borderRadius: "var(--radius-full)",
-                    background: "var(--bg-surface-sub)",
-                  }}>
-                    <div style={{
-                      height: "3px", borderRadius: "var(--radius-full)",
-                      background: barColor, width: `${rate}%`,
-                    }} />
-                  </div>
-                  <div style={{
-                    fontSize: "9px", color: "var(--txt-secondary)",
-                    lineHeight: 1, marginTop: "1px",
-                  }}>
-                    {rate}%
-                  </div>
-                  <div style={{ display: "flex", gap: "2px", flexWrap: "wrap", marginTop: "1px" }}>
-                    {data.present > 0 && <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "var(--clr-success-500)" }} />}
-                    {data.late > 0 && <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "var(--clr-warning-500)" }} />}
-                    {data.leave > 0 && <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "var(--clr-info-500)" }} />}
-                    {data.absent > 0 && <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "var(--clr-danger-400)" }} />}
-                  </div>
-                </>
+        return (
+          <div
+            key={dateStr}
+            onClick={() => !isWeekend && data && onSelectDay(dateStr)}
+            style={{
+              flex: 1, height: "100%", display: "flex", flexDirection: "column",
+              alignItems: "center", gap: "var(--sp-2)",
+              cursor: isWeekend || !data ? "default" : "pointer",
+              opacity: isWeekend ? 0.4 : 1,
+            }}
+          >
+            <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", color: "var(--txt-secondary)" }}>
+              {data ? `${pct}%` : "—"}
+            </div>
+            <div style={{ width: "100%", flex: 1, display: "flex", alignItems: "flex-end", background: "var(--bg-surface-sub)" }}>
+              {data && (
+                <div style={{
+                  height: `${Math.max(pct, 4)}%`, width: "100%",
+                  background: isSelected ? "var(--clr-primary-400)" : "var(--txt-primary)",
+                  opacity: isSelected ? 1 : 0.5,
+                  transition: "background 0.15s, opacity 0.15s",
+                }} />
               )}
             </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Day detail panel ─── */
-function DayPanel({ dateStr, rows, onClose }) {
-  const { t } = useTranslation();
-  const days = t("common.days", { returnObjects: true });
-  const months = t("common.months", { returnObjects: true });
-
-  if (!dateStr || rows.length === 0) return (
-    <div style={{
-      background: "var(--bg-surface-alt)", borderRadius: "var(--radius-md)",
-      padding: "var(--sp-5)", textAlign: "center",
-      color: "var(--txt-secondary)", fontSize: "var(--fs-sm)",
-    }}>
-      {t("attendance.selectDatePrompt")}
-    </div>
-  );
-
-  const d = new Date(dateStr + "T00:00:00");
-  const label = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-
-  return (
-    <div style={{ background: "var(--bg-surface)", border: "1px solid var(--bdr-subtle)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        padding: "var(--sp-4) var(--sp-5)",
-        borderBottom: "1px solid var(--bdr-subtle)",
-        background: "var(--bg-surface-alt)",
-      }}>
-        <div>
-          <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>{label}</div>
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            {t("attendance.dayPanel.records", { count: rows.length })}
-          </div>
-        </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1 }}>×</button>
-      </div>
-
-      <div style={{ display: "flex", gap: "var(--sp-2)", padding: "var(--sp-3) var(--sp-5)", flexWrap: "wrap", borderBottom: "1px solid var(--bdr-subtle)" }}>
-        {[["Present","success"],["Late","warning"],["On Leave","info"],["Absent","danger"]].map(([statusCode, v]) => {
-          const count = rows.filter((r) => r.status === statusCode).length;
-          return count > 0 && (
-            <Badge key={statusCode} variant={v} dot size="sm">{count} {statusLabel(t, statusCode)}</Badge>
-          );
-        })}
-      </div>
-
-      <div style={{ maxHeight: "360px", overflowY: "auto" }}>
-        <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
-          <thead>
-            <tr>
-              <th>{t("attendance.dayPanel.table.employee")}</th>
-              <th>{t("attendance.dayPanel.table.checkIn")}</th>
-              <th>{t("attendance.dayPanel.table.checkOut")}</th>
-              <th>{t("attendance.dayPanel.table.hours")}</th>
-              <th>{t("attendance.dayPanel.table.status")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const hours = r.checkIn && r.checkOut
-                ? (() => {
-                    const [h1, m1] = r.checkIn.split(":").map(Number);
-                    const [h2, m2] = r.checkOut.split(":").map(Number);
-                    const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-                    return `${Math.floor(diff / 60)}h ${diff % 60}m`;
-                  })()
-                : "—";
-              return (
-                <tr key={r.employeeId}>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-                      <Avatar name={r.name} size="xs" />
-                      <span>{r.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ color: r.status === "Late" ? "var(--txt-warning)" : "var(--txt-primary)" }}>
-                    {fmt(r.checkIn)}
-                  </td>
-                  <td>{fmt(r.checkOut)}</td>
-                  <td style={{ color: "var(--txt-secondary)" }}>{hours}</td>
-                  <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════
-   Clock In / Clock Out widget
-═══════════════════════════════════════════════ */
-/**
- * ClockInOutWidget
- *
- * Calls the real backend POST /attendance/check-in and /check-out endpoints.
- * Employee is auto-selected by matching the logged-in user's email against the
- * employees list. Admins/managers can change the selection via a dropdown.
- * The check-in/check-out time is derived from getAppNow() so it respects the
- * demo clock (HeaderDateTime).
- */
-function ClockInOutWidget({ employees, attendance, getAppNow, clockIn, clockOut, currentUser }) {
-  const { t } = useTranslation();
-  const days = t("common.days", { returnObjects: true });
-  const months = t("common.months", { returnObjects: true });
-  // Find the employee record linked to the logged-in user (match by email).
-  const myEmployee = employees.find(
-    (e) => e.email && currentUser?.email && e.email.toLowerCase() === currentUser.email.toLowerCase()
-  ) || employees[0] || null;
-
-  const [selectedEmpId, setSelectedEmpId] = useState(() => myEmployee?.id ?? "");
-  const [loading, setLoading] = useState(null); // "in" | "out" | null
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  // Sync default selection when employees list loads (it might be empty on first render)
-  useEffect(() => {
-    if (!selectedEmpId && myEmployee?.id) {
-      setSelectedEmpId(myEmployee.id);
-    }
-  }, [myEmployee, selectedEmpId]);
-
-  // Auto-dismiss success message after 4 s
-  useEffect(() => {
-    if (!success) return;
-    const id = setTimeout(() => setSuccess(""), 4000);
-    return () => clearTimeout(id);
-  }, [success]);
-
-  const now = getAppNow();
-  const todayStr = now.toISOString().split("T")[0];
-  const currentTimeHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-  // Find today's attendance record for the selected employee
-  const todayRecord = attendance.find(
-    (r) => idsMatch(r.employeeId, selectedEmpId) && r.date === todayStr
-  ) ?? null;
-
-  const hasCheckedIn = Boolean(todayRecord?.checkIn);
-  const hasCheckedOut = Boolean(todayRecord?.checkOut);
-
-  // Derive display status from today's record
-  const todayStatus = todayRecord
-    ? resolveStatus({ ...todayRecord, status: todayRecord.status || "Present" })
-    : null;
-
-  const selectedEmployee = employees.find((e) => idsMatch(e.id, selectedEmpId)) ?? null;
-
-  const handleClockIn = async () => {
-    if (!selectedEmpId) { setError(t("attendance.clockWidget.pleaseSelectEmployee")); return; }
-    setLoading("in"); setError(""); setSuccess("");
-    try {
-      await clockIn(selectedEmpId, todayStr, currentTimeHHMM);
-      setSuccess(t("attendance.clockWidget.clockedInAt", { time: fmt(currentTimeHHMM) }));
-    } catch (err) {
-      setError(err.message || t("attendance.clockWidget.failedClockIn"));
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleClockOut = async () => {
-    if (!selectedEmpId) { setError(t("attendance.clockWidget.pleaseSelectEmployee")); return; }
-    setLoading("out"); setError(""); setSuccess("");
-    try {
-      await clockOut(selectedEmpId, todayStr, currentTimeHHMM);
-      setSuccess(t("attendance.clockWidget.clockedOutAt", { time: fmt(currentTimeHHMM) }));
-    } catch (err) {
-      setError(err.message || t("attendance.clockWidget.failedClockOut"));
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  // Spinner SVG (inline so no extra import needed)
-  const Spinner = () => (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"
-      style={{ animation: "att-spin 0.7s linear infinite", flexShrink: 0 }}>
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-      <path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <style>{`@keyframes att-spin { to { transform: rotate(360deg) } }`}</style>
-    </svg>
-  );
-
-  return (
-    <div className="content-card" style={{ padding: "var(--sp-5) var(--sp-6)" }}>
-      {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)" }}>
-        {/* Clock icon */}
-        <span style={{
-          width: "36px", height: "36px", borderRadius: "var(--radius-md)",
-          background: "var(--bg-primary-subtle)", color: "var(--clr-primary-400)",
-          display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }} aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 3" />
-          </svg>
-        </span>
-        <div>
-          <div style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", lineHeight: 1 }}>
-            {t("attendance.clockWidget.title")}
-          </div>
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "3px" }}>
-            {t("attendance.clockWidget.todayPrefix")} · {days[now.getDay()]}, {months[now.getMonth()]} {now.getDate()}, {now.getFullYear()} · {fmt(currentTimeHHMM)}
-          </div>
-        </div>
-      </div>
-
-      {/* Controls row */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--sp-4)", flexWrap: "wrap" }}>
-
-        {/* Employee selector */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)", minWidth: "200px", flex: 1, maxWidth: "320px" }}>
-          <label style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            {t("attendance.clockWidget.employeeLabel")}
-          </label>
-          {employees.length === 0 ? (
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", padding: "10px var(--sp-4)", border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-md)" }}>
-              {t("attendance.clockWidget.loadingEmployees")}
+            <div style={{
+              fontSize: "var(--fs-xs)", fontWeight: isSelected ? "var(--fw-bold)" : "var(--fw-medium)",
+              color: isSelected ? "var(--txt-primary-brand)" : "var(--txt-disabled)",
+              textTransform: "uppercase",
+            }}>
+              {days[dow]}
             </div>
-          ) : (
-            <select
-              value={selectedEmpId}
-              onChange={(e) => { setSelectedEmpId(e.target.value); setError(""); setSuccess(""); }}
-              style={{
-                padding: "10px var(--sp-4)",
-                border: "1px solid var(--bdr-default)",
-                borderRadius: "var(--radius-md)",
-                background: "var(--bg-surface)",
-                color: "var(--txt-primary)",
-                fontFamily: "var(--font-family)",
-                fontSize: "var(--fs-md)",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">{t("attendance.clockWidget.selectEmployeePlaceholder")}</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.name}{emp.email === currentUser?.email ? ` ${t("attendance.clockWidget.youSuffix")}` : ""}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Today's record summary */}
-        <div style={{
-          flex: 1,
-          display: "flex", gap: "var(--sp-4)", flexWrap: "wrap",
-          padding: "var(--sp-3) var(--sp-4)",
-          background: "var(--bg-surface-alt)",
-          border: "1px solid var(--bdr-subtle)",
-          borderRadius: "var(--radius-md)",
-          alignItems: "center",
-          minWidth: "240px",
-        }}>
-          <RecordField label={t("attendance.clockWidget.checkInLabel")} value={todayRecord?.checkIn ? fmt(todayRecord.checkIn) : "—"} highlight={hasCheckedIn} />
-          <div style={{ width: "1px", height: "32px", background: "var(--bdr-subtle)", flexShrink: 0 }} />
-          <RecordField label={t("attendance.clockWidget.checkOutLabel")} value={todayRecord?.checkOut ? fmt(todayRecord.checkOut) : "—"} />
-          <div style={{ width: "1px", height: "32px", background: "var(--bdr-subtle)", flexShrink: 0 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{t("attendance.clockWidget.statusLabel")}</span>
-            {todayStatus
-              ? <Badge variant={variantMap(todayStatus)} size="sm" dot>{statusLabel(t, todayStatus)}</Badge>
-              : <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-disabled)" }}>{t("attendance.clockWidget.noRecord")}</span>
-            }
           </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: "flex", gap: "var(--sp-3)", flexShrink: 0 }}>
-          <Button
-            variant="primary"
-            onClick={handleClockIn}
-            disabled={loading !== null || hasCheckedIn || !selectedEmpId}
-            title={hasCheckedIn ? t("attendance.clockWidget.alreadyClockedIn") : t("attendance.clockWidget.clockInNow")}
-            style={{ gap: "var(--sp-2)", minWidth: "110px" }}
-          >
-            {loading === "in" ? <Spinner /> : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7v5l3 3" />
-              </svg>
-            )}
-            {loading === "in" ? t("attendance.clockWidget.clockingLabel") : t("attendance.clockWidget.clockInButton")}
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={handleClockOut}
-            disabled={loading !== null || !hasCheckedIn || hasCheckedOut || !selectedEmpId}
-            title={
-              !hasCheckedIn ? t("attendance.clockWidget.mustClockInFirst")
-              : hasCheckedOut ? t("attendance.clockWidget.alreadyClockedOut")
-              : t("attendance.clockWidget.clockOutNow")
-            }
-            style={{ gap: "var(--sp-2)", minWidth: "115px" }}
-          >
-            {loading === "out" ? <Spinner /> : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            )}
-            {loading === "out" ? t("attendance.clockWidget.clockingLabel") : t("attendance.clockWidget.clockOutButton")}
-          </Button>
-        </div>
-      </div>
-
-      {/* Feedback row */}
-      {(error || success) && (
-        <div style={{ marginTop: "var(--sp-3)", display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-          {error && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: "var(--sp-2)",
-              fontSize: "var(--fs-sm)", color: "var(--txt-danger)",
-              padding: "var(--sp-2) var(--sp-3)",
-              background: "var(--bg-danger-subtle)", border: "1px solid var(--bdr-danger)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M6 1L11 10H1L6 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                <path d="M6 5V7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                <circle cx="6" cy="8.5" r="0.6" fill="currentColor"/>
-              </svg>
-              {error}
-            </span>
-          )}
-          {success && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: "var(--sp-2)",
-              fontSize: "var(--fs-sm)", color: "var(--txt-success)",
-              padding: "var(--sp-2) var(--sp-3)",
-              background: "var(--bg-success-subtle)", border: "1px solid var(--bdr-success)",
-              borderRadius: "var(--radius-md)",
-            }}>
-              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M3.5 6L5.5 8L8.5 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {success}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* State hints below buttons */}
-      {selectedEmployee && (
-        <div style={{ marginTop: "var(--sp-3)", display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-            <Avatar name={selectedEmployee.name} src={selectedEmployee.avatar} size="xs" />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-              {selectedEmployee.name} · {selectedEmployee.department} · {selectedEmployee.designation}
-            </span>
-          </div>
-          {hasCheckedIn && !hasCheckedOut && (
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-success)", fontWeight: "var(--fw-medium)" }}>
-              {t("attendance.clockWidget.activeSince", { time: fmt(todayRecord.checkIn) })}
-            </span>
-          )}
-          {hasCheckedOut && (
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-              {t("attendance.clockWidget.shiftComplete", {
-                duration: (() => {
-                  const [h1, m1] = todayRecord.checkIn.split(":").map(Number);
-                  const [h2, m2] = todayRecord.checkOut.split(":").map(Number);
-                  const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-                  return `${Math.floor(diff / 60)}h ${diff % 60}m`;
-                })(),
-              })}
-            </span>
-          )}
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
 
-/* Small labelled field used inside the record summary */
-function RecordField({ label, value, highlight }) {
+/* ═══════════════════════════════════════════
+   Monthly heatmap — alpha-shaded rate cells, click to select
+═══════════════════════════════════════════ */
+function MonthlyHeatmap({ year, month, dayData, selectedDay, onSelectDay, todayStr, weekdayLabels }) {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push({ blank: true, key: `b${i}` });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateISO = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const dow = new Date(year, month, d).getDay();
+    const isWeekend = dow === 0 || dow === 6;
+    const data = dayData[dateISO];
+    const rate = data && !isWeekend ? Math.round(((data.present + data.late) / data.total) * 100) : null;
+    cells.push({ blank: false, key: dateISO, dateISO, day: d, rate, isWeekend, isToday: dateISO === todayStr, isSelected: dateISO === selectedDay });
+  }
+  while (cells.length % 7 !== 0) cells.push({ blank: true, key: `e${cells.length}` });
+
+  const alphaFor = (rate) => 0.06 + (rate / 100) * 0.3;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
-      <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-        {label}
-      </span>
-      <span style={{
-        fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)",
-        color: highlight ? "var(--clr-success-600)" : "var(--txt-primary)",
-      }}>
-        {value}
-      </span>
+    <div style={{ border: "1px solid var(--bdr-subtle)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderBottom: "1px solid var(--bdr-subtle)" }}>
+        {weekdayLabels.map((l) => (
+          <div key={l} style={{ padding: "var(--sp-2) 0", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", color: "var(--txt-disabled)", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {l}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+        {cells.map((c) => (
+          <div
+            key={c.key}
+            onClick={() => !c.blank && c.rate !== null && onSelectDay(c.dateISO)}
+            style={{
+              minHeight: "62px", padding: "var(--sp-2) var(--sp-3)",
+              display: "flex", flexDirection: "column", justifyContent: "space-between",
+              borderRight: "1px solid var(--bdr-subtle)", borderBottom: "1px solid var(--bdr-subtle)",
+              cursor: !c.blank && c.rate !== null ? "pointer" : "default",
+              background: c.blank ? "transparent"
+                : c.isSelected ? "var(--bg-primary-subtle)"
+                : c.rate !== null ? `rgba(47, 111, 237, ${alphaFor(c.rate)})`
+                : "transparent",
+              boxShadow: c.isSelected ? "inset 0 0 0 2px var(--bdr-brand)"
+                : c.isToday ? "inset 0 0 0 2px var(--clr-primary-300)" : "none",
+            }}
+          >
+            {!c.blank && (
+              <>
+                <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", color: c.isToday ? "var(--txt-primary-brand)" : "var(--txt-primary)" }}>
+                  {c.day}
+                </div>
+                {c.rate !== null && (
+                  <div style={{ height: "4px", background: "var(--bg-surface-sub)" }}>
+                    <div style={{ height: "4px", width: `${c.rate}%`, background: "var(--clr-primary-400)" }} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   No-show queue — moved here from Settings.jsx (mockup puts this
+   review queue as the Attendance page's second tab, not a Settings
+   section). Same NoShowReviewsAPI the Settings panel used to call —
+   real backend-generated flags (task 4.7), just relocated.
+═══════════════════════════════════════════ */
+function NoShowQueueTab() {
+  const { t } = useTranslation();
+  const { language } = useLanguage();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [filterStatus, setFilterStatus] = useState("pending");
+  const [reviewingId, setReviewingId] = useState(null);
+  const [note, setNote] = useState("");
+  const [actionLoading, setActionLoading] = useState(null);
+  const [toast, setToast] = useState("");
+
+  const loadRequests = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const res = await NoShowReviewsAPI.list({ status: filterStatus });
+      setRequests(res.items ?? []);
+    } catch (err) {
+      setError(err.message || t("settings.noShowReview.loadFailed"));
+    }
+    setLoading(false);
+  }, [filterStatus, t]);
+
+  useEffect(() => { loadRequests(); }, [loadRequests]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(""), 4000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  const handleReview = async (requestId, decision) => {
+    setActionLoading(decision);
+    try {
+      await NoShowReviewsAPI.review(requestId, decision, note);
+      setToast(decision === "approved" ? t("settings.noShowReview.confirmSuccess") : t("settings.noShowReview.dismissSuccess"));
+      setReviewingId(null);
+      setNote("");
+      loadRequests();
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
+    setActionLoading(null);
+  };
+
+  return (
+    <div className="content-card">
+      <div style={{ marginBottom: "var(--sp-5)" }}>
+        <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+          {t("settings.sections.noShowReviewQueue.title")}
+        </h3>
+        <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          {t("settings.sections.noShowReviewQueue.description")}
+        </p>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
+          {["pending", "approved", "rejected", "all"].map((s) => (
+            <button
+              key={s} type="button"
+              onClick={() => { setFilterStatus(s); setReviewingId(null); }}
+              style={{
+                padding: "5px 12px", borderRadius: "6px", border: "none", cursor: "pointer",
+                background: filterStatus === s ? "var(--bg-surface)" : "transparent",
+                color: filterStatus === s ? "var(--txt-primary)" : "var(--txt-secondary)",
+                fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
+                fontWeight: filterStatus === s ? "var(--fw-medium)" : "var(--fw-regular)",
+                boxShadow: filterStatus === s ? "var(--shadow-xs)" : "none",
+              }}
+            >{t(`settings.statusFilter.${s}`)}</button>
+          ))}
+        </div>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>{t("settings.refresh")}</Button>
+        <span style={{ marginLeft: "auto", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+          {t("settings.noShowReview.flagCount", { count: requests.length })}
+        </span>
+      </div>
+
+      {toast && (
+        <div style={{
+          marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+          background: toast.startsWith("Error") ? "var(--bg-danger-subtle)" : "var(--bg-success-subtle)",
+          border: `1px solid ${toast.startsWith("Error") ? "var(--bdr-danger)" : "var(--bdr-success)"}`,
+          borderRadius: "var(--radius-md)", fontSize: "var(--fs-sm)",
+          color: toast.startsWith("Error") ? "var(--txt-danger)" : "var(--txt-success)",
+        }}>{toast}</div>
+      )}
+      {error && (
+        <div style={{
+          marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+          background: "var(--bg-danger-subtle)", border: "1px solid var(--bdr-danger)",
+          borderRadius: "var(--radius-md)", color: "var(--txt-danger)", fontSize: "var(--fs-sm)",
+        }}>{error}</div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>
+          {t("settings.noShowReview.loadingFlags")}
+        </div>
+      ) : requests.length === 0 ? (
+        <div style={{ padding: "var(--sp-8)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>
+          {filterStatus !== "all"
+            ? t("settings.noShowReview.noFlagsFiltered", { status: t(`settings.statusFilter.${filterStatus}`) })
+            : t("settings.noShowReview.noFlags")}
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+          {requests.map((req) => {
+            const isOpen = reviewingId === req.id;
+            return (
+              <div key={req.id} style={{
+                border: `1px solid ${isOpen ? "var(--bdr-brand)" : "var(--bdr-subtle)"}`,
+                borderRadius: "var(--radius-md)", padding: "var(--sp-4)",
+                background: "var(--bg-surface-alt)", transition: "border-color 0.15s",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+                  <Avatar name={req.employeeName ?? "?"} size="sm" />
+                  <div style={{ flex: 1, minWidth: "180px" }}>
+                    <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+                      {req.employeeName} <span style={{ color: "var(--txt-secondary)", fontWeight: "var(--fw-regular)" }}>({req.employeeCode})</span>
+                    </div>
+                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                      {t("settings.noShowReview.recordLine", { count: req.noShowCount, date: formatDate(req.flaggedAt ?? req.createdAt, language) })}
+                    </div>
+                  </div>
+                  <Badge variant={req.status === "pending" ? "warning" : req.status === "approved" ? "success" : "danger"} size="sm">
+                    {t(`settings.statusFilter.${req.status}`) || req.status}
+                  </Badge>
+                  {req.status === "pending" && (
+                    <Button
+                      variant="secondary" size="sm"
+                      onClick={() => { setReviewingId(isOpen ? null : req.id); setNote(""); }}
+                    >{isOpen ? t("settings.close") : t("settings.review")}</Button>
+                  )}
+                </div>
+
+                {isOpen && (
+                  <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-4)", borderTop: "1px solid var(--bdr-subtle)" }}>
+                    <div style={{
+                      marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
+                      background: "var(--bg-warning-subtle)", border: "1px solid var(--bdr-warning)",
+                      borderRadius: "var(--radius-md)", color: "var(--txt-warning)", fontSize: "var(--fs-sm)",
+                    }}>
+                      {t("settings.noShowReview.autoStatusWarning")}
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label" htmlFor={`noshow-note-${req.id}`}>
+                        {t("settings.reviewNoteLabel")} <span style={{ color: "var(--txt-secondary)", fontWeight: "var(--fw-regular)" }}>{t("settings.optional")}</span>
+                      </label>
+                      <textarea
+                        id={`noshow-note-${req.id}`} rows={2} value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder={t("settings.noShowReview.notePlaceholder")}
+                        style={{ resize: "vertical" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+                      <Button variant="success" disabled={actionLoading !== null} onClick={() => handleReview(req.id, "approved")}>
+                        {actionLoading === "approved" ? t("settings.savingEllipsis") : t("settings.noShowReview.confirmPattern")}
+                      </Button>
+                      <Button variant="danger" disabled={actionLoading !== null} onClick={() => handleReview(req.id, "rejected")}>
+                        {actionLoading === "rejected" ? t("settings.savingEllipsis") : t("settings.noShowReview.dismiss")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {req.status !== "pending" && req.reviewNote && (
+                  <div style={{
+                    marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)",
+                    borderTop: "1px solid var(--bdr-subtle)", fontStyle: "italic",
+                    fontSize: "var(--fs-sm)", color: "var(--txt-secondary)",
+                  }}>{t("settings.adminNote", { note: req.reviewNote })}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -599,257 +350,439 @@ function Attendance() {
   const { t } = useTranslation();
   const days = t("common.days", { returnObjects: true });
   const months = t("common.months", { returnObjects: true });
+  const monthsShort = months.map((m) => m.slice(0, 3));
   const { attendance, employees, getAppNow, clockIn, clockOut } = useStore();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAdmin, isManager } = useAuth();
+  const navigate = useNavigate();
 
-  // Task 4.3: per-employee attendance report — ViewEmployee.jsx links here
-  // as `/attendance?employee=<id>` so HR can jump straight into that
-  // employee's table view instead of manually filtering.
   const [searchParams] = useSearchParams();
   const linkedEmployeeId = searchParams.get("employee");
 
+  // 8.0e Day 7 — department-scoped roster: Admin sees everyone, Manager is
+  // scoped to their own department, Employee sees only themselves.
+  const [myEmployee, setMyEmployee] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    EmployeesAPI.myProfile()
+      .then((res) => { if (!cancelled) setMyEmployee(res.data ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const scopedEmployees = useMemo(() => {
+    if (isAdmin) return employees;
+    if (isManager && myEmployee?.department) {
+      return employees.filter((e) => e.department === myEmployee.department);
+    }
+    if (myEmployee) return employees.filter((e) => idsMatch(e.id, myEmployee.id));
+    return employees;
+  }, [employees, isAdmin, isManager, myEmployee]);
+
   const today = getAppNow();
-  const [viewYear, setViewYear] = useState(2026);
-  const [viewMonth, setViewMonth] = useState(0);
-  const [view, setView] = useState(linkedEmployeeId ? "table" : "calendar");
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [empFilter, setEmpFilter] = useState(linkedEmployeeId ?? "all");
+  const todayStr = isoOf(today);
 
-  /* ── Enrich attendance with employee names + Late status ── */
-  const enriched = useMemo(() => attendance.map((r) => {
-    const emp = employees.find((e) => idsMatch(e.id, r.employeeId));
-    return { ...r, name: emp?.name ?? `Employee #${r.employeeId}`, status: resolveStatus(r) };
-  }), [attendance, employees]);
+  // Admin-only "Roster" / "No-show queue" tabs, matching the mockup's
+  // isAdminRole-gated toggle. The queue itself moved here wholesale from
+  // Settings.jsx (see NoShowQueueTab above) — mockup never shows it there.
+  const [activeTab, setActiveTab] = useState("roster");
 
-  /* ── Build full month data (fill gaps with mock) ── */
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [granularity, setGranularity] = useState("weekly"); // "weekly" | "monthly"
+  const [weekAnchor, setWeekAnchor] = useState(() => today);
+  const [selectedDay, setSelectedDay] = useState(todayStr);
+  const [search, setSearch] = useState("");
+  const [showReport, setShowReport] = useState(false);
+  const [actionLoadingKey, setActionLoadingKey] = useState(null);
+
+  // Deep link from ViewEmployee (`/attendance?employee=<id>`) — narrow the
+  // roster search to that employee instead of switching views entirely.
+  useEffect(() => {
+    if (!linkedEmployeeId) return;
+    const emp = employees.find((e) => idsMatch(e.id, linkedEmployeeId));
+    if (emp) setSearch(emp.name);
+  }, [linkedEmployeeId, employees]);
+
+  /* ── Enrich real attendance with employee names + Late status ── */
+  const enriched = useMemo(() => attendance
+    .filter((r) => scopedEmployees.some((e) => idsMatch(e.id, r.employeeId)))
+    .map((r) => {
+      const emp = scopedEmployees.find((e) => idsMatch(e.id, r.employeeId));
+      return { ...r, name: emp?.name ?? `Employee #${r.employeeId}`, status: resolveStatus(r) };
+    }), [attendance, scopedEmployees]);
+
   const fullMonth = useMemo(
-    () => buildMonthAttendance(viewYear, viewMonth, employees, enriched),
-    [viewYear, viewMonth, employees, enriched]
+    () => buildMonthAttendance(viewYear, viewMonth, scopedEmployees, enriched),
+    [viewYear, viewMonth, scopedEmployees, enriched]
   );
+  const dayData = useMemo(() => buildDayData(fullMonth, scopedEmployees), [fullMonth, scopedEmployees]);
 
-  /* ── Per-day aggregate for calendar cells ── */
-  const dayData = useMemo(() => {
-    const map = {};
-    fullMonth.forEach((r) => {
-      if (!map[r.date]) map[r.date] = { present: 0, late: 0, leave: 0, absent: 0, total: 0, records: [] };
-      const s = resolveStatus(r);
-      if (s === "Present") map[r.date].present++;
-      else if (s === "Late") map[r.date].late++;
-      else if (s === "On Leave") map[r.date].leave++;
-      else map[r.date].absent++;
-      map[r.date].total++;
-      map[r.date].records.push({ ...r, status: s, name: employees.find((e) => idsMatch(e.id, r.employeeId))?.name ?? `#${r.employeeId}` });
+  const weekDates = useMemo(() => {
+    const d = new Date(weekAnchor);
+    d.setHours(0, 0, 0, 0);
+    const sunday = new Date(d);
+    sunday.setDate(d.getDate() - d.getDay());
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(sunday);
+      day.setDate(sunday.getDate() + i);
+      return day;
     });
-    return map;
-  }, [fullMonth, employees]);
+  }, [weekAnchor]);
 
-  /* ── Filtered rows for table view ── */
-  const tableRows = useMemo(() => {
-    const prefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-`;
-    return fullMonth
-      .filter((r) => r.date.startsWith(prefix) && (empFilter === "all" || idsMatch(r.employeeId, empFilter)))
-      .map((r) => ({ ...r, status: resolveStatus(r), name: employees.find((e) => idsMatch(e.id, r.employeeId))?.name ?? `#${r.employeeId}` }))
-      .sort((a, b) => b.date.localeCompare(a.date) || compareIds(a.employeeId, b.employeeId));
-  }, [fullMonth, viewYear, viewMonth, empFilter, employees]);
+  const weekDayData = useMemo(() => {
+    const monthKeys = new Set(weekDates.map((d) => `${d.getFullYear()}-${d.getMonth()}`));
+    const merged = {};
+    monthKeys.forEach((key) => {
+      const [y, m] = key.split("-").map(Number);
+      const prefix = `${y}-${String(m + 1).padStart(2, "0")}-`;
+      const existingForMonth = enriched.filter((r) => r.date.startsWith(prefix));
+      const monthFull = buildMonthAttendance(y, m, scopedEmployees, existingForMonth);
+      Object.assign(merged, buildDayData(monthFull, scopedEmployees));
+    });
+    return merged;
+  }, [weekDates, scopedEmployees, enriched]);
 
-  /* ── Month summary stats ── */
-  const monthKey = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-`;
-  const monthRecs = Object.entries(dayData)
-    .filter(([d]) => d.startsWith(monthKey))
-    .map(([, v]) => v);
-  const totalRecs = monthRecs.reduce((s, d) => s + d.total, 0);
-  const totalPresent = monthRecs.reduce((s, d) => s + d.present + d.late, 0);
-  const avgRate = totalRecs > 0 ? Math.round((totalPresent / totalRecs) * 100) : 0;
-  const workdays = Object.keys(dayData).filter((d) => d.startsWith(monthKey)).length;
+  const activeDayData = granularity === "weekly" ? weekDayData : dayData;
+  const selectedData = activeDayData[selectedDay] ?? null;
 
-  /* ── Selected day rows ── */
-  const selectedRows = selectedDay ? (dayData[selectedDay]?.records ?? []) : [];
+  const prevMonth = () => { if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); } else setViewMonth((m) => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); } else setViewMonth((m) => m + 1); };
+  const prevWeek = () => setWeekAnchor((d) => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; });
+  const nextWeek = () => setWeekAnchor((d) => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; });
 
-  const prevMonth = () => { if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); } else setViewMonth(m => m - 1); setSelectedDay(null); };
-  const nextMonth = () => { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); } else setViewMonth(m => m + 1); setSelectedDay(null); };
+  const dSel = new Date(selectedDay + "T00:00:00");
+  const dayLabel = granularity === "monthly"
+    ? `${monthsShort[dSel.getMonth()]} ${dSel.getDate()}${selectedDay === todayStr ? ` (${t("attendance.today", { defaultValue: "Today" })})` : ""}`
+    : `${days[dSel.getDay()]}${selectedDay === todayStr ? ` (${t("attendance.today", { defaultValue: "Today" })})` : ""}`;
+
+  /* ── Stat strip (scoped to the selected day) ── */
+  const statCells = [
+    {
+      label: t("attendance.stats.checkedIn", { defaultValue: "Checked In" }),
+      value: selectedData ? `${selectedData.present + selectedData.late}/${selectedData.total}` : "0/0",
+      trend: selectedData ? `${Math.round(((selectedData.present + selectedData.late) / selectedData.total) * 100)}% attendance` : "—",
+    },
+    {
+      label: t("attendance.stats.present", { defaultValue: "Present" }),
+      value: String(selectedData?.present ?? 0),
+      trend: t("attendance.stats.presentTrend", { defaultValue: "On time" }),
+    },
+    {
+      label: t("attendance.stats.late", { defaultValue: "Late" }),
+      value: String(selectedData?.late ?? 0),
+      trend: t("attendance.stats.lateTrend", { defaultValue: "Checked in late" }),
+    },
+    {
+      label: t("attendance.stats.absentLeave", { defaultValue: "Absent / Leave" }),
+      value: String((selectedData?.absent ?? 0) + (selectedData?.leave ?? 0)),
+      trend: `${selectedData?.leave ?? 0} on leave`,
+    },
+  ];
+
+  /* ── Roster rows for the selected day, filtered by search ── */
+  const rosterRows = useMemo(() => {
+    const records = selectedData?.records ?? [];
+    const searchLower = search.trim().toLowerCase();
+    const canAct = (isAdmin || isManager) && selectedDay === todayStr;
+    return records
+      .map((r) => {
+        const emp = scopedEmployees.find((e) => idsMatch(e.id, r.employeeId));
+        return {
+          ...r,
+          department: emp?.department ?? "—",
+          designation: emp?.designation ?? "",
+          employeeCode: emp?.employeeId ?? "",
+          canCheckIn: canAct && r.status !== "On Leave" && !r.checkIn,
+          canCheckOut: canAct && r.status !== "On Leave" && Boolean(r.checkIn) && !r.checkOut,
+        };
+      })
+      .filter((r) =>
+        !searchLower ||
+        r.name.toLowerCase().includes(searchLower) ||
+        r.department.toLowerCase().includes(searchLower) ||
+        r.designation.toLowerCase().includes(searchLower)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedData, search, scopedEmployees, isAdmin, isManager, selectedDay, todayStr]);
+
+  const handleInlineCheckIn = async (employeeId) => {
+    setActionLoadingKey(`${employeeId}-in`);
+    const now = getAppNow();
+    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    try { await clockIn(employeeId, todayStr, t); } catch { /* surfaced via row staying unchanged */ }
+    setActionLoadingKey(null);
+  };
+  const handleInlineCheckOut = async (employeeId) => {
+    setActionLoadingKey(`${employeeId}-out`);
+    const now = getAppNow();
+    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    try { await clockOut(employeeId, todayStr, t); } catch { /* surfaced via row staying unchanged */ }
+    setActionLoadingKey(null);
+  };
+
+  /* ── "Report" modal — month-to-date rate + most-missed-this-week ── */
+  const cellsSoFar = Object.entries(dayData)
+    .filter(([d]) => d.startsWith(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-`) && new Date(d + "T00:00:00") <= today)
+    .map(([d, v]) => ({ date: d, rate: Math.round(((v.present + v.late) / v.total) * 100) }));
+  const avgMonthRate = cellsSoFar.length ? Math.round(cellsSoFar.reduce((s, c) => s + c.rate, 0) / cellsSoFar.length) : 0;
+  const bestCell = cellsSoFar.reduce((a, b) => (!a || b.rate > a.rate ? b : a), null);
+  const worstCell = cellsSoFar.reduce((a, b) => (!a || b.rate < a.rate ? b : a), null);
+  const fmtCal = (iso) => { const d = new Date(iso + "T00:00:00"); return `${monthsShort[d.getMonth()]} ${d.getDate()}`; };
+  const reportStatCells = [
+    { label: "Month to date", value: `${avgMonthRate}%`, trend: "Avg. attendance" },
+    { label: "Best day", value: bestCell ? `${bestCell.rate}%` : "—", trend: bestCell ? fmtCal(bestCell.date) : "" },
+    { label: "Toughest day", value: worstCell ? `${worstCell.rate}%` : "—", trend: worstCell ? fmtCal(worstCell.date) : "" },
+    { label: "Days logged", value: String(cellsSoFar.length), trend: months[viewMonth] },
+  ];
+  const missedThisWeek = useMemo(() => {
+    return scopedEmployees.map((e) => {
+      let absent = 0, late = 0;
+      weekDates.forEach((d) => {
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) return;
+        const rec = weekDayData[isoOf(d)]?.records?.find((r) => idsMatch(r.employeeId, e.id));
+        if (rec?.status === "Absent") absent++;
+        else if (rec?.status === "Late") late++;
+      });
+      return { name: e.name, department: e.department, absent, late };
+    }).filter((r) => r.absent + r.late > 0).sort((a, b) => (b.absent * 2 + b.late) - (a.absent * 2 + a.late)).slice(0, 5);
+  }, [scopedEmployees, weekDates, weekDayData]);
+
+  const noShowCountBadge = ""; // pending-flag count intentionally omitted here — see disclosure below the tab row
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
-      {/* ── CLOCK IN / CLOCK OUT WIDGET ── */}
-      <ClockInOutWidget
-        employees={employees}
-        attendance={attendance}
-        getAppNow={getAppNow}
-        clockIn={clockIn}
-        clockOut={clockOut}
-        currentUser={currentUser}
-      />
-
-      {/* ── HEADER ── */}
-      <div className="content-card" style={{ padding: "var(--sp-4) var(--sp-6)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-4)", flexWrap: "wrap" }}>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.header.title")}</h2>
-            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-              {t("attendance.header.subtitle", { month: months[viewMonth], year: viewYear, workdays, rate: avgRate })}
-            </p>
-          </div>
-
-          {/* Month nav */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-            <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
-            <span style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", minWidth: "140px", textAlign: "center" }}>
-              {months[viewMonth]} {viewYear}
-            </span>
-            <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
-          </div>
-
-          {/* View toggle */}
-          <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
-            {[["calendar", `📅 ${t("attendance.header.viewToggle.calendar")}`], ["table", `📋 ${t("attendance.header.viewToggle.table")}`]].map(([v, label]) => (
-              <button key={v} type="button" onClick={() => setView(v)} style={{
-                padding: "5px 14px", borderRadius: "6px", border: "none",
-                background: view === v ? "var(--bg-surface)" : "transparent",
-                color: view === v ? "var(--txt-primary)" : "var(--txt-secondary)",
-                fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", cursor: "pointer",
-                fontWeight: view === v ? "var(--fw-medium)" : "var(--fw-regular)",
-                boxShadow: view === v ? "var(--shadow-xs)" : "none", transition: "all 0.15s",
-              }}>{label}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Summary chips */}
-        <div style={{ display: "flex", gap: "var(--sp-3)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
+      {/* ── Roster / No-show queue tabs (admin only) ── */}
+      {isAdmin && (
+        <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)", alignSelf: "flex-start" }}>
           {[
-            { label: statusLabel(t, "Present"), value: monthRecs.reduce((s, d) => s + d.present, 0), variant: "success" },
-            { label: statusLabel(t, "Late"), value: monthRecs.reduce((s, d) => s + d.late, 0), variant: "warning" },
-            { label: statusLabel(t, "On Leave"), value: monthRecs.reduce((s, d) => s + d.leave, 0), variant: "info" },
-            { label: statusLabel(t, "Absent"), value: monthRecs.reduce((s, d) => s + d.absent, 0), variant: "danger" },
-          ].map((s) => (
-            <Badge key={s.label} variant={s.variant} dot>
-              {s.value} {s.label}
-            </Badge>
+            { key: "roster", label: t("attendance.tabs.roster", { defaultValue: "Roster" }) },
+            { key: "noshow", label: t("attendance.tabs.noShowQueue", { defaultValue: "No-show queue" }) },
+          ].map(({ key, label }) => (
+            <button key={key} type="button" onClick={() => setActiveTab(key)} style={{
+              padding: "7px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
+              background: activeTab === key ? "var(--bg-surface)" : "transparent",
+              color: activeTab === key ? "var(--txt-primary)" : "var(--txt-secondary)",
+              fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
+              fontWeight: activeTab === key ? "var(--fw-semibold)" : "var(--fw-regular)",
+              boxShadow: activeTab === key ? "var(--shadow-xs)" : "none",
+            }}>{label}{noShowCountBadge}</button>
           ))}
-          <span style={{ marginLeft: "auto", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", alignSelf: "center" }}>
-            {t("attendance.header.clickToView")}
-          </span>
-        </div>
-      </div>
-
-      {/* ── CALENDAR VIEW ── */}
-      {view === "calendar" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--sp-5)", alignItems: "start" }}>
-          <div className="content-card">
-            {/* Legend */}
-            <div style={{ display: "flex", gap: "var(--sp-4)", marginBottom: "var(--sp-4)", flexWrap: "wrap" }}>
-              {[
-                { color: "var(--clr-success-500)", label: "≥90%" },
-                { color: "var(--clr-warning-500)", label: "≥75%" },
-                { color: "var(--clr-danger-400)", label: "<75%" },
-              ].map((l) => (
-                <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                  <span style={{ width: "10px", height: "4px", borderRadius: "2px", background: l.color, display: "inline-block" }} />
-                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{l.label}</span>
-                </div>
-              ))}
-              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--clr-success-500)", display: "inline-block" }} />
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("attendance.calendar.legend.present")}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--clr-warning-500)", display: "inline-block" }} />
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("attendance.calendar.legend.late")}</span>
-              </div>
-            </div>
-
-            <CalendarGrid
-              year={viewYear} month={viewMonth}
-              dayData={dayData}
-              selectedDay={selectedDay}
-              onSelectDay={setSelectedDay}
-              todayStr={today.toISOString().split("T")[0]}
-            />
-          </div>
-
-          {/* Day detail */}
-          <DayPanel
-            dateStr={selectedDay}
-            rows={selectedRows}
-            onClose={() => setSelectedDay(null)}
-          />
         </div>
       )}
 
-      {/* ── TABLE VIEW ── */}
-      {view === "table" && (
-        <div className="content-card">
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
-            <select
-              value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}
-              style={{
-                padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
-                borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
-                color: "var(--txt-primary)", fontFamily: "var(--font-family)",
-                fontSize: "var(--fs-sm)", outline: "none", cursor: "pointer",
-              }}
-            >
-              <option value="all">{t("attendance.table.allEmployees")}</option>
-              {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-            <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginLeft: "auto" }}>
-              {t("attendance.table.recordsCount", { count: tableRows.length })}
-            </span>
-          </div>
-
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>{t("attendance.table.headers.employee")}</th>
-                  <th>{t("attendance.table.headers.date")}</th>
-                  <th>{t("attendance.table.headers.day")}</th>
-                  <th>{t("attendance.table.headers.checkIn")}</th>
-                  <th>{t("attendance.table.headers.checkOut")}</th>
-                  <th>{t("attendance.table.headers.hours")}</th>
-                  <th>{t("attendance.table.headers.status")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows.slice(0, 50).map((r) => {
-                  const dow = new Date(r.date + "T00:00:00").getDay();
-                  const hours = r.checkIn && r.checkOut
-                    ? (() => {
-                        const [h1, m1] = r.checkIn.split(":").map(Number);
-                        const [h2, m2] = r.checkOut.split(":").map(Number);
-                        const diff = (h2 * 60 + m2) - (h1 * 60 + m1);
-                        return `${Math.floor(diff / 60)}h${diff % 60 > 0 ? ` ${diff % 60}m` : ""}`;
-                      })()
-                    : "—";
-                  return (
-                    <tr key={`${r.employeeId}-${r.date}`}>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
-                          <Avatar name={r.name} size="xs" />
-                          <span style={{ fontWeight: "var(--fw-medium)" }}>{r.name}</span>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: "var(--fs-sm)" }}>{r.date}</td>
-                      <td style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{days[dow]}</td>
-                      <td style={{ color: r.status === "Late" ? "var(--txt-warning)" : "var(--txt-primary)" }}>
-                        {fmt(r.checkIn)}
-                      </td>
-                      <td>{fmt(r.checkOut)}</td>
-                      <td style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{hours}</td>
-                      <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {tableRows.length > 50 && (
-            <p style={{ textAlign: "center", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "var(--sp-4)" }}>
-              {t("attendance.table.showingFirst", { count: tableRows.length })}
+      {activeTab === "noshow" ? (
+        <NoShowQueueTab />
+      ) : (
+        <>
+          {isManager && (
+            <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", margin: 0 }}>
+              Showing your team{myEmployee?.department ? ` (${myEmployee.department})` : ""} — {scopedEmployees.length} employee{scopedEmployees.length === 1 ? "" : "s"}
             </p>
           )}
+          {!isAdmin && !isManager && (
+            <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", margin: 0 }}>
+              Showing your own attendance
+            </p>
+          )}
+
+          {/* ── Stat strip ── */}
+          <div className="stat-strip">
+            {statCells.map((c) => (
+              <div key={c.label} className="stat-cell" style={{ cursor: "default" }}>
+                <div className="stat-cell-label">{c.label}</div>
+                <div className="stat-cell-value">{c.value}</div>
+                <div className="stat-cell-trend">{c.trend}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Weekly bars / Monthly heatmap panel ── */}
+          <div className="content-card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-4)", flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+                  {granularity === "monthly" ? "Monthly attendance" : "Weekly attendance"}
+                </h3>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                  {granularity === "monthly" ? `${months[viewMonth]} ${viewYear} · ` : ""}Click a day to view its roster
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+                {granularity === "monthly" ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                    <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
+                    <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", minWidth: "110px", textAlign: "center" }}>
+                      {months[viewMonth]} {viewYear}
+                    </span>
+                    <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                    <Button variant="secondary" size="sm" onClick={prevWeek}>‹</Button>
+                    <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", minWidth: "150px", textAlign: "center" }}>
+                      {monthsShort[weekDates[0].getMonth()]} {weekDates[0].getDate()} – {weekDates[6].getMonth() !== weekDates[0].getMonth() ? `${monthsShort[weekDates[6].getMonth()]} ` : ""}{weekDates[6].getDate()}
+                    </span>
+                    <Button variant="secondary" size="sm" onClick={nextWeek}>›</Button>
+                  </div>
+                )}
+                <div style={{ display: "flex", border: "1px solid var(--bdr-default)" }}>
+                  {[["weekly", "Weekly"], ["monthly", "Monthly"]].map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => setGranularity(v)} style={{
+                      padding: "6px 14px", border: "none", cursor: "pointer",
+                      background: granularity === v ? "var(--txt-primary)" : "transparent",
+                      color: granularity === v ? "var(--bg-surface)" : "var(--txt-secondary)",
+                      fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)",
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>Report</Button>
+              </div>
+            </div>
+
+            {granularity === "weekly" ? (
+              <WeeklyBars weekDates={weekDates} dayData={weekDayData} selectedDay={selectedDay} onSelectDay={setSelectedDay} days={days} />
+            ) : (
+              <MonthlyHeatmap
+                year={viewYear} month={viewMonth} dayData={dayData}
+                selectedDay={selectedDay} onSelectDay={setSelectedDay}
+                todayStr={todayStr} weekdayLabels={days}
+              />
+            )}
+          </div>
+
+          {/* ── Roster panel ── */}
+          <div className="content-card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Roster</div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{dayLabel} roster</h3>
+              </div>
+              <input
+                type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("common2.searchEmployeesPlaceholder", { defaultValue: "Search employees…" })}
+                style={{
+                  fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", padding: "9px var(--sp-4)",
+                  background: "var(--bg-surface)", color: "var(--txt-primary)",
+                  border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-md)", width: "240px",
+                }}
+              />
+            </div>
+
+            {rosterRows.length === 0 ? (
+              <div className="empty-state">
+                <h3 className="empty-state-title">No employees match</h3>
+                <p className="empty-state-description">Try a different search, or pick another day.</p>
+              </div>
+            ) : (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t("attendance.table.headers.employee")}</th>
+                      <th>Department</th>
+                      <th>{t("attendance.table.headers.checkIn")}</th>
+                      <th>{t("attendance.table.headers.checkOut")}</th>
+                      <th>{t("attendance.table.headers.status")}</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rosterRows.map((r) => (
+                      <tr key={r.employeeId} style={{ cursor: "pointer" }} onClick={() => navigate(`/employees/${r.employeeId}`)}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                            <Avatar name={r.name} size="xs" />
+                            <div>
+                              <div style={{ fontWeight: "var(--fw-medium)" }}>{r.name}</div>
+                              {r.employeeCode && <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{r.employeeCode}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ color: "var(--txt-secondary)" }}>{r.department}</td>
+                        <td style={{ color: r.status === "Late" ? "var(--txt-warning)" : "var(--txt-primary)" }}>{fmt(r.checkIn)}</td>
+                        <td style={{ color: "var(--txt-secondary)" }}>{fmt(r.checkOut)}</td>
+                        <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {r.canCheckIn && (
+                            <Button
+                              variant="primary" size="xs"
+                              loading={actionLoadingKey === `${r.employeeId}-in`}
+                              onClick={() => handleInlineCheckIn(r.employeeId)}
+                              style={{ marginRight: "var(--sp-2)" }}
+                            >Check-in</Button>
+                          )}
+                          {r.canCheckOut && (
+                            <Button
+                              variant="secondary" size="xs"
+                              loading={actionLoadingKey === `${r.employeeId}-out`}
+                              onClick={() => handleInlineCheckOut(r.employeeId)}
+                              style={{ marginRight: "var(--sp-2)" }}
+                            >Check-out</Button>
+                          )}
+                          <Button variant="link" size="xs" onClick={() => navigate(`/employees/${r.employeeId}`)}>View</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Report modal ── */}
+      {showReport && (
+        <div
+          role="dialog" aria-modal="true"
+          style={{ position: "fixed", inset: 0, background: "rgba(11,22,38,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: "var(--z-modal)" }}
+          onClick={() => setShowReport(false)}
+        >
+          <div
+            className="content-card"
+            style={{
+              width: "560px", maxWidth: "92vw", maxHeight: "85vh", overflowY: "auto",
+              background: "var(--bg-page)", boxShadow: "var(--shadow-xl)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-5)" }}>
+              <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{months[viewMonth]} {viewYear} attendance summary</h3>
+              <button onClick={() => setShowReport(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1 }}>×</button>
+            </div>
+
+            <div className="stat-strip" style={{ marginBottom: "var(--sp-5)", gridTemplateColumns: "repeat(4, 1fr)" }}>
+              {reportStatCells.map((c) => (
+                <div key={c.label} className="stat-cell" style={{ cursor: "default", padding: "var(--sp-3) var(--sp-3)" }}>
+                  <div className="stat-cell-label" style={{ height: "28px", lineHeight: "1.35", overflow: "hidden" }}>{c.label}</div>
+                  <div className="stat-cell-value sm">{c.value}</div>
+                  <div className="stat-cell-trend">{c.trend}</div>
+                </div>
+              ))}
+            </div>
+
+            <h4 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-3)" }}>Most missed this week</h4>
+            {missedThisWeek.length === 0 ? (
+              <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>No absences or late check-ins recorded this week.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+                {missedThisWeek.map((r) => (
+                  <div key={r.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--sp-2) 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
+                    <div>
+                      <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>{r.name}</div>
+                      <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{r.department}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                      {r.absent > 0 && <Badge variant="danger" size="sm">{r.absent} absent</Badge>}
+                      {r.late > 0 && <Badge variant="warning" size="sm">{r.late} late</Badge>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -15,18 +15,24 @@ router.get("/", verifyToken, employeeController.getAll);
 // see their own profile.
 router.get("/:id", verifyToken, employeeController.getDetail);
 
-// Create / update / delete — HR (MANAGER) and ADMIN only
+// Create — HR (company-wide)/ADMIN only. Matches the demo's role model:
+// MANAGER has no "Add Employee" capability anywhere (no nav item, no
+// backend route) — only update/manage employees already in their own
+// department (see utils/managerScope.js).
 router.post(
   "/",
   verifyToken,
-  authorize("ADMIN", "MANAGER"),
+  authorize("ADMIN", "HR"),
   validate.employee.create,
   employeeController.create,
 );
+
+// Update / delete — MANAGER (own department), HR (company-wide) and ADMIN
+// for update; delete stays ADMIN-only.
 router.put(
   "/:id",
   verifyToken,
-  authorize("ADMIN", "MANAGER"),
+  authorize("ADMIN", "MANAGER", "HR"),
   validate.employee.update,
   employeeController.update,
 );
@@ -42,13 +48,14 @@ router.post(
   employeeController.uploadAvatar,
 );
 
-// Contract PDF upload (task 1.4) — HR (MANAGER) and ADMIN only, unlike the
-// avatar route above. Employees view their own contract read-only via
-// GET /employees/me (contractUrl is already in employeeToClient's shape).
+// Contract PDF upload (task 1.4) — MANAGER (own department)/HR/ADMIN only,
+// unlike the avatar route above. Employees view their own contract
+// read-only via GET /employees/me (contractUrl is already in
+// employeeToClient's shape).
 router.post(
   "/:id/contract",
   verifyToken,
-  authorize("ADMIN", "MANAGER"),
+  authorize("ADMIN", "MANAGER", "HR"),
   handleUploadErrors(uploadPdf.single("contract")),
   employeeController.uploadContract,
 );

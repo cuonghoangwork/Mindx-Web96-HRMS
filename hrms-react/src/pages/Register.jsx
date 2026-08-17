@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import FormField from "../components/FormField";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/Button";
+import AuthBrandPanel from "../components/AuthBrandPanel";
+import AuthThemeToggle from "../components/AuthThemeToggle";
 
 /* ─────────────────────────────────
    Validation rules
@@ -115,7 +117,12 @@ function Register() {
 
   return (
     <div className="login-page">
-      <div className="login-card" style={{ maxWidth: "440px" }}>
+      <AuthBrandPanel />
+
+      <div className="login-form-panel">
+        <AuthThemeToggle />
+
+        <div className="login-card" style={{ maxWidth: "440px" }}>
         <div className="login-header">
           <h1>Create Account</h1>
         </div>
@@ -294,6 +301,7 @@ function Register() {
           Already have an account?{" "}
           <Link to="/login" className="link-primary">Sign in</Link>
         </p>
+        </div>
       </div>
     </div>
   );

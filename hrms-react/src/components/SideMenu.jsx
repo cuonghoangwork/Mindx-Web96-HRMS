@@ -1,55 +1,116 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
+import { getRoleLabel } from "../utils/roles";
 
 function SideMenu({ isOpen = false, onNavigate }) {
   const { theme, toggleTheme } = useTheme();
-  const { isHR, isAdmin } = useAuth();
+  const { isAdmin, isHR, isHRTier, isManager, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Base items visible to all authenticated users
-  const baseItems = [
-    { path: "/dashboard",    title: "Dashboard",   icon: dashboardIcon },
-    { path: "/attendance",   title: "Attendance",  icon: attendanceIcon },
-    { path: "/notifications",title: "Notifications",icon: notifIcon },
-    { path: "/settings",     title: "Settings",    icon: settingsIcon },
-  ];
+  // Plain MANAGER (not also HR/Admin) gets a distinct "My Info"-style nav
+  // shape matching the design (My Profile / Directory / My Department),
+  // rather than the People-group HR/Admin nav with a couple of items
+  // swapped — see below.
+  const isPlainManager = isManager && !isHRTier;
 
-  // HR / Manager + Admin items
-  const hrItems = [
-    { path: "/employees",    title: "All Employees",    icon: employeesIcon },
-    { path: "/departments",  title: "All Departments",  icon: departmentsIcon },
-    { path: "/payroll",      title: "Payroll",          icon: payrollIcon },
-    { path: "/jobs",         title: "Jobs",             icon: jobsIcon },
-    { path: "/candidates",   title: "Candidates",       icon: candidatesIcon },
-    { path: "/holidays",     title: "Holidays",         icon: holidaysIcon },
-  ];
+  // Plain EMPLOYEE (not Manager/HR/Admin) gets the same "My Info" shape as
+  // isPlainManager, plus further trims the design calls for that MANAGER
+  // doesn't need: no Hiring group (Candidates/Jobs are requireHR — MANAGER
+  // passes that gate, EMPLOYEE doesn't), no Holidays in Time & Pay
+  // (requireManager, same reason), and "Payroll"/"Leave" there point into
+  // My Profile's Salary/Leave tabs (?tab=salary / ?tab=leave, see
+  // ViewEmployee.jsx) instead of the admin /payroll page EMPLOYEE can't
+  // reach — that data already lives on those tabs, this just gives it a
+  // direct sidebar shortcut matching the design.
+  const isPlainEmployee = !isManager && !isHRTier;
 
-  // Build the final ordered list
-  // Dashboard → HR section (if applicable) → Attendance → Notifications → Settings
-  let menuItems;
-  if (isHR) {
-    menuItems = [
-      { path: "/dashboard",     title: "Dashboard",      icon: dashboardIcon },
-      { path: "/employees",     title: "All Employees",  icon: employeesIcon },
-      { path: "/departments",   title: "All Departments",icon: departmentsIcon },
-      { path: "/attendance",    title: "Attendance",     icon: attendanceIcon },
-      { path: "/payroll",       title: "Payroll",        icon: payrollIcon },
-      { path: "/jobs",          title: "Jobs",           icon: jobsIcon },
-      { path: "/candidates",    title: "Candidates",     icon: candidatesIcon },
-      { path: "/holidays",      title: "Holidays",       icon: holidaysIcon },
-      { path: "/notifications", title: "Notifications",  icon: notifIcon },
-      { path: "/settings",      title: "Settings",       icon: settingsIcon },
-    ];
-  } else {
-    // EMPLOYEE — only attendance + notifications + settings + dashboard
-    menuItems = [
-      { path: "/dashboard",     title: "Dashboard",     icon: dashboardIcon },
-      { path: "/attendance",    title: "Attendance",    icon: attendanceIcon },
+  // Same nav list for every authenticated role by default — restricted
+  // destinations (Payroll, Jobs, Candidates — see App.jsx/
+  // ProtectedRoute.jsx's requireHR/requireManager) still resolve to the
+  // app's existing "Access Denied" screen rather than a broken page, so
+  // showing the item is a pure discoverability choice, not a permissions
+  // change. MANAGER and EMPLOYEE are the exception: their nav items are
+  // swapped/trimmed below to match what each can actually reach, rather
+  // than pointing at pages they'd immediately get denied on.
+  //
+  // Grouping below mirrors the mockup's NAV_RAW — numbered sections
+  // (01 Overview, 02 People, ...) instead of one flat list. Icons are kept
+  // per an explicit product decision (mockup itself is icon-free, but the
+  // current app deliberately keeps its outline-SVG icon system). Group
+  // index numbers are assigned by position after filtering (below), not
+  // hardcoded, since EMPLOYEE drops the Hiring group entirely.
+  const rawGroups = [
+    { key: "overview", title: "Overview", items: [
+      { path: "/dashboard", title: "Dashboard", icon: dashboardIcon },
+    ]},
+    { key: "people", title: isPlainManager || isPlainEmployee ? "My Info" : "People", items: [
+      // "My Profile" — every role's own record (ViewEmployee.jsx's
+      // /employees/:id route is open to any authenticated user, not just
+      // MANAGER). user.employeeId comes straight off the JWT-derived
+      // /auth/me response, no extra fetch needed; every seeded role
+      // (including ADMIN) now has a linked Employee record, see seed.js.
+      ...(user?.employeeId
+        ? [{ path: `/employees/${user.employeeId}`, title: "My Profile", icon: employeesIcon }]
+        : []),
+      // Directory read is company-wide for every role (see
+      // employeeController.getAll) — only the label changes for MANAGER/
+      // EMPLOYEE, matching the design's "Directory" wording; the page
+      // itself already hides management actions (bulk select, Promote,
+      // Add Employee) for a plain viewer.
+      { path: "/employees", title: isPlainManager || isPlainEmployee ? "Directory" : "All Employees", icon: employeesIcon },
+      // Add Employee: HR/Admin only (App.jsx gates employees/add requireHR)
+      // — previously only reachable via the "+ Add Employee" button on the
+      // All Employees page; the design lists it as its own People-group
+      // nav item, so it gets a direct sidebar shortcut too.
+      ...(isHRTier ? [{ path: "/employees/add", title: "Add Employee", icon: addEmployeeIcon }] : []),
+      // MANAGER/EMPLOYEE get a "My Department" shortcut instead of the
+      // full company Departments list — matches the demo's role model
+      // (neither has a general Departments browser, only their own via
+      // MyDepartmentRedirect.jsx), and App.jsx gates /departments requireHR.
+      isPlainManager || isPlainEmployee
+        ? { path: "/departments/me", title: "My Department", icon: departmentsIcon }
+        : { path: "/departments", title: "All Departments", icon: departmentsIcon },
+      // Org Chart: HR/Admin only (matches the demo — no such nav item for
+      // MANAGER/EMPLOYEE), so it's omitted from their nav below instead of
+      // just relying on the Access Denied fallback.
+      ...(isPlainManager || isPlainEmployee ? [] : [{ path: "/org-chart", title: "Org Chart", icon: orgChartIcon }]),
+    ]},
+    { key: "timepay", title: "Time & Pay", items: [
+      { path: "/attendance", title: "Attendance", icon: attendanceIcon },
+      ...(isPlainEmployee && user?.employeeId
+        // EMPLOYEE: "Payroll"/"Leave" deep-link into My Profile's own tabs
+        // (see ViewEmployee.jsx's ?tab= handling) rather than the
+        // requireManager-gated /payroll or the nonexistent standalone
+        // /leave page — same underlying self-service data, just reachable
+        // directly from the sidebar like the design shows.
+        ? [
+            { path: `/employees/${user.employeeId}?tab=salary`, title: "Payroll", icon: payrollIcon },
+            { path: `/employees/${user.employeeId}?tab=leave`,  title: "Leave",   icon: holidaysIcon },
+          ]
+        // MANAGER/HR/Admin: both requireManager (App.jsx) — all three pass
+        // that gate, so they keep the full admin pages.
+        : isPlainEmployee ? [] : [
+            { path: "/payroll",  title: "Payroll",  icon: payrollIcon },
+            { path: "/holidays", title: "Holidays", icon: holidaysIcon },
+          ]),
+    ]},
+    // Hiring: requireHR (App.jsx), so MANAGER hits Access Denied here too
+    // — pre-existing behavior, unchanged, matching both the demo and the
+    // live app's current Manager sidebar (out of scope to revisit here).
+    // Only EMPLOYEE, which never had a Hiring group in the design, drops
+    // it from its own nav.
+    ...(isPlainEmployee ? [] : [{ key: "hiring", title: "Hiring", items: [
+      { path: "/candidates", title: "Candidates", icon: candidatesIcon },
+      { path: "/jobs",       title: "Job Openings", icon: jobsIcon },
+    ]}]),
+    { key: "system", title: isPlainEmployee ? "Account" : "System", items: [
       { path: "/notifications", title: "Notifications", icon: notifIcon },
       { path: "/settings",      title: "Settings",      icon: settingsIcon },
-    ];
-  }
+    ]},
+  ];
+  const navGroups = rawGroups.map((group, i) => ({ ...group, index: String(i + 1).padStart(2, "0") }));
 
   const goToHome = () => navigate("/dashboard");
 
@@ -60,7 +121,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
         onClick={goToHome}
         type="button"
         style={{
-          cursor: "pointer", background: "none", border: "none",
+          cursor: "pointer", background: "none",
           textAlign: "left", fontFamily: "inherit",
         }}
         title="Go to Dashboard"
@@ -75,83 +136,168 @@ function SideMenu({ isOpen = false, onNavigate }) {
           </svg>
         </div>
         <h1>HRMS</h1>
+        {/* codename tag — matches mockup's sidebarCodenameStyle ("/ LEDGER") */}
+        <span className="brand-codename">/ LEDGER</span>
       </button>
 
-      {/* Role badge */}
-      {!isHR && (
-        <div style={{
-          margin: "0 0 var(--sp-4) 0",
-          padding: "var(--sp-2) var(--sp-3)",
-          background: "var(--bg-surface-alt)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--bdr-subtle)",
-          display: "flex", alignItems: "center", gap: "var(--sp-2)",
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
-          <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-            Employee access
-          </span>
-        </div>
-      )}
-
-      {isAdmin && (
-        <div style={{
-          margin: "0 0 var(--sp-4) 0",
-          padding: "var(--sp-2) var(--sp-3)",
-          background: "var(--bg-primary-subtle)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid rgba(113,82,243,0.25)",
-          display: "flex", alignItems: "center", gap: "var(--sp-2)",
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
-            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
-            <path d="M9 12l2 2 4-4" />
-          </svg>
-          <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
-            Administrator
-          </span>
-        </div>
-      )}
-
-      <nav className="menu-list">
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => `menu-item ${isActive ? "active" : ""}`}
-            end={item.path === "/dashboard"}
-            onClick={onNavigate}
-          >
-            <span className="menu-indicator"></span>
-            <span className="menu-icon">{item.icon}</span>
-            <span className="menu-text">{item.title}</span>
-          </NavLink>
+      <div className="side-menu-nav-scroll">
+        {navGroups.map((group) => (
+          <div className="nav-group" key={group.index}>
+            <div className="nav-group-header">
+              <span className="nav-group-index">{group.index}</span>
+              {group.title}
+            </div>
+            <nav className="menu-list">
+              {group.items.map((item) => {
+                // Exact pathname+query match rather than NavLink's default
+                // fuzzy/prefix matching — needed now that "Payroll" and
+                // "Leave" (EMPLOYEE nav) point at the same /employees/:id
+                // path as "My Profile", distinguished only by ?tab=, which
+                // NavLink's isActive ignores entirely.
+                const [itemPathname, itemQuery = ""] = item.path.split("?");
+                const isItemActive =
+                  location.pathname === itemPathname &&
+                  location.search === (itemQuery ? `?${itemQuery}` : "");
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`menu-item ${isItemActive ? "active" : ""}`}
+                    onClick={onNavigate}
+                  >
+                    <span className="menu-icon">{item.icon}</span>
+                    <span className="menu-text">{item.title}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         ))}
-      </nav>
+      </div>
 
-      <div className="theme-switch" role="tablist" aria-label="Theme switcher">
+      <div className="side-menu-footer">
+        {/* Role badge — real-auth indicator (no demo role switcher, per 8.0d) */}
+        {isAdmin && (
+          <div style={{
+            margin: "0 0 var(--sp-4) 0",
+            padding: "var(--sp-2) var(--sp-3)",
+            background: "var(--bg-primary-subtle)",
+            border: "1px solid var(--bdr-brand)",
+            display: "flex", alignItems: "center", gap: "var(--sp-2)",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
+              <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
+              Administrator
+            </span>
+          </div>
+        )}
+
+        {isHR && (
+          <div style={{
+            margin: "0 0 var(--sp-4) 0",
+            padding: "var(--sp-2) var(--sp-3)",
+            background: "var(--bg-info-subtle)",
+            border: "1px solid var(--bdr-info)",
+            display: "flex", alignItems: "center", gap: "var(--sp-2)",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: "var(--txt-info)", flexShrink: 0 }} aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M8 4v3M16 4v3M3 10h18" />
+              <path d="M9 15l2 2 4-4" />
+            </svg>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", fontWeight: "var(--fw-medium)" }}>
+              HR
+            </span>
+          </div>
+        )}
+
+        {isManager && (
+          <div style={{
+            margin: "0 0 var(--sp-4) 0",
+            padding: "var(--sp-2) var(--sp-3)",
+            background: "var(--bg-info-subtle)",
+            border: "1px solid var(--bdr-info)",
+            display: "flex", alignItems: "center", gap: "var(--sp-2)",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: "var(--txt-info)", flexShrink: 0 }} aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", fontWeight: "var(--fw-medium)" }}>
+              Manager
+            </span>
+          </div>
+        )}
+
+        {!isAdmin && !isHR && !isManager && (
+          <div style={{
+            margin: "0 0 var(--sp-4) 0",
+            padding: "var(--sp-2) var(--sp-3)",
+            background: "var(--bg-surface-alt)",
+            border: "1px solid var(--bdr-default)",
+            display: "flex", alignItems: "center", gap: "var(--sp-2)",
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: "var(--clr-primary-400)", flexShrink: 0 }} aria-hidden="true">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+            </svg>
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+              Employee access
+            </span>
+          </div>
+        )}
+
+        <div className="theme-switch" role="tablist" aria-label="Theme switcher">
+          <button
+            className={`theme-option ${theme === "light" ? "active" : ""}`}
+            onClick={() => theme !== "light" && toggleTheme()}
+            type="button"
+          >
+            <span>☀</span>
+            <span>Light</span>
+          </button>
+          <button
+            className={`theme-option ${theme === "dark" ? "active" : ""}`}
+            onClick={() => theme !== "dark" && toggleTheme()}
+            type="button"
+          >
+            <span>◐</span>
+            <span>Dark</span>
+          </button>
+        </div>
+
+        {/* User identity chip — moved here from the topbar, matching the
+            mockup's sidebarFooterStyle layout (userChipWrapStyle above
+            signOutStyle). */}
         <button
-          className={`theme-option ${theme === "light" ? "active" : ""}`}
-          onClick={() => theme !== "light" && toggleTheme()}
           type="button"
+          className="user-chip"
+          onClick={() => navigate("/settings")}
+          title="Go to Settings"
         >
-          <span>☀</span>
-          <span>Light</span>
+          <span className="user-chip-avatar" aria-hidden="true">
+            {user?.avatar || "AU"}
+          </span>
+          <span className="user-chip-text">
+            <span className="user-chip-name">{user?.name || "Admin User"}</span>
+            <span className="user-chip-role">{getRoleLabel(user?.role) || "Administrator"}</span>
+          </span>
         </button>
-        <button
-          className={`theme-option ${theme === "dark" ? "active" : ""}`}
-          onClick={() => theme !== "dark" && toggleTheme()}
-          type="button"
-        >
-          <span>◐</span>
-          <span>Dark</span>
+
+        <button type="button" className="sign-out-link" onClick={logout}>
+          Sign Out
         </button>
       </div>
     </aside>
@@ -168,6 +314,15 @@ const dashboardIcon = (
 const employeesIcon = (
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+  </svg>
+);
+
+const addEmployeeIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M19 8v6M22 11h-6" />
   </svg>
 );
 
@@ -218,6 +373,16 @@ const notifIcon = (
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </svg>
+);
+
+const orgChartIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="5" r="2.5" />
+    <circle cx="5" cy="19" r="2.5" />
+    <circle cx="19" cy="19" r="2.5" />
+    <path d="M12 7.5v4M12 11.5H5v5M12 11.5h7v5" />
   </svg>
 );
 

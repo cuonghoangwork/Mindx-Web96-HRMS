@@ -138,7 +138,7 @@ describe("collectAbsentKeys", () => {
 describe("approved paid leave is never charged as absence", () => {
   it("nets every approved leave day out of the absent set regardless of type", () => {
     const leaveRows = [
-      { employee: "e1", type: "paid", startDate: localDate(2026, 8, 3), endDate: localDate(2026, 8, 7) },
+      { employee: "e1", type: "annual", startDate: localDate(2026, 8, 3), endDate: localDate(2026, 8, 7) },
     ];
     const spuriousAbsences = [
       { employee: "e1", date: utcDate(2026, 8, 3) },

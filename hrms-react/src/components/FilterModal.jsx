@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useStore } from "../context/StoreContext";
+import Button from "./Button";
 
 const EMPLOYMENT_TYPES = [
   { value: "all", label: "All" },
@@ -48,57 +49,25 @@ function FilterModal({ onClose }) {
   const rightColumn = departmentNames.slice(mid);
 
   return (
-    <div
-      className="modal-overlay"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(22, 21, 28, 0.3)",
-        backdropFilter: "blur(10px)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 1000,
-        padding: "20px",
-      }}
-    >
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="filter-modal"
+        className="modal"
         onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--surface)",
-          borderRadius: "20px",
-          width: "100%",
-          maxWidth: "383px",
-          maxHeight: "90vh",
-          overflowY: "auto",
-          padding: "20px",
-          boxShadow: "var(--shadow)",
-        }}
+        style={{ maxWidth: "400px" }}
       >
-        {/* Header */}
-        <div style={{ marginBottom: "16px" }}>
-          <h2
-            style={{
-              fontFamily: "Lexend",
-              fontSize: "20px",
-              fontWeight: 600,
-              color: "var(--txt-primary)",
-              margin: 0,
-            }}
+        <div className="modal-header">
+          <h2>Filter</h2>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            aria-label="Close"
           >
-            Filter
-          </h2>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-
-        {/* Divider */}
-        <div
-          style={{
-            height: "1px",
-            background: "var(--bdr-default)",
-            marginBottom: "20px",
-          }}
-        />
 
         {/* Search Input */}
         <div style={{ marginBottom: "24px" }}>
@@ -109,11 +78,14 @@ function FilterModal({ onClose }) {
               gap: "10px",
               padding: "13px 16px",
               border: "1px solid var(--bdr-subtle)",
-              borderRadius: "10px",
-              cursor: "pointer",
+              borderRadius: "var(--radius-md)",
+              color: "var(--txt-secondary)",
             }}
           >
-            <span style={{ fontSize: "16px" }}>🔽</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
             <input
               type="text"
               placeholder="Search by name, employee ID, department..."
@@ -123,9 +95,8 @@ function FilterModal({ onClose }) {
                 border: "none",
                 background: "none",
                 flex: 1,
-                fontFamily: "Lexend",
-                fontSize: "16px",
-                fontWeight: 300,
+                fontFamily: "var(--font-family)",
+                fontSize: "var(--fs-md)",
                 color: "var(--txt-primary)",
                 outline: "none",
               }}
@@ -137,9 +108,9 @@ function FilterModal({ onClose }) {
         <div style={{ marginBottom: "24px" }}>
           <h3
             style={{
-              fontFamily: "Lexend",
-              fontSize: "16px",
-              fontWeight: 600,
+              fontFamily: "var(--font-family)",
+              fontSize: "var(--fs-md)",
+              fontWeight: "var(--fw-semibold)",
               color: "var(--txt-primary)",
               marginBottom: "16px",
             }}
@@ -195,9 +166,9 @@ function FilterModal({ onClose }) {
         <div style={{ marginBottom: "24px" }}>
           <h3
             style={{
-              fontFamily: "Lexend",
-              fontSize: "16px",
-              fontWeight: 600,
+              fontFamily: "var(--font-family)",
+              fontSize: "var(--fs-md)",
+              fontWeight: "var(--fw-semibold)",
               color: "var(--txt-primary)",
               marginBottom: "16px",
             }}
@@ -223,45 +194,13 @@ function FilterModal({ onClose }) {
           </div>
         </div>
 
-        {/* Buttons */}
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-          }}
-        >
-          <button
-            onClick={handleReset}
-            style={{
-              flex: 1,
-              padding: "20px",
-              border: "1px solid var(--bdr-default)",
-              borderRadius: "10px",
-              background: "transparent",
-              color: "var(--txt-primary)",
-              fontFamily: "Poppins",
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
+        <div className="modal-actions" style={{ marginTop: 0, paddingTop: "var(--sp-5)" }}>
+          <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
             Reset
-          </button>
-          <button
-            onClick={handleApply}
-            style={{
-              flex: 1,
-              padding: "20px",
-              border: "none",
-              borderRadius: "10px",
-              background: "var(--bg-primary)",
-              color: "var(--txt-on-brand)",
-              fontFamily: "Poppins",
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
+          </Button>
+          <Button variant="primary" onClick={handleApply} style={{ flex: 1 }}>
             Apply
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -280,18 +219,22 @@ function CheckboxItem({ label, checked, onChange }) {
     >
       <div
         style={{
-          width: "24px",
-          height: "24px",
-          borderRadius: "4px",
+          width: "20px",
+          height: "20px",
+          borderRadius: "var(--radius-sm)",
           border: checked ? "none" : "1.5px solid var(--bdr-subtle)",
           background: checked ? "var(--bg-primary)" : "transparent",
           display: "grid",
           placeItems: "center",
-          fontSize: "14px",
-          color: "white",
+          color: "var(--txt-on-brand)",
+          flexShrink: 0,
         }}
       >
-        {checked && "✓"}
+        {checked && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        )}
       </div>
       <input
         type="checkbox"
@@ -301,9 +244,8 @@ function CheckboxItem({ label, checked, onChange }) {
       />
       <span
         style={{
-          fontFamily: "Lexend",
-          fontSize: "16px",
-          fontWeight: 300,
+          fontFamily: "var(--font-family)",
+          fontSize: "var(--fs-md)",
           color: "var(--txt-primary)",
         }}
       >
@@ -354,9 +296,8 @@ function RadioItem({ label, checked, onChange }) {
       />
       <span
         style={{
-          fontFamily: "Lexend",
-          fontSize: "16px",
-          fontWeight: 300,
+          fontFamily: "var(--font-family)",
+          fontSize: "var(--fs-md)",
           color: "var(--txt-primary)",
         }}
       >

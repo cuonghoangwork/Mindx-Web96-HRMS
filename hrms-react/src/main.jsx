@@ -7,6 +7,7 @@ import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { StoreProvider } from "./context/StoreContext.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { CurrencyProvider } from "./context/CurrencyContext.jsx";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
@@ -15,9 +16,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <AuthProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <StoreProvider>
-              <App />
-            </StoreProvider>
+            <CurrencyProvider>
+              <StoreProvider>
+                <App />
+              </StoreProvider>
+            </CurrencyProvider>
           </LanguageProvider>
         </ThemeProvider>
       </AuthProvider>

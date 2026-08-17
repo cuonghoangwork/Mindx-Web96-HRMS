@@ -1,9 +1,20 @@
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
+import { useAuth } from "../context/AuthContext";
+import { useCurrency } from "../context/CurrencyContext";
+import { EmployeesAPI, LeaveRequestsAPI, PayrollAPI } from "../api";
+import { useLanguage } from "../context/LanguageContext";
+import { formatDate } from "../utils/format";
+import { fmtMoney } from "../utils/payroll";
+import { idsMatch } from "../utils/id";
+import { leaveTypeLabel } from "../utils/leaveTypes";
 import Avatar from "../components/Avatar";
-import { StatusBadge } from "../components/Badge";
+import Badge, { StatusBadge } from "../components/Badge";
+import Button from "../components/Button";
 import AttendanceTrendChart from "../components/AttendanceTrendChart";
+import ApplyLeaveModal from "../components/ApplyLeaveModal";
 
 /* ─────────────────────────────────────────
    SVG Sparkline (pure SVG, no lib needed)
@@ -95,43 +106,32 @@ function DeptBars({ departments, getEmployeeCountByDepartment }) {
 }
 
 /* ─────────────────────────────────────────
-   Donut Chart — contract types
+   Contract Mix — single stacked bar + legend
+   (mockup's stackTrackStyle/contractSegments pattern)
 ───────────────────────────────────────── */
-function DonutChart({ segments, total, size = 80 }) {
-  const r = 28, cx = size / 2, cy = size / 2;
-  const circ = 2 * Math.PI * r;
-  let offset = 0;
+function ContractMixBar({ segments, total }) {
+  let acc = 0;
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-4)" }}>
-      <div style={{ position: "relative", flexShrink: 0, width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-          style={{ transform: "rotate(-90deg)" }}>
-          {segments.map((seg, i) => {
-            const dash = (seg.value / (total || 1)) * circ;
-            const el = (
-              <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-                stroke={seg.color} strokeWidth="11"
-                strokeDasharray={`${dash} ${circ - dash}`}
-                strokeDashoffset={-offset} />
-            );
-            offset += dash;
-            return el;
-          })}
-        </svg>
-        <div style={{
-          position: "absolute", inset: 0, display: "flex",
-          flexDirection: "column", alignItems: "center", justifyContent: "center",
-        }}>
-          <span style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", lineHeight: 1 }}>{total}</span>
-          <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>total</span>
-        </div>
+    <div>
+      <div style={{ position: "relative", height: "22px", background: "var(--bg-surface-alt)", marginBottom: "16px", marginTop: "4px" }}>
+        {segments.map((seg) => {
+          const pct = total ? (seg.value / total) * 100 : 0;
+          const el = (
+            <div key={seg.label} style={{
+              position: "absolute", left: `${acc}%`, top: 0, bottom: 0, width: `${pct}%`,
+              background: seg.color, borderRight: "2px solid var(--bg-page)",
+            }} />
+          );
+          acc += pct;
+          return el;
+        })}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {segments.map((s) => (
-          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</span>
-            <span style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{s.value}</span>
+          <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+            <span style={{ width: "9px", height: "9px", background: s.color, flexShrink: 0 }} />
+            <span style={{ fontSize: "12.5px", color: "var(--txt-secondary)", flex: 1 }}>{s.label}</span>
+            <span style={{ fontSize: "12.5px", fontWeight: "var(--fw-bold)", color: "var(--txt-primary)" }}>{s.value}</span>
           </div>
         ))}
       </div>
@@ -163,9 +163,24 @@ function StatCard({ title, value, hint, trend, trendUp, sparkData, accentColor =
 }
 
 /* ─────────────────────────────────────────
+   StripStatCell — bordered-strip stat cell (mockup's cellBase pattern)
+   Used on the admin Dashboard's two stat rows: one 2px-bordered strip
+   of cells divided by internal borders, no per-cell card box.
+───────────────────────────────────────── */
+function StripStatCell({ label, value, trend, onClick, small }) {
+  return (
+    <button type="button" className="stat-cell" onClick={onClick}>
+      <div className="stat-cell-label">{label}</div>
+      <div className={`stat-cell-value${small ? " sm" : ""}`}>{value}</div>
+      {trend && <div className="stat-cell-trend">{trend}</div>}
+    </button>
+  );
+}
+
+/* ─────────────────────────────────────────
    Activity feed item
 ───────────────────────────────────────── */
-function ActivityItem({ icon, bg, text, time }) {
+function ActivityItem({ icon, bg, color, text, time }) {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: "var(--sp-3)",
@@ -173,7 +188,7 @@ function ActivityItem({ icon, bg, text, time }) {
     }}>
       <div style={{
         width: "30px", height: "30px", borderRadius: "50%", flexShrink: 0,
-        background: bg, display: "grid", placeItems: "center", fontSize: "13px",
+        background: bg, color, display: "grid", placeItems: "center",
       }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)", lineHeight: 1.4 }}>{text}</div>
@@ -184,11 +199,27 @@ function ActivityItem({ icon, bg, text, time }) {
 }
 
 /* ═══════════════════════════════════════════
-   DASHBOARD
+   DASHBOARD — role-aware entry point (8.0e)
+   HR + Admin (isHRTier — both are company-wide, see AuthContext) get the
+   full org-wide dashboard below. Manager + Employee get the compact
+   self-service variant (My Leave, upcoming holidays, and for Manager a
+   client-side department-scoped team strip).
 ═══════════════════════════════════════════ */
 function Dashboard() {
+  const { isHRTier } = useAuth();
+  return isHRTier ? <AdminDashboard /> : <SelfServiceDashboard />;
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN DASHBOARD — org-wide, shared by HR + Admin (isHRTier)
+═══════════════════════════════════════════ */
+function AdminDashboard() {
   const { t } = useTranslation();
-  const { employees, attendance, departments, getEmployeeCountByDepartment, getAppNow } = useStore();
+  const navigate = useNavigate();
+  const {
+    employees, attendance, departments, getEmployeeCountByDepartment, getAppNow,
+    jobs, candidates, unreadNotificationCount,
+  } = useStore();
 
   // ── Stats ──
   const totalEmployees = employees.length;
@@ -204,16 +235,31 @@ function Dashboard() {
     return d.getMonth() === curMonth && d.getFullYear() === curYear;
   }).length;
 
-  // ── Sparklines (7 mock points based on real data) ──
-  const attendSpark = [82, 88, 85, 91, 87, 93, attendanceRate];
-  const hireSpark   = [0, 1, 1, 2, 1, 2, Math.max(newHires, 1)];
+  // ── Row 2 operational stats (real data) ──
+  // Mirrors the mockup's second stat row, with one substitution: this app
+  // has no Performance Reviews module, so "Open Job Postings" fills that
+  // slot instead of inventing a fake metric.
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    LeaveRequestsAPI.list()
+      .then((res) => {
+        if (cancelled) return;
+        const items = res.items || [];
+        setPendingLeaveCount(items.filter((r) => r.status === "pending").length);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const openPipelineCount = candidates.filter((c) => c.stage !== "Hired" && c.stage !== "Rejected").length;
+  const openJobsCount = jobs.filter((j) => j.status === "Open").length;
 
-  // ── Donut chart data ──
+  // ── Contract mix data (mockup uses a tiered grayscale, not a rainbow) ──
   const contractSegs = [
-    { label: "Full-time", value: employees.filter((e) => e.type === "Full-time").length, color: "var(--clr-primary-400)" },
-    { label: "Part-time", value: employees.filter((e) => e.type === "Part-time").length, color: "var(--clr-success-500)" },
-    { label: "Contract",  value: employees.filter((e) => e.type === "Contract").length,  color: "var(--clr-warning-500)" },
-    { label: "Intern",    value: employees.filter((e) => e.type === "Intern").length,    color: "var(--clr-info-500)" },
+    { label: "Full-time", value: employees.filter((e) => e.type === "Full-time").length, color: "var(--txt-primary-brand)" },
+    { label: "Part-time", value: employees.filter((e) => e.type === "Part-time").length, color: "var(--txt-primary)" },
+    { label: "Contract",  value: employees.filter((e) => e.type === "Contract").length,  color: "var(--txt-secondary)" },
+    { label: "Intern",    value: employees.filter((e) => e.type === "Intern").length,    color: "var(--txt-disabled)" },
   ].filter((s) => s.value > 0);
 
   // ── Recent employees ──
@@ -222,151 +268,100 @@ function Dashboard() {
     .slice(0, 5);
 
   // ── Activity feed (mock) ──
+  const iconProps = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
   const activities = [
-    { icon: "✚", bg: "var(--bg-success-subtle)", text: t("dashboard.recentActivity.newEmployee", { name: employees[employees.length - 1]?.name || t("dashboard.recentActivity.defaultNewEmployee") }), time: t("dashboard.recentActivity.time.minutesAgo") },
-    { icon: "📋", bg: "var(--bg-warning-subtle)", text: t("dashboard.recentActivity.onLeave", { count: onLeave }), time: t("dashboard.recentActivity.time.hourAgo") },
-    { icon: "💰", bg: "var(--bg-primary-subtle)", text: t("dashboard.recentActivity.payrollApproved"), time: t("dashboard.recentActivity.time.hoursAgo") },
-    { icon: "📊", bg: "var(--bg-info-subtle)", text: t("dashboard.recentActivity.attendanceToday", { rate: attendanceRate }), time: t("dashboard.recentActivity.time.today") },
-    { icon: "🔔", bg: "var(--bg-danger-subtle)", text: t("dashboard.recentActivity.pendingApprovals"), time: t("dashboard.recentActivity.time.yesterday") },
-  ];
-
-  // ── Quick links ──
-  const quickLinks = [
     {
-      to: "/employees/add",
-      label: t("dashboard.quickActions.addEmployee"),
-      bg: "var(--bg-primary-subtle)",
-      color: "var(--clr-primary-400)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M19 8v6" />
-          <path d="M22 11h-6" />
-        </svg>
-      ),
+      icon: <svg {...iconProps}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6" /><path d="M22 11h-6" /></svg>,
+      bg: "var(--bg-success-subtle)", color: "var(--txt-success)",
+      text: t("dashboard.recentActivity.newEmployee", { name: employees[employees.length - 1]?.name || t("dashboard.recentActivity.defaultNewEmployee") }), time: t("dashboard.recentActivity.time.minutesAgo"),
     },
     {
-      to: "/employees",
-      label: t("dashboard.quickActions.allEmployees"),
-      bg: "var(--bg-primary-subtle)",
-      color: "var(--clr-primary-400)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      ),
+      icon: <svg {...iconProps}><rect x="4" y="4" width="16" height="18" rx="1" /><path d="M9 2h6v4H9z" /><path d="M8 11h8M8 15h5" /></svg>,
+      bg: "var(--bg-warning-subtle)", color: "var(--txt-warning)",
+      text: t("dashboard.recentActivity.onLeave", { count: onLeave }), time: t("dashboard.recentActivity.time.hourAgo"),
     },
     {
-      to: "/attendance",
-      label: t("dashboard.quickActions.attendance"),
-      bg: "var(--bg-info-subtle)",
-      color: "var(--clr-info-500)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 3" />
-        </svg>
-      ),
+      icon: <svg {...iconProps}><circle cx="12" cy="12" r="9" /><path d="M12 7v10M9 9.5a2.5 2.5 0 0 1 2.5-2.5h1a2.5 2.5 0 0 1 0 5h-1a2.5 2.5 0 0 0 0 5h1a2.5 2.5 0 0 0 2.5-2.5" /></svg>,
+      bg: "var(--bg-primary-subtle)", color: "var(--txt-primary-brand)",
+      text: t("dashboard.recentActivity.payrollApproved"), time: t("dashboard.recentActivity.time.hoursAgo"),
     },
     {
-      to: "/payroll",
-      label: t("dashboard.quickActions.payroll"),
-      bg: "var(--bg-success-subtle)",
-      color: "var(--clr-success-500)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="6" width="20" height="12" rx="2" />
-          <circle cx="12" cy="12" r="2.5" />
-          <path d="M6 6v0" />
-          <path d="M18 18v0" />
-        </svg>
-      ),
+      icon: <svg {...iconProps}><path d="M3 3v18h18" /><path d="M7 16l4-6 3 3 5-8" /></svg>,
+      bg: "var(--bg-info-subtle)", color: "var(--txt-info)",
+      text: t("dashboard.recentActivity.attendanceToday", { rate: attendanceRate }), time: t("dashboard.recentActivity.time.today"),
     },
     {
-      to: "/departments",
-      label: t("dashboard.quickActions.departments"),
-      bg: "var(--bg-warning-subtle)",
-      color: "var(--clr-warning-500)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 21h18" />
-          <path d="M6 21V8l6-4 6 4v13" />
-          <path d="M10 21v-4h4v4" />
-          <path d="M9 10h.01" />
-          <path d="M15 10h.01" />
-          <path d="M9 14h.01" />
-          <path d="M15 14h.01" />
-        </svg>
-      ),
-    },
-    {
-      to: "/holidays",
-      label: t("dashboard.quickActions.holidays"),
-      bg: "var(--bg-danger-subtle)",
-      color: "var(--clr-danger-500)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2" />
-          <path d="M16 2v4" />
-          <path d="M8 2v4" />
-          <path d="M3 10h18" />
-          <path d="M8 14h.01" />
-          <path d="M12 14h.01" />
-          <path d="M16 14h.01" />
-          <path d="M8 18h.01" />
-          <path d="M12 18h.01" />
-        </svg>
-      ),
+      icon: <svg {...iconProps}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>,
+      bg: "var(--bg-danger-subtle)", color: "var(--txt-danger)",
+      text: t("dashboard.recentActivity.pendingApprovals"), time: t("dashboard.recentActivity.time.yesterday"),
     },
   ];
 
   return (
     <div className="dashboard">
 
-      {/* ── ROW 1: 4 Stat Cards ── */}
-      <div className="stat-grid">
-        <StatCard
-          title={t("dashboard.stats.totalEmployees.title")}
+      {/* ── ROW 1: org-wide stats ── */}
+      <div className="stat-strip">
+        <StripStatCell
+          label={t("dashboard.stats.totalEmployees.title")}
           value={totalEmployees}
-          trend={t("dashboard.stats.totalEmployees.trend")}
-          trendUp
-          hint={t("dashboard.stats.totalEmployees.hint", { count: departments.length })}
-          accentColor="var(--clr-primary-400)"
+          trend={t("dashboard.stats.totalEmployees.hint", { count: departments.length })}
+          onClick={() => navigate("/employees")}
         />
-        <StatCard
-          title={t("dashboard.stats.attendanceRate.title")}
+        <StripStatCell
+          label={t("dashboard.stats.attendanceRate.title")}
           value={`${attendanceRate}%`}
-          trend={t("dashboard.stats.attendanceRate.trend")}
-          trendUp
-          hint={t("dashboard.stats.attendanceRate.hint", { present: presentCount, total: attendance.length })}
-          sparkData={attendSpark}
-          accentColor="var(--clr-success-600)"
+          trend={t("dashboard.stats.attendanceRate.hint", { present: presentCount, total: attendance.length })}
+          onClick={() => navigate("/attendance")}
         />
-        <StatCard
-          title={t("dashboard.stats.onLeave.title")}
+        <StripStatCell
+          label={t("dashboard.stats.onLeave.title")}
           value={onLeave}
-          trend={t("dashboard.stats.onLeave.trend")}
-          trendUp={false}
-          hint={t("dashboard.stats.onLeave.hint")}
-          accentColor="var(--clr-warning-600)"
+          trend={t("dashboard.stats.onLeave.hint")}
+          onClick={() => navigate("/employees")}
         />
-        <StatCard
-          title={t("dashboard.stats.newHires.title")}
+        <StripStatCell
+          label={t("dashboard.stats.newHires.title")}
           value={newHires}
-          trend={t("dashboard.stats.newHires.trend")}
-          trendUp
-          hint={t("dashboard.stats.newHires.hint")}
-          sparkData={hireSpark}
-          accentColor="var(--clr-info-600)"
+          trend={t("dashboard.stats.newHires.hint")}
+          onClick={() => navigate("/employees")}
         />
       </div>
 
-      {/* ── ROW 2: Attendance Trend + Headcount + Contract Donut ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 200px", gap: "var(--sp-5)", minWidth: 0 }}>
+      {/* ── ROW 2: operational stats (real data — see note above) ── */}
+      <div className="stat-strip" style={{ marginTop: "var(--sp-5)" }}>
+        <StripStatCell
+          small
+          label="Pending Leave Requests"
+          value={pendingLeaveCount}
+          trend="Awaiting review"
+          onClick={() => navigate("/holidays")}
+        />
+        <StripStatCell
+          small
+          label="Open Pipeline"
+          value={openPipelineCount}
+          trend="Active candidates"
+          onClick={() => navigate("/candidates")}
+        />
+        <StripStatCell
+          small
+          label="Unread Notifications"
+          value={unreadNotificationCount}
+          trend="Since last visit"
+          onClick={() => navigate("/notifications")}
+        />
+        <StripStatCell
+          small
+          label="Open Job Postings"
+          value={openJobsCount}
+          trend="Currently hiring"
+          onClick={() => navigate("/jobs")}
+        />
+      </div>
+
+      {/* ── ROW 3: Attendance Trend + Headcount ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--sp-5)", minWidth: 0 }}>
 
         {/* Attendance trend - last 7 days */}
         <div className="content-card">
@@ -412,16 +407,10 @@ function Dashboard() {
           </div>
           <DeptBars departments={departments} getEmployeeCountByDepartment={getEmployeeCountByDepartment} />
         </div>
-
-        {/* Contract type donut */}
-        <div className="content-card">
-          <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>{t("dashboard.contractTypes.title")}</h3>
-          <DonutChart segments={contractSegs} total={totalEmployees} />
-        </div>
       </div>
 
-      {/* ── ROW 3: Recent Employees + Activity + Quick Links ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: "var(--sp-5)" }}>
+      {/* ── ROW 4: Recent Employees + (Contract Mix / Recent Activity) ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "var(--sp-5)" }}>
 
         {/* Recent employees table */}
         <div className="content-card">
@@ -467,26 +456,13 @@ function Dashboard() {
           </table>
         </div>
 
-        {/* Right col: Quick links + Activity */}
+        {/* Right col: Contract Mix + Activity */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
-          {/* Quick links */}
+          {/* Contract mix */}
           <div className="content-card">
-            <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>{t("dashboard.quickActions.title")}</h3>
-            <div className="quick-links">
-              {quickLinks.map((link) => (
-                <Link key={link.to} to={link.to} className="quick-link">
-                  <span
-                    className="quick-link-icon"
-                    aria-hidden="true"
-                    style={{ background: link.bg, color: link.color }}
-                  >
-                    {link.icon}
-                  </span>
-                  <span>{link.label}</span>
-                </Link>
-              ))}
-            </div>
+            <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>{t("dashboard.contractTypes.title")}</h3>
+            <ContractMixBar segments={contractSegs} total={totalEmployees} />
           </div>
 
           {/* Activity feed */}
@@ -502,6 +478,292 @@ function Dashboard() {
         </div>
       </div>
 
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   Leave status badge (pending/approved/rejected)
+───────────────────────────────────────── */
+function LeaveStatusBadge({ status }) {
+  const variant = status === "approved" ? "success" : status === "rejected" ? "danger" : "warning";
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
+  return <Badge variant={variant} size="sm" dot>{label}</Badge>;
+}
+
+/* ═══════════════════════════════════════════
+   SELF-SERVICE DASHBOARD — Manager + Employee (8.0e)
+   "My Leave" table + upcoming holidays, shared by both.
+   Manager additionally gets a "your team" stat strip,
+   client-side filtered to department === me.department
+   over the existing full-list fetches (no backend
+   department scoping exists yet — see 8.0e's audit).
+═══════════════════════════════════════════ */
+function SelfServiceDashboard() {
+  const { t } = useTranslation();
+  const { language } = useLanguage();
+  const { isManager, isManagerTier, user } = useAuth();
+  const { currency } = useCurrency();
+  const { holidays, employees, attendance, getAppNow } = useStore();
+
+  const [myProfile, setMyProfile] = useState(null);
+  const [leaveRequests, setLeaveRequests] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [lastPayslip, setLastPayslip] = useState(null);
+  const [loadingLeave, setLoadingLeave] = useState(true);
+  const [leaveError, setLeaveError] = useState("");
+  const [applyOpen, setApplyOpen] = useState(false);
+
+  const loadLeaveData = useCallback(async () => {
+    setLoadingLeave(true);
+    setLeaveError("");
+    try {
+      const [profileRes, listRes, balRes, payslipsRes] = await Promise.all([
+        EmployeesAPI.myProfile(),
+        LeaveRequestsAPI.list(),
+        LeaveRequestsAPI.balance(),
+        // Self-service, same endpoint ViewEmployee's Salary tab uses —
+        // returns only approved/paid periods, most recent first. Swallow
+        // errors rather than blocking the rest of the dashboard on it.
+        PayrollAPI.myPayslips().catch(() => ({ items: [] })),
+      ]);
+      setMyProfile(profileRes.data ?? null);
+      setLeaveRequests(listRes.items || []);
+      setLeaveBalance(balRes.data ?? null);
+      setLastPayslip((payslipsRes.items || [])[0] ?? null);
+    } catch (err) {
+      setLeaveError(err.message || "Could not load leave data.");
+    } finally {
+      setLoadingLeave(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLeaveData();
+  }, [loadLeaveData]);
+
+  const handleApplyLeave = async (payload) => {
+    await LeaveRequestsAPI.create(payload);
+    await loadLeaveData();
+  };
+
+  // For MANAGER (and ADMIN) the list endpoint returns everyone's requests,
+  // so narrow down to mine for "My Leave". EMPLOYEE already gets only its
+  // own set from the backend, but the filter is harmless either way.
+  const myLeaveRequests = myProfile
+    ? [...leaveRequests]
+        .filter((r) => idsMatch(r.employeeId, myProfile.id))
+        .sort((a, b) => new Date(b.appliedAt || b.createdAt) - new Date(a.appliedAt || a.createdAt))
+    : [];
+  const myPendingLeaveCount = myLeaveRequests.filter((r) => r.status === "pending").length;
+
+  const now = getAppNow();
+  const upcomingHolidays = [...holidays]
+    .filter((h) => new Date(h.date) >= now)
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .slice(0, 5);
+
+  const myDepartment = myProfile?.department;
+  const teamEmployees = isManager && myDepartment
+    ? employees.filter((e) => e.department === myDepartment)
+    : [];
+  const teamHeadcount = teamEmployees.length;
+  const teamAttendanceRecords = isManager && myDepartment
+    ? attendance.filter((a) => {
+        const emp = employees.find((e) => idsMatch(e.id, a.employeeId));
+        return emp && emp.department === myDepartment;
+      })
+    : [];
+  const teamPresentCount = teamAttendanceRecords.filter((a) => a.status === "Present").length;
+  const teamAttendanceRate = teamAttendanceRecords.length > 0
+    ? Math.round((teamPresentCount / teamAttendanceRecords.length) * 100) : 0;
+  const teamPendingApprovals = isManager && myDepartment
+    ? leaveRequests.filter((r) => {
+        if (r.status !== "pending") return false;
+        const emp = employees.find((e) => idsMatch(e.id, r.employeeId));
+        return emp && emp.department === myDepartment;
+      }).length
+    : 0;
+
+  return (
+    <div className="dashboard">
+      <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ margin: 0 }}>{t("dashboard.title", { defaultValue: "Dashboard" })}</h2>
+          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            Welcome back{user?.name ? `, ${user.name}` : ""}.
+          </p>
+        </div>
+        <Button variant="primary" onClick={() => setApplyOpen(true)}>
+          Apply for Leave
+        </Button>
+      </div>
+
+      {/* Personal stats — every self-service role (Employee, and Manager as
+          an employee in their own right) gets these three, matching the
+          design's PTO/Pending/Last Payslip row. */}
+      <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
+        <StatCard
+          title="PTO Days Remaining"
+          value={leaveBalance ? leaveBalance.remaining : "—"}
+          hint={leaveBalance ? `of ${leaveBalance.total} Annual/PTO` : "Leave balance unavailable"}
+          accentColor="var(--clr-primary-400)"
+        />
+        <StatCard
+          title="Pending Leave Requests"
+          value={myPendingLeaveCount}
+          hint="Awaiting review"
+          accentColor="var(--clr-warning-600)"
+        />
+        <StatCard
+          title="Last Payslip (Net)"
+          value={lastPayslip ? fmtMoney(lastPayslip.netPay, currency, lastPayslip.fxRate) : "—"}
+          hint={lastPayslip ? lastPayslip.periodLabel : "No payslips yet"}
+          accentColor="var(--clr-success-600)"
+        />
+      </div>
+
+      {isManager && (
+        <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
+          <StatCard
+            title="Your Team"
+            value={teamHeadcount}
+            hint={myDepartment ? `${myDepartment} department` : "No department linked to your profile"}
+            accentColor="var(--clr-primary-400)"
+          />
+          <StatCard
+            title="Pending Approvals"
+            value={teamPendingApprovals}
+            hint="Leave requests awaiting your review"
+            accentColor="var(--clr-warning-600)"
+          />
+          <StatCard
+            title="Team Attendance"
+            value={`${teamAttendanceRate}%`}
+            hint={`${teamPresentCount} of ${teamAttendanceRecords.length} records present`}
+            accentColor="var(--clr-success-600)"
+          />
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "var(--sp-5)", alignItems: "start" }}>
+        {/* My Leave */}
+        <div className="content-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
+            <div>
+              <h3 className="section-title" style={{ margin: 0 }}>My leave requests</h3>
+              <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                Recent requests and their status
+              </p>
+            </div>
+            {user?.employeeId && (
+              <Link
+                to={`/employees/${user.employeeId}?tab=leave`}
+                style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}
+              >
+                View leave →
+              </Link>
+            )}
+          </div>
+
+          {leaveError && <p className="form-error">{leaveError}</p>}
+
+          {loadingLeave ? (
+            <div className="skeleton skeleton-text" style={{ width: "60%" }} />
+          ) : myLeaveRequests.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+              </div>
+              <div className="empty-state-title">No leave requests yet</div>
+              <div className="empty-state-description">Apply for leave and it'll show up here.</div>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Dates</th>
+                  <th>Days</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myLeaveRequests.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ fontSize: "var(--fs-sm)" }}>
+                      {formatDate(r.startDate, language)} – {formatDate(r.endDate, language)}
+                    </td>
+                    <td style={{ fontSize: "var(--fs-sm)" }}>{r.days}</td>
+                    <td style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
+                      {leaveTypeLabel(r.type)}
+                    </td>
+                    <td><LeaveStatusBadge status={r.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Upcoming holidays */}
+        <div className="content-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-4)" }}>
+            <h3 className="section-title" style={{ margin: 0 }}>Upcoming company holidays</h3>
+            {/* /holidays is requireManager (App.jsx) — plain Employee has no
+                reachable destination for a full list, so the link is
+                omitted rather than pointing at a dead end. */}
+            {isManagerTier && (
+              <Link
+                to="/holidays"
+                style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}
+              >
+                View all →
+              </Link>
+            )}
+          </div>
+          {upcomingHolidays.length === 0 ? (
+            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
+              No upcoming holidays scheduled.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+              {upcomingHolidays.map((h) => (
+                <div key={h.id} style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+                  <div style={{
+                    width: "38px", height: "38px", borderRadius: "var(--radius-md)",
+                    background: "var(--bg-info-subtle)", color: "var(--txt-info)",
+                    display: "grid", placeItems: "center", flexShrink: 0,
+                  }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="4" width="18" height="18" rx="2" />
+                      <path d="M16 2v4M8 2v4M3 10h18" />
+                    </svg>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
+                      {h.name}
+                    </div>
+                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                      {formatDate(h.date, language)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {applyOpen && (
+        <ApplyLeaveModal
+          onClose={() => setApplyOpen(false)}
+          onSubmit={handleApplyLeave}
+        />
+      )}
     </div>
   );
 }

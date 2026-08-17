@@ -111,9 +111,17 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false)
   }, [])
 
-  // Helpers for role checks — used by ProtectedRoute and page-level guards
+  // Helpers for role checks — used by ProtectedRoute and page-level guards.
+  // Four roles: ADMIN (full control), HR (company-wide, unscoped), MANAGER
+  // (department-scoped line manager — see hrms-backend/utils/managerScope.js),
+  // EMPLOYEE (self-service only). isHRTier/isManagerTier are the two
+  // "at least this tier" checks most UI actually wants — most call sites
+  // should use one of those two, not the bare role flags.
   const isAdmin = user?.role === 'ADMIN'
-  const isHR = user?.role === 'MANAGER' || user?.role === 'ADMIN'
+  const isHR = user?.role === 'HR'
+  const isManager = user?.role === 'MANAGER'
+  const isHRTier = isHR || isAdmin            // company-wide HR-or-above (payroll, departments, holidays, jobs, candidates, audit log, broadcasts)
+  const isManagerTier = isManager || isHR || isAdmin // department-manager-or-above (employee/attendance/leave actions — MANAGER stays scoped server-side)
   const isEmployee = Boolean(user)
   const mustChangePassword = Boolean(user?.mustChangePassword)
 
@@ -122,7 +130,10 @@ export function AuthProvider({ children }) {
     isAuthenticated,
     loading,
     isAdmin,
-    isHR,      // true for MANAGER + ADMIN
+    isHR,        // true for HR only
+    isManager,   // true for MANAGER only — drives the scoped self-service nav/dashboard (8.0e)
+    isHRTier,    // true for HR + ADMIN
+    isManagerTier, // true for MANAGER + HR + ADMIN
     isEmployee, // true for all authenticated users
     mustChangePassword,
     publicRegistration,

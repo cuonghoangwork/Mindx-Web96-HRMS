@@ -30,39 +30,153 @@ function hashPassword(plain) {
   return bcrypt.hashSync(plain, salt);
 }
 
-/* ── Admin account (ADMIN role — seed only) ── */
-async function upsertAdmin() {
+/* ── Admin account (ADMIN role — seed only) ──
+ * Also gets a linked Employee record (same pattern as upsertHRUser/
+ * upsertManagerUser below) so the sidebar's "My Profile" link — now shown
+ * to every role — resolves to a real page instead of a dead link.
+ */
+async function upsertAdmin(deptByName) {
   const email = "admin@hrms.com";
   let user = await UserModel.findOne({ email });
-  if (user) {
+  if (!user) {
+    user = await UserModel.create({
+      email,
+      password: hashPassword("admin123"),
+      name: "Admin User",
+      role: "ADMIN",
+    });
+    console.log("✓ Created ADMIN user:", email, "/ admin123");
+  } else {
     console.log("✓ Admin user already exists:", email);
-    return user;
   }
-  user = await UserModel.create({
-    email,
-    password: hashPassword("admin123"),
-    name: "Admin User",
-    role: "ADMIN",
-  });
-  console.log("✓ Created ADMIN user:", email, "/ admin123");
+
+  let employee = user.employee
+    ? await EmployeeModel.findById(user.employee)
+    : await EmployeeModel.findOne({ email });
+  if (!employee) {
+    const dept = deptByName["Management"];
+    employee = await EmployeeModel.create({
+      employeeId: "ADM001",
+      name: "Admin User",
+      email,
+      department: dept ? dept._id : undefined,
+      designation: "System Administrator",
+      contractType: "full-time",
+      status: "active",
+      positionLevel: "Manager",
+      annualSalary: 150000,
+      userId: user._id,
+    });
+    console.log("✓ Created employee record for ADMIN user:", email, "(Management dept)");
+  }
+
+  if (!user.employee) {
+    user.employee = employee._id;
+    await user.save();
+  }
+
   return user;
 }
 
-/* ── Demo HR/Manager account (MANAGER role — promoted for demo) ── */
-async function upsertHRUser() {
+/* ── Demo HR account (company-wide, unscoped — see utils/managerScope.js
+ * and HRMS_IMPROVEMENT_TASKS.md's HR/MANAGER role split) ──
+ * Every "manager-tier" account needs a linked Employee record with a
+ * department or it's locked out of manager-only actions — HR isn't
+ * department-scoped, but the same User.employee -> Employee lookup still
+ * resolves it, so it still needs the link.
+ */
+async function upsertHRUser(deptByName) {
   const email = "hr@hrms.com";
   let user = await UserModel.findOne({ email });
-  if (user) {
+  if (!user) {
+    user = await UserModel.create({
+      email,
+      password: hashPassword("hr123456"),
+      name: "HR Manager",
+      role: "HR",
+    });
+    console.log("✓ Created HR user:", email, "/ hr123456");
+  } else {
     console.log("✓ HR user already exists:", email);
-    return user;
+    if (user.role !== "HR") {
+      user.role = "HR";
+      await user.save();
+      console.log("✓ Upgraded", email, "from MANAGER to HR (role split)");
+    }
   }
-  user = await UserModel.create({
-    email,
-    password: hashPassword("hr123456"),
-    name: "HR Manager",
-    role: "MANAGER",
-  });
-  console.log("✓ Created MANAGER user:", email, "/ hr123456");
+
+  let employee = user.employee
+    ? await EmployeeModel.findById(user.employee)
+    : await EmployeeModel.findOne({ email });
+  if (!employee) {
+    const dept = deptByName["Management"];
+    employee = await EmployeeModel.create({
+      employeeId: "MGR001",
+      name: "HR Manager",
+      email,
+      department: dept ? dept._id : undefined,
+      designation: "HR Manager",
+      contractType: "full-time",
+      status: "active",
+      positionLevel: "Manager",
+      annualSalary: 130000,
+      userId: user._id,
+    });
+    console.log("✓ Created employee record for HR user:", email, "(Management dept)");
+  }
+
+  if (!user.employee) {
+    user.employee = employee._id;
+    await user.save();
+  }
+
+  return user;
+}
+
+/* ── Demo MANAGER account — department-scoped line manager. Real backend
+ * scoping (utils/managerScope.js) means this account only ever sees/acts
+ * on Engineering, unlike the HR account above.
+ */
+async function upsertManagerUser(deptByName) {
+  const email = "manager@hrms.com";
+  let user = await UserModel.findOne({ email });
+  if (!user) {
+    user = await UserModel.create({
+      email,
+      password: hashPassword("manager123"),
+      name: "Team Manager",
+      role: "MANAGER",
+    });
+    console.log("✓ Created MANAGER user:", email, "/ manager123");
+  } else {
+    console.log("✓ MANAGER user already exists:", email);
+  }
+
+  let employee = user.employee
+    ? await EmployeeModel.findById(user.employee)
+    : await EmployeeModel.findOne({ email });
+  if (!employee) {
+    const dept = deptByName["Engineering"];
+    employee = await EmployeeModel.create({
+      employeeId: "MGR002",
+      name: "Team Manager",
+      email,
+      department: dept ? dept._id : undefined,
+      designation: "Engineering Manager",
+      contractType: "full-time",
+      status: "active",
+      positionLevel: "Manager",
+      annualSalary: 120000,
+      userId: user._id,
+    });
+    console.log("✓ Created employee record for MANAGER user:", email, "(Engineering dept)");
+  }
+
+  if (!user.employee) {
+    user.employee = employee._id;
+    await user.save();
+  }
+
   return user;
 }
 
@@ -312,10 +426,10 @@ async function seedNotifications() {
 async function main() {
   await connectDB();
 
-  await upsertAdmin();
-  await upsertHRUser();
-
   const deptByName = await seedDepartments();
+  await upsertAdmin(deptByName);
+  await upsertHRUser(deptByName);
+  await upsertManagerUser(deptByName);
   const employees  = await seedEmployees(deptByName);
   const jobs       = await seedJobs(deptByName);
 
@@ -328,8 +442,9 @@ async function main() {
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
-  console.log("   Admin  → admin@hrms.com  / admin123");
-  console.log("   HR     → hr@hrms.com     / hr123456");
+  console.log("   Admin    → admin@hrms.com    / admin123");
+  console.log("   HR       → hr@hrms.com       / hr123456   (company-wide)");
+  console.log("   Manager  → manager@hrms.com  / manager123 (Engineering dept only)");
   console.log("   Employees → <firstname>.<lastname>@hrms.com / emp001pass … emp008pass\n");
 
   process.exit(0);

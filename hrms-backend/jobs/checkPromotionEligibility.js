@@ -85,7 +85,7 @@ export async function checkPromotionEligibility({ asOf = new Date() } = {}) {
       title: "Promotion eligibility flagged",
       message: `${employee.name} is now eligible for promotion to ${nextLevel} and needs review.`,
       category: "employee",
-      link: "/settings",
+      link: "/employees",
       linkLabel: "Review promotion queue",
     });
   }

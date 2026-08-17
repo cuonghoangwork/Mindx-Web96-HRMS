@@ -4,9 +4,10 @@ import { verifyToken, authorize } from "../middleware/auth.js";
 
 const router = Router();
 
-// HR/Admin only — this queue never has an employee-facing "my requests" view
-// (see controller header: every entry is systemGenerated, nothing to submit).
-router.get("/", verifyToken, authorize("MANAGER", "ADMIN"), noShowReviewController.list);
+// MANAGER (own department)/HR/ADMIN — this queue never has an
+// employee-facing "my requests" view (see controller header: every entry
+// is systemGenerated, nothing to submit).
+router.get("/", verifyToken, authorize("MANAGER", "HR", "ADMIN"), noShowReviewController.list);
 
 router.patch(
   "/:id/review",

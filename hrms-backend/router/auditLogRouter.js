@@ -7,7 +7,8 @@ const router = Router();
 // Recent feed — used by Dashboard; any authenticated user can read
 router.get("/recent", verifyToken, auditLogController.getRecent);
 
-// Full log — ADMIN/MANAGER only
-router.get("/", verifyToken, authorize("ADMIN", "MANAGER"), auditLogController.getAll);
+// Full, unscoped log — ADMIN/HR only (company-wide, not MANAGER's
+// department-scoped remit).
+router.get("/", verifyToken, authorize("ADMIN", "HR"), auditLogController.getAll);
 
 export default router;

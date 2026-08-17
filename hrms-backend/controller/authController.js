@@ -8,6 +8,28 @@ import { publicRegistrationEnabled, accountEmailDomain } from "../middleware/reg
 
 const SALT_ROUNDS = 10;
 
+// Some Employee records end up with `userId` set (e.g.
+// employeeController.create's existingUser branch, or a manually-fixed
+// record) without the reverse `User.employee` pointer ever being set — the
+// sidebar's "My Profile" link (and every self-service feature keyed off
+// user.employee) then silently stays broken for that account forever.
+// Self-heal here on every login/me/changePassword call, same fallback
+// employeeController.getMyProfile already does for its own lookup.
+async function resolveEmployeeId(user) {
+  if (user.employee) return String(user.employee);
+  const employee = await EmployeeModel.findOne({
+    $or: [{ userId: user._id }, { email: user.email }],
+  });
+  if (!employee) return null;
+  user.employee = employee._id;
+  await user.save();
+  if (!employee.userId) {
+    employee.userId = user._id;
+    await employee.save();
+  }
+  return String(employee._id);
+}
+
 const authController = {
   config: (req, res) => {
     res.json({
@@ -93,6 +115,8 @@ const authController = {
       user.refreshToken = refresh_token;
       await user.save();
 
+      const employeeId = await resolveEmployeeId(user);
+
       res.json({
         success: true,
         data: {
@@ -103,7 +127,7 @@ const authController = {
             email: user.email,
             name: user.name,
             role: user.role,
-            employeeId: user.employee ? String(user.employee) : null,
+            employeeId,
             mustChangePassword,
           },
         },
@@ -164,6 +188,7 @@ const authController = {
     try {
       const user = await UserModel.findById(req.user.id).select("-password -refreshToken");
       if (!user) throw new Error("User not found.");
+      const employeeId = await resolveEmployeeId(user);
       res.json({
         success: true,
         data: {
@@ -171,7 +196,7 @@ const authController = {
           email: user.email,
           name: user.name,
           role: user.role,
-          employeeId: user.employee ? String(user.employee) : null,
+          employeeId,
           mustChangePassword: Boolean(user.mustChangePassword),
         },
       });
@@ -214,6 +239,8 @@ const authController = {
       user.refreshToken = refresh_token;
       await user.save();
 
+      const employeeId = await resolveEmployeeId(user);
+
       res.json({
         success: true,
         message: "Password updated.",
@@ -225,7 +252,7 @@ const authController = {
             email: user.email,
             name: user.name,
             role: user.role,
-            employeeId: user.employee ? String(user.employee) : null,
+            employeeId,
             mustChangePassword: false,
           },
         },
@@ -260,10 +287,10 @@ const authController = {
   promote: async (req, res) => {
     try {
       const { role } = req.body;
-      if (!["EMPLOYEE", "MANAGER", "ADMIN"].includes(role)) {
+      if (!["EMPLOYEE", "MANAGER", "HR", "ADMIN"].includes(role)) {
         return res.status(400).json({
           success: false,
-          message: "role must be one of EMPLOYEE, MANAGER or ADMIN.",
+          message: "role must be one of EMPLOYEE, MANAGER, HR or ADMIN.",
         });
       }
 
@@ -287,7 +314,8 @@ const authController = {
 
       const LABELS = {
         EMPLOYEE: "set back to Employee",
-        MANAGER: "promoted to HR/Manager",
+        MANAGER: "promoted to Manager",
+        HR: "promoted to HR",
         ADMIN: "promoted to Administrator",
       };
 

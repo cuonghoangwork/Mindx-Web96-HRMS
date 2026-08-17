@@ -7,6 +7,7 @@ import { POSITION_LEVELS } from "../model/PositionLevel.js";
 import { createReviewRequestController } from "../utils/reviewQueue.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { logAction } from "../utils/auditLog.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
@@ -98,6 +99,8 @@ const { list, review: factoryReview } = createReviewRequestController({
       message: `Your promotion has been approved${parts.length ? ` — ${parts.join(", ")}` : ""}. Your HR record has been updated.`,
     };
   },
+  employeeLink: (request) => `/employees/${request.employee._id ?? request.employee}`,
+  employeeLinkLabel: "View profile",
 });
 
 const promotionRequestController = {
@@ -115,6 +118,25 @@ const promotionRequestController = {
       const employee = await EmployeeModel.findById(employeeId).populate("department", "name");
       if (!employee) {
         return res.status(404).json({ success: false, message: "Employee not found." });
+      }
+
+      // MANAGER can only propose promotions for employees in their own
+      // department, and can't use a promotion to move someone to another one.
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        const empDeptId = employee.department?._id ?? employee.department;
+        if (!empDeptId || String(empDeptId) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only propose promotions for employees in your own department.",
+          });
+        }
+        if (department && String(department) !== String(employee.department?.name ?? "")) {
+          return res.status(403).json({
+            success: false,
+            message: "You cannot propose moving an employee to a different department.",
+          });
+        }
       }
 
       const existing = await PromotionRequestModel.findOne({
@@ -185,6 +207,8 @@ const promotionRequestController = {
             category: "employee",
             title: "Promotion proposal awaiting review",
             message: `A promotion was proposed for ${employee.name} (${employee.employeeId}).`,
+            link: "/employees",
+            linkLabel: "Review promotion queue",
             read: false,
           }),
         ),
@@ -200,7 +224,7 @@ const promotionRequestController = {
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message });
     }
   },
 

@@ -1,9 +1,11 @@
-import LeaveRequestModel, { PAID_LEAVE_DAYS_PER_YEAR } from "../model/LeaveRequest.js";
+import LeaveRequestModel, { LEAVE_TYPES, LEAVE_TYPE_LABELS, LEAVE_TYPE_ALLOWANCES } from "../model/LeaveRequest.js";
 import UserModel from "../model/User.js";
 import NotificationModel from "../model/Notification.js";
 import AttendanceModel from "../model/Attendance.js";
+import EmployeeModel from "../model/Employee.js";
 import { createReviewRequestController, resolveRequestingEmployee } from "../utils/reviewQueue.js";
-import { getRemainingPaidDays, countWorkingDays } from "../utils/leaveBalance.js";
+import { getRemainingDays, getAllBalances, countWorkingDays } from "../utils/leaveBalance.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 function dateOnly(d) {
   return d ? new Date(d).toISOString().slice(0, 10) : null;
@@ -68,6 +70,8 @@ const { list, review } = createReviewRequestController({
       ? `Your ${request.type} leave from ${dateOnly(request.startDate)} to ${dateOnly(request.endDate)} has been approved.`
       : `Your leave request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
   }),
+  employeeLink: "/dashboard",
+  employeeLinkLabel: "View leave balance",
 });
 
 const leaveRequestController = {
@@ -75,8 +79,12 @@ const leaveRequestController = {
    * POST /api/v1/leave-requests
    * Employee applies for leave.
    *
-   * - `type` (paid/unpaid) is computed here from the employee's remaining
-   *   balance for the request's year — never trusted from the client.
+   * - `type` is chosen by the employee (annual/sick/parental/bereavement/
+   *   unpaid) and validated here against LEAVE_TYPES and, for capped types,
+   *   against their remaining balance for the request's year — a request
+   *   that would exceed the remaining balance for a capped type is
+   *   rejected rather than silently downgraded to unpaid, since the
+   *   employee explicitly picked the type. "unpaid" has no cap.
    * - 9AM same-day rule: a request whose startDate is today is only
    *   accepted before 9:00 AM server time; after that, the employee can
    *   still apply, just not for today (they can pick a future date).
@@ -88,9 +96,12 @@ const leaveRequestController = {
         return res.status(404).json({ success: false, message: "No employee profile is linked to your account. Ask HR to link your profile." });
       }
 
-      const { startDate, endDate, reason } = req.body;
+      const { startDate, endDate, reason, type } = req.body;
       if (!startDate) throw new Error("startDate is required.");
       if (!endDate) throw new Error("endDate is required.");
+      if (!LEAVE_TYPES.includes(type)) {
+        throw new Error(`type must be one of: ${LEAVE_TYPES.join(", ")}.`);
+      }
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -116,8 +127,14 @@ const leaveRequestController = {
         throw new Error("The selected range contains no working days.");
       }
 
-      const remaining = await getRemainingPaidDays(employee._id, start.getFullYear());
-      const type = days <= remaining ? "paid" : "unpaid";
+      if (type !== "unpaid") {
+        const remaining = await getRemainingDays(employee._id, start.getFullYear(), type);
+        if (days > remaining) {
+          throw new Error(
+            `Not enough ${LEAVE_TYPE_LABELS[type]} balance: ${remaining} day${remaining === 1 ? "" : "s"} remaining, ${days} requested. Choose fewer days or apply as Unpaid.`,
+          );
+        }
+      }
 
       const request = await LeaveRequestModel.create({
         employee: employee._id,
@@ -129,6 +146,41 @@ const leaveRequestController = {
         reason: reason ?? "",
         appliedAt: now,
       });
+
+      // The pre-check above (getRemainingDays) reads committed state before
+      // this write, so two concurrent requests for the same employee/type
+      // can both pass it before either commits. Re-verify now that this
+      // request is committed: recompute usage across every committed
+      // request of this type/year in insertion order (_id order, which is
+      // deterministic and identical for both racing requests once both have
+      // committed) and roll this one back if it's the one that pushed the
+      // type over its cap.
+      if (type !== "unpaid") {
+        const year = start.getFullYear();
+        const yearStart = new Date(Date.UTC(year, 0, 1));
+        const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+        const committed = await LeaveRequestModel.find({
+          employee: employee._id,
+          type,
+          status: { $in: ["pending", "approved"] },
+          startDate: { $gte: yearStart, $lte: yearEnd },
+        }).sort({ _id: 1 });
+        const allowance = LEAVE_TYPE_ALLOWANCES[type];
+        let cumulative = 0;
+        for (const r of committed) {
+          cumulative += r.days;
+          if (String(r._id) === String(request._id)) {
+            if (cumulative > allowance) {
+              await LeaveRequestModel.deleteOne({ _id: request._id });
+              throw new Error(
+                `Not enough ${LEAVE_TYPE_LABELS[type]} balance: a concurrent request already used it. Choose fewer days or apply as Unpaid.`,
+              );
+            }
+            break;
+          }
+        }
+      }
+
       await request.populate("employee", "name email employeeId");
 
       // Notify all HR/Admin users
@@ -139,6 +191,8 @@ const leaveRequestController = {
           category: "leave",
           title: "New leave request",
           message: `${employee.name} requested ${days} ${type} leave day${days === 1 ? "" : "s"} (${dateOnly(start)} → ${dateOnly(end)}).`,
+          link: "/holidays",
+          linkLabel: "Review request",
           read: false,
         })
       ));
@@ -161,6 +215,11 @@ const leaveRequestController = {
    * HR/Admin can pass ?employeeId= to check someone else's; omitting it
    * falls back to their own (rarely meaningful for non-employees, but
    * keeps the endpoint safe to call without params).
+   *
+   * Returns a per-type breakdown (`balances`), one row per LEAVE_TYPES
+   * entry, plus a flattened `annual`/`total`/`remaining`/`used` for
+   * backwards-compatible callers that only care about the Annual/PTO pool
+   * (e.g. the self-service dashboard's "PTO Days Remaining" stat).
    */
   balance: async (req, res) => {
     try {
@@ -170,21 +229,74 @@ const leaveRequestController = {
       if (req.user.role === "EMPLOYEE" || !employeeId) {
         const employee = await resolveRequestingEmployee(req);
         if (!employee) {
-          return res.json({
-            success: true,
-            data: { year, total: PAID_LEAVE_DAYS_PER_YEAR, remaining: PAID_LEAVE_DAYS_PER_YEAR, used: 0 },
-          });
+          const balances = LEAVE_TYPES.map((type) => ({
+            type,
+            label: LEAVE_TYPE_LABELS[type],
+            accrued: LEAVE_TYPE_ALLOWANCES[type] ?? null,
+            used: 0,
+            remaining: LEAVE_TYPE_ALLOWANCES[type] ?? null,
+          }));
+          return res.json({ success: true, data: { year, balances } });
         }
         employeeId = employee._id;
+      } else if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        const target = await EmployeeModel.findById(employeeId, "department");
+        if (!target || String(target.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only view leave balances for your own department.",
+          });
+        }
       }
 
-      const remaining = await getRemainingPaidDays(employeeId, year);
+      const balances = await getAllBalances(employeeId, year);
+      const annual = balances.find((b) => b.type === "annual");
       res.json({
         success: true,
-        data: { year, total: PAID_LEAVE_DAYS_PER_YEAR, remaining, used: PAID_LEAVE_DAYS_PER_YEAR - remaining },
+        data: {
+          year,
+          balances,
+          // Flattened Annual/PTO shortcut — kept for callers (dashboard stat
+          // card) that only need the one number, not the full breakdown.
+          total: annual?.accrued ?? 0,
+          used: annual?.used ?? 0,
+          remaining: annual?.remaining ?? 0,
+        },
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  /**
+   * GET /api/v1/leave-requests/balances?year= — MANAGER/HR/ADMIN only.
+   * One getAllBalances() row per employee they can see (MANAGER scoped to
+   * their own department, same rule as list/review). Exists so callers
+   * like the Holidays "Leave balances" panel can get every employee's
+   * authoritative per-type balance in one request instead of re-deriving
+   * it client-side from raw leave requests (which misses the late
+   * half-day annual deduction and duplicates LEAVE_TYPE_ALLOWANCES).
+   */
+  balances: async (req, res) => {
+    try {
+      const year = Number(req.query.year) || new Date().getFullYear();
+      const condition = { status: { $ne: "terminated" } };
+      if (req.user.role === "MANAGER") {
+        condition.department = await getManagerDepartmentId(req);
+      }
+      const employees = await EmployeeModel.find(condition, "name employeeId department")
+        .populate("department", "name");
+      const items = await Promise.all(employees.map(async (e) => ({
+        employeeId: String(e._id),
+        name: e.name,
+        employeeCode: e.employeeId,
+        department: e.department?.name ?? null,
+        balances: await getAllBalances(e._id, year),
+      })));
+      res.json({ success: true, data: { year, items } });
+    } catch (error) {
+      res.status(error.status || 500).json({ success: false, message: error.message });
     }
   },
 };

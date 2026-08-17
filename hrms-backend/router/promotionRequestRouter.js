@@ -5,12 +5,12 @@ import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
-router.get("/", verifyToken, authorize("MANAGER", "ADMIN"), promotionRequestController.list);
+router.get("/", verifyToken, authorize("MANAGER", "HR", "ADMIN"), promotionRequestController.list);
 
 router.post(
   "/",
   verifyToken,
-  authorize("MANAGER", "ADMIN"),
+  authorize("MANAGER", "HR", "ADMIN"),
   validate.promotionRequest.create,
   promotionRequestController.create,
 );

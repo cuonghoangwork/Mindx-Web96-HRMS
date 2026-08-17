@@ -57,6 +57,8 @@ const { list, review } = createReviewRequestController({
       ? "Your profile edit request has been approved and your information has been updated."
       : `Your profile edit request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
   }),
+  employeeLink: (request) => `/employees/${request.employee._id ?? request.employee}`,
+  employeeLinkLabel: "View profile",
 });
 
 const profileEditRequestController = {
@@ -123,6 +125,8 @@ const profileEditRequestController = {
           category: "employee",
           title: "Profile edit request",
           message: `${employee.name} has submitted a request to update their profile.`,
+          link: "/employees?tab=editRequests",
+          linkLabel: "Review request",
           read: false,
         })
       ));

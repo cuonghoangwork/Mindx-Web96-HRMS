@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useCurrency } from "../context/CurrencyContext";
 import { formatDateTime } from "../utils/format";
-import { PayrollAPI } from "../api";
+import { PayrollAPI, EmployeesAPI } from "../api";
+import { fmtMoney, fmtMoneyK } from "../utils/payroll";
+import PayrollBreakdownPanel from "../components/PayrollBreakdownPanel";
 import Avatar from "../components/Avatar";
 import { TypeBadge } from "../components/Badge";
 import Button from "../components/Button";
@@ -34,36 +37,6 @@ function colorForName(name, palette) {
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) | 0;
   return palette[Math.abs(hash) % palette.length];
-}
-
-// Task 6.6 — both branches now pin an explicit locale ("en-US" for USD,
-// "vi-VN" for VND) rather than the USD branch's previous bare
-// `.toLocaleString()`, which silently inherited whatever locale the
-// browser/OS happened to be set to. A USD figure rendered under a
-// Vietnamese-locale browser would otherwise group with periods instead of
-// commas (e.g. "$75.000" instead of "$75,000") — genuinely ambiguous, since
-// that reads like "seventy-five point zero zero". Currency grouping follows
-// the currency, not the in-app language toggle (VND already worked this way
-// before this task; USD just wasn't pinned down the same way).
-function fmtMoney(vnd, currency, fxRate) {
-  const n = Number(vnd) || 0;
-  if (currency === "USD" && fxRate > 0) {
-    return `$${Math.round(n / fxRate).toLocaleString("en-US")}`;
-  }
-  return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
-}
-
-function fmtMoneyK(vnd, currency, fxRate) {
-  const n = Number(vnd) || 0;
-  if (currency === "USD" && fxRate > 0) {
-    const usd = n / fxRate;
-    if (usd >= 1_000_000) return `$${(usd / 1_000_000).toFixed(1)}M`;
-    if (usd >= 1_000) return `$${(usd / 1_000).toFixed(0)}K`;
-    return `$${Math.round(usd)}`;
-  }
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} tỷ ₫`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)} triệu ₫`;
-  return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
 }
 
 function csvCell(value) {
@@ -183,125 +156,94 @@ function SortableHeader({ field, label, sortField, sortDir, onSort, align = "lef
   );
 }
 
-function MoneyInput({ value, disabled, onCommit }) {
-  const [draft, setDraft] = useState(String(value ?? 0));
-  const [saving, setSaving] = useState(false);
+function MoneyInput({ value, disabled, onCommit, currency = "VND", fxRate = 0 }) {
+  // The figure stored on the payslip (`value`) is always VND. When the
+  // topbar currency toggle is set to USD, this edits in USD instead — same
+  // as every read-only money cell on this page (fmtMoney) — and converts
+  // back to VND on commit rather than silently editing raw VND under a
+  // "$" label.
+  const isUsd = currency === "USD" && fxRate > 0;
+  const toUnit = (vnd) => (isUsd ? Math.round((Number(vnd) || 0) / fxRate) : Math.round(Number(vnd) || 0));
+  const toVnd = (unitAmount) => (isUsd ? Math.round(Number(unitAmount) * fxRate) : Number(unitAmount));
 
-  useEffect(() => { setDraft(String(value ?? 0)); }, [value]);
+  const [draft, setDraft] = useState(String(toUnit(value)));
+  const [saving, setSaving] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => { setDraft(String(toUnit(value))); }, [value, isUsd, fxRate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = async () => {
+    setFocused(false);
     if (saving || disabled) return;
     const next = draft.trim();
-    if (next === "" || Number(next) === Number(value)) {
-      setDraft(String(value ?? 0));
+    const nextVnd = next === "" ? 0 : toVnd(next);
+    if (next === "" || nextVnd === Number(value)) {
+      setDraft(String(toUnit(value)));
       return;
     }
     setSaving(true);
     try {
-      const ok = await onCommit(Number(next));
-      if (!ok) setDraft(String(value ?? 0));
+      const ok = await onCommit(nextVnd);
+      if (!ok) setDraft(String(toUnit(value)));
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <input
-      type="number"
-      min="0"
-      step="1000"
-      value={draft}
-      disabled={disabled || saving}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") setDraft(String(value ?? 0));
-      }}
-      style={{
-        width: "112px", padding: "4px 6px", textAlign: "right",
-        border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)",
-        background: disabled ? "var(--bg-surface-alt)" : "var(--bg-surface)",
-        color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
-      }}
-    />
-  );
-}
-
-function BreakdownPanel({ slip, currency, fxRate, period }) {
-  const rows = [
-    { label: "Base salary", value: slip.baseSalary, sign: 1 },
-    { label: "Bonus", value: slip.bonus, sign: 1 },
-    { label: "Allowance", value: slip.allowance, sign: 1 },
-    { label: "Deduction", value: slip.deduction, sign: -1 },
-    { label: "Gross pay", value: slip.grossPay, total: true },
-    { label: `Social insurance (BHXH 8%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhxh, sign: -1 },
-    { label: `Health insurance (BHYT 1.5%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhyt, sign: -1 },
-    { label: `Unemployment (BHTN 1%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhtn, sign: -1 },
-    { label: "Personal income tax", value: slip.pit, sign: -1 },
-    { label: "Net pay", value: slip.netPay, total: true },
-  ];
+  // These figures can run into the hundreds of millions/billions in VND —
+  // showing raw digits at all times ("21800535693") is unreadable, so this
+  // only shows the plain editable digits while focused and renders a
+  // thousands-grouped, currency-matched preview otherwise (still a real
+  // <input>, still fully editable — just formatted like every other money
+  // figure on this page when you're not actively typing in it).
+  const displayValue = focused ? draft : (Number(draft) || 0).toLocaleString(isUsd ? "en-US" : "vi-VN");
 
   return (
-    <div style={{
-      padding: "var(--sp-5)", background: "var(--bg-surface-alt)",
-      borderRadius: "var(--radius-md)", border: "1px solid var(--bdr-subtle)",
-    }}>
-      <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-        Salary breakdown — {slip.employeeName}
-      </div>
-
-      <div style={{ maxWidth: "520px" }}>
-        {rows.map((r) => (
-          <div key={r.label} style={{
-            display: "flex", justifyContent: "space-between", gap: "var(--sp-4)",
-            padding: "7px 0", borderBottom: "1px solid var(--bdr-subtle)",
-            fontWeight: r.total ? "var(--fw-semibold)" : "var(--fw-regular)",
-          }}>
-            <span style={{ fontSize: "var(--fs-sm)", color: r.total ? "var(--txt-primary)" : "var(--txt-secondary)" }}>
-              {r.label}
-            </span>
-            <span style={{
-              fontSize: "var(--fs-sm)",
-              color: r.total ? "var(--txt-primary)" : r.sign === -1 ? "var(--txt-danger)" : "var(--txt-primary)",
-            }}>
-              {r.sign === -1 ? "− " : ""}{fmtMoney(r.value, currency, fxRate)}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{
-        marginTop: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
-        background: "var(--bg-info-subtle)", border: "1px solid var(--bdr-info)",
-        borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-info)",
-      }}>
-        Period {period.label} · {period.standardWorkingDays} standard working days · FX rate locked at{" "}
-        {Number(period.fxRate).toLocaleString("vi-VN")} VND/USD
-        {period.fxRateSource && period.fxRateSource !== "manual"
-          ? ` (${period.fxRateSource === "api" ? "live" : "fallback"} rate)`
-          : ""} · {slip.unpaidLeaveDays} unpaid leave day
-        {slip.unpaidLeaveDays === 1 ? "" : "s"} · {slip.absentDays} absent day
-        {slip.absentDays === 1 ? "" : "s"} · assumes 0 registered dependents.
-      </div>
-
-      {slip.insuranceExempt && (
-        <div style={{
-          marginTop: "var(--sp-3)", padding: "var(--sp-3) var(--sp-4)",
-          background: "var(--bg-warning-subtle)", border: "1px solid var(--bdr-default)",
-          borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
-        }}>
-          No social, health or unemployment insurance is charged this period: {slip.unpaidLeaveDays + slip.absentDays} unpaid
-          working days reached the 14-day statutory exemption. Personal income tax still applies.
-        </div>
-      )}
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+      <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)" }}>{isUsd ? "$" : "₫"}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={displayValue}
+        disabled={disabled || saving}
+        onFocus={() => setFocused(true)}
+        onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ""))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") { setDraft(String(toUnit(value))); e.currentTarget.blur(); }
+        }}
+        style={{
+          width: "112px", padding: "5px 8px", textAlign: "right",
+          border: "1px solid var(--bdr-default)", borderRadius: "var(--radius-sm)",
+          background: disabled ? "var(--bg-surface-alt)" : "var(--bg-surface)",
+          color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      />
     </div>
   );
 }
 
+
 function Payroll() {
   const { language } = useLanguage();
-  const { isAdmin, isHR } = useAuth();
+  const { isAdmin, isHRTier, isManager } = useAuth();
+
+  // MANAGER gets a real, backend-enforced department-scoped view here (see
+  // payrollController.js's departmentId filtering) — this client-side
+  // filter is now redundant with what the API already returns for MANAGER,
+  // kept only because it's harmless and matches Attendance's equivalent
+  // "your team" pattern. isHRTier (HR+ADMIN) gates every write action
+  // below (create/regenerate/approve/pay/edit) — MANAGER is read-only.
+  const [myEmployee, setMyEmployee] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    EmployeesAPI.myProfile()
+      .then((res) => { if (!cancelled) setMyEmployee(res.data ?? null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const [periods, setPeriods] = useState([]);
   const [periodId, setPeriodId] = useState("");
@@ -335,11 +277,14 @@ function Payroll() {
   const [sortDir, setSortDir] = useState("desc");
   const [expanded, setExpanded] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [currency, setCurrency] = useState("VND");
+  // Currency display preference now lives in the shared topbar toggle
+  // (CurrencyContext) instead of page-local state — single source of
+  // truth, no duplicate in-page control.
+  const { currency } = useCurrency();
 
   const fxRate = period?.fxRate ?? 0;
   const isDraft = period?.status === "draft";
-  const canEdit = isDraft && isHR;
+  const canEdit = isDraft && isHRTier;
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -398,18 +343,25 @@ function Payroll() {
     loadPayslips(periodId);
   }, [periodId, loadPayslips]);
 
+  const scopedPayslips = useMemo(() => {
+    if (isManager && myEmployee?.department) {
+      return payslips.filter((p) => p.departmentName === myEmployee.department);
+    }
+    return payslips;
+  }, [payslips, isManager, myEmployee]);
+
   const deptOptions = useMemo(
-    () => [...new Set(payslips.map((p) => p.departmentName).filter(Boolean))].sort(),
-    [payslips],
+    () => [...new Set(scopedPayslips.map((p) => p.departmentName).filter(Boolean))].sort(),
+    [scopedPayslips],
   );
   const typeOptions = useMemo(
-    () => [...new Set(payslips.map((p) => p.type).filter(Boolean))].sort(),
-    [payslips],
+    () => [...new Set(scopedPayslips.map((p) => p.type).filter(Boolean))].sort(),
+    [scopedPayslips],
   );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const rows = payslips.filter((p) => {
+    const rows = scopedPayslips.filter((p) => {
       const matchesSearch =
         !q ||
         p.employeeName?.toLowerCase().includes(q) ||
@@ -428,11 +380,11 @@ function Payroll() {
       const cmp = (Number(va) || 0) - (Number(vb) || 0);
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [payslips, search, deptFilter, typeFilter, sortField, sortDir]);
+  }, [scopedPayslips, search, deptFilter, typeFilter, sortField, sortDir]);
 
   const deptData = useMemo(() => {
     const map = new Map();
-    for (const p of payslips) {
+    for (const p of scopedPayslips) {
       const name = p.departmentName ?? "Unassigned";
       const cur = map.get(name) ?? { name, total: 0, count: 0 };
       cur.total += p.grossPay;
@@ -442,11 +394,11 @@ function Payroll() {
     return [...map.values()]
       .sort((a, b) => b.total - a.total)
       .map((d) => ({ ...d, color: colorForName(d.name, DEPT_COLORS) }));
-  }, [payslips]);
+  }, [scopedPayslips]);
 
   const typeSegs = useMemo(() => {
     const map = new Map();
-    for (const p of payslips) {
+    for (const p of scopedPayslips) {
       const label = p.type ?? "Unspecified";
       const cur = map.get(label) ?? { label, value: 0, total: 0 };
       cur.value += 1;
@@ -454,7 +406,7 @@ function Payroll() {
       map.set(label, cur);
     }
     return [...map.values()].map((s) => ({ ...s, color: colorForName(s.label, DEPT_COLORS) }));
-  }, [payslips]);
+  }, [scopedPayslips]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAYROLL_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
@@ -620,13 +572,13 @@ function Payroll() {
     setBusy(false);
   };
 
-  const handleDeletePeriod = async () => {
+  const handleDeletePeriod = async (id = periodId) => {
     if (!window.confirm("Delete this draft period and all of its payslips?")) return;
     setBusy(true);
     try {
-      await PayrollAPI.removePeriod(periodId);
+      await PayrollAPI.removePeriod(id);
       setToast("Period deleted.");
-      setPeriodId("");
+      if (id === periodId) setPeriodId("");
       await loadPeriods();
     } catch (err) {
       setToast(`Error: ${err.message}`);
@@ -659,8 +611,6 @@ function Payroll() {
     URL.revokeObjectURL(url);
   };
 
-  const totals = period?.totals ?? {};
-
   return (
     <div>
       {/* ── Period bar ── */}
@@ -669,24 +619,6 @@ function Payroll() {
           <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
             Payroll
           </h2>
-
-          {periods.length > 0 && (
-            <select
-              value={periodId}
-              onChange={(e) => setPeriodId(e.target.value)}
-              style={{
-                padding: "7px var(--sp-3)", border: "1px solid var(--bdr-default)",
-                borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
-                color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
-              }}
-            >
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {MONTHS[p.month - 1]} {p.year} · {p.status}
-                </option>
-              ))}
-            </select>
-          )}
 
           {period && <StatusPill status={period.status} />}
           {period?.systemGenerated && (
@@ -724,51 +656,6 @@ function Payroll() {
                 Run last month&rsquo;s payroll
               </Button>
             )}
-            {isHR && (
-              <Button variant="primary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
-                {showNewForm ? "Cancel" : "+ New period"}
-              </Button>
-            )}
-            {period && isDraft && isHR && (
-              <>
-                <Button variant="secondary" size="sm" disabled={busy} onClick={handleRegenerate}>
-                  Regenerate drafts
-                </Button>
-                <Button
-                  variant="success"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => handleStatus("approved")}
-                >
-                  Approve payroll
-                </Button>
-              </>
-            )}
-            {period && isDraft && isAdmin && (
-              <Button variant="danger" size="sm" disabled={busy} onClick={handleDeletePeriod}>
-                Delete period
-              </Button>
-            )}
-            {period?.status === "approved" && isHR && (
-              <Button
-                variant="success"
-                size="sm"
-                disabled={busy}
-                onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}
-              >
-                Mark as paid
-              </Button>
-            )}
-            {period?.status === "approved" && isAdmin && (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={busy}
-                onClick={() => handleStatus("draft")}
-              >
-                Reopen to draft
-              </Button>
-            )}
           </div>
         </div>
 
@@ -794,30 +681,32 @@ function Payroll() {
         {showNewForm && (
           <form onSubmit={handleCreatePeriod} style={{
             marginTop: "var(--sp-4)", paddingTop: "var(--sp-4)", borderTop: "1px solid var(--bdr-subtle)",
-            display: "flex", gap: "var(--sp-4)", alignItems: "flex-end", flexWrap: "wrap",
+            display: "flex", gap: "var(--sp-4)", alignItems: "flex-start", flexWrap: "wrap",
           }}>
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group" style={{ marginBottom: 0, width: "140px", flexShrink: 0 }}>
               <label className="form-label" htmlFor="np-month">Month</label>
               <select id="np-month" value={newPeriod.month}
                 onChange={(e) => setNewPeriod((p) => ({ ...p, month: e.target.value }))}>
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group" style={{ marginBottom: 0, width: "100px", flexShrink: 0 }}>
               <label className="form-label" htmlFor="np-year">Year</label>
               <input id="np-year" type="number" min="2000" max="2100" value={newPeriod.year}
                 onChange={(e) => setNewPeriod((p) => ({ ...p, year: e.target.value }))} />
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
+            <div className="form-group" style={{ marginBottom: 0, width: "320px", flex: "1 1 320px" }}>
               <label className="form-label" htmlFor="np-fx">FX rate (VND per USD)</label>
-              <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "stretch" }}>
                 <input id="np-fx" type="number" min="1" step="any" value={newPeriod.fxRate}
+                  style={{ flex: 1, minWidth: 0 }}
                   onChange={(e) => setNewPeriod((p) => ({ ...p, fxRate: e.target.value }))} />
                 <Button
                   variant="secondary"
                   size="sm"
                   disabled={fxPreviewLoading}
                   onClick={handleFetchLiveRate}
+                  style={{ flexShrink: 0 }}
                 >
                   {fxPreviewLoading ? "Fetching…" : "Fetch live rate"}
                 </Button>
@@ -828,9 +717,12 @@ function Payroll() {
                   : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
               </span>
             </div>
-            <Button variant="primary" type="submit" disabled={busy}>
-              {busy ? "Generating…" : "Create & generate drafts"}
-            </Button>
+            <div className="form-group" style={{ marginBottom: 0, flexShrink: 0 }}>
+              <label className="form-label" style={{ visibility: "hidden" }}>Action</label>
+              <Button variant="primary" type="submit" disabled={busy} style={{ whiteSpace: "nowrap" }}>
+                {busy ? "Generating…" : "Create & generate drafts"}
+              </Button>
+            </div>
           </form>
         )}
       </div>
@@ -875,93 +767,198 @@ function Payroll() {
         </div>
       ) : (
         <>
-          {/* ── Stat cards ── */}
-          <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
-            {[
-              { label: "Total gross", value: totals.grossPay, color: "var(--clr-primary-400)", hint: `${period?.payslipCount ?? 0} payslips` },
-              { label: "Total net", value: totals.netPay, color: "var(--clr-success-600)", hint: "Take-home total" },
-              { label: "Tax + insurance", value: (totals.pit ?? 0) + (totals.insuranceTotal ?? 0), color: "var(--clr-info-600)", hint: "PIT + BHXH/BHYT/BHTN" },
-              { label: "Total deductions", value: totals.deduction, color: "var(--clr-warning-600)", hint: "Unpaid leave & absence" },
-            ].map((c) => (
-              <div key={c.label} className="stat-card">
-                <div className="stat-card-label">{c.label}</div>
-                <div className="stat-card-value" style={{ color: c.color }}>
-                  {fmtMoneyK(c.value, currency, fxRate)}
-                </div>
-                <div className="stat-card-hint">{c.hint}</div>
-              </div>
-            ))}
-          </div>
+          {isManager && (
+            <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", margin: "0 0 var(--sp-3)" }}>
+              Showing your team{myEmployee?.department ? ` (${myEmployee.department})` : ""} — {scopedPayslips.length} payslip{scopedPayslips.length === 1 ? "" : "s"} this period
+            </p>
+          )}
 
-          {/* ── Charts ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "var(--sp-5)", marginBottom: "var(--sp-5)" }}>
-            <div className="content-card">
-              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-                Gross pay by department
-              </div>
-              <DeptChart data={deptData} currency={currency} fxRate={fxRate} />
-            </div>
-            <div className="content-card">
-              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-                By contract type
-              </div>
-              <TypeDonut segments={typeSegs} total={payslips.length} currency={currency} fxRate={fxRate} />
-            </div>
-          </div>
-
-          {/* ── Payslip table ── */}
-          <div className="content-card">
-            <div className="toolbar">
-              <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-                Payslips
-              </div>
-              <input
-                className="search-input"
-                style={{ width: "180px" }}
-                placeholder="Search employee…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-              />
-              <select value={deptFilter} onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}>
-                <option value="all">All departments</option>
-                {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}>
-                <option value="all">All types</option>
-                {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <div style={{ display: "flex", gap: "2px", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
-                {["VND", "USD"].map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-pressed={currency === c}
-                    onClick={() => setCurrency(c)}
-                    style={{
-                      padding: "4px 11px", borderRadius: "6px", border: "none", cursor: "pointer",
-                      background: currency === c ? "var(--bg-surface)" : "transparent",
-                      color: currency === c ? "var(--txt-primary)" : "var(--txt-secondary)",
-                      fontFamily: "var(--font-family)", fontSize: "var(--fs-xs)",
-                      boxShadow: currency === c ? "var(--shadow-xs)" : "none",
-                    }}
-                  >{c}</button>
+          {/* ── Stat strip ── */}
+          {(() => {
+            // Scoped totals — for Manager these reflect only their own
+            // department's payslips (scopedPayslips), summed client-side
+            // since the backend's period.totals/payslipCount are always
+            // org-wide aggregates. Admin sees the full period as before.
+            const totalSlips = scopedPayslips.length;
+            const grossSum = scopedPayslips.reduce((s, p) => s + p.grossPay, 0);
+            const netSum = scopedPayslips.reduce((s, p) => s + p.netPay, 0);
+            // Real backend tracks pay status per PERIOD (draft/approved/paid),
+            // not per payslip — there's no individual "mark this one employee
+            // paid" endpoint like the mockup's demo has. "Paid" below reflects
+            // that: everyone in a paid period, nobody otherwise.
+            const paidCount = period?.status === "paid" ? totalSlips : 0;
+            const pendingCount = totalSlips - paidCount;
+            const pendingTrend = period?.status === "approved" ? "Awaiting payment" : period?.status === "paid" ? "—" : "Awaiting run";
+            const statCells = [
+              { label: period ? `${MONTHS[period.month - 1]} ${period.year}` : "Payroll", value: fmtMoneyK(grossSum, currency, fxRate), trend: "Gross payout" },
+              { label: "Net payout", value: fmtMoneyK(netSum, currency, fxRate), trend: "After deductions" },
+              { label: "Paid", value: `${paidCount}/${totalSlips}`, trend: "Employees settled" },
+              { label: "Pending", value: String(pendingCount), trend: pendingTrend },
+            ];
+            return (
+              <div className="stat-strip" style={{ marginBottom: "var(--sp-5)" }}>
+                {statCells.map((c) => (
+                  <div key={c.label} className="stat-cell" style={{ cursor: "default" }}>
+                    <div className="stat-cell-label">{c.label}</div>
+                    <div className="stat-cell-value">{c.value}</div>
+                    <div className="stat-cell-trend">{c.trend}</div>
+                  </div>
                 ))}
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={exportCSV}
-                title="CSV export is always raw VND, regardless of the display currency above."
-              >
-                ↓ Export CSV
-              </Button>
+            );
+          })()}
+
+          {/* ── Pay run history — every period, click a row to select it
+              (replaces the old dropdown selector) ── */}
+          <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Pay run history</h3>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>Click a run to view its breakdown</div>
+              </div>
+              {isHRTier && (
+                <Button variant="secondary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
+                  {showNewForm ? "Cancel" : "+ New draft"}
+                </Button>
+              )}
+            </div>
+
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Pay date</th>
+                    <th>Employees</th>
+                    <th>Gross</th>
+                    <th>Net</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {periods.map((p) => {
+                    const payDate = new Date(p.year, p.month, 0);
+                    const canDelete = p.status === "draft";
+                    return (
+                      <tr
+                        key={p.id}
+                        onClick={() => setPeriodId(p.id)}
+                        style={{ cursor: "pointer", background: p.id === periodId ? "var(--bg-primary-subtle)" : "transparent" }}
+                      >
+                        <td style={{ fontWeight: p.id === periodId ? "var(--fw-semibold)" : "var(--fw-regular)" }}>{MONTHS[p.month - 1]} {p.year}</td>
+                        <td style={{ color: "var(--txt-secondary)" }}>{MONTHS[payDate.getMonth()].slice(0, 3)} {payDate.getDate()}, {payDate.getFullYear()}</td>
+                        <td style={{ color: "var(--txt-secondary)" }}>{p.payslipCount ?? 0}</td>
+                        <td>{fmtMoney(p.totals?.grossPay, currency, p.fxRate ?? fxRate)}</td>
+                        <td>{fmtMoney(p.totals?.netPay, currency, p.fxRate ?? fxRate)}</td>
+                        <td><StatusPill status={p.status} /></td>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {isAdmin && (
+                            <>
+                              <Button variant="link" size="xs" onClick={() => setPeriodId(p.id)} style={{ marginRight: "var(--sp-3)" }}>Edit</Button>
+                              {canDelete ? (
+                                <Button
+                                  variant="link" size="xs" className="btn-link-muted"
+                                  onClick={() => handleDeletePeriod(p.id)}
+                                >Delete</Button>
+                              ) : (
+                                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)" }}>Delete</span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Current period / payslips ── */}
+          <div className="content-card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Current period</div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+                  {period ? `${MONTHS[period.month - 1]} ${period.year}` : "—"}
+                </h3>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                <input
+                  className="search-input"
+                  style={{ width: "180px" }}
+                  placeholder="Search employee…"
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                />
+                <select
+                  value={deptFilter}
+                  onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}
+                  style={{
+                    padding: "10px var(--sp-4)", border: "1px solid var(--bdr-default)",
+                    borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
+                    color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
+                  }}
+                >
+                  <option value="all">All departments</option>
+                  {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => { setTypeFilter(e.target.value); setCurrentPage(1); }}
+                  style={{
+                    padding: "10px var(--sp-4)", border: "1px solid var(--bdr-default)",
+                    borderRadius: "var(--radius-md)", background: "var(--bg-surface)",
+                    color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
+                  }}
+                >
+                  <option value="all">All types</option>
+                  {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={exportCSV}
+                  title="CSV export is always raw VND, regardless of the currency toggle in the top bar."
+                >
+                  ↓ Export CSV
+                </Button>
+                {period && isDraft && isHRTier && (
+                  <>
+                    <Button
+                      variant="secondary" size="sm" disabled={busy} onClick={handleRegenerate}
+                      title={isManager ? "Regenerates drafts for the whole company's payroll this period, not just your department." : undefined}
+                    >Regenerate drafts</Button>
+                    <Button
+                      variant="primary" size="sm" disabled={busy} onClick={() => handleStatus("approved")}
+                      title={isManager ? "Approves the whole company's payroll for this period, not just your department." : undefined}
+                    >Approve payroll</Button>
+                  </>
+                )}
+                {period && isDraft && isAdmin && (
+                  <Button variant="danger" size="sm" disabled={busy} onClick={() => handleDeletePeriod()}>Delete period</Button>
+                )}
+                {period?.status === "approved" && isHRTier && (
+                  <Button
+                    variant="primary" size="sm" disabled={busy}
+                    onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}
+                    title={isManager ? "Marks the whole company's payroll as paid for this period, not just your department." : undefined}
+                  >
+                    Mark as paid
+                  </Button>
+                )}
+                {period?.status === "approved" && isAdmin && (
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleStatus("draft")}>Reopen to draft</Button>
+                )}
+              </div>
             </div>
 
             {loadingSlips ? (
               <div style={{ padding: "var(--sp-8)", textAlign: "center", color: "var(--txt-secondary)" }}>
                 Loading payslips…
               </div>
-            ) : payslips.length === 0 ? (
+            ) : scopedPayslips.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -970,9 +967,13 @@ function Payroll() {
                     <path d="M9 13h6M9 17h6M9 9h1" />
                   </svg>
                 </div>
-                <div className="empty-state-title">No payslips in this period</div>
+                <div className="empty-state-title">
+                  {isManager && payslips.length > 0 ? "No payslips for your department in this period" : "No payslips in this period"}
+                </div>
                 <div className="empty-state-description">
-                  {isDraft && isHR ? "Use Regenerate drafts to build them." : "This period has no payslips."}
+                  {isManager && payslips.length > 0
+                    ? "Other departments have payslips this period, but none in yours yet."
+                    : isDraft && isHRTier ? "Use Regenerate drafts to build them." : "This period has no payslips."}
                 </div>
               </div>
             ) : filtered.length === 0 ? (
@@ -1009,36 +1010,47 @@ function Payroll() {
                     <tbody>
                       {paginated.map((p) => (
                         <Fragment key={p.id}>
-                          <tr>
-                            <td>
-                              <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-                                <Avatar name={p.employeeName} size="sm" />
+                          <tr
+                            onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+                            aria-expanded={expanded === p.id}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <td style={{ minWidth: "180px", verticalAlign: "top" }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--sp-3)" }}>
+                                <Avatar name={p.employeeName} size="sm" style={{ marginTop: "1px" }} />
                                 <div>
-                                  <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>{p.employeeName}</div>
+                                  <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", lineHeight: 1.3 }}>{p.employeeName}</div>
                                   <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{p.employeeCode}</div>
                                 </div>
                               </div>
                             </td>
-                            <td>{p.departmentName ?? "—"}</td>
-                            <td>{p.type ? <TypeBadge type={p.type} /> : "—"}</td>
-                            <td style={{ textAlign: "right" }}>
-                              {canEdit
-                                ? <MoneyInput value={p.baseSalary} onCommit={(v) => patchPayslip(p.id, { baseSalary: v })} />
-                                : fmtMoney(p.baseSalary, currency, fxRate)}
+                            <td style={{ minWidth: "90px", verticalAlign: "top" }}>{p.departmentName ?? "—"}</td>
+                            <td style={{ verticalAlign: "top" }}>{p.type ? <TypeBadge type={p.type} /> : "—"}</td>
+                            <td style={{ textAlign: "right", minWidth: "150px", verticalAlign: "top" }} onClick={(e) => canEdit && e.stopPropagation()}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                {canEdit
+                                  ? <MoneyInput value={p.baseSalary} currency={currency} fxRate={fxRate} onCommit={(v) => patchPayslip(p.id, { baseSalary: v })} />
+                                  : fmtMoney(p.baseSalary, currency, fxRate)}
+                              </div>
                             </td>
-                            <td style={{ textAlign: "right" }}>
-                              {canEdit
-                                ? <MoneyInput value={p.bonus} onCommit={(v) => patchPayslip(p.id, { bonus: v })} />
-                                : fmtMoney(p.bonus, currency, fxRate)}
+                            <td style={{ textAlign: "right", minWidth: "150px", verticalAlign: "top" }} onClick={(e) => canEdit && e.stopPropagation()}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                {canEdit
+                                  ? <MoneyInput value={p.bonus} currency={currency} fxRate={fxRate} onCommit={(v) => patchPayslip(p.id, { bonus: v })} />
+                                  : fmtMoney(p.bonus, currency, fxRate)}
+                              </div>
                             </td>
-                            <td style={{ textAlign: "right" }}>
-                              {canEdit
-                                ? <MoneyInput value={p.allowance} onCommit={(v) => patchPayslip(p.id, { allowance: v })} />
-                                : fmtMoney(p.allowance, currency, fxRate)}
+                            <td style={{ textAlign: "right", minWidth: "150px", verticalAlign: "top" }} onClick={(e) => canEdit && e.stopPropagation()}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                                {canEdit
+                                  ? <MoneyInput value={p.allowance} currency={currency} fxRate={fxRate} onCommit={(v) => patchPayslip(p.id, { allowance: v })} />
+                                  : fmtMoney(p.allowance, currency, fxRate)}
+                              </div>
                             </td>
-                            <td style={{ textAlign: "right" }}>
+                            <td style={{ textAlign: "right", minWidth: "150px", verticalAlign: "top" }} onClick={(e) => canEdit && e.stopPropagation()}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                               {canEdit
-                                ? <MoneyInput value={p.deduction} onCommit={(v) => patchPayslip(p.id, { deduction: v })} />
+                                ? <MoneyInput value={p.deduction} currency={currency} fxRate={fxRate} onCommit={(v) => patchPayslip(p.id, { deduction: v })} />
                                 : fmtMoney(p.deduction, currency, fxRate)}
                               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
                                 {p.unpaidLeaveDays} unpaid + {p.absentDays} absent
@@ -1054,9 +1066,10 @@ function Payroll() {
                                   >recompute</button>
                                 )}
                               </div>
+                              </div>
                             </td>
-                            <td style={{ textAlign: "right", fontWeight: "var(--fw-medium)" }}>{fmtMoney(p.grossPay, currency, fxRate)}</td>
-                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>
+                            <td style={{ textAlign: "right", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap", minWidth: "100px", verticalAlign: "top" }}>{fmtMoney(p.grossPay, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", color: "var(--txt-danger)", whiteSpace: "nowrap", minWidth: "90px", verticalAlign: "top" }}>
                               {p.insuranceExempt ? (
                                 <span
                                   title={`Exempt — ${p.unpaidLeaveDays + p.absentDays} unpaid working days reached the 14-day threshold`}
@@ -1068,14 +1081,14 @@ function Payroll() {
                                 `−${fmtMoney(p.insuranceTotal, currency, fxRate)}`
                               )}
                             </td>
-                            <td style={{ textAlign: "right", color: "var(--txt-danger)" }}>−{fmtMoney(p.pit, currency, fxRate)}</td>
-                            <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)", color: "var(--txt-success)" }}>
+                            <td style={{ textAlign: "right", color: "var(--txt-danger)", whiteSpace: "nowrap", minWidth: "90px", verticalAlign: "top" }}>−{fmtMoney(p.pit, currency, fxRate)}</td>
+                            <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)", color: "var(--txt-success)", whiteSpace: "nowrap", minWidth: "100px", verticalAlign: "top" }}>
                               {fmtMoney(p.netPay, currency, fxRate)}
                             </td>
-                            <td style={{ textAlign: "right" }}>
+                            <td style={{ textAlign: "right", verticalAlign: "top" }}>
                               <button
                                 type="button"
-                                onClick={() => setExpanded(expanded === p.id ? null : p.id)}
+                                onClick={(e) => { e.stopPropagation(); setExpanded(expanded === p.id ? null : p.id); }}
                                 aria-expanded={expanded === p.id}
                                 style={{
                                   background: "none", border: "none", cursor: "pointer",
@@ -1087,7 +1100,7 @@ function Payroll() {
                           {expanded === p.id && (
                             <tr>
                               <td colSpan={12} style={{ padding: "var(--sp-4)" }}>
-                                <BreakdownPanel slip={p} currency={currency} fxRate={fxRate} period={period} />
+                                <PayrollBreakdownPanel slip={p} currency={currency} fxRate={fxRate} period={period} />
                               </td>
                             </tr>
                           )}
@@ -1142,6 +1155,29 @@ function Payroll() {
               </>
             )}
           </div>
+
+          {/* ── Gross-by-department / contract-type mix — not in the mockup,
+              kept as a real, already-working breakdown of this period's
+              payslips rather than dropped for parity's sake. Dropped for
+              Manager: once the view is scoped to a single department, a
+              "gross pay by department" bar chart with one bar (and a
+              contract-type donut of just their own team) isn't useful. ── */}
+          {!isManager && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "var(--sp-5)", marginTop: "var(--sp-5)" }}>
+              <div className="content-card">
+                <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
+                  Gross pay by department
+                </div>
+                <DeptChart data={deptData} currency={currency} fxRate={fxRate} />
+              </div>
+              <div className="content-card">
+                <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
+                  By contract type
+                </div>
+                <TypeDonut segments={typeSegs} total={scopedPayslips.length} currency={currency} fxRate={fxRate} />
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

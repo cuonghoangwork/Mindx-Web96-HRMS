@@ -302,7 +302,7 @@ function Jobs() {
                         {job.deadline ? ` • Apply by ${formatDate(job.deadline, language)}` : ""}
                       </p>
                       <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-                        <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm" dot>
+                        <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm">
                           {job.status}
                         </Badge>
                         <TypeBadge type={job.type} size="sm" />
@@ -320,27 +320,25 @@ function Jobs() {
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-1)", alignItems: "flex-end" }}>
                         <Button
-                          variant="secondary"
-                          style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                          variant="link"
+                          className="btn-link-emphasis"
                           onClick={() => navigate(`/candidates?job=${job.id}`)}
                         >
                           View Applicants
                         </Button>
-                        <div style={{ display: "flex", gap: "var(--sp-2)" }}>
+                        <div style={{ display: "flex", gap: "var(--sp-1)" }}>
                           {hasDetails && (
                             <Button
-                              variant="secondary"
-                              style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                              variant="link"
                               onClick={() => setExpandedId(isExpanded ? null : job.id)}
                             >
                               {isExpanded ? "Hide Details" : "Details"}
                             </Button>
                           )}
                           <Button
-                            variant="secondary"
-                            style={{ padding: "8px 16px", fontSize: "var(--fs-xs)" }}
+                            variant="link"
                             onClick={() => {
                               setEditingJob(job);
                               setModalOpen(true);
@@ -349,12 +347,8 @@ function Jobs() {
                             Edit
                           </Button>
                           <Button
-                            variant="secondary"
-                            style={{
-                              padding: "8px 16px",
-                              fontSize: "var(--fs-xs)",
-                              color: "var(--txt-danger)",
-                            }}
+                            variant="link"
+                            className="btn-link-muted"
                             onClick={() => handleDelete(job.id)}
                           >
                             Delete

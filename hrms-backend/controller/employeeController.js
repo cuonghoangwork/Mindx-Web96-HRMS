@@ -12,6 +12,7 @@ import {
   resolveAccountEmail,
   assertCanAssignRole,
 } from "../utils/credentials.js";
+import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const SALT_ROUNDS = 10;
 
@@ -40,6 +41,16 @@ const employeeController = {
         }
       }
 
+      // Deliberately NOT department-scoped for MANAGER: the roster/directory
+      // read has always been company-wide for every authenticated role (see
+      // the router comment — even plain EMPLOYEE sees all names/departments
+      // "for display"). Scoping this would make MANAGER's read visibility
+      // *more* restrictive than EMPLOYEE's, which is backwards. Real
+      // least-privilege for MANAGER lives on the write side (create is
+      // HR/ADMIN-only; update/avatar/contract/promote check
+      // getManagerDepartmentId — see those handlers below) and on the
+      // separate department-scoped views (attendance, payroll, "My
+      // Department" via departmentController.getDetail).
       if (status && status !== "all") {
         const mapped = employeeFromClient({ status });
         if (mapped.status) condition.status = mapped.status;
@@ -86,6 +97,10 @@ const employeeController = {
           return res.status(403).json({ success: false, message: "Access denied." });
         }
       }
+
+      // MANAGER can view any employee's basic profile (directory read is
+      // company-wide, see getAll above) — write actions (update/avatar/
+      // contract/promote) still enforce department scoping on their own.
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
@@ -228,6 +243,26 @@ const employeeController = {
           : null;
       }
 
+      // MANAGER can only update employees currently in their own department,
+      // and can't use this endpoint to move someone into a different one.
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        const existing = await EmployeeModel.findById(req.params.id, "department");
+        if (!existing) throw new Error("Employee not found.");
+        if (String(existing.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only update employees in your own department.",
+          });
+        }
+        if (data.department !== undefined && data.department !== null && String(data.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You cannot move an employee to a different department.",
+          });
+        }
+      }
+
       const employee = await EmployeeModel.findByIdAndUpdate(req.params.id, data, {
         new: true,
         runValidators: true,
@@ -280,6 +315,17 @@ const employeeController = {
         }
       }
 
+      // MANAGER can only manage avatars for their own department
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        if (!employee.department || String(employee.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only update avatars for employees in your own department.",
+          });
+        }
+      }
+
       const result = await uploadBufferToCloudinary(req.file.buffer, {
         folder: "hrms/avatars",
         public_id: `employee_${employee._id}`,
@@ -313,6 +359,17 @@ const employeeController = {
 
       const employee = await EmployeeModel.findById(req.params.id);
       if (!employee) throw new Error("Employee not found.");
+
+      // MANAGER can only manage contracts for their own department
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        if (!employee.department || String(employee.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only manage contracts for employees in your own department.",
+          });
+        }
+      }
 
       const result = await uploadBufferToCloudinary(req.file.buffer, {
         folder: "hrms/contracts",
