@@ -3,7 +3,7 @@ import UserModel from "../model/User.js";
 import NotificationModel from "../model/Notification.js";
 import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
-import { createReviewRequestController, resolveRequestingEmployee } from "../utils/reviewQueue.js";
+import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { getRemainingDays, getAllBalances, countWorkingDays } from "../utils/leaveBalance.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 
@@ -130,13 +130,11 @@ const leaveRequestController = {
       // Block if there's already a pending request for this employee — same
       // rule profileEditRequestController.js and promotionRequestController.js
       // apply for their own request types.
-      const existingPending = await LeaveRequestModel.findOne({ employee: employee._id, status: "pending" });
-      if (existingPending) {
-        return res.status(409).json({
-          success: false,
-          message: "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
-        });
-      }
+      await assertNoPendingRequest(
+        LeaveRequestModel,
+        employee._id,
+        "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+      );
 
       if (type !== "unpaid") {
         const remaining = await getRemainingDays(employee._id, start.getFullYear(), type);
@@ -157,6 +155,25 @@ const leaveRequestController = {
         reason: reason ?? "",
         appliedAt: now,
       });
+
+      // The pending-request pre-check above has the same race: two
+      // concurrent submissions can both pass it before either commits. Re-
+      // verify now that this request is committed — if another pending
+      // request for this employee has an earlier _id, this one lost the
+      // race and must be rolled back (mirrors the balance-cap re-check
+      // below, which closes the identical race for the balance check).
+      const earlierPending = await LeaveRequestModel.findOne({
+        employee: employee._id,
+        status: "pending",
+        _id: { $ne: request._id },
+      }).sort({ _id: 1 });
+      if (earlierPending) {
+        await LeaveRequestModel.deleteOne({ _id: request._id });
+        return res.status(409).json({
+          success: false,
+          message: "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+        });
+      }
 
       // The pre-check above (getRemainingDays) reads committed state before
       // this write, so two concurrent requests for the same employee/type
@@ -210,7 +227,7 @@ const leaveRequestController = {
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message });
     }
   },
 

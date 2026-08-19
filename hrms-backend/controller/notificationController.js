@@ -2,6 +2,12 @@ import NotificationModel from "../model/Notification.js";
 import EmployeeModel from "../model/Employee.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
 
+// HR-tier: sees the "hr" broadcast audience company-wide; everyone else
+// (including the department-scoped MANAGER role) sees "employees" instead.
+function isHRRole(role) {
+  return role === "ADMIN" || role === "HR";
+}
+
 const notificationController = {
   // Returns notifications addressed to the current user PLUS broadcasts that match
   // their role-based audience (user: null, audience: "all" | role-appropriate).
@@ -10,7 +16,7 @@ const notificationController = {
       const { category, read } = req.query;
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "HR";
+      const isHR = isHRRole(role);
 
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       const condition = {
@@ -100,7 +106,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "HR";
+      const isHR = isHRRole(role);
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       await NotificationModel.updateMany(
         { $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }] },
@@ -116,7 +122,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = role === "ADMIN" || role === "HR";
+      const isHR = isHRRole(role);
       const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
       await NotificationModel.deleteMany({
         $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }],

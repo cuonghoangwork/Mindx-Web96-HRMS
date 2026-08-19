@@ -4,7 +4,7 @@ import DepartmentModel from "../model/Department.js";
 import UserModel from "../model/User.js";
 import NotificationModel from "../model/Notification.js";
 import { POSITION_LEVELS } from "../model/PositionLevel.js";
-import { createReviewRequestController } from "../utils/reviewQueue.js";
+import { createReviewRequestController, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { logAction } from "../utils/auditLog.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
@@ -139,16 +139,11 @@ const promotionRequestController = {
         }
       }
 
-      const existing = await PromotionRequestModel.findOne({
-        employee: employee._id,
-        status: "pending",
-      });
-      if (existing) {
-        return res.status(409).json({
-          success: false,
-          message: `${employee.name} already has a pending promotion proposal. It must be reviewed before another is submitted.`,
-        });
-      }
+      await assertNoPendingRequest(
+        PromotionRequestModel,
+        employee._id,
+        `${employee.name} already has a pending promotion proposal. It must be reviewed before another is submitted.`,
+      );
 
       const currentDepartmentName = employee.department?.name ?? null;
 

@@ -4,7 +4,9 @@
 // own distinct types). "unpaid" is unchanged in both models.
 //
 // Safe to re-run: only matches documents still holding the literal "paid"
-// value, so a second run is a no-op.
+// value, so a second run is a no-op. Also runs automatically on server boot
+// (see utils/startupMigrations.js, which this script calls into) — this
+// file exists for running the fix manually without a full server start.
 //
 // Usage:
 //   cd hrms-backend
@@ -16,23 +18,14 @@ const env = process.env.NODE_ENV || "dev";
 dotenv.config({ path: `.env.${env}` });
 
 import { connectDB } from "../config/db.js";
-import LeaveRequestModel from "../model/LeaveRequest.js";
-import AttendanceModel from "../model/Attendance.js";
+import { migratePaidLeaveType } from "../utils/startupMigrations.js";
 import mongoose from "mongoose";
 
 async function run() {
   await connectDB();
 
-  const leaveResult = await LeaveRequestModel.updateMany(
-    { type: "paid" },
-    { $set: { type: "annual" } },
-  );
+  const { leaveResult, attendanceResult } = await migratePaidLeaveType();
   console.log(`LeaveRequest: ${leaveResult.modifiedCount} document(s) "paid" -> "annual"`);
-
-  const attendanceResult = await AttendanceModel.updateMany(
-    { lateHalfDayType: "paid" },
-    { $set: { lateHalfDayType: "annual" } },
-  );
   console.log(`Attendance: ${attendanceResult.modifiedCount} document(s) lateHalfDayType "paid" -> "annual"`);
 
   await mongoose.connection.close();

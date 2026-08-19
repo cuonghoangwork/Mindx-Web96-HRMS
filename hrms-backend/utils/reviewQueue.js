@@ -39,7 +39,7 @@ import mongoose from "mongoose";
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
-import { getManagerDepartmentId } from "./managerScope.js";
+import { getManagerDepartmentId, resolveEmployeeForUser } from "./managerScope.js";
 
 export const REVIEW_STATUSES = ["pending", "approved", "rejected"];
 
@@ -81,11 +81,21 @@ export function reviewRequestBaseFields() {
  */
 export async function resolveRequestingEmployee(req) {
   const user = await UserModel.findById(req.user.id);
-  if (!user) return null;
-  const employee = user.employee
-    ? await EmployeeModel.findById(user.employee)
-    : await EmployeeModel.findOne({ email: user.email });
-  return employee;
+  return resolveEmployeeForUser(user);
+}
+
+/**
+ * Rejects with a 409 if the employee already has a pending request in
+ * `Model` — the shared "block a second submission until the first is
+ * reviewed" rule every request-type's create() enforces.
+ */
+export async function assertNoPendingRequest(Model, employeeId, message) {
+  const existing = await Model.findOne({ employee: employeeId, status: "pending" });
+  if (existing) {
+    const err = new Error(message);
+    err.status = 409;
+    throw err;
+  }
 }
 
 /**
@@ -212,7 +222,26 @@ export function createReviewRequestController({
           await onApprove(request);
         }
 
-        await request.save();
+        try {
+          await request.save();
+        } catch (saveError) {
+          // onApprove has already committed its side effect by this point
+          // (a separate document from `request`), so the reviewed status
+          // must not be left stuck at "pending" — fall back to a targeted
+          // update, which (unlike .save()) doesn't run full-document
+          // validation and so can't be blocked by an unrelated stale field
+          // elsewhere in the document.
+          console.error(
+            `[reviewQueue] request.save() failed after onApprove for ${Model.modelName} ${request._id}, falling back to a targeted update:`,
+            saveError.message,
+          );
+          await Model.findByIdAndUpdate(request._id, {
+            status: request.status,
+            reviewNote: request.reviewNote,
+            reviewedBy: request.reviewedBy,
+            reviewedAt: request.reviewedAt,
+          });
+        }
 
         // Notify the employee of the outcome (best-effort — a missing linked
         // User account shouldn't fail the review itself).

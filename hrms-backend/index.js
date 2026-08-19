@@ -37,7 +37,13 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 8080;
 
 connectDB()
-  .then(() => runStartupMigrations())
+  .then(() =>
+    // A migration failure is a best-effort data fix gone wrong, not a
+    // reason to refuse to serve traffic — log it and keep booting.
+    runStartupMigrations().catch((err) => {
+      console.error("Startup migrations failed (continuing to start server):", err);
+    }),
+  )
   .then(() => {
     startScheduler();
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

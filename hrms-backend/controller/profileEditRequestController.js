@@ -2,7 +2,7 @@ import ProfileEditRequestModel, { EDITABLE_FIELDS } from "../model/ProfileEditRe
 import EmployeeModel from "../model/Employee.js";
 import UserModel from "../model/User.js";
 import NotificationModel from "../model/Notification.js";
-import { createReviewRequestController, resolveRequestingEmployee } from "../utils/reviewQueue.js";
+import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 
 /* ── client-shape field name → DB field name (mirrors mappers.js) ── */
 const CLIENT_TO_DB = {
@@ -105,10 +105,11 @@ const profileEditRequestController = {
       }
 
       // Block if there's already a pending request for this employee
-      const existing = await ProfileEditRequestModel.findOne({ employee: employee._id, status: "pending" });
-      if (existing) {
-        return res.status(409).json({ success: false, message: "You already have a pending profile edit request. Wait for HR to review it before submitting another." });
-      }
+      await assertNoPendingRequest(
+        ProfileEditRequestModel,
+        employee._id,
+        "You already have a pending profile edit request. Wait for HR to review it before submitting another.",
+      );
 
       const request = await ProfileEditRequestModel.create({
         employee: employee._id,
@@ -133,7 +134,7 @@ const profileEditRequestController = {
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message });
     }
   },
 
