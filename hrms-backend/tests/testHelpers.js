@@ -104,3 +104,24 @@ export async function seedAdminAndLogin(app) {
     userId: res.body.data?.user?.id,
   };
 }
+
+export async function seedUserAndLogin(app, { email, password = "testpass1", name, role, employee = null }) {
+  const { default: UserModel } = await import("../model/User.js");
+  const supertest = (await import("supertest")).default;
+
+  const user = await UserModel.create({
+    email,
+    password: bcrypt.hashSync(password, 10),
+    name: name ?? email,
+    role,
+    employee,
+  });
+
+  const res = await supertest(app).post("/api/v1/auth/login").send({ email, password });
+
+  return {
+    user,
+    token:  res.body.data?.access_token,
+    userId: res.body.data?.user?.id,
+  };
+}

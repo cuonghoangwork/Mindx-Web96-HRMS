@@ -27,6 +27,10 @@ const VALID_HOLIDAY_TYPES    = ["Public", "Company", "Optional"];
 // (like every other VALID_* above) rather than importing the model, since
 // this file stays framework/DB-free by convention.
 const VALID_LEAVE_TYPES      = ["annual", "sick", "parental", "bereavement", "unpaid"];
+const VALID_COMPETENCIES        = ["communication", "execution", "ownership", "collaboration", "leadership", "problemSolving"];
+const VALID_CYCLE_STATUSES      = ["Open", "Closed"];
+const VALID_APPEAL_REASONS      = ["rating_low", "inaccurate", "process", "other"];
+const VALID_APPEAL_RESOLUTIONS  = ["Upheld", "Adjusted"];
 
 /**
  * Build a middleware that runs a list of check functions against req.body.
@@ -379,6 +383,22 @@ const isIntInRange = (field, label, min, max) => (body) => {
     : `${label} must be an integer between ${min} and ${max}.`;
 };
 
+const provided = (value) => value !== undefined && value !== null && value !== "";
+
+const isStepInRange = (field, label, min, max, step) => (body) => {
+  const n = Number(body[field]);
+  return Number.isInteger(n) && n >= min && n <= max && n % step === 0
+    ? null
+    : `${label} must be a whole number between ${min} and ${max} in steps of ${step}.`;
+};
+
+const isOptionalText = (field, label, max) => (body) => {
+  const value = body[field];
+  if (!provided(value)) return null;
+  if (typeof value !== "string") return `${label} must be text.`;
+  return value.trim().length > max ? `${label} must be at most ${max} characters.` : null;
+};
+
 const payrollCreatePeriod = makeValidator([
   required("year", "Year"),
   isIntInRange("year", "Year", 2000, 2100),
@@ -405,6 +425,81 @@ const payrollUpdatePayslip = makeValidator([
   isRequiredText("reason", "Adjustment reason", 300),
 ]);
 
+const performanceCreateCycle = makeValidator([
+  isRequiredText("label", "Cycle label", 80),
+  required("start", "Start date"),
+  isDateString("start", "Start date"),
+  required("end", "End date"),
+  isDateString("end", "End date"),
+  (body) => {
+    if (!body.start || !body.end) return null;
+    const start = new Date(body.start);
+    const end = new Date(body.end);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+    return end < start ? "End date cannot be before start date." : null;
+  },
+]);
+
+const performanceCycleStatus = makeValidator([
+  required("status", "Cycle status"),
+  isOneOf("status", "Cycle status", VALID_CYCLE_STATUSES),
+]);
+
+const performanceSelfReview = makeValidator([
+  required("selfRating", "Self rating"),
+  isIntInRange("selfRating", "Self rating", 1, 5),
+  isOptionalText("selfComments", "Self comments", 2000),
+]);
+
+const performanceManagerReview = makeValidator([
+  required("managerRating", "Manager rating"),
+  isIntInRange("managerRating", "Manager rating", 1, 5),
+  isOptionalText("managerComments", "Manager comments", 2000),
+]);
+
+const performanceCompetency = makeValidator([
+  required("key", "Competency"),
+  isOneOf("key", "Competency", VALID_COMPETENCIES),
+  (body) => (provided(body.value) ? null : "Rating is required."),
+  (body) => (provided(body.value) ? isIntInRange("value", "Rating", 1, 5)(body) : null),
+]);
+
+const performanceGoalCreate = makeValidator([
+  isRequiredText("text", "Goal", 300),
+  (body) => (provided(body.progress) ? isStepInRange("progress", "Progress", 0, 100, 10)(body) : null),
+]);
+
+const performanceGoalUpdate = makeValidator([
+  (body) => (provided(body.progress) ? null : "Progress is required."),
+  (body) => (provided(body.progress) ? isStepInRange("progress", "Progress", 0, 100, 10)(body) : null),
+]);
+
+const performancePeerFeedback = makeValidator([
+  isRequiredText("name", "Reviewer name", 100),
+  isOptionalText("relation", "Relation", 100),
+  isRequiredText("comments", "Comments", 2000),
+]);
+
+const performanceAppealCreate = makeValidator([
+  required("reasonCategory", "Reason category"),
+  isOneOf("reasonCategory", "Reason category", VALID_APPEAL_REASONS),
+  isRequiredText("detail", "Appeal detail", 2000),
+]);
+
+const performanceAppealResolve = makeValidator([
+  required("resolution", "Resolution"),
+  isOneOf("resolution", "Resolution", VALID_APPEAL_RESOLUTIONS),
+  (body) =>
+    body.resolution === "Adjusted"
+      ? isIntInRange("resolvedRating", "Adjusted rating", 1, 5)(body)
+      : null,
+  (body) =>
+    body.resolution === "Upheld" && provided(body.resolvedRating)
+      ? "Adjusted rating only applies when the resolution is Adjusted."
+      : null,
+  isRequiredText("resolverNote", "Resolver note", 1000),
+]);
+
 /* ── Exports ── */
 export const validate = {
   employee:   { create: employeeCreate, update: employeeUpdate },
@@ -417,4 +512,16 @@ export const validate = {
   leaveRequest: { create: leaveRequestCreate },
   promotionRequest: { create: promotionRequestCreate },
   payroll: { createPeriod: payrollCreatePeriod, updatePayslip: payrollUpdatePayslip },
+  performance: {
+    createCycle: performanceCreateCycle,
+    cycleStatus: performanceCycleStatus,
+    selfReview: performanceSelfReview,
+    managerReview: performanceManagerReview,
+    competency: performanceCompetency,
+    goalCreate: performanceGoalCreate,
+    goalUpdate: performanceGoalUpdate,
+    peerFeedback: performancePeerFeedback,
+    appealCreate: performanceAppealCreate,
+    appealResolve: performanceAppealResolve,
+  },
 };

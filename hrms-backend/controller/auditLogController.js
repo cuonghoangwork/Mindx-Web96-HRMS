@@ -57,6 +57,7 @@ const auditLogController = {
         user:         "system",
         promotion:    "employee",
         payroll:      "payroll",
+        performance:  "employee",
       };
 
       const enriched = items.map((entry) => {

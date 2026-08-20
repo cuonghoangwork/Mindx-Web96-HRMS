@@ -52,6 +52,7 @@ const auditLogSchema = new mongoose.Schema(
         "user",
         "promotion",
         "payroll",
+        "performance",
       ],
     },
     resourceId: { type: String },

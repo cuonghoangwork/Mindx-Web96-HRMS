@@ -15,7 +15,7 @@ const notificationSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["leave", "hiring", "payroll", "employee", "holiday", "system", "announcement"],
+      enum: ["leave", "hiring", "payroll", "employee", "holiday", "system", "announcement", "performance"],
       required: true,
     },
     title: { type: String, required: true },

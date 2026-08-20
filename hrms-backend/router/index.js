@@ -14,6 +14,7 @@ import promotionRequestRouter from "./promotionRequestRouter.js";
 import noShowReviewRouter from "./noShowReviewRouter.js";
 import payrollRouter from "./payrollRouter.js";
 import positionLevelRouter from "./positionLevelRouter.js";
+import performanceRouter from "./performanceRouter.js";
 
 const rootRouter = Router();
 
@@ -32,5 +33,6 @@ rootRouter.use("/promotion-requests", promotionRequestRouter);
 rootRouter.use("/no-show-reviews", noShowReviewRouter);
 rootRouter.use("/payroll", payrollRouter);
 rootRouter.use("/position-levels", positionLevelRouter);
+rootRouter.use("/performance", performanceRouter);
 
 export default rootRouter;

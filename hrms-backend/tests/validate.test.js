@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { validate } from "../middleware/validate.js";
+import { APPEAL_REASON_CATEGORIES, COMPETENCIES } from "../model/PerformanceReview.js";
 
 // ─── Mini test harness ────────────────────────────────────
 function runValidator(middleware, body) {
@@ -454,5 +455,228 @@ describe("validate.payroll.updatePayslip", () => {
 
   it("treats an empty-string money field as not provided", async () => {
     expect(await failsWith(v, { baseSalary: "", reason: "Blank" }, "at least one")).toBe(true);
+  });
+});
+
+describe("validate.performance.createCycle", () => {
+  const v = validate.performance.createCycle;
+  const ok = { label: "FY26 mid-year", start: "2026-01-01", end: "2026-06-30" };
+
+  it("passes with a label and an ordered date range", async () => {
+    expect(await passes(v, ok)).toBe(true);
+  });
+
+  it("rejects a missing or blank label", async () => {
+    expect(await failsWith(v, { ...ok, label: undefined }, "Cycle label is required")).toBe(true);
+    expect(await failsWith(v, { ...ok, label: "   " }, "Cycle label is required")).toBe(true);
+  });
+
+  it("rejects a non-string label with 400 rather than throwing", async () => {
+    expect(await failsWith(v, { ...ok, label: 7 }, "Cycle label is required")).toBe(true);
+  });
+
+  it("rejects a missing or unparseable date", async () => {
+    expect(await failsWith(v, { ...ok, start: undefined }, "Start date")).toBe(true);
+    expect(await failsWith(v, { ...ok, end: "not-a-date" }, "End date")).toBe(true);
+  });
+
+  it("rejects an end date before the start date", async () => {
+    expect(await failsWith(v, { ...ok, start: "2026-06-30", end: "2026-01-01" }, "End date cannot be before")).toBe(true);
+  });
+
+  it("accepts a single-day cycle", async () => {
+    expect(await passes(v, { ...ok, start: "2026-03-01", end: "2026-03-01" })).toBe(true);
+  });
+});
+
+describe("validate.performance.cycleStatus", () => {
+  const v = validate.performance.cycleStatus;
+
+  it("accepts Open and Closed", async () => {
+    expect(await passes(v, { status: "Open" })).toBe(true);
+    expect(await passes(v, { status: "Closed" })).toBe(true);
+  });
+
+  it("rejects a missing or unknown status", async () => {
+    expect(await failsWith(v, {}, "Cycle status is required")).toBe(true);
+    expect(await failsWith(v, { status: "open" }, "must be one of")).toBe(true);
+    expect(await failsWith(v, { status: "Archived" }, "must be one of")).toBe(true);
+  });
+});
+
+describe("validate.performance.selfReview", () => {
+  const v = validate.performance.selfReview;
+
+  it("accepts a rating with or without comments", async () => {
+    expect(await passes(v, { selfRating: 3 })).toBe(true);
+    expect(await passes(v, { selfRating: 5, selfComments: "Shipped the payroll job." })).toBe(true);
+  });
+
+  it("accepts a numeric string rating, matching the payroll validators", async () => {
+    expect(await passes(v, { selfRating: "4" })).toBe(true);
+  });
+
+  it("rejects a missing or out-of-scale rating", async () => {
+    expect(await failsWith(v, {}, "Self rating is required")).toBe(true);
+    expect(await failsWith(v, { selfRating: 0 }, "Self rating is required")).toBe(true);
+    expect(await failsWith(v, { selfRating: 6 }, "between 1 and 5")).toBe(true);
+    expect(await failsWith(v, { selfRating: 3.5 }, "between 1 and 5")).toBe(true);
+  });
+
+  it("rejects a non-string comment with 400 rather than letting it reach the query", async () => {
+    expect(await failsWith(v, { selfRating: 3, selfComments: { $gt: "" } }, "Self comments must be text")).toBe(true);
+    expect(await failsWith(v, { selfRating: 3, selfComments: 12345 }, "Self comments must be text")).toBe(true);
+  });
+
+  it("rejects comments longer than 2000 characters", async () => {
+    expect(await failsWith(v, { selfRating: 3, selfComments: "x".repeat(2001) }, "at most 2000")).toBe(true);
+  });
+});
+
+describe("validate.performance.managerReview", () => {
+  const v = validate.performance.managerReview;
+
+  it("accepts a rating and rejects a missing one", async () => {
+    expect(await passes(v, { managerRating: 4, managerComments: "Strong half." })).toBe(true);
+    expect(await failsWith(v, {}, "Manager rating is required")).toBe(true);
+    expect(await failsWith(v, { managerRating: 9 }, "between 1 and 5")).toBe(true);
+  });
+});
+
+describe("validate.performance.competency", () => {
+  const v = validate.performance.competency;
+
+  it("accepts every competency key the model defines", async () => {
+    for (const key of COMPETENCIES) {
+      expect(await passes(v, { key, value: 3 })).toBe(true);
+    }
+    expect(COMPETENCIES).toHaveLength(6);
+  });
+
+  it("rejects a key the model does not define", async () => {
+    expect(await failsWith(v, { key: "charisma", value: 3 }, "must be one of")).toBe(true);
+    expect(await failsWith(v, { key: "Communication", value: 3 }, "must be one of")).toBe(true);
+    expect(await failsWith(v, { value: 3 }, "Competency is required")).toBe(true);
+  });
+
+  it("rejects a rating outside the 1-5 scale", async () => {
+    expect(await failsWith(v, { key: "execution", value: 0 }, "between 1 and 5")).toBe(true);
+    expect(await failsWith(v, { key: "execution", value: 6 }, "between 1 and 5")).toBe(true);
+    expect(await failsWith(v, { key: "execution" }, "Rating is required")).toBe(true);
+  });
+
+  it("ignores a client-supplied rater field", async () => {
+    expect(await passes(v, { key: "ownership", value: 2, rater: "manager" })).toBe(true);
+  });
+});
+
+describe("validate.performance.goalCreate", () => {
+  const v = validate.performance.goalCreate;
+
+  it("accepts text with an optional progress value", async () => {
+    expect(await passes(v, { text: "Ship the analytics panel" })).toBe(true);
+    expect(await passes(v, { text: "Ship it", progress: 40 })).toBe(true);
+  });
+
+  it("rejects blank, missing or non-string text", async () => {
+    expect(await failsWith(v, {}, "Goal is required")).toBe(true);
+    expect(await failsWith(v, { text: "  " }, "Goal is required")).toBe(true);
+    expect(await failsWith(v, { text: 42 }, "Goal is required")).toBe(true);
+  });
+
+  it("rejects progress that is not a multiple of ten", async () => {
+    expect(await failsWith(v, { text: "Ship it", progress: 35 }, "steps of 10")).toBe(true);
+    expect(await failsWith(v, { text: "Ship it", progress: 110 }, "steps of 10")).toBe(true);
+  });
+});
+
+describe("validate.performance.goalUpdate", () => {
+  const v = validate.performance.goalUpdate;
+
+  it("accepts progress of 0, which a falsy required() check would have rejected", async () => {
+    expect(await passes(v, { progress: 0 })).toBe(true);
+  });
+
+  it("accepts every valid step and the numeric-string form", async () => {
+    for (let progress = 0; progress <= 100; progress += 10) {
+      expect(await passes(v, { progress })).toBe(true);
+    }
+    expect(await passes(v, { progress: "70" })).toBe(true);
+  });
+
+  it("rejects a missing progress value", async () => {
+    expect(await failsWith(v, {}, "Progress is required")).toBe(true);
+    expect(await failsWith(v, { progress: null }, "Progress is required")).toBe(true);
+    expect(await failsWith(v, { progress: "" }, "Progress is required")).toBe(true);
+  });
+
+  it("rejects off-step and out-of-range values", async () => {
+    expect(await failsWith(v, { progress: 37 }, "steps of 10")).toBe(true);
+    expect(await failsWith(v, { progress: -10 }, "steps of 10")).toBe(true);
+    expect(await failsWith(v, { progress: 101 }, "steps of 10")).toBe(true);
+  });
+});
+
+describe("validate.performance.peerFeedback", () => {
+  const v = validate.performance.peerFeedback;
+
+  it("accepts a name and comments, with relation optional", async () => {
+    expect(await passes(v, { name: "Dana", comments: "Great pairing partner." })).toBe(true);
+    expect(await passes(v, { name: "Dana", relation: "Peer", comments: "Great." })).toBe(true);
+  });
+
+  it("rejects a missing name or missing comments", async () => {
+    expect(await failsWith(v, { comments: "Great." }, "Reviewer name is required")).toBe(true);
+    expect(await failsWith(v, { name: "Dana" }, "Comments is required")).toBe(true);
+  });
+
+  it("rejects a non-string relation with 400", async () => {
+    expect(await failsWith(v, { name: "Dana", comments: "Great.", relation: { $ne: null } }, "Relation must be text")).toBe(true);
+  });
+});
+
+describe("validate.performance.appealCreate", () => {
+  const v = validate.performance.appealCreate;
+
+  it("accepts every reason category the contract defines", async () => {
+    for (const reasonCategory of APPEAL_REASON_CATEGORIES) {
+      expect(await passes(v, { reasonCategory, detail: "Please review the rating." })).toBe(true);
+    }
+  });
+
+  it("rejects an unknown reason category or missing detail", async () => {
+    expect(await failsWith(v, { reasonCategory: "unfair", detail: "x" }, "must be one of")).toBe(true);
+    expect(await failsWith(v, { reasonCategory: "process" }, "Appeal detail is required")).toBe(true);
+    expect(await failsWith(v, { detail: "x" }, "Reason category is required")).toBe(true);
+  });
+});
+
+describe("validate.performance.appealResolve", () => {
+  const v = validate.performance.appealResolve;
+
+  it("accepts Upheld without a rating", async () => {
+    expect(await passes(v, { resolution: "Upheld", resolverNote: "Rating stands." })).toBe(true);
+  });
+
+  it("accepts Adjusted with a valid rating", async () => {
+    expect(await passes(v, { resolution: "Adjusted", resolvedRating: 4, resolverNote: "Raised after review." })).toBe(true);
+  });
+
+  it("rejects Adjusted without a rating", async () => {
+    expect(await failsWith(v, { resolution: "Adjusted", resolverNote: "Raised." }, "Adjusted rating")).toBe(true);
+  });
+
+  it("rejects Adjusted with an out-of-scale rating", async () => {
+    expect(await failsWith(v, { resolution: "Adjusted", resolvedRating: 0, resolverNote: "x" }, "between 1 and 5")).toBe(true);
+  });
+
+  it("rejects Upheld that also carries a rating", async () => {
+    expect(await failsWith(v, { resolution: "Upheld", resolvedRating: 4, resolverNote: "x" }, "only applies when")).toBe(true);
+  });
+
+  it("requires a resolver note and a known resolution", async () => {
+    expect(await failsWith(v, { resolution: "Upheld" }, "Resolver note is required")).toBe(true);
+    expect(await failsWith(v, { resolution: "Reversed", resolverNote: "x" }, "must be one of")).toBe(true);
+    expect(await failsWith(v, { resolverNote: "x" }, "Resolution is required")).toBe(true);
   });
 });
