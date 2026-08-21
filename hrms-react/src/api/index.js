@@ -178,9 +178,9 @@ export const ProfileEditRequestsAPI = {
     }),
 };
 
-// Milestone 1 only (see PERFORMANCE_REVIEWS_API_CONTRACT.md) — core review
-// loop. Competencies/goals/peer-feedback/appeals/analytics/AI-insight/cycle
-// management methods get added here as their milestones land.
+// Milestones 1-5 (see PERFORMANCE_REVIEWS_API_CONTRACT.md) — core review
+// loop, competencies/goals, peer feedback/appeals, cycle management +
+// analytics, AI insight.
 export const PerformanceReviewsAPI = {
   /** Rating scale + competency keys — single source of truth, see the contract's §1 note on the frontend not hardcoding a second copy */
   meta: () => apiFetch("/performance/meta"),
@@ -196,4 +196,30 @@ export const PerformanceReviewsAPI = {
   /** That employee's MANAGER (not self), or HR for an "orphan manager", only while the cycle is Open */
   submitManager: (cycleKey, employeeId, data) =>
     apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/manager`, { method: "PATCH", body: data }),
+  /** Rater (self vs. manager) is inferred server-side from the caller, never accepted from the client */
+  setCompetency: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/competencies`, { method: "PATCH", body: data }),
+  /** Goal owner only, only while the cycle is Open */
+  addGoal: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/goals`, { method: "POST", body: data }),
+  updateGoal: (cycleKey, employeeId, goalId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/goals/${goalId}`, { method: "PATCH", body: data }),
+  /** Anyone who can view the review (self, manager, HR, admin) */
+  addPeerFeedback: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/peer-feedback`, { method: "POST", body: data }),
+  /** The employee themselves, within the appeal window */
+  fileAppeal: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/appeal`, { method: "POST", body: data }),
+  /** ADMIN/HR only, while the appeal is Pending */
+  resolveAppeal: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/appeal`, { method: "PATCH", body: data }),
+  /** ADMIN only */
+  createCycle: (data) => apiFetch("/performance/cycles", { method: "POST", body: data }),
+  /** ADMIN only — open/close/reopen */
+  setCycleStatus: (key, status) => apiFetch(`/performance/cycles/${key}`, { method: "PATCH", body: { status } }),
+  /** deptCompare is null unless the caller is ADMIN/HR — server-scoped, not client-hidden */
+  analytics: (cycleKey) => apiFetch(`/performance/cycles/${cycleKey}/analytics`),
+  /** Backend builds the prompt server-side from the stored review — no prompt logic on the client */
+  askAI: (cycleKey, employeeId) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST" }),
 };

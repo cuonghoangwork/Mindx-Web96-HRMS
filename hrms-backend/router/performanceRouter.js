@@ -29,6 +29,12 @@ router.get("/cycles/:key/analytics", verifyToken, performanceController.getAnaly
 
 router.get("/reviews/:cycleKey/:employeeId", verifyToken, performanceController.getReview);
 
+router.post(
+  "/reviews/:cycleKey/:employeeId/ai-insight",
+  verifyToken,
+  performanceController.getAiInsight,
+);
+
 router.patch(
   "/reviews/:cycleKey/:employeeId/self",
   verifyToken,

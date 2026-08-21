@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { PerformanceReviewsAPI } from "../api";
+import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
+import CreateCycleDialog from "../components/CreateCycleDialog";
 import PerformanceReviewDialog from "../components/PerformanceReviewDialog";
 
-// Milestone 1 (see PERFORMANCE_REVIEWS_TASK_SPLIT.md) — cycles, roster,
-// self/manager review submission. Competencies, goals, peer feedback,
-// appeals, analytics, and the AI insight button land in later milestones.
+// Milestones 1-4 (see PERFORMANCE_REVIEWS_TASK_SPLIT.md) — cycles, roster,
+// self/manager review submission, competencies, goals, peer feedback,
+// appeals, cycle management, analytics. The AI insight button lands in a
+// later milestone.
 //
 // Status comes from the roster row's own `status` field (one of
 // meta.reviewStatuses) rather than being re-derived from selfRating/
@@ -25,17 +28,27 @@ const STATUS_DISPLAY = {
   Completed: { key: "completed", variant: "success" },
 };
 
+// isAdmin here only gates button *visibility* — the real enforcement is the
+// backend's admin middleware on POST/PATCH /performance/cycles. Unlike
+// PerformanceReviewDialog's canEdit* flags (which need server-side lookups
+// like the orphan-manager check), "is this user ADMIN" needs no extra data,
+// so there's no guessing risk in reading it from useAuth() here.
+
 function Performance() {
   const { t } = useTranslation();
+  const { isAdmin } = useAuth();
 
   const [meta, setMeta] = useState(null);
   const [cycles, setCycles] = useState([]);
   const [selectedCycleKey, setSelectedCycleKey] = useState(null);
   const [roster, setRoster] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [openReview, setOpenReview] = useState(null); // { employeeId, employeeName } | null
+  const [showCreateCycle, setShowCreateCycle] = useState(false);
+  const [togglingCycle, setTogglingCycle] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +76,37 @@ function Performance() {
 
   useEffect(() => { loadRoster(); }, [loadRoster]);
 
+  const loadAnalytics = useCallback(() => {
+    if (!selectedCycleKey) return;
+    PerformanceReviewsAPI.analytics(selectedCycleKey)
+      .then((res) => setAnalytics(res.data ?? null))
+      .catch(() => setAnalytics(null));
+  }, [selectedCycleKey]);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+
   const selectedCycle = cycles.find((c) => c.key === selectedCycleKey) ?? null;
+
+  const handleCycleCreated = (cycle) => {
+    if (!cycle) return;
+    setCycles((prev) => [cycle, ...prev]);
+    setSelectedCycleKey(cycle.key);
+  };
+
+  const handleToggleCycleStatus = () => {
+    if (!selectedCycle) return;
+    const nextStatus = selectedCycle.status === "Open" ? "Closed" : "Open";
+    setTogglingCycle(true);
+    setError("");
+    PerformanceReviewsAPI.setCycleStatus(selectedCycle.key, nextStatus)
+      .then((res) => {
+        const updated = res.data;
+        if (updated) setCycles((prev) => prev.map((c) => (c.key === updated.key ? updated : c)));
+        loadAnalytics();
+      })
+      .catch((err) => setError(err.message || t("performance.loadFailed")))
+      .finally(() => setTogglingCycle(false));
+  };
 
   const statCells = useMemo(() => {
     const total = roster.length;
@@ -86,8 +129,28 @@ function Performance() {
     return roster.filter((r) => r.name.toLowerCase().includes(q) || (r.department ?? "").toLowerCase().includes(q));
   }, [roster, search]);
 
+  const ratingOptions = meta?.ratingOptions ?? [1, 2, 3, 4, 5];
+  const ratingLabel = (n) => t(`performance.ratingLabels.${n}`, { defaultValue: meta?.ratingLabels?.[n] ?? String(n) });
+
+  const ratingDistBars = useMemo(() => {
+    const build = (dist) => {
+      const counts = ratingOptions.map((n) => dist?.[n] ?? 0);
+      const max = Math.max(1, ...counts);
+      return ratingOptions.map((n, i) => ({ n, count: counts[i], pct: (counts[i] / max) * 100 }));
+    };
+    return {
+      self: build(analytics?.ratingDistribution?.self),
+      manager: build(analytics?.ratingDistribution?.manager),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analytics, meta]);
+
+  const hasAnalyticsData = Boolean(analytics && analytics.totals.employees > analytics.totals.notStarted);
+  const competencyRows = analytics?.competencyAverages ?? [];
+  const deptCompareRows = analytics?.deptCompare ?? null;
+
   const handleCloseDialog = () => setOpenReview(null);
-  const handleSubmitted = () => loadRoster();
+  const handleSubmitted = () => { loadRoster(); loadAnalytics(); };
 
   if (loading) {
     return <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.loading")}</p>;
@@ -118,8 +181,42 @@ function Performance() {
               {c.label}{c.status === "Open" && ` (${t("performance.open")})`}
             </button>
           ))}
+          {isAdmin && selectedCycle && (
+            <button
+              type="button"
+              onClick={handleToggleCycleStatus}
+              disabled={togglingCycle}
+              style={{
+                fontFamily: "var(--font-family)", fontWeight: "var(--fw-bold)", fontSize: "var(--fs-sm)",
+                padding: "9px 16px", cursor: togglingCycle ? "default" : "pointer",
+                background: "transparent", color: "var(--txt-primary)", border: "1px solid var(--bdr-default)",
+                opacity: togglingCycle ? 0.6 : 1,
+              }}
+            >
+              {selectedCycle.status === "Open" ? t("performance.toolbar.closeCycle") : t("performance.toolbar.reopenCycle")}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowCreateCycle(true)}
+              style={{
+                fontFamily: "var(--font-family)", fontWeight: "var(--fw-bold)", fontSize: "var(--fs-sm)",
+                padding: "9px 16px", cursor: "pointer",
+                background: "transparent", color: "var(--txt-primary)", border: "1px dashed var(--bdr-default)",
+              }}
+            >
+              {t("performance.toolbar.newCustomCycle")}
+            </button>
+          )}
         </div>
       </div>
+
+      {selectedCycle?.status === "Closed" && (
+        <div className="form-error" style={{ background: "var(--bg-warning-subtle)", color: "var(--txt-warning)", border: "1px solid var(--bdr-warning)" }}>
+          {t("performance.toolbar.closedNote")}
+        </div>
+      )}
 
       {error && <p className="form-error">{error}</p>}
 
@@ -193,6 +290,15 @@ function Performance() {
                           <Badge variant={STATUS_DISPLAY[r.status]?.variant ?? "neutral"} size="sm">
                             {t(`performance.status.${STATUS_DISPLAY[r.status]?.key}`, { defaultValue: r.status })}
                           </Badge>
+                          {r.hasAppeal && (
+                            <Badge
+                              variant={r.appealStatus === "Resolved" ? "success" : "warning"}
+                              size="sm"
+                              style={{ marginLeft: "var(--sp-2)" }}
+                            >
+                              {t(`performance.dialog.appealStatus.${r.appealStatus}`, { defaultValue: r.appealStatus })}
+                            </Badge>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -201,6 +307,86 @@ function Performance() {
               </div>
             )}
           </div>
+
+          {hasAnalyticsData && (
+            <>
+              <h3 style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-secondary)", margin: 0 }}>
+                {t("performance.analytics.title")}
+              </h3>
+
+              <div style={{ display: "grid", gridTemplateColumns: deptCompareRows?.length > 1 ? "1.3fr 1fr" : "1fr", gap: "var(--sp-5)" }}>
+                <div className="content-card">
+                  <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.ratingDistTitle")}</h3>
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.ratingDistSub")}</div>
+                  <div style={{ display: "flex", gap: "var(--sp-5)" }}>
+                    {[
+                      { key: "self", bars: ratingDistBars.self },
+                      { key: "manager", bars: ratingDistBars.manager },
+                    ].map((group) => (
+                      <div key={group.key} style={{ flex: 1 }}>
+                        <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase", marginBottom: "var(--sp-2)" }}>
+                          {t(`performance.analytics.${group.key}`)}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: "var(--sp-2)", height: "90px" }}>
+                          {group.bars.map((bar) => (
+                            <div key={bar.n} title={ratingLabel(bar.n)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                              <div style={{ fontSize: "10px", color: "var(--txt-secondary)", marginBottom: "2px" }}>{bar.count}</div>
+                              <div style={{ width: "100%", height: "70px", display: "flex", alignItems: "flex-end", background: "var(--bg-surface-sub)" }}>
+                                <div style={{ width: "100%", height: `${bar.pct}%`, background: "var(--bg-primary)" }} />
+                              </div>
+                              <div style={{ fontSize: "10px", color: "var(--txt-secondary)", marginTop: "2px" }}>{bar.n}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {deptCompareRows?.length > 1 && (
+                  <div className="content-card">
+                    <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.deptCompareTitle")}</h3>
+                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.deptCompareSub")}</div>
+                    {deptCompareRows.map((d) => (
+                      <div key={d.departmentId ?? d.department} style={{ marginBottom: "var(--sp-3)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-sm)", marginBottom: "4px" }}>
+                          <span>{d.department ?? "—"}</span>
+                          <span style={{ color: "var(--txt-secondary)" }}>{d.avgManager ?? "—"}</span>
+                        </div>
+                        <div style={{ height: "6px", background: "var(--bg-surface-sub)" }}>
+                          <div style={{ height: "100%", width: `${((d.avgManager ?? 0) / 5) * 100}%`, background: "var(--bg-primary)" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="content-card">
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.competencyTitle")}</h3>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.competencySub")}</div>
+                {competencyRows.map((row) => (
+                  <div key={row.key} style={{ padding: "8px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
+                    <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", marginBottom: "6px" }}>
+                      {t(`performance.competencies.${row.key}`, { defaultValue: row.key })}
+                    </div>
+                    {[
+                      { label: t("performance.analytics.self"), value: row.self },
+                      { label: t("performance.analytics.manager"), value: row.manager },
+                    ].map((line) => (
+                      <div key={line.label} style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", marginBottom: "3px" }}>
+                        <span style={{ fontSize: "10px", color: "var(--txt-secondary)", width: "56px", flexShrink: 0 }}>{line.label}</span>
+                        <div style={{ flex: 1, height: "6px", background: "var(--bg-surface-sub)" }}>
+                          <div style={{ height: "100%", width: `${((line.value ?? 0) / 5) * 100}%`, background: "var(--bg-primary)" }} />
+                        </div>
+                        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", width: "24px", textAlign: "right", flexShrink: 0 }}>{line.value ?? "—"}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -213,6 +399,10 @@ function Performance() {
           onClose={handleCloseDialog}
           onSubmitted={handleSubmitted}
         />
+      )}
+
+      {showCreateCycle && (
+        <CreateCycleDialog onClose={() => setShowCreateCycle(false)} onCreated={handleCycleCreated} />
       )}
     </div>
   );

@@ -61,6 +61,15 @@ export function appealWindowDaysElapsed(managerSubmittedDate, asOf = new Date())
   return Math.round((to.getTime() - from.getTime()) / DAY_MS);
 }
 
+/** Days from `asOf` until `value` (negative if `value` is in the past). Used by the
+ * performance-reminder job (task 5) to find cycles nearing their end date. */
+export function daysUntil(value, asOf = new Date()) {
+  const target = utcDayStart(value);
+  const from = utcDayStart(asOf);
+  if (!target || !from) return null;
+  return Math.round((target.getTime() - from.getTime()) / DAY_MS);
+}
+
 export function isWithinAppealWindow(managerSubmittedDate, asOf = new Date()) {
   const elapsed = appealWindowDaysElapsed(managerSubmittedDate, asOf);
   return elapsed !== null && elapsed >= 0 && elapsed <= APPEAL_WINDOW_DAYS;

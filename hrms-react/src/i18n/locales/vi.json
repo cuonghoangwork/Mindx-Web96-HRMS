@@ -503,12 +503,45 @@
    "title": "Không tìm thấy nhân viên phù hợp",
    "description": "Hãy thử một từ khóa tìm kiếm khác."
   },
+  "toolbar": {
+   "closeCycle": "Đóng chu kỳ",
+   "reopenCycle": "Mở lại chu kỳ",
+   "newCustomCycle": "+ Chu kỳ tùy chỉnh mới",
+   "closedNote": "Chu kỳ này đã đóng. Mở lại để tiếp tục chỉnh sửa."
+  },
+  "createCycleDialog": {
+   "title": "Chu Kỳ Tùy Chỉnh Mới",
+   "labelField": "Nhãn",
+   "startField": "Ngày bắt đầu",
+   "endField": "Ngày kết thúc",
+   "cancel": "Hủy",
+   "create": "Tạo chu kỳ"
+  },
+  "analytics": {
+   "title": "Phân tích",
+   "ratingDistTitle": "Phân bố điểm đánh giá",
+   "ratingDistSub": "Tự đánh giá so với đánh giá của quản lý trong chu kỳ này",
+   "deptCompareTitle": "So sánh phòng ban",
+   "deptCompareSub": "Điểm TB của quản lý theo phòng ban",
+   "competencyTitle": "Điểm TB Năng lực",
+   "competencySub": "Tự đánh giá so với quản lý, toàn bộ danh sách",
+   "self": "Tự đánh giá",
+   "manager": "Quản lý"
+  },
   "ratingLabels": {
    "1": "Cần cải thiện",
    "2": "Đang phát triển",
    "3": "Đạt yêu cầu",
    "4": "Vượt mong đợi",
    "5": "Xuất sắc"
+  },
+  "competencies": {
+   "communication": "Giao tiếp",
+   "execution": "Thực thi",
+   "ownership": "Tinh thần trách nhiệm",
+   "collaboration": "Hợp tác",
+   "leadership": "Lãnh đạo",
+   "problemSolving": "Giải quyết vấn đề"
   },
   "dialog": {
    "loading": "Đang tải…",
@@ -522,7 +555,52 @@
    "submitSelf": "Gửi tự đánh giá",
    "submitManager": "Gửi đánh giá quản lý",
    "notSubmittedYet": "Chưa được gửi.",
-   "closeButton": "Đóng"
+   "closeButton": "Đóng",
+   "competenciesTitle": "Năng lực",
+   "selfColumn": "Tự đánh giá",
+   "managerColumn": "Quản lý",
+   "goalsTitle": "Mục tiêu",
+   "noGoalsYet": "Chưa có mục tiêu nào.",
+   "goalPlaceholder": "Mô tả một mục tiêu…",
+   "addGoal": "Thêm mục tiêu",
+   "goalStatus": {
+    "notStarted": "Chưa bắt đầu",
+    "inProgress": "Đang thực hiện",
+    "done": "Hoàn thành"
+   },
+   "peerFeedbackTitle": "Phản hồi từ đồng nghiệp",
+   "noPeerFeedbackYet": "Chưa có phản hồi nào.",
+   "peerNamePlaceholder": "Tên người phản hồi",
+   "peerRelationPlaceholder": "Mối quan hệ (VD: Đồng đội)",
+   "peerCommentsPlaceholder": "Nội dung phản hồi…",
+   "addFeedback": "Thêm phản hồi",
+   "appealBtn": "Khiếu nại",
+   "appealCancel": "Hủy",
+   "appealSubmit": "Gửi khiếu nại",
+   "appealReasonLabel": "Lý do",
+   "appealDetailPlaceholder": "Giải thích lý do bạn khiếu nại…",
+   "appealReasons": {
+    "rating_low": "Điểm đánh giá quá thấp",
+    "inaccurate": "Nhận xét không chính xác",
+    "process": "Vấn đề quy trình",
+    "other": "Khác"
+   },
+   "appealDeadlineHint": "Bạn có thể khiếu nại đến hết ngày {{date}}.",
+   "appealTitle": "Khiếu nại",
+   "appealStatus": {
+    "Pending": "Đang chờ xử lý",
+    "Resolved": "Đã xử lý"
+   },
+   "appealResolutionUpheld": "Giữ nguyên — điểm đánh giá ban đầu không đổi.",
+   "appealResolutionAdjusted": "Đã điều chỉnh thành {{rating}}.",
+   "appealResolverNotePlaceholder": "Ghi chú cho nhân viên…",
+   "appealNewRatingLabel": "Điểm đã điều chỉnh",
+   "appealUphold": "Giữ nguyên",
+   "appealAdjustAndResolve": "Điều chỉnh & xử lý",
+   "askAi": "Hỏi AI",
+   "aiInsightTitle": "Nhận Định AI",
+   "aiThinking": "Đang phân tích…",
+   "aiUnavailable": "Nhận định AI hiện không khả dụng. Vui lòng thử lại sau."
   }
  }
 }

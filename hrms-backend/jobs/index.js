@@ -4,6 +4,7 @@ import { checkPromotionEligibility } from "./checkPromotionEligibility.js";
 import { generateMonthlyPayrollDraft } from "./generateMonthlyPayrollDraft.js";
 import { runMonthlyPayroll } from "./runMonthlyPayroll.js";
 import { annualSalaryRaise } from "./annualSalaryRaise.js";
+import { sendPerformanceReminders } from "./performanceReminders.js";
 import { dateKeyInTz } from "../utils/workday.js";
 
 export const SCHEDULER_TZ = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
@@ -13,6 +14,7 @@ let promotionCheckRunning = false;
 let monthlyPayrollDraftRunning = false;
 let monthlyPayrollRunRunning = false;
 let annualRaiseRunning = false;
+let performanceRemindersRunning = false;
 
 async function runCloseAttendance() {
   if (running) {
@@ -95,6 +97,22 @@ async function runAnnualSalaryRaise() {
   }
 }
 
+async function runPerformanceReminders() {
+  if (performanceRemindersRunning) {
+    console.log("[scheduler] sendPerformanceReminders skipped - previous run still in progress");
+    return;
+  }
+  performanceRemindersRunning = true;
+  try {
+    const result = await sendPerformanceReminders({ asOf: new Date() });
+    console.log("[scheduler] sendPerformanceReminders", JSON.stringify(result));
+  } catch (err) {
+    console.error("[scheduler] sendPerformanceReminders failed:", err.message);
+  } finally {
+    performanceRemindersRunning = false;
+  }
+}
+
 export function startScheduler() {
   if (process.env.ENABLE_SCHEDULER === "false" || process.env.NODE_ENV === "test") {
     console.log("[scheduler] disabled");
@@ -161,12 +179,30 @@ export function startScheduler() {
     console.log(`[scheduler] annualSalaryRaise scheduled "${annualRaiseExpression}" (${SCHEDULER_TZ})`);
   }
 
+  // Task 5: daily check for performance review cycles nearing their
+  // deadline. Kept well clear of the other jobs' times above.
+  const performanceRemindersExpression = process.env.CRON_PERFORMANCE_REMINDERS || "0 9 * * *";
+  let performanceRemindersTask = null;
+  if (!cron.validate(performanceRemindersExpression)) {
+    console.error(
+      `[scheduler] invalid cron expression: ${performanceRemindersExpression} - performance reminders not started`,
+    );
+  } else {
+    performanceRemindersTask = cron.schedule(performanceRemindersExpression, runPerformanceReminders, {
+      timezone: SCHEDULER_TZ,
+    });
+    console.log(
+      `[scheduler] sendPerformanceReminders scheduled "${performanceRemindersExpression}" (${SCHEDULER_TZ})`,
+    );
+  }
+
   return {
     closeAttendanceTask: task,
     promotionEligibilityTask: promotionTask,
     monthlyPayrollDraftTask,
     monthlyPayrollRunTask,
     annualRaiseTask,
+    performanceRemindersTask,
   };
 }
 

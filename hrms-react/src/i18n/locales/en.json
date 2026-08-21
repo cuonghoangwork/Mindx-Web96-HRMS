@@ -509,12 +509,45 @@
    "title": "No employees match",
    "description": "Try a different search."
   },
+  "toolbar": {
+   "closeCycle": "Close cycle",
+   "reopenCycle": "Reopen cycle",
+   "newCustomCycle": "+ New custom cycle",
+   "closedNote": "This cycle is closed. Reopen it to make changes."
+  },
+  "createCycleDialog": {
+   "title": "New Custom Cycle",
+   "labelField": "Label",
+   "startField": "Start date",
+   "endField": "End date",
+   "cancel": "Cancel",
+   "create": "Create cycle"
+  },
+  "analytics": {
+   "title": "Analytics",
+   "ratingDistTitle": "Rating Distribution",
+   "ratingDistSub": "Self vs. manager ratings this cycle",
+   "deptCompareTitle": "Department Comparison",
+   "deptCompareSub": "Avg. manager rating by department",
+   "competencyTitle": "Competency Averages",
+   "competencySub": "Self vs. manager, across the roster",
+   "self": "Self",
+   "manager": "Manager"
+  },
   "ratingLabels": {
    "1": "Needs improvement",
    "2": "Developing",
    "3": "Meets expectations",
    "4": "Exceeds expectations",
    "5": "Outstanding"
+  },
+  "competencies": {
+   "communication": "Communication",
+   "execution": "Execution",
+   "ownership": "Ownership",
+   "collaboration": "Collaboration",
+   "leadership": "Leadership",
+   "problemSolving": "Problem solving"
   },
   "dialog": {
    "loading": "Loading…",
@@ -528,7 +561,52 @@
    "submitSelf": "Submit self review",
    "submitManager": "Submit manager review",
    "notSubmittedYet": "Not submitted yet.",
-   "closeButton": "Close"
+   "closeButton": "Close",
+   "competenciesTitle": "Competencies",
+   "selfColumn": "Self",
+   "managerColumn": "Manager",
+   "goalsTitle": "Goals",
+   "noGoalsYet": "No goals yet.",
+   "goalPlaceholder": "Describe a goal…",
+   "addGoal": "Add goal",
+   "goalStatus": {
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "done": "Done"
+   },
+   "peerFeedbackTitle": "Peer Feedback",
+   "noPeerFeedbackYet": "No peer feedback yet.",
+   "peerNamePlaceholder": "Reviewer name",
+   "peerRelationPlaceholder": "Relation (e.g. Teammate)",
+   "peerCommentsPlaceholder": "Feedback comments…",
+   "addFeedback": "Add feedback",
+   "appealBtn": "File appeal",
+   "appealCancel": "Cancel",
+   "appealSubmit": "Submit appeal",
+   "appealReasonLabel": "Reason",
+   "appealDetailPlaceholder": "Explain why you're appealing…",
+   "appealReasons": {
+    "rating_low": "Rating too low",
+    "inaccurate": "Inaccurate feedback",
+    "process": "Process issue",
+    "other": "Other"
+   },
+   "appealDeadlineHint": "You can file an appeal until {{date}}.",
+   "appealTitle": "Appeal",
+   "appealStatus": {
+    "Pending": "Pending",
+    "Resolved": "Resolved"
+   },
+   "appealResolutionUpheld": "Upheld — the original rating stands.",
+   "appealResolutionAdjusted": "Adjusted to {{rating}}.",
+   "appealResolverNotePlaceholder": "Note for the employee…",
+   "appealNewRatingLabel": "Adjusted rating",
+   "appealUphold": "Uphold",
+   "appealAdjustAndResolve": "Adjust & resolve",
+   "askAi": "Ask AI",
+   "aiInsightTitle": "AI Insight",
+   "aiThinking": "Thinking…",
+   "aiUnavailable": "AI insight is unavailable right now. Try again later."
   }
  }
 }

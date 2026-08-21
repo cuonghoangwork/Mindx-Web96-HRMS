@@ -15,6 +15,8 @@ import PerformanceReviewModel, {
 } from "../model/PerformanceReview.js";
 import { notifyHR } from "./notificationController.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
+import { askGemini } from "../utils/geminiClient.js";
+import { buildInsightPrompt } from "../utils/performanceInsightPrompt.js";
 import { computeAnalytics, reviewStatusOf } from "../utils/performanceAnalytics.js";
 import {
   APPEAL_WINDOW_DAYS,
@@ -212,7 +214,7 @@ async function loadScopedReviewData(cycleKey, employeeCondition) {
   return { employees, reviews };
 }
 
-async function findUserForEmployee(employee) {
+export async function findUserForEmployee(employee) {
   return UserModel.findOne(
     { $or: [{ employee: employee._id }, { email: employee.email }] },
     "_id",
@@ -419,6 +421,29 @@ const performanceController = {
       });
     } catch (error) {
       res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  getAiInsight: async (req, res) => {
+    try {
+      const { cycle, employee, access } = await loadReviewContext(req);
+      assertCanViewReview(access);
+
+      const review = await PerformanceReviewModel.findOne({
+        cycleKey: cycle.key,
+        employee: employee._id,
+      });
+
+      const prompt = buildInsightPrompt({
+        employee,
+        cycle,
+        review: reviewToClient(review ?? emptyReviewDoc(cycle.key, employee._id)),
+      });
+      const text = await askGemini(prompt);
+
+      res.json({ success: true, text });
+    } catch (error) {
+      res.status(error.status || 502).json({ success: false, message: error.message });
     }
   },
 
