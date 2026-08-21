@@ -479,8 +479,8 @@
   "stats": {
    "completed": "Đã hoàn thành",
    "completedHint": "Đã nộp tự đánh giá + quản lý",
-   "selfOnly": "Chỉ tự đánh giá",
-   "selfOnlyHint": "Đang chờ quản lý đánh giá",
+   "inProgress": "Đang thực hiện",
+   "inProgressHint": "Đang chờ phía còn lại đánh giá",
    "notStarted": "Chưa bắt đầu",
    "notStartedHint": "Chưa nộp đánh giá nào",
    "avgManagerRating": "Điểm TB của Quản lý",
@@ -495,8 +495,9 @@
   },
   "status": {
    "completed": "Đã hoàn thành",
-   "self-only": "Chỉ tự đánh giá",
-   "not-started": "Chưa bắt đầu"
+   "selfSubmitted": "Đã tự đánh giá",
+   "managerSubmitted": "Quản lý đã đánh giá",
+   "notStarted": "Chưa bắt đầu"
   },
   "empty": {
    "title": "Không tìm thấy nhân viên phù hợp",

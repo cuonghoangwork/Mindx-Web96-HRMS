@@ -8,13 +8,22 @@ import PerformanceReviewDialog from "../components/PerformanceReviewDialog";
 // Milestone 1 (see PERFORMANCE_REVIEWS_TASK_SPLIT.md) — cycles, roster,
 // self/manager review submission. Competencies, goals, peer feedback,
 // appeals, analytics, and the AI insight button land in later milestones.
-const STATUS_VARIANT = { completed: "success", "self-only": "warning", "not-started": "danger" };
-
-function statusOf(row) {
-  if (row.selfRating != null && row.managerRating != null) return "completed";
-  if (row.selfRating != null || row.managerRating != null) return "self-only";
-  return "not-started";
-}
+//
+// Status comes from the roster row's own `status` field (one of
+// meta.reviewStatuses) rather than being re-derived from selfRating/
+// managerRating client-side — the two ratings can be submitted in either
+// order, so "only one rating present" doesn't tell you which one.
+//
+// One map (not two parallel ones) so a status can't drift out of sync with
+// itself; an unrecognized status (a future addition to meta.reviewStatuses
+// this map hasn't been updated for) falls back to a neutral badge with the
+// raw status string instead of a broken i18n key.
+const STATUS_DISPLAY = {
+  "Not started": { key: "notStarted", variant: "danger" },
+  "Self submitted": { key: "selfSubmitted", variant: "warning" },
+  "Manager submitted": { key: "managerSubmitted", variant: "warning" },
+  Completed: { key: "completed", variant: "success" },
+};
 
 function Performance() {
   const { t } = useTranslation();
@@ -58,14 +67,15 @@ function Performance() {
 
   const statCells = useMemo(() => {
     const total = roster.length;
-    const completed = roster.filter((r) => statusOf(r) === "completed").length;
-    const selfOnly = roster.filter((r) => statusOf(r) === "self-only").length;
+    const completed = roster.filter((r) => r.status === "Completed").length;
+    const notStarted = roster.filter((r) => r.status === "Not started").length;
+    const inProgress = total - completed - notStarted;
     const ratings = roster.map((r) => r.managerRating).filter((v) => v != null);
     const avgManagerRating = ratings.length ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1) : "—";
     return [
       { label: t("performance.stats.completed"), value: `${completed}/${total}`, trend: t("performance.stats.completedHint") },
-      { label: t("performance.stats.selfOnly"), value: selfOnly, trend: t("performance.stats.selfOnlyHint") },
-      { label: t("performance.stats.notStarted"), value: total - completed - selfOnly, trend: t("performance.stats.notStartedHint") },
+      { label: t("performance.stats.inProgress"), value: inProgress, trend: t("performance.stats.inProgressHint") },
+      { label: t("performance.stats.notStarted"), value: notStarted, trend: t("performance.stats.notStartedHint") },
       { label: t("performance.stats.avgManagerRating"), value: avgManagerRating, trend: t("performance.stats.avgManagerRatingHint") },
     ];
   }, [roster, t]);
@@ -180,8 +190,8 @@ function Performance() {
                         <td style={{ color: "var(--txt-secondary)" }}>{r.selfRating ?? "—"}</td>
                         <td style={{ color: "var(--txt-secondary)" }}>{r.managerRating ?? "—"}</td>
                         <td>
-                          <Badge variant={STATUS_VARIANT[statusOf(r)]} size="sm">
-                            {t(`performance.status.${statusOf(r)}`)}
+                          <Badge variant={STATUS_DISPLAY[r.status]?.variant ?? "neutral"} size="sm">
+                            {t(`performance.status.${STATUS_DISPLAY[r.status]?.key}`, { defaultValue: r.status })}
                           </Badge>
                         </td>
                       </tr>
@@ -199,7 +209,6 @@ function Performance() {
           cycleKey={selectedCycleKey}
           employeeId={openReview.employeeId}
           employeeName={openReview.employeeName}
-          cycleOpen={selectedCycle?.status === "Open"}
           meta={meta}
           onClose={handleCloseDialog}
           onSubmitted={handleSubmitted}

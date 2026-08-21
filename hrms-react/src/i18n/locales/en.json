@@ -485,8 +485,8 @@
   "stats": {
    "completed": "Completed",
    "completedHint": "Self + manager submitted",
-   "selfOnly": "Self Only",
-   "selfOnlyHint": "Awaiting manager review",
+   "inProgress": "In Progress",
+   "inProgressHint": "Awaiting the other review",
    "notStarted": "Not Started",
    "notStartedHint": "No review submitted yet",
    "avgManagerRating": "Avg. Manager Rating",
@@ -501,8 +501,9 @@
   },
   "status": {
    "completed": "Completed",
-   "self-only": "Self Only",
-   "not-started": "Not Started"
+   "selfSubmitted": "Self Submitted",
+   "managerSubmitted": "Manager Submitted",
+   "notStarted": "Not Started"
   },
   "empty": {
    "title": "No employees match",

@@ -1,26 +1,23 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../context/AuthContext";
 import { PerformanceReviewsAPI } from "../api";
 import Button from "./Button";
 
 // Milestone 1 only — self/manager rating + comments. Competencies, goals,
 // peer feedback, appeals, and the AI insight button land in later
-// milestones once the backend endpoints for them exist (see
-// PERFORMANCE_REVIEWS_API_CONTRACT.md).
+// milestones once frontend UI for them is built (the backend already
+// supports them — see PERFORMANCE_REVIEWS_API_CONTRACT.md).
 //
-// canEditManager is a client-side approximation of a server-authoritative
-// check (own-department MANAGER, or HR-as-manager for an "orphan" department
-// manager) — the contract deliberately keeps that check server-side ("don't
-// trust a client-supplied scope param"), so a submit the server rejects
-// surfaces as a plain error message here rather than the form being hidden
-// up front. Tightening this once the roster response's exact shape is
-// confirmed against the real backend is a fast follow, not a blocker.
-function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, cycleOpen, meta, onClose, onSubmitted }) {
+// canEditSelf/canEditManager come from the `permissions` object the server
+// returns alongside the review (§2.3 of the contract) rather than being
+// guessed client-side — deciding canEditManager requires the orphan-manager
+// query, which needs per-department MANAGER-user data this component never
+// receives.
+function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onClose, onSubmitted }) {
   const { t } = useTranslation();
-  const { user, isManagerTier, isHRTier } = useAuth();
 
   const [review, setReview] = useState(null);
+  const [permissions, setPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -40,6 +37,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, cycleOpen
         if (cancelled) return;
         const rec = res.data ?? null;
         setReview(rec);
+        setPermissions(res.permissions ?? null);
         setSelfRating(rec?.selfRating != null ? String(rec.selfRating) : "");
         setSelfComments(rec?.selfComments ?? "");
         setManagerRating(rec?.managerRating != null ? String(rec.managerRating) : "");
@@ -50,9 +48,8 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, cycleOpen
     return () => { cancelled = true; };
   }, [cycleKey, employeeId, t]);
 
-  const isOwnReview = String(user?.employeeId ?? "") === String(employeeId);
-  const canEditSelf = cycleOpen && isOwnReview;
-  const canEditManager = cycleOpen && !isOwnReview && (isManagerTier || isHRTier);
+  const canEditSelf = Boolean(permissions?.canEditSelf);
+  const canEditManager = Boolean(permissions?.canEditManager);
 
   const hasSelfSubmitted = Boolean(review?.selfSubmittedDate);
   const hasManagerSubmitted = Boolean(review?.managerSubmittedDate);
