@@ -177,3 +177,23 @@ export const ProfileEditRequestsAPI = {
       body: { decision, reviewNote },
     }),
 };
+
+// Milestone 1 only (see PERFORMANCE_REVIEWS_API_CONTRACT.md) — core review
+// loop. Competencies/goals/peer-feedback/appeals/analytics/AI-insight/cycle
+// management methods get added here as their milestones land.
+export const PerformanceReviewsAPI = {
+  /** Rating scale + competency keys — single source of truth, see the contract's §1 note on the frontend not hardcoding a second copy */
+  meta: () => apiFetch("/performance/meta"),
+  /** Every cycle (2 closed + 1 open standard, plus any custom ones), effective status applied */
+  cycles: () => apiFetch("/performance/cycles"),
+  /** Role-scoped server-side: ADMIN/HR see everyone, MANAGER sees self + department, EMPLOYEE sees only self */
+  roster: (cycleKey) => apiFetch(`/performance/cycles/${cycleKey}/roster`),
+  /** One employee's review record for a cycle (shaped default if none exists yet) */
+  getReview: (cycleKey, employeeId) => apiFetch(`/performance/reviews/${cycleKey}/${employeeId}`),
+  /** The employee themselves, only while the cycle is Open */
+  submitSelf: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/self`, { method: "PATCH", body: data }),
+  /** That employee's MANAGER (not self), or HR for an "orphan manager", only while the cycle is Open */
+  submitManager: (cycleKey, employeeId, data) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/manager`, { method: "PATCH", body: data }),
+};

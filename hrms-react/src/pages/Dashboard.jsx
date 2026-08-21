@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
-import { EmployeesAPI, LeaveRequestsAPI, PayrollAPI } from "../api";
+import { EmployeesAPI, LeaveRequestsAPI, PayrollAPI, PerformanceReviewsAPI } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate } from "../utils/format";
 import { fmtMoney } from "../utils/payroll";
@@ -218,7 +218,7 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const {
     employees, attendance, departments, getEmployeeCountByDepartment, getAppNow,
-    jobs, candidates, unreadNotificationCount,
+    candidates, unreadNotificationCount,
   } = useStore();
 
   // ── Stats ──
@@ -236,9 +236,6 @@ function AdminDashboard() {
   }).length;
 
   // ── Row 2 operational stats (real data) ──
-  // Mirrors the mockup's second stat row, with one substitution: this app
-  // has no Performance Reviews module, so "Open Job Postings" fills that
-  // slot instead of inventing a fake metric.
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -252,7 +249,32 @@ function AdminDashboard() {
     return () => { cancelled = true; };
   }, []);
   const openPipelineCount = candidates.filter((c) => c.stage !== "Hired" && c.stage !== "Rejected").length;
-  const openJobsCount = jobs.filter((j) => j.status === "Open").length;
+
+  // Mirrors the mockup's second stat row's fourth cell: completed/total
+  // performance reviews for the current cycle. Best-effort — the backend
+  // endpoints are still landing (see PERFORMANCE_REVIEWS_TASK_SPLIT.md), so
+  // a failed fetch just leaves the counts at 0 rather than erroring the
+  // whole dashboard.
+  const [performanceStats, setPerformanceStats] = useState({ completed: 0, total: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    PerformanceReviewsAPI.cycles()
+      .then((res) => {
+        if (cancelled) return;
+        const cycleList = res.items ?? res.data ?? [];
+        const openCycle = cycleList.find((c) => c.status === "Open");
+        if (!openCycle) return null;
+        return PerformanceReviewsAPI.roster(openCycle.key);
+      })
+      .then((res) => {
+        if (cancelled || !res) return;
+        const rows = res.items ?? res.data ?? [];
+        const completed = rows.filter((r) => r.selfRating != null && r.managerRating != null).length;
+        setPerformanceStats({ completed, total: rows.length });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Contract mix data (mockup uses a tiered grayscale, not a rainbow) ──
   const contractSegs = [
@@ -353,10 +375,10 @@ function AdminDashboard() {
         />
         <StripStatCell
           small
-          label="Open Job Postings"
-          value={openJobsCount}
-          trend="Currently hiring"
-          onClick={() => navigate("/jobs")}
+          label="Performance Reviews"
+          value={`${performanceStats.completed}/${performanceStats.total}`}
+          trend="Completed this cycle"
+          onClick={() => navigate("/performance")}
         />
       </div>
 

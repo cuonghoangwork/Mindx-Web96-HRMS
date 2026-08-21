@@ -475,5 +475,59 @@
    "title": "Roles & permissions",
    "subtitle": "Change an account's role between Employee, Manager (department-scoped), HR (company-wide) and Admin. Fine-grained permission editing isn't available yet — access is controlled by these four roles."
   }
+ },
+ "performance": {
+  "title": "Performance Reviews",
+  "loading": "Loading…",
+  "loadFailed": "Failed to load performance reviews.",
+  "open": "Open",
+  "rosterLabel": "Roster",
+  "stats": {
+   "completed": "Completed",
+   "completedHint": "Self + manager submitted",
+   "selfOnly": "Self Only",
+   "selfOnlyHint": "Awaiting manager review",
+   "notStarted": "Not Started",
+   "notStartedHint": "No review submitted yet",
+   "avgManagerRating": "Avg. Manager Rating",
+   "avgManagerRatingHint": "This cycle"
+  },
+  "table": {
+   "employee": "Employee",
+   "department": "Department",
+   "selfRating": "Self Rating",
+   "managerRating": "Manager Rating",
+   "status": "Status"
+  },
+  "status": {
+   "completed": "Completed",
+   "self-only": "Self Only",
+   "not-started": "Not Started"
+  },
+  "empty": {
+   "title": "No employees match",
+   "description": "Try a different search."
+  },
+  "ratingLabels": {
+   "1": "Needs improvement",
+   "2": "Developing",
+   "3": "Meets expectations",
+   "4": "Exceeds expectations",
+   "5": "Outstanding"
+  },
+  "dialog": {
+   "loading": "Loading…",
+   "loadFailed": "Failed to load this review.",
+   "submitFailed": "Failed to submit.",
+   "selfSection": "Self Review",
+   "managerSection": "Manager Review",
+   "ratingLabel": "Rating",
+   "selectRating": "Select a rating",
+   "commentsLabel": "Comments",
+   "submitSelf": "Submit self review",
+   "submitManager": "Submit manager review",
+   "notSubmittedYet": "Not submitted yet.",
+   "closeButton": "Close"
+  }
  }
 }

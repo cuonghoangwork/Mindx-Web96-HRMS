@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "hrms-react", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "hrms-backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "hrms-backend", "run", "dev:env"],
+      "port": 8080
     }
   ]
 }

@@ -7,6 +7,7 @@ import AllEmployees from "./pages/AllEmployees";
 import ViewEmployee from "./pages/ViewEmployee";
 import AddEmployee from "./pages/AddEmployee";
 import Attendance from "./pages/Attendance";
+import Performance from "./pages/Performance";
 import Payroll from "./pages/Payroll";
 import Jobs from "./pages/Jobs";
 import Candidates from "./pages/Candidates";
@@ -78,6 +79,11 @@ function App() {
         {/* ── All authenticated users ── */}
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="attendance" element={<Attendance />} />
+        {/* Performance Reviews: every role has at least their own review
+            (ADMIN/HR/MANAGER also review reports), so no ProtectedRoute
+            guard — same as attendance/notifications above. Roster/review
+            visibility itself is scoped server-side (see the API contract). */}
+        <Route path="performance" element={<Performance />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
 

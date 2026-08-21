@@ -44,6 +44,7 @@ function Header({ onMenuToggle }) {
     if (path.startsWith("/departments/")) return isPlainManager || isPlainEmployee ? "My Department" : "Department Details";
     if (path === "/org-chart") return "Org Chart";
     if (path === "/attendance") return "Attendance";
+    if (path === "/performance") return "Performance Reviews";
     if (path === "/payroll") return "Payroll";
     if (path === "/jobs") return "Jobs";
     if (path === "/candidates") return "Candidates";
@@ -65,7 +66,7 @@ function Header({ onMenuToggle }) {
     if (path.startsWith("/employees/add")) return "People / New";
     if (viewingEmployee) return `${peopleKicker} / Profile`;
     if (path.startsWith("/employees") || path.startsWith("/departments") || path === "/org-chart") return peopleKicker;
-    if (path === "/attendance" || path === "/payroll" || path === "/holidays") return "Time & Pay";
+    if (path === "/attendance" || path === "/performance" || path === "/payroll" || path === "/holidays") return "Time & Pay";
     if (path === "/jobs" || path === "/candidates") return "Hiring";
     if (path === "/settings" || path === "/notifications") return "System";
     return "Overview";
