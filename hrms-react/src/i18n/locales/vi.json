@@ -469,5 +469,60 @@
    "title": "Vai trò & quyền",
    "subtitle": "Đổi vai trò của tài khoản giữa Nhân viên, Quản lý (giới hạn một phòng ban), HR (toàn công ty) và Quản trị viên. Tính năng chỉnh quyền chi tiết chưa khả dụng — quyền truy cập được kiểm soát bởi bốn vai trò này."
   }
+ },
+ "performance": {
+  "title": "Đánh giá hiệu suất",
+  "loading": "Đang tải…",
+  "loadFailed": "Không thể tải đánh giá hiệu suất.",
+  "open": "Đang mở",
+  "rosterLabel": "Danh sách",
+  "stats": {
+   "completed": "Đã hoàn thành",
+   "completedHint": "Đã nộp tự đánh giá + quản lý",
+   "inProgress": "Đang thực hiện",
+   "inProgressHint": "Đang chờ phía còn lại đánh giá",
+   "notStarted": "Chưa bắt đầu",
+   "notStartedHint": "Chưa nộp đánh giá nào",
+   "avgManagerRating": "Điểm TB của Quản lý",
+   "avgManagerRatingHint": "Chu kỳ này"
+  },
+  "table": {
+   "employee": "Nhân viên",
+   "department": "Phòng ban",
+   "selfRating": "Tự đánh giá",
+   "managerRating": "Đánh giá của Quản lý",
+   "status": "Trạng thái"
+  },
+  "status": {
+   "completed": "Đã hoàn thành",
+   "selfSubmitted": "Đã tự đánh giá",
+   "managerSubmitted": "Quản lý đã đánh giá",
+   "notStarted": "Chưa bắt đầu"
+  },
+  "empty": {
+   "title": "Không tìm thấy nhân viên phù hợp",
+   "description": "Hãy thử một từ khóa tìm kiếm khác."
+  },
+  "ratingLabels": {
+   "1": "Cần cải thiện",
+   "2": "Đang phát triển",
+   "3": "Đạt yêu cầu",
+   "4": "Vượt mong đợi",
+   "5": "Xuất sắc"
+  },
+  "dialog": {
+   "loading": "Đang tải…",
+   "loadFailed": "Không thể tải đánh giá này.",
+   "submitFailed": "Gửi không thành công.",
+   "selfSection": "Tự đánh giá",
+   "managerSection": "Đánh giá của Quản lý",
+   "ratingLabel": "Điểm đánh giá",
+   "selectRating": "Chọn một mức điểm",
+   "commentsLabel": "Nhận xét",
+   "submitSelf": "Gửi tự đánh giá",
+   "submitManager": "Gửi đánh giá quản lý",
+   "notSubmittedYet": "Chưa được gửi.",
+   "closeButton": "Đóng"
+  }
  }
 }
