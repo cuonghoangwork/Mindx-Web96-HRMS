@@ -94,10 +94,6 @@ function validateStep(stepId, data) {
   return errs;
 }
 
-function isStepComplete(stepId, data) {
-  return Object.keys(validateStep(stepId, data)).length === 0;
-}
-
 /* Field = FormField alias for convenience inside this file */
 const Field = FormField;
 

@@ -150,7 +150,7 @@ function Candidates() {
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdParam = searchParams.get("job");
 
-  const { candidates, jobs, updateCandidate, uploadCandidateCv, removeCandidate, getJobById } = useStore();
+  const { candidates, updateCandidate, uploadCandidateCv, removeCandidate, getJobById } = useStore();
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");

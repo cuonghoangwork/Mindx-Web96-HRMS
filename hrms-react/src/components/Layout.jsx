@@ -43,7 +43,7 @@ function Layout() {
                 marginBottom: "var(--sp-5)",
               }}
             >
-              <span>Couldn't load data: {storeError}</span>
+              <span>Couldn&apos;t load data: {storeError}</span>
               <Button
                 variant="secondary"
                 size="sm"

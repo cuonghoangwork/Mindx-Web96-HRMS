@@ -38,6 +38,8 @@ services:
         sync: false
       - key: API_SECRET
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false           # optional — leave blank to disable the performance review "Ask AI" insight
       - key: ALLOW_PUBLIC_REGISTRATION
         value: "false"        # accounts are created through the Add Employee flow
       - key: ACCOUNT_EMAIL_DOMAIN

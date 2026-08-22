@@ -118,7 +118,7 @@ function Login() {
 
           {!configLoading && publicRegistration && (
             <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link to="/register" className="link-primary">
                 Create one
               </Link>

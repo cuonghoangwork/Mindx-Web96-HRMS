@@ -106,7 +106,7 @@ function buildChartData(attendance, totalStaff) {
 }
 
 /* ─── Tooltip ─── */
-function Tooltip({ x, y, data, svgW, svgH }) {
+function Tooltip({ x, y, data, svgW }) {
   if (!data) return null;
   const W = 148, H = 96;
   const tx = Math.min(Math.max(x - W / 2, 4), svgW - W - 4);

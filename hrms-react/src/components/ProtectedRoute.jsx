@@ -69,7 +69,7 @@ function AccessDenied() {
           Access Denied
         </div>
         <div style={{ fontSize: 'var(--fs-md)' }}>
-          You don't have permission to view this page.
+          You don&apos;t have permission to view this page.
         </div>
         <div style={{ fontSize: 'var(--fs-sm)', marginTop: 'var(--sp-1)' }}>
           Contact your Administrator if you need access.

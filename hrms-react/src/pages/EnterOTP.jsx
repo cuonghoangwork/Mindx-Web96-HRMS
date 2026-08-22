@@ -49,7 +49,7 @@ function EnterOTP() {
           </form>
 
           <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--txt-secondary)' }}>
-            Didn't receive the code?{' '}
+            Didn&apos;t receive the code?{' '}
             <button type="button" className="link-primary" style={{
               background: 'none',
               border: 'none',

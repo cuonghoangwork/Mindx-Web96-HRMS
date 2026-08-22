@@ -8,7 +8,6 @@ import { useLanguage } from "../context/LanguageContext";
 import { formatDate } from "../utils/format";
 import { LeaveRequestsAPI, PayrollAPI, AuditLogAPI, ProfileEditRequestsAPI } from "../api";
 import { resolveStatus, buildMonthAttendance, buildDayData } from "../utils/attendance";
-import { fmtMoney } from "../utils/payroll";
 import AttendanceCalendarGrid from "../components/AttendanceCalendarGrid";
 import PayrollBreakdownPanel from "../components/PayrollBreakdownPanel";
 import Avatar from "../components/Avatar";
@@ -963,7 +962,7 @@ function SalaryTab({ employee, isManagerTier }) {
           </svg>
         </div>
         <div className="empty-state-title">No payslips on file</div>
-        <div className="empty-state-description">This employee hasn't been included in a payroll run yet.</div>
+        <div className="empty-state-description">This employee hasn&apos;t been included in a payroll run yet.</div>
       </div>
     );
   }
@@ -1042,7 +1041,7 @@ function ActivityTab({ employee }) {
         </div>
         <div className="empty-state-title">No recent activity</div>
         <div className="empty-state-description">
-          Changes to this employee's record will show up here (from the last 50 system-wide events).
+          Changes to this employee&apos;s record will show up here (from the last 50 system-wide events).
         </div>
       </div>
     );
@@ -1170,21 +1169,6 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
         Only a single contract PDF is supported today. Multi-document uploads (offer letters, ID
         scans, etc.) need a new backend model — flagged as a follow-up.
       </p>
-    </div>
-  );
-}
-
-function TabComingSoon({ title, description }) {
-  return (
-    <div className="empty-state">
-      <div className="empty-state-icon">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--txt-disabled)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 3" />
-        </svg>
-      </div>
-      <div className="empty-state-title">{title}</div>
-      <div className="empty-state-description">{description}</div>
     </div>
   );
 }

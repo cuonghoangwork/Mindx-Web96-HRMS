@@ -26,7 +26,7 @@ function ForgotPassword() {
           <div className="login-header">
             <h1>Forgot Password</h1>
           </div>
-          <p className="login-subtitle">Enter your email and we'll send you a reset link</p>
+          <p className="login-subtitle">Enter your email and we&apos;ll send you a reset link</p>
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">

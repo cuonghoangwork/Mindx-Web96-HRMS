@@ -701,7 +701,7 @@ function SelfServiceDashboard() {
                 </svg>
               </div>
               <div className="empty-state-title">No leave requests yet</div>
-              <div className="empty-state-description">Apply for leave and it'll show up here.</div>
+              <div className="empty-state-description">Apply for leave and it&apos;ll show up here.</div>
             </div>
           ) : (
             <table className="data-table">

@@ -2,7 +2,7 @@
 
 **Project:** MindX Web96 Capstone — HR Management System
 **Source docs:** `HRMS improvement.txt` (v3/v4), plus follow-up discussion on Position Ladder and Eng/Vie language switch
-**Status:** §0–§7 planning, §8–§9 (Navy Signal Blue redesign) shipped 2026-08. See §10 for what the redesign sprint deliberately cut.
+**Status:** §0–§7 planning, §8–§9 (Navy Signal Blue redesign) shipped 2026-08. §10 was the redesign sprint's cut list — as of 2026-08-22, most of it has since shipped too; see §10 below for what's actually still open versus what this doc had drifted out of sync with the code on.
 
 This document is the single source of truth for what's being built next. Each task has a priority (High / Medium / Low) and a rough effort size (S / M / L). Tasks are grouped by feature area, with dependencies called out explicitly since several items share infrastructure (scheduler, Payroll model, review-queue pattern).
 
@@ -110,7 +110,7 @@ Current state: `LanguageContext.jsx` + `src/i18n/locales/en.json`/`vi.json` alre
 |---|---|---|---|---|
 | 7.1 | Redesign pages to be less generic | Medium | L | **Done** — see §8/§9 (Navy Signal Blue redesign, shipped 2026-08). |
 | 7.2 | In-house chat (Zalo-style) | Low | L | Flagged as disproportionate — real-time infra (WebSockets, persistence, presence) unrelated to core HR domain logic. Treat as stretch/optional. |
-| 7.3 | AI-assisted employee review generation | Medium | M | Feasible, good demo value, no new infra beyond an LLM API call. Depends on attendance/payroll/KPI data existing to feed it, and on the Performance module (net new, see §10) existing to attach reviews to. |
+| 7.3 | AI-assisted employee review generation | Medium | M | **Done** — shipped as the per-review "Ask AI" insight button inside the Performance Reviews module (§10.1), backed by `utils/geminiClient.js` (Google AI Studio / Gemini, not a generic placeholder). |
 
 ---
 
@@ -120,24 +120,33 @@ Full visual reskin (design tokens, Archivo typeface, flat/border-first aesthetic
 
 ---
 
-## 10. Redesign Sprint — Backlog (cut from Navy Signal Blue scope, for the next planning pass)
+## 10. Redesign Sprint — Backlog (cut from Navy Signal Blue scope)
 
-The Navy Signal Blue mockup (source: `HRMS Navy Signal Blue.dc.html`) specified more than the 10-day/2-person sprint could responsibly fit. These items were deliberately deferred, not forgotten — most need real backend work first, not just frontend wiring.
+The Navy Signal Blue mockup (source: `HRMS Navy Signal Blue.dc.html`) specified more than the 10-day/2-person sprint could responsibly fit. These items were deliberately deferred, not forgotten.
 
-| # | Item | Why it was cut | Priority | Effort | Notes |
-|---|---|---|---|---|---|
-| 10.1 | **Performance Review module** — review cycles, self/manager ratings, competency dot-grid, goals, peer feedback, appeal workflow, analytics | No backend model exists at all; comparable in scope to the Payroll rework (§3), needs its own sprint(s) | Medium | L | Blocks §7.3 (AI-assisted review generation) if that's ever picked up. |
-| 10.2 | **AI chat assistant** (floating widget, role-scoped context, deep-linking into pages) | Matches already-planned §7.3 but wasn't sequenced into this sprint | Low | M | Feasible as a fast-follow — no new infra beyond an LLM API call once the shell is stable. |
-| 10.3 | **Audit log settings tab** (system-wide, not per-employee) | Backend (`AuditLog` model + controller + router) is real and already partially wired — this sprint's Employee Detail Activity tab (§9) consumes `GET /audit-log/recent` and filters client-side per employee, but there's no standalone Settings-level audit log browser with the full `resource`/`action`/`actor` filters the backend already supports | Low | S | **Cheapest item on this list** — confirmed frontend-only work during the sprint's pre-work audit. Worth pulling in first if a slot opens up. |
-| 10.4 | **Roles & Permissions matrix** settings tab (system-admin only) | No backend permissions-config model exists — genuinely new scope, not just a UI gap | Medium | M | — |
-| 10.5 | **USD⇄VND currency toggle** in the topbar (live, user-facing switch) | `ExchangeRate` model and backend usage already exist; `Payroll.jsx`/`Jobs.jsx`/`format.js` already touch currency formatting. Lower risk than the original comparison doc assumed, but a topbar-level live toggle wasn't in this sprint's Day 1–10 scope | Low | S | Cheapest currency-related gap; the underlying FX infra is done. |
-| 10.6 | **Icon system removal** (mockup is nearly icon-free; current app kept its outline-SVG icon system, per decision 8.0c) | Deliberate scope decision — no clear product reason to strip icons, and it would touch every page | — | — | Only revisit if explicitly requested by whoever owns the design brief. |
-| 10.7 | **Manager department-scoping is UI-level only, not a real security boundary** | This sprint's Manager scoping (Attendance/Leave/roster filtered to `department === me.department`) is entirely client-side filtering over an already-unscoped API response — a Manager account can still reach company-wide data by calling the API directly, matching today's status quo elsewhere in the app | Medium | M | If real least-privilege enforcement is ever wanted, add department checks inside `attendanceController`/`leaveRequestController`/`employeeController`, not just the frontend filter. |
-| 10.8 | **Payroll self-service** — no payslip endpoint for `EMPLOYEE` role | Payroll API (`payrollRouter.js`) is entirely `authorize("MANAGER","ADMIN")`-gated; the new Employee Detail Salary tab (§9) shows Employees their on-file salary figure only, with an explicit note that a full payslip view isn't available to them today | Medium | S | Needs one new self-service route (`GET /payroll/my-payslips` or similar) scoped to the logged-in employee's own records — the `Payslip` model and calculation engine already exist, this is additive routing/authorization only. |
-| 10.9 | **Employee Detail Documents tab — single-document limit** | Current `Employee.contractUrl` (or equivalent) supports one contract file; the mockup implies multi-document upload (contract + ID + certificates, etc.) | Low | M | Needs a versioned `Document`/`Contract` collection instead of a single URL field — schema change, not just UI. |
-| 10.10 | **i18n coverage gap in new redesign-sprint UI** | Org Chart, Candidates Kanban, the self-service Dashboard, and the new Employee Detail tabs (Attendance/Leave/Salary/Documents/Activity) were all built with hardcoded English strings — they were not extracted into `en.json`/`vi.json` during this sprint | Medium | S–M | Should be folded into §6.2/§6.3's next pass rather than treated as fully separate work — same extraction process, just a few more files. |
+**Update, 2026-08-22:** this section had drifted out of sync with the code — five of the ten items below shipped in follow-on work without this doc being updated. Verified against the actual repo (`git log`, live controller/route/component inspection), not just re-reading this file. Split into what's shipped and what's still genuinely open.
 
-**Explicitly confirmed as no leftover mock/seed data:** the sprint's end-of-day audit (Day 10) checked every file touched or added in Days 6–9 (Org Chart, Candidates Kanban, Dashboard self-service view, Employee Detail tabs, Attendance weekly toggle, and the new `utils/attendance.js`/`utils/payroll.js` extractions) for mock/seed/fake/dummy data patterns. The only matches were the Attendance page's pre-existing deterministic mock-fill logic (present before this sprint, only relocated into `utils/attendance.js` verbatim) and Dashboard's pre-existing mock activity-feed array (also unchanged). The new Employee Detail Activity tab deliberately avoided copying that mock pattern and instead wired the real `AuditLog` API — the one place this sprint improved on data-fidelity rather than just matching the mockup's visuals.
+### Shipped since this list was written
+
+| # | Item | Status |
+|---|---|---|
+| 10.1 | **Performance Review module** — review cycles, self/manager ratings, competency dot-grid, goals, peer feedback, appeal workflow, analytics, AI insight | **Shipped** — `PerformanceCycle`/`PerformanceReview` models, `performanceController`/`performanceRouter`, `utils/performanceScope.js` (real server-side access control — see 10.7 below), `utils/geminiClient.js` for the "Ask AI" insight. Frontend: `Performance.jsx`, `PerformanceReviewDialog.jsx`, `CreateCycleDialog.jsx`, all with tests. Merged to `main` 2026-08-21. See `PERFORMANCE_REVIEWS_TASK_SPLIT.md` / `PERFORMANCE_REVIEWS_API_CONTRACT.md` for the frozen contract this was built against. |
+| 10.3 | **Audit log settings tab** | **Shipped** — `Settings.jsx`'s `AuditLogTab`, gated to HR-tier, has real content (actor/role/action/time columns) wired to `GET /audit-log`, not a stub. |
+| 10.5 | **USD⇄VND currency toggle** in the topbar | **Shipped** — `Header.jsx` uses `useCurrency()`/`toggleCurrency` from `CurrencyContext`. |
+| 10.7 | **Manager department-scoping was UI-level only** | **Resolved** — real server-side enforcement now exists everywhere it matters: `utils/managerScope.js`'s `getManagerDepartmentId()` is used across `attendanceController` (checkIn/checkOut/update/remove, not just list), `employeeController` (write actions), `payrollController`, and the shared `utils/reviewQueue.js` pattern (leave/profile-edit/promotion/no-show requests, with 403s on both list and review). The new Performance module has its own equivalent in `utils/performanceScope.js`. `employeeController.getDetail` is the one deliberate exception — Manager directory reads are company-wide by design (see its inline comment), while writes stay department-scoped. |
+| 10.8 | **Payroll self-service** — no payslip endpoint for `EMPLOYEE` | **Shipped** — `GET /payroll/my-payslips`, scoped to the requesting employee's own records, filters out draft-status periods so employees never see unapproved payroll data. |
+
+### Still open
+
+| # | Item | Priority | Effort | Notes |
+|---|---|---|---|---|
+| 10.2 | **AI chat assistant** (floating widget, role-scoped context, deep-linking into pages) | Low | M | Confirmed not started — no floating widget component anywhere in `src/`. Distinct from 10.1's per-review "Ask AI" button, which is a different, narrower feature that did ship. |
+| 10.4 | **Roles & Permissions matrix** settings tab (system-admin only) | Medium | M | Partially misleading to call fully open: a "Roles & Permissions" tab now exists in Settings (`RolesTab`, admin-only), but its content is `PromoteUsersPanel` — a tool for promoting a user's *role* (Employee→Manager, etc.), not a matrix for configuring what each role is *permitted to do*. The latter (no backend permissions-config model) is still genuinely unbuilt. |
+| 10.6 | **Icon system removal** (mockup is nearly icon-free; current app kept its outline-SVG icon system, per decision 8.0c) | — | — | Unchanged, deliberate no-op. Only revisit if explicitly requested by whoever owns the design brief. |
+| 10.9 | **Employee Detail Documents tab — single-document limit** | Low | M | Confirmed still open — `ViewEmployee.jsx`'s Documents tab has an explicit inline note that only one contract PDF is supported and multi-document upload needs a new backend model. |
+| 10.10 | **i18n coverage gap in redesign-sprint UI** | Medium | S–M | Confirmed still open, and uneven: `OrgChart.jsx` and `Candidates.jsx` (Kanban view) have **zero** `useTranslation`/`t()` usage — fully hardcoded English. `ViewEmployee.jsx`'s newer tabs (Salary/Documents/Activity) are also mostly hardcoded (1 `t()` call across a 1,300+ line file). `Dashboard.jsx` is the exception — largely already extracted (37 `t()` calls), likely from a later i18n pass that didn't circle back to the others. |
+
+**Explicitly confirmed as no leftover mock/seed data (as of the original redesign sprint):** the sprint's end-of-day audit (Day 10) checked every file touched or added in Days 6–9 for mock/seed/fake/dummy data patterns. The only matches were the Attendance page's pre-existing deterministic mock-fill logic (present before this sprint, only relocated into `utils/attendance.js` verbatim) and Dashboard's pre-existing mock activity-feed array (also unchanged). The new Employee Detail Activity tab deliberately avoided copying that mock pattern and instead wired the real `AuditLog` API.
 
 ---
 
@@ -148,10 +157,10 @@ The Navy Signal Blue mockup (source: `HRMS Navy Signal Blue.dc.html`) specified 
 3. **Position Ladder** (§2) + **Payroll rework** (§3) — built together; they share the `PositionLevel` table and the scheduler
 4. **Leave Request system** (§4.1–4.8) — highest reuse of existing review-queue pattern
 5. **Jobs/Candidates schema expansion + resume upload** (§5) — additive, low risk, can run in parallel with the above
-6. **AI review generation** (§7.3) — bolt-on once attendance/payroll/KPI data is stable
-7. **Language switch** (§6) — substantially done; remaining work is re-verifying coverage after §8–§9 and closing the §10.10 gap
+6. **AI review generation** (§7.3) — **done**, shipped as part of the Performance module (§10.1)
+7. **Language switch** (§6) — substantially done; remaining work is closing the §10.10 gap (Org Chart, Candidates Kanban, and the newer Employee Detail tabs are hardcoded English)
 8. **Design rework** (§7.1 / §8–§9) — **done**
-9. **Redesign backlog** (§10) — pick off cheapest items first: audit log tab (10.3) and currency toggle (10.5) are frontend-only; payroll self-service (10.8) is a small additive route
+9. **Redesign backlog** (§10) — 10.1/10.3/10.5/10.7/10.8 **done**; remaining open items are the AI chat widget (10.2), a real permissions-config matrix (10.4), multi-document upload (10.9), and the i18n gap (10.10) — see §10 for current status of each
 10. **Chat** (§7.2) — only if time permits; optional
 
 ---
