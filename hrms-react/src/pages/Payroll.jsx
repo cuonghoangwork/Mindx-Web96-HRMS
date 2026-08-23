@@ -77,9 +77,9 @@ function DeptChart({ data, currency, fxRate }) {
             width: "88px", flexShrink: 0, textAlign: "right", fontSize: "var(--fs-xs)",
             color: "var(--txt-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>{d.name}</span>
-          <div style={{ flex: 1, height: "10px", background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)" }}>
+          <div style={{ flex: 1, height: "10px", background: "var(--bg-surface-sub)" }}>
             <div style={{
-              height: "10px", borderRadius: "var(--radius-full)", background: d.color,
+              height: "10px", background: d.color,
               width: `${Math.round((d.total / max) * 100)}%`, transition: "width 0.5s ease",
             }} />
           </div>

@@ -115,8 +115,7 @@ function Tooltip({ x, y, data, svgW }) {
   return (
     <g>
       <rect x={tx} y={ty} width={W} height={H}
-        rx="2" fill="var(--bg-surface)" stroke="var(--bdr-default)" strokeWidth="0.5"
-        filter="drop-shadow(0 4px 12px rgba(11,31,58,0.14))" />
+        fill="var(--bg-surface)" stroke="var(--bdr-default)" strokeWidth="1" />
       <text x={tx + 10} y={ty + 18} fontSize="11" fontWeight="600" fill="var(--txt-primary)">
         {data.fullLabel}{data.isToday ? " (today)" : ""}
       </text>
@@ -127,7 +126,7 @@ function Tooltip({ x, y, data, svgW }) {
         { label: "Absent",   value: data.absent,  color: "var(--clr-danger-500)" },
       ].map((row, i) => (
         <g key={row.label}>
-          <rect x={tx + 10} y={ty + 28 + i * 16} width="7" height="7" rx="2" fill={row.color} />
+          <rect x={tx + 10} y={ty + 28 + i * 16} width="7" height="7" fill={row.color} />
           <text x={tx + 22} y={ty + 36 + i * 16} fontSize="11" fill="var(--txt-secondary)">{row.label}</text>
           <text x={tx + W - 10} y={ty + 36 + i * 16} fontSize="11" fontWeight="500"
             fill="var(--txt-primary)" textAnchor="end">{row.value}</text>
@@ -191,17 +190,6 @@ export default function AttendanceTrendChart({
         aria-label="Attendance trend chart — last 7 days"
         onMouseLeave={() => setHovered(null)}
       >
-        <defs>
-          <linearGradient id="atc-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="var(--clr-primary-400)" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="var(--clr-primary-400)" stopOpacity="0.02" />
-          </linearGradient>
-          <linearGradient id="atc-today" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="var(--clr-primary-400)" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="var(--clr-primary-500)" stopOpacity="1" />
-          </linearGradient>
-        </defs>
-
         {/* ── Grid lines ── */}
         {yTicks.map((tick) => (
           <g key={tick}>
@@ -219,7 +207,7 @@ export default function AttendanceTrendChart({
         ))}
 
         {/* ── Area fill ── */}
-        <polygon points={areaPath} fill="url(#atc-area)" />
+        <polygon points={areaPath} fill="var(--clr-primary-400)" fillOpacity="0.08" />
 
         {/* ── Line ── */}
         <polyline
@@ -293,9 +281,9 @@ export default function AttendanceTrendChart({
                 <g>
                   <rect
                     x={cx - 16} y={yPos(d.pct) - 22}
-                    width="32" height="16" rx="4"
+                    width="32" height="16"
                     fill={d.isToday ? "var(--clr-primary-400)" : "var(--bg-surface-alt)"}
-                    stroke="var(--bdr-default)" strokeWidth="0.5"
+                    stroke="var(--bdr-default)" strokeWidth="1"
                   />
                   <text
                     x={cx} y={yPos(d.pct) - 10}
@@ -332,7 +320,7 @@ export default function AttendanceTrendChart({
           ].map((l) => (
             <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
               <span style={{
-                width: "10px", height: "10px", borderRadius: "2px",
+                width: "10px", height: "10px",
                 background: l.color, display: "inline-block", flexShrink: 0,
               }} />
               <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>

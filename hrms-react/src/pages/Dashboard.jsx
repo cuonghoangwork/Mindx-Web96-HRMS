@@ -34,13 +34,7 @@ function Sparkline({ data = [], color = "var(--clr-primary-400)", height = 44 })
   const areaPath = `${pts.join(" ")} ${W - pad},${H - pad} ${pad},${H - pad}`;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height, display: "block", overflow: "visible" }}>
-      <defs>
-        <linearGradient id={`sg-${color.replace(/[^a-z]/gi, "")}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={areaPath} fill={`url(#sg-${color.replace(/[^a-z]/gi, "")})`} />
+      <polygon points={areaPath} fill={color} fillOpacity="0.08" />
       <polyline points={pts.join(" ")} fill="none" stroke={color}
         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       {last && (
@@ -86,10 +80,9 @@ function DeptBars({ departments, getEmployeeCountByDepartment }) {
           }}>{d.name}</span>
           <div style={{
             flex: 1, height: "8px", background: "var(--bg-surface-sub)",
-            borderRadius: "var(--radius-full)",
           }}>
             <div style={{
-              height: "8px", borderRadius: "var(--radius-full)",
+              height: "8px",
               background: d.color,
               width: `${Math.round((d.count / max) * 100)}%`,
               transition: "width 0.5s ease",
