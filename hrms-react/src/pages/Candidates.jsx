@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import Avatar from "../components/Avatar";
 import { CandidateStageBadge } from "../components/Badge";
@@ -34,6 +35,7 @@ function StarRating({ rating }) {
  * same handleStageChange(id, stage) the list view's actions already use.
  */
 function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate }) {
+  const { t } = useTranslation();
   const [dragOverStage, setDragOverStage] = useState(null);
 
   const byStage = useMemo(() => {
@@ -86,14 +88,14 @@ function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate 
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
-                {stage}
+                {t(`common.candidateStages.${stage}`, { defaultValue: stage })}
               </span>
               <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{items.length}</span>
             </div>
 
             {items.length === 0 ? (
               <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", textAlign: "center", padding: "var(--sp-4) 0" }}>
-                Drop here
+                {t("candidates.kanban.dropHere")}
               </div>
             ) : (
               items.map((candidate) => {
@@ -132,7 +134,7 @@ function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate 
                       fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                     }}>
-                      {job ? job.title : "—"}
+                      {job ? job.title : t("candidates.table.noRole")}
                     </div>
                     <StarRating rating={candidate.rating} />
                   </div>
@@ -147,6 +149,7 @@ function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate 
 }
 
 function Candidates() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdParam = searchParams.get("job");
 
@@ -218,15 +221,15 @@ function Candidates() {
   return (
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
-        <h2 style={{ flex: 1 }}>Candidates</h2>
+        <h2 style={{ flex: 1 }}>{t("candidates.title")}</h2>
         <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)" }}>
           {[
             {
-              v: "list", label: "List",
+              v: "list", label: t("candidates.viewToggle.list"),
               icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1" /><path d="M3 10h18M9 4v16" /></svg>,
             },
             {
-              v: "kanban", label: "Kanban",
+              v: "kanban", label: t("candidates.viewToggle.kanban"),
               icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1" /><rect x="10" y="4" width="5" height="10" rx="1" /><rect x="17" y="4" width="5" height="13" rx="1" /></svg>,
             },
           ].map(({ v, label, icon }) => (
@@ -252,27 +255,27 @@ function Candidates() {
         }}
       >
         <div className="stat-card">
-          <div className="stat-card-label">Total Candidates</div>
+          <div className="stat-card-label">{t("candidates.stats.total.title")}</div>
           <div className="stat-card-value">{stats.total}</div>
-          <div className="stat-card-hint">In the pipeline</div>
+          <div className="stat-card-hint">{t("candidates.stats.total.hint")}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">In Interview</div>
+          <div className="stat-card-label">{t("candidates.stats.inInterview.title")}</div>
           <div className="stat-card-value">{stats.inInterview}</div>
-          <div className="stat-card-hint">Active interview stage</div>
+          <div className="stat-card-hint">{t("candidates.stats.inInterview.hint")}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Offers Extended</div>
+          <div className="stat-card-label">{t("candidates.stats.offers.title")}</div>
           <div className="stat-card-value">{stats.offers}</div>
-          <div className="stat-card-hint">Awaiting response</div>
+          <div className="stat-card-hint">{t("candidates.stats.offers.hint")}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Avg. Rating</div>
+          <div className="stat-card-label">{t("candidates.stats.avgRating.title")}</div>
           <div className="stat-card-value">{stats.avgRating.toFixed(1)}</div>
-          <div className="stat-card-hint">Across all candidates</div>
+          <div className="stat-card-hint">{t("candidates.stats.avgRating.hint")}</div>
         </div>
       </div>
 
@@ -281,7 +284,7 @@ function Candidates() {
           <input
             type="text"
             className="search-input"
-            placeholder="Search by name or role..."
+            placeholder={t("candidates.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -302,10 +305,10 @@ function Candidates() {
                 fontSize: "var(--fs-md)",
               }}
             >
-              <option value="all">All Stages</option>
+              <option value="all">{t("candidates.allStages")}</option>
               {STAGES.map((stage) => (
                 <option key={stage} value={stage}>
-                  {stage}
+                  {t(`common.candidateStages.${stage}`, { defaultValue: stage })}
                 </option>
               ))}
             </select>
@@ -325,11 +328,11 @@ function Candidates() {
                 background: "var(--bg-primary-subtle)",
               }}
             >
-              Job: {jobFilter ? jobFilter.title : "Unknown / Removed"}
+              {t("candidates.jobFilter.label", { title: jobFilter ? jobFilter.title : t("candidates.jobFilter.unknown") })}
               <button
                 type="button"
                 onClick={clearJobFilter}
-                aria-label="Clear job filter"
+                aria-label={t("candidates.jobFilter.clear")}
                 style={{
                   background: "none",
                   border: "none",
@@ -349,9 +352,9 @@ function Candidates() {
             variant="secondary"
             onClick={handleReset}
             disabled={!hasActiveFilters}
-            title="Reset search and filters"
+            title={t("candidates.resetTooltip")}
           >
-            Reset
+            {t("candidates.reset")}
           </Button>
         </div>
 
@@ -363,18 +366,18 @@ function Candidates() {
                 <path d="M4 21c0-4 4-7 8-7s8 3 8 7" />
               </svg>
             </div>
-            <div className="empty-state-title">No candidates found</div>
+            <div className="empty-state-title">{t("candidates.empty.title")}</div>
             <div className="empty-state-description">
               {hasActiveFilters
-                ? "Try adjusting your search or filters to find what you're looking for."
-                : "Candidates will appear here once they apply to a job opening."}
+                ? t("candidates.empty.filtered")
+                : t("candidates.empty.unfiltered")}
             </div>
             {hasActiveFilters && (
               <Button
                 variant="secondary"
                 onClick={handleReset}
               >
-                Clear filters
+                {t("candidates.empty.clearFilters")}
               </Button>
             )}
           </div>
@@ -389,12 +392,12 @@ function Candidates() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Candidate</th>
-                <th>Role Applied For</th>
-                <th>Stage</th>
-                <th>Rating</th>
-                <th>Applied Date</th>
-                <th>Action</th>
+                <th>{t("candidates.table.candidate")}</th>
+                <th>{t("candidates.table.roleAppliedFor")}</th>
+                <th>{t("candidates.table.stage")}</th>
+                <th>{t("candidates.table.rating")}</th>
+                <th>{t("candidates.table.appliedDate")}</th>
+                <th>{t("candidates.table.action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -408,7 +411,7 @@ function Candidates() {
                         <span style={{ fontWeight: "var(--fw-medium)" }}>{candidate.name}</span>
                       </div>
                     </td>
-                    <td>{job ? job.title : "—"}</td>
+                    <td>{job ? job.title : t("candidates.table.noRole")}</td>
                     <td>
                       <CandidateStageBadge stage={candidate.stage} />
                     </td>
@@ -421,7 +424,7 @@ function Candidates() {
                         variant="link"
                         onClick={() => setSelectedCandidateId(candidate.id)}
                       >
-                        View
+                        {t("candidates.table.view")}
                       </Button>
                     </td>
                   </tr>

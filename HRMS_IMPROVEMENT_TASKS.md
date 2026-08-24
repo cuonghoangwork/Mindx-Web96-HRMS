@@ -2,7 +2,7 @@
 
 **Project:** MindX Web96 Capstone — HR Management System
 **Source docs:** `HRMS improvement.txt` (v3/v4), plus follow-up discussion on Position Ladder and Eng/Vie language switch
-**Status:** §0–§7 planning, §8–§9 (Navy Signal Blue redesign) shipped 2026-08. §10 was the redesign sprint's cut list — as of 2026-08-22, most of it has since shipped too; see §10 below for what's actually still open versus what this doc had drifted out of sync with the code on.
+**Status:** §0–§5 were re-verified directly against the live repo on 2026-08-23 — despite still being labeled "Planning" in each table below, roughly 24 of 25 items have shipped (see the "Status Update — 2026-08-23" block after §5 for the itemized breakdown). The one remaining item, KPI bonus rules (§3.4), was formally **descoped by product decision on 2026-08-23** — see that section for why. §8–§9 (Navy Signal Blue redesign) shipped 2026-08. §10 was the redesign sprint's cut list — as of 2026-08-22, most of it has since shipped too; see §10 below for what's actually still open versus what this doc had drifted out of sync with the code on.
 
 This document is the single source of truth for what's being built next. Each task has a priority (High / Medium / Low) and a rough effort size (S / M / L). Tasks are grouped by feature area, with dependencies called out explicitly since several items share infrastructure (scheduler, Payroll model, review-queue pattern).
 
@@ -54,7 +54,7 @@ These aren't user-facing features on their own, but four other feature areas bel
 | 3.1 | `Payroll` model (see 0.4) | High | M | Foundation for everything below. |
 | 3.2 | Basic salary / bonus / allowance / deductions as distinct fields per pay period | High | S | Once 3.1 exists, this is just the schema. |
 | 3.3 | Basic salary +10%/year, varies by position | Medium | M | Feeds off `PositionLevel` (2.3) — needs an annual increment job (uses 0.1). |
-| 3.4 | Bonus rules: up to 40% of basic for Sales (KPI-based), fixed 10% for other positions | Medium | L | Requires KPI tracking, which doesn't exist anywhere today — the largest net-new subsystem in the whole list. |
+| 3.4 | ~~Bonus rules: up to 40% of basic for Sales (KPI-based), fixed 10% for other positions~~ | — | — | **Removed from scope, 2026-08-23** — product decision. Was the largest net-new subsystem on this list (would have required building KPI/quota tracking from scratch). See the Status Update block below for the reasoning. |
 | 3.5 | Payroll run on the 10th of each month, notify everyone | Medium | M | Uses shared scheduler (0.1) + `notifyHR()`/broadcast notification. |
 | 3.6 | Manager/Admin manual payroll adjustment | High | S–M | Reuse the audit-log pattern already built for employees/departments. |
 | 3.7 | Migrate `Payroll.jsx` display + CSV export to read from `Payroll` records instead of live `employee.salary` | High | M | UI rework once 3.1–3.2 are live; keep the existing VN PIT/BHXH/BHYT/BHTN math intact as the engine. |
@@ -84,6 +84,37 @@ These aren't user-facing features on their own, but four other feature areas bel
 | 5.2 | Candidate count per job | — | — | **Already implemented** (`applicantCount` via `getApplicantCount`). |
 | 5.3 | Real PDF CV upload for candidates | Medium | S–M | Extend existing Multer + Cloudinary avatar pattern to resumes (`resource_type: "raw"`). |
 | 5.4 | HR accept/reject candidates | — | — | **Already implemented** via `stage` enum (`Hired`/`Rejected`) + `CandidateSidePanel`. |
+
+---
+
+## Status Update — 2026-08-23
+
+Same verification method as §10 below: checked directly against `git log`, live model/controller/job inspection — not a re-read of this file. §0–§5 above are still labeled "Planning" in their table headers, but nearly everything in them has shipped:
+
+| # | Item | Status |
+|---|---|---|
+| 0.1 | Job scheduler | **Done.** `node-cron` in `jobs/index.js`, 6 scheduled jobs (closeAttendanceDay, checkPromotionEligibility, generateMonthlyPayrollDraft, runMonthlyPayroll, annualSalaryRaise, sendPerformanceReminders), each with a re-entrancy guard and a configurable cron expression via env var. |
+| 0.2 | Generic review-queue pattern | **Done.** `utils/reviewQueue.js`, reused by `LeaveRequest`, `NoShowReview`, `PromotionRequest`, and the original `ProfileEditRequest`. |
+| 0.3 | `PositionLevel` lookup model | **Done.** `model/PositionLevel.js`. |
+| 0.4 / 3.1–3.2 | Real `Payroll` model | **Done.** Shipped as two models — `PayrollPeriod` (one per month, `draft/approved/paid`) + `Payslip` (one per employee per period) — rather than a single `Payroll` model, but covers the same ground. |
+| 3.3 | Basic salary +10%/year | **Done.** `jobs/annualSalaryRaise.js`, `ANNUAL_RAISE_RATE = 0.1`. Auto-flags a `PromotionRequest` for HR review — never auto-applies, consistent with 2.4's "never auto-promote" principle. |
+| **3.4** | **KPI-based bonus rules** | **Removed from scope, 2026-08-23 — product decision.** Confirmed there was no partial implementation to preserve: no KPI/quota/target/revenue tracking existed anywhere in the codebase, so this would have been a from-scratch subsystem (schema, data entry, computation) rather than a gap in something already started. Payroll doesn't lose bonus functionality by dropping this — `Payslip.bonus` is a real field, and the existing manual payroll-adjustment endpoint (task 3.6, shipped) already lets HR/Admin set a bonus amount per employee per period by hand, including for Sales. Descoping 3.4 only removes the *automatic, KPI-driven calculation* of that number, not the ability to pay a bonus at all. |
+| 3.5 | Monthly payroll run + notify | **Done.** `jobs/runMonthlyPayroll.js`. |
+| 3.6 | Manual payroll adjustment | **Done**, audited (`tests/payrollAdjustment.integration.test.js`). |
+| 3.7 | `Payroll.jsx` reads from real records | **Done.** Confirmed — the page calls `PayrollAPI.listPeriods()`/`listPayslips()` exclusively; no live `employee.annualSalary` computation left. |
+| 4.1 | `LeaveRequest` model | **Done, and expanded.** Shipped as a 5-type system (`annual/sick/parental/bereavement/unpaid`) with per-type allowances rather than one flat 12-day cap — a deliberate redesign per the "Migrate leave system to 5 leave types" commit, not a partial build. |
+| 4.2 | Late = half-day paid/unpaid | **Done.** `Attendance.lateHalfDayType`, counted against the annual balance in `utils/leaveBalance.js`. |
+| 4.4 | Leave beyond cap → unpaid | **Superseded, same effect.** Each capped type has its own allowance and `unpaid` is uncapped by design, rather than one global 12-day cutover. |
+| **4.5** | **14+ unpaid days → tax/SI exemption** | **Done.** `INSURANCE_EXEMPT_UNPAID_DAYS = 14` in `utils/payrollEngine.js` — `insuranceBase` zeroes out and `Payslip.insuranceExempt` is set once unpaid days hit the threshold. |
+| 4.6 | No-show status | **Done.** `no-show` is a real `Attendance.status` value. |
+| 4.7 | 5 no-shows → flag for HR review | **Done.** `NoShowReview` model + controller. |
+| 4.8 | Notify Manager/Admin on flags | **Done** — `notifyHR()` used throughout. |
+| 5.1 | Expand `Job` fields | **Done.** All fields present on the live `Job` model. |
+| 5.3 | Real PDF CV upload | **Done.** `Candidate.resumeUrl`/`resumeUploadedAt`, `tests/candidateCv.integration.test.js`. |
+
+**Net effect:** of the ~25 items in §0–§5, everything has now either shipped or been explicitly descoped — **3.4 (KPI bonus rules)** was the only one still open, and it was removed from scope on 2026-08-23 (see row above). §0–§5 can be considered closed. See `hrms_schema_docs.md` (regenerated 2026-08-23) for the full current schema these items shipped against.
+
+**§1 (Account Model Flip) is also fully shipped**, checked separately since the Build Order below references it: public self-registration is now closed by default (`middleware/registrationGate.js` — `POST /auth/register` 403s unless `ALLOW_PUBLIC_REGISTRATION=true`; `Register.jsx` still exists in the frontend but the route it calls is gated); `employeeController.create` genuinely creates a `User` account (not just linking an existing one) with an auto-generated temp password and `mustChangePassword: true` forced on first login — exactly the "force password reset rather than leaving the ID-derived password live" recommendation this doc made.
 
 ---
 
@@ -152,11 +183,11 @@ The Navy Signal Blue mockup (source: `HRMS Navy Signal Blue.dc.html`) specified 
 
 ## Recommended Build Order
 
-1. **Shared infrastructure** (§0) — scheduler, review-queue pattern, PositionLevel model, Payroll model
-2. **Account model flip** (§1) — blocks payroll/leave/contracts, which all assume a real linked account
-3. **Position Ladder** (§2) + **Payroll rework** (§3) — built together; they share the `PositionLevel` table and the scheduler
-4. **Leave Request system** (§4.1–4.8) — highest reuse of existing review-queue pattern
-5. **Jobs/Candidates schema expansion + resume upload** (§5) — additive, low risk, can run in parallel with the above
+1. **Shared infrastructure** (§0) — **done** — scheduler, review-queue pattern, PositionLevel model, Payroll model (as `PayrollPeriod`/`Payslip`)
+2. **Account model flip** (§1) — **done** — public registration gated off by default, HR/Admin-created accounts with forced first-login password reset
+3. **Position Ladder** (§2) + **Payroll rework** (§3) — **done and closed**; 3.4 (KPI-based bonus rules) was removed from scope on 2026-08-23
+4. **Leave Request system** (§4.1–4.8) — **done** — shipped as a 5-type leave system, exceeds the original flat 12-day-cap scope
+5. **Jobs/Candidates schema expansion + resume upload** (§5) — **done**
 6. **AI review generation** (§7.3) — **done**, shipped as part of the Performance module (§10.1)
 7. **Language switch** (§6) — substantially done; remaining work is closing the §10.10 gap (Org Chart, Candidates Kanban, and the newer Employee Detail tabs are hardcoded English)
 8. **Design rework** (§7.1 / §8–§9) — **done**

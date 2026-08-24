@@ -151,9 +151,12 @@ Seeded by `npm run seed:env`:
 
 | Role | Email | Password |
 |---|---|---|
-| Administrator | `admin@hrms.com` | `admin123` |
-| HR / Manager | `hr@hrms.com` | `hr123456` |
+| Administrator (`ADMIN`) | `admin@hrms.com` | `admin123` |
+| HR — company-wide (`HR`) | `hr@hrms.com` | `hr123456` |
+| Manager — department-scoped (`MANAGER`) | `manager@hrms.com` | `manager123` |
 | Employee | `john.doe@hrms.com` (and other seeded accounts) | `emp001pass` |
+
+`ADMIN`, `HR`, `MANAGER`, and `EMPLOYEE` are four distinct roles (see [Database Schema](#database-schema)) — `HR` is unscoped/company-wide, `MANAGER` is scoped to a single department (`manager@hrms.com` is seeded into Engineering).
 
 ---
 
@@ -245,7 +248,16 @@ Collections:
 - `holidays`
 - `notifications`
 - `auditlogs`
+- `exchangeRates`
+- `leaveRequests`
+- `noShowReviews`
+- `payrollPeriods`
+- `payslips`
+- `performanceCycles`
+- `performanceReviews`
+- `positionLevels`
 - `profileEditRequests`
+- `promotionRequests`
 
 See `hrms_schema_docs.md` for full schema documentation.
 

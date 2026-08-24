@@ -22,7 +22,15 @@
    "October",
    "November",
    "December"
-  ]
+  ],
+  "candidateStages": {
+   "Applied": "Applied",
+   "Screening": "Screening",
+   "Interview": "Interview",
+   "Offer": "Offer",
+   "Hired": "Hired",
+   "Rejected": "Rejected"
+  }
  },
  "dashboard": {
   "stats": {
@@ -607,6 +615,99 @@
    "aiInsightTitle": "AI Insight",
    "aiThinking": "Thinking…",
    "aiUnavailable": "AI insight is unavailable right now. Try again later."
+  }
+ },
+ "orgChart": {
+  "title": "Org Chart",
+  "subtitle": "Department managers and their teams, read-only.",
+  "empty": {
+   "title": "No departments yet",
+   "description": "Create a department to see it here."
+  },
+  "unassignedTitle": "Unassigned",
+  "unassignedCount_one": "{{count}} employee without a matching department record",
+  "unassignedCount_other": "{{count}} employees without a matching department record",
+  "employeeCount_one": "{{count}} employee",
+  "employeeCount_other": "{{count}} employees",
+  "managerOnFile": "Manager on file: {{name}} (no linked employee record)",
+  "noEmployees": "No employees in this department yet.",
+  "managerBadge": "Manager",
+  "noDesignation": "—"
+ },
+ "candidates": {
+  "title": "Candidates",
+  "viewToggle": {
+   "list": "List",
+   "kanban": "Kanban"
+  },
+  "kanban": {
+   "dropHere": "Drop here"
+  },
+  "stats": {
+   "total": {
+    "title": "Total Candidates",
+    "hint": "In the pipeline"
+   },
+   "inInterview": {
+    "title": "In Interview",
+    "hint": "Active interview stage"
+   },
+   "offers": {
+    "title": "Offers Extended",
+    "hint": "Awaiting response"
+   },
+   "avgRating": {
+    "title": "Avg. Rating",
+    "hint": "Across all candidates"
+   }
+  },
+  "searchPlaceholder": "Search by name or role...",
+  "allStages": "All Stages",
+  "jobFilter": {
+   "label": "Job: {{title}}",
+   "unknown": "Unknown / Removed",
+   "clear": "Clear job filter"
+  },
+  "reset": "Reset",
+  "resetTooltip": "Reset search and filters",
+  "empty": {
+   "title": "No candidates found",
+   "filtered": "Try adjusting your search or filters to find what you're looking for.",
+   "unfiltered": "Candidates will appear here once they apply to a job opening.",
+   "clearFilters": "Clear filters"
+  },
+  "table": {
+   "candidate": "Candidate",
+   "roleAppliedFor": "Role Applied For",
+   "stage": "Stage",
+   "rating": "Rating",
+   "appliedDate": "Applied Date",
+   "action": "Action",
+   "view": "View",
+   "noRole": "—"
+  },
+  "panel": {
+   "title": "Candidate Profile",
+   "close": "Close",
+   "appliedFor": "Applied for",
+   "email": "Email",
+   "phone": "Phone",
+   "appliedDate": "Applied Date",
+   "rating": "Rating",
+   "resume": "Resume",
+   "pipelineStage": "Pipeline Stage",
+   "notes": "Notes",
+   "removeCandidate": "Remove Candidate",
+   "done": "Done",
+   "viewResume": "View Resume",
+   "noCv": "No CV on file yet.",
+   "uploading": "Uploading…",
+   "replaceCv": "Replace CV",
+   "uploadCv": "Upload CV",
+   "cvTypeError": "Please choose a PDF file.",
+   "cvSizeError": "CV must be 10MB or smaller.",
+   "cvUploadError": "Failed to upload CV.",
+   "noValue": "—"
   }
  }
 }

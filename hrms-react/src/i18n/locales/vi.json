@@ -22,7 +22,15 @@
    "Tháng 10",
    "Tháng 11",
    "Tháng 12"
-  ]
+  ],
+  "candidateStages": {
+   "Applied": "Đã ứng tuyển",
+   "Screening": "Sàng lọc",
+   "Interview": "Phỏng vấn",
+   "Offer": "Đề nghị",
+   "Hired": "Đã tuyển",
+   "Rejected": "Từ chối"
+  }
  },
  "dashboard": {
   "stats": {
@@ -601,6 +609,97 @@
    "aiInsightTitle": "Nhận Định AI",
    "aiThinking": "Đang phân tích…",
    "aiUnavailable": "Nhận định AI hiện không khả dụng. Vui lòng thử lại sau."
+  }
+ },
+ "orgChart": {
+  "title": "Sơ Đồ Tổ Chức",
+  "subtitle": "Quản lý phòng ban và đội nhóm của họ, chỉ xem.",
+  "empty": {
+   "title": "Chưa có phòng ban nào",
+   "description": "Tạo một phòng ban để xem tại đây."
+  },
+  "unassignedTitle": "Chưa phân bổ",
+  "unassignedCount_other": "{{count}} nhân viên không có bản ghi phòng ban phù hợp",
+  "employeeCount_other": "{{count}} nhân viên",
+  "managerOnFile": "Quản lý trên hồ sơ: {{name}} (không có bản ghi nhân viên liên kết)",
+  "noEmployees": "Chưa có nhân viên nào trong phòng ban này.",
+  "managerBadge": "Quản lý",
+  "noDesignation": "—"
+ },
+ "candidates": {
+  "title": "Ứng viên",
+  "viewToggle": {
+   "list": "Danh sách",
+   "kanban": "Kanban"
+  },
+  "kanban": {
+   "dropHere": "Thả vào đây"
+  },
+  "stats": {
+   "total": {
+    "title": "Tổng số ứng viên",
+    "hint": "Trong quy trình tuyển dụng"
+   },
+   "inInterview": {
+    "title": "Đang phỏng vấn",
+    "hint": "Đang ở giai đoạn phỏng vấn"
+   },
+   "offers": {
+    "title": "Đã gửi đề nghị",
+    "hint": "Đang chờ phản hồi"
+   },
+   "avgRating": {
+    "title": "Đánh giá TB",
+    "hint": "Trên tất cả ứng viên"
+   }
+  },
+  "searchPlaceholder": "Tìm theo tên hoặc vị trí...",
+  "allStages": "Tất cả giai đoạn",
+  "jobFilter": {
+   "label": "Vị trí: {{title}}",
+   "unknown": "Không xác định / Đã xóa",
+   "clear": "Bỏ lọc theo vị trí"
+  },
+  "reset": "Đặt lại",
+  "resetTooltip": "Đặt lại tìm kiếm và bộ lọc",
+  "empty": {
+   "title": "Không tìm thấy ứng viên",
+   "filtered": "Hãy thử điều chỉnh tìm kiếm hoặc bộ lọc của bạn.",
+   "unfiltered": "Ứng viên sẽ xuất hiện ở đây khi họ ứng tuyển vào một vị trí.",
+   "clearFilters": "Xóa bộ lọc"
+  },
+  "table": {
+   "candidate": "Ứng viên",
+   "roleAppliedFor": "Vị trí ứng tuyển",
+   "stage": "Giai đoạn",
+   "rating": "Đánh giá",
+   "appliedDate": "Ngày ứng tuyển",
+   "action": "Thao tác",
+   "view": "Xem",
+   "noRole": "—"
+  },
+  "panel": {
+   "title": "Hồ sơ ứng viên",
+   "close": "Đóng",
+   "appliedFor": "Ứng tuyển vị trí",
+   "email": "Email",
+   "phone": "Điện thoại",
+   "appliedDate": "Ngày ứng tuyển",
+   "rating": "Đánh giá",
+   "resume": "Hồ sơ",
+   "pipelineStage": "Giai đoạn tuyển dụng",
+   "notes": "Ghi chú",
+   "removeCandidate": "Xóa ứng viên",
+   "done": "Xong",
+   "viewResume": "Xem hồ sơ",
+   "noCv": "Chưa có hồ sơ CV.",
+   "uploading": "Đang tải lên…",
+   "replaceCv": "Thay CV",
+   "uploadCv": "Tải lên CV",
+   "cvTypeError": "Vui lòng chọn tệp PDF.",
+   "cvSizeError": "CV phải nhỏ hơn hoặc bằng 10MB.",
+   "cvUploadError": "Tải lên CV thất bại.",
+   "noValue": "—"
   }
  }
 }

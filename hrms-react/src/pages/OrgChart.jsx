@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { idsMatch } from "../utils/id";
 import Avatar from "../components/Avatar";
@@ -17,6 +18,7 @@ import Badge from "../components/Badge";
  * real schema change. Admin/HR only, matching the nav split from 8.0e.
  */
 function OrgChart() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { departments, employees, getEmployeesByDepartment } = useStore();
 
@@ -28,9 +30,9 @@ function OrgChart() {
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ margin: 0 }}>Org Chart</h2>
+          <h2 style={{ margin: 0 }}>{t("orgChart.title")}</h2>
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            Department managers and their teams, read-only.
+            {t("orgChart.subtitle")}
           </p>
         </div>
       </div>
@@ -43,8 +45,8 @@ function OrgChart() {
                 <path d="M3 21h18" /><path d="M6 21V8l6-4 6 4v13" /><path d="M10 21v-4h4v4" />
               </svg>
             </div>
-            <div className="empty-state-title">No departments yet</div>
-            <div className="empty-state-description">Create a department to see it here.</div>
+            <div className="empty-state-title">{t("orgChart.empty.title")}</div>
+            <div className="empty-state-description">{t("orgChart.empty.description")}</div>
           </div>
         </div>
       ) : (
@@ -61,10 +63,10 @@ function OrgChart() {
           {unassigned.length > 0 && (
             <div className="content-card">
               <h3 className="section-title" style={{ marginBottom: "var(--sp-2)" }}>
-                Unassigned
+                {t("orgChart.unassignedTitle")}
               </h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>
-                {unassigned.length} employee{unassigned.length === 1 ? "" : "s"} without a matching department record
+                {t("orgChart.unassignedCount", { count: unassigned.length })}
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-3)" }}>
                 {unassigned.map((emp) => (
@@ -80,6 +82,7 @@ function OrgChart() {
 }
 
 function DepartmentCluster({ department, employees, onSelectEmployee }) {
+  const { t } = useTranslation();
   const manager = department.managerId
     ? employees.find((e) => idsMatch(e.id, department.managerId))
     : null;
@@ -93,12 +96,12 @@ function DepartmentCluster({ department, employees, onSelectEmployee }) {
         <div>
           <h3 className="section-title" style={{ margin: 0 }}>{department.name}</h3>
           <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            {employees.length} employee{employees.length === 1 ? "" : "s"}
+            {t("orgChart.employeeCount", { count: employees.length })}
           </p>
         </div>
         {!manager && department.manager && (
           <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-            Manager on file: {department.manager} (no linked employee record)
+            {t("orgChart.managerOnFile", { name: department.manager })}
           </span>
         )}
       </div>
@@ -117,7 +120,7 @@ function DepartmentCluster({ department, employees, onSelectEmployee }) {
       {reports.length === 0 ? (
         !manager && (
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", textAlign: "center" }}>
-            No employees in this department yet.
+            {t("orgChart.noEmployees")}
           </p>
         )
       ) : (
@@ -132,6 +135,7 @@ function DepartmentCluster({ department, employees, onSelectEmployee }) {
 }
 
 function EmployeeChip({ employee, onClick, highlight = false }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -161,10 +165,10 @@ function EmployeeChip({ employee, onClick, highlight = false }) {
           fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
         }}>
-          {employee.designation || "—"}
+          {employee.designation || t("orgChart.noDesignation")}
         </div>
       </div>
-      {highlight && <Badge variant="primary" size="sm" style={{ marginLeft: "auto" }}>Manager</Badge>}
+      {highlight && <Badge variant="primary" size="sm" style={{ marginLeft: "auto" }}>{t("orgChart.managerBadge")}</Badge>}
     </button>
   );
 }

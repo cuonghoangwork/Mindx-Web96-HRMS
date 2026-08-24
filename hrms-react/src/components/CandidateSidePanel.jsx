@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Avatar from "./Avatar";
 import { CandidateStageBadge } from "./Badge";
 import Button from "./Button";
@@ -28,6 +29,7 @@ function StarRating({ rating }) {
 }
 
 function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDelete, onUploadCv }) {
+  const { t } = useTranslation();
   if (!candidate) return null;
 
   return (
@@ -57,12 +59,12 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
         `}</style>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--sp-6)" }}>
-          <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)" }}>Candidate Profile</h2>
+          <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)" }}>{t("candidates.panel.title")}</h2>
           <button
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("candidates.panel.close")}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
@@ -81,16 +83,16 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-          <InfoRow label="Applied for" value={jobTitle ?? candidate.role} />
-          <InfoRow label="Email" value={candidate.email} />
-          <InfoRow label="Phone" value={candidate.phone} />
-          <InfoRow label="Applied Date" value={candidate.appliedDate} />
+          <InfoRow label={t("candidates.panel.appliedFor")} value={jobTitle ?? candidate.role} />
+          <InfoRow label={t("candidates.panel.email")} value={candidate.email} />
+          <InfoRow label={t("candidates.panel.phone")} value={candidate.phone} />
+          <InfoRow label={t("candidates.panel.appliedDate")} value={candidate.appliedDate} />
           <InfoRow
-            label="Rating"
+            label={t("candidates.panel.rating")}
             value={<StarRating rating={candidate.rating} />}
           />
           <InfoRow
-            label="Resume"
+            label={t("candidates.panel.resume")}
             value={
               <ResumeField candidate={candidate} onUploadCv={onUploadCv} />
             }
@@ -98,7 +100,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
 
           <div className="form-group" style={{ marginTop: "var(--sp-2)" }}>
             <label className="form-label" htmlFor="stage-select">
-              Pipeline Stage
+              {t("candidates.panel.pipelineStage")}
             </label>
             <select
               id="stage-select"
@@ -107,7 +109,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
             >
               {STAGES.map((stage) => (
                 <option key={stage} value={stage}>
-                  {stage}
+                  {t(`common.candidateStages.${stage}`, { defaultValue: stage })}
                 </option>
               ))}
             </select>
@@ -119,7 +121,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
           {candidate.notes && (
             <div>
               <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "var(--ls-widest)", marginBottom: "var(--sp-1)" }}>
-                Notes
+                {t("candidates.panel.notes")}
               </div>
               <div style={{ fontSize: "var(--fs-md)", color: "var(--txt-primary)", lineHeight: "var(--lh-relaxed)" }}>
                 {candidate.notes}
@@ -137,10 +139,10 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
               onClose();
             }}
           >
-            Remove Candidate
+            {t("candidates.panel.removeCandidate")}
           </Button>
           <Button variant="primary" onClick={onClose}>
-            Done
+            {t("candidates.panel.done")}
           </Button>
         </div>
       </div>
@@ -152,6 +154,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
 // ContractCard (file input hidden behind a Button, 10MB/PDF-only client
 // check before hitting the server, inline error message on failure).
 function ResumeField({ candidate, onUploadCv }) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
@@ -164,11 +167,11 @@ function ResumeField({ candidate, onUploadCv }) {
     if (!file) return;
 
     if (file.type !== "application/pdf") {
-      setError("Please choose a PDF file.");
+      setError(t("candidates.panel.cvTypeError"));
       return;
     }
     if (file.size > MAX_CV_BYTES) {
-      setError("CV must be 10MB or smaller.");
+      setError(t("candidates.panel.cvSizeError"));
       return;
     }
 
@@ -177,7 +180,7 @@ function ResumeField({ candidate, onUploadCv }) {
     try {
       await onUploadCv?.(candidate.id, file);
     } catch (err) {
-      setError(err.message || "Failed to upload CV.");
+      setError(err.message || t("candidates.panel.cvUploadError"));
     } finally {
       setUploading(false);
     }
@@ -193,10 +196,10 @@ function ResumeField({ candidate, onUploadCv }) {
             rel="noreferrer"
             style={{ color: "var(--txt-primary-brand)" }}
           >
-            View Resume
+            {t("candidates.panel.viewResume")}
           </a>
         ) : (
-          <span style={{ color: "var(--txt-secondary)" }}>No CV on file yet.</span>
+          <span style={{ color: "var(--txt-secondary)" }}>{t("candidates.panel.noCv")}</span>
         )}
 
         {onUploadCv && (
@@ -207,7 +210,11 @@ function ResumeField({ candidate, onUploadCv }) {
               onClick={handlePick}
               disabled={uploading}
             >
-              {uploading ? "Uploading…" : candidate.resumeUploadedAt ? "Replace CV" : "Upload CV"}
+              {uploading
+                ? t("candidates.panel.uploading")
+                : candidate.resumeUploadedAt
+                  ? t("candidates.panel.replaceCv")
+                  : t("candidates.panel.uploadCv")}
             </Button>
             <input
               ref={fileInputRef}
@@ -229,13 +236,14 @@ function ResumeField({ candidate, onUploadCv }) {
 }
 
 function InfoRow({ label, value }) {
+  const { t } = useTranslation();
   return (
     <div>
       <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "var(--ls-widest)", marginBottom: "var(--sp-1)" }}>
         {label}
       </div>
       <div style={{ fontSize: "var(--fs-md)", color: "var(--txt-primary)" }}>
-        {value || "—"}
+        {value || t("candidates.panel.noValue")}
       </div>
     </div>
   );

@@ -24,6 +24,8 @@
  *   <TypeBadge type={employee.type} />
  */
 
+import { useTranslation } from "react-i18next";
+
 /* ─── Variant → CSS class mapping ─── */
 const VARIANT_CLASS = {
   // Employee status
@@ -138,6 +140,7 @@ export function TypeBadge({ type, size, ...rest }) {
 
 /* ─── CandidateStageBadge: hiring pipeline stage badge ─── */
 export function CandidateStageBadge({ stage, size, ...rest }) {
+  const { t } = useTranslation();
   const map = {
     Applied:   "neutral",
     Screening: "info",
@@ -148,7 +151,7 @@ export function CandidateStageBadge({ stage, size, ...rest }) {
   };
   return (
     <Badge variant={map[stage] ?? "neutral"} size={size} {...rest}>
-      {stage}
+      {t(`common.candidateStages.${stage}`, { defaultValue: stage })}
     </Badge>
   );
 }
