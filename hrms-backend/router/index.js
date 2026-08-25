@@ -15,6 +15,8 @@ import noShowReviewRouter from "./noShowReviewRouter.js";
 import payrollRouter from "./payrollRouter.js";
 import positionLevelRouter from "./positionLevelRouter.js";
 import performanceRouter from "./performanceRouter.js";
+import aiRouter from "./aiRouter.js";
+import permissionRouter from "./permissionRouter.js";
 
 const rootRouter = Router();
 
@@ -34,5 +36,7 @@ rootRouter.use("/no-show-reviews", noShowReviewRouter);
 rootRouter.use("/payroll", payrollRouter);
 rootRouter.use("/position-levels", positionLevelRouter);
 rootRouter.use("/performance", performanceRouter);
+rootRouter.use("/ai", aiRouter);
+rootRouter.use("/permissions", permissionRouter);
 
 export default rootRouter;

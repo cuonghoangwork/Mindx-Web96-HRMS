@@ -501,6 +501,9 @@ const performanceAppealResolve = makeValidator([
   isRequiredText("resolverNote", "Resolver note", 1000),
 ]);
 
+// Solo Gaps Milestone 2 — AI chat widget.
+const aiChat = makeValidator([isRequiredText("message", "Message", 2000)]);
+
 /* ── Exports ── */
 export const validate = {
   employee:   { create: employeeCreate, update: employeeUpdate },
@@ -525,4 +528,5 @@ export const validate = {
     appealCreate: performanceAppealCreate,
     appealResolve: performanceAppealResolve,
   },
+  ai: { chat: aiChat },
 };

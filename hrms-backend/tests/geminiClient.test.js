@@ -96,6 +96,28 @@ describe("askGemini", () => {
     expect(JSON.parse(options.body).generationConfig.responseMimeType).toBeUndefined();
   });
 
+  it("gives the plain-text path real headroom above the model's thinking-token overhead", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "plain text" }] } }] }),
+    });
+    await askGemini("prompt", { apiKey: "test-key", fetchImpl });
+    const [, options] = fetchImpl.mock.calls[0];
+    expect(JSON.parse(options.body).generationConfig.maxOutputTokens).toBe(1200);
+  });
+
+  it("gives the JSON path even more headroom than the plain-text path", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: '{"summary":"Good.","strengths":[],"growthAreas":[]}' }] } }],
+      }),
+    });
+    await askGemini("prompt", { apiKey: "test-key", fetchImpl, json: true });
+    const [, options] = fetchImpl.mock.calls[0];
+    expect(JSON.parse(options.body).generationConfig.maxOutputTokens).toBe(2000);
+  });
+
   it("uses the given model instead of the default", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,

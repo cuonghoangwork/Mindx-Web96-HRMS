@@ -44,6 +44,18 @@ export const EmployeesAPI = {
     form.append("contract", file);
     return apiFetch(`/employees/${id}/contract`, { method: "POST", body: form });
   },
+  // Solo Gaps Milestone 1 — arbitrary multi-document upload (offer
+  // letters, ID scans, other), additive alongside uploadContract above.
+  // label/type apply to the whole batch.
+  uploadDocuments: (id, files, { label, type } = {}) => {
+    const form = new FormData();
+    Array.from(files).forEach((f) => form.append("documents", f));
+    if (label) form.append("label", label);
+    if (type) form.append("type", type);
+    return apiFetch(`/employees/${id}/documents`, { method: "POST", body: form });
+  },
+  removeDocument: (id, docId) =>
+    apiFetch(`/employees/${id}/documents/${docId}`, { method: "DELETE" }),
 };
 
 export const DepartmentsAPI = {
@@ -226,4 +238,18 @@ export const PerformanceReviewsAPI = {
   /** Backend builds the prompt server-side from the stored review — no prompt logic on the client */
   askAI: (cycleKey, employeeId) =>
     apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST" }),
+};
+
+// Solo Gaps Milestone 2 — scoped product-help chat widget, no live data
+// access (see hrms-backend/utils/appChatPrompt.js).
+export const AiAPI = {
+  chat: (message, history) => apiFetch("/ai/chat", { method: "POST", body: { message, history } }),
+};
+
+// Solo Gaps Milestone 3 — permissions matrix. ADMIN-only both ways; can
+// only make MANAGER stricter than authorize() already allows.
+export const PermissionsAPI = {
+  list: () => apiFetch("/permissions"),
+  toggle: (role, capability, enabled) =>
+    apiFetch(`/permissions/${role}/${capability}`, { method: "PATCH", body: { enabled } }),
 };

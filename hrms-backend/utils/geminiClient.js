@@ -79,10 +79,12 @@ export async function askGemini(prompt, {
     // gemini-3.6-flash's "thinking" tokens come out of the same budget as
     // the visible output and can't be disabled for this model (see the
     // DEFAULT_GEMINI_MODEL comment above) — measured ~700-800 thinking
-    // tokens for a realistic review prompt, so the JSON path needs real
-    // headroom above that or the response gets cut off mid-JSON
-    // (finishReason: "MAX_TOKENS") instead of ever reaching "STOP".
-    const generationConfig = { temperature: 0.4, maxOutputTokens: json ? 2000 : 400 };
+    // tokens for a realistic prompt, so BOTH branches need real headroom
+    // above that or the response gets cut off mid-output (finishReason:
+    // "MAX_TOKENS") instead of ever reaching "STOP". JSON mode gets more
+    // room since a structured {summary, strengths, growthAreas} reply runs
+    // longer than a short plain-text chat answer.
+    const generationConfig = { temperature: 0.4, maxOutputTokens: json ? 2000 : 1200 };
     if (json) generationConfig.responseMimeType = "application/json";
 
     const response = await fetchImpl(apiUrlFor(model, apiKey), {

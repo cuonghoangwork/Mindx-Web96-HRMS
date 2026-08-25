@@ -32,6 +32,37 @@
    "Rejected": "Rejected"
   }
  },
+ "documents": {
+  "title": "Documents",
+  "addDocument": "Add Document",
+  "labelPlaceholder": "Label (optional)",
+  "typeFieldLabel": "Type",
+  "typeOfferLetter": "Offer Letter",
+  "typeIdScan": "ID Scan",
+  "typeOther": "Other",
+  "chooseFiles": "Choose Files",
+  "uploading": "Uploading…",
+  "cancel": "Cancel",
+  "noDocuments": "No documents uploaded yet.",
+  "view": "View",
+  "delete": "Delete",
+  "deleteConfirm": "Delete this document? This cannot be undone.",
+  "typeError": "Please choose PDF files only.",
+  "sizeError": "Each document must be 10MB or smaller.",
+  "tooManyError": "You can upload up to 5 files at once.",
+  "uploadError": "Failed to upload document(s).",
+  "deleteError": "Failed to delete document."
+ },
+ "chat": {
+  "openLabel": "Open assistant",
+  "closeLabel": "Close assistant",
+  "title": "HRMS Assistant",
+  "greeting": "Hi! Ask me how to use HRMS — e.g. \"how do I request leave?\"",
+  "placeholder": "Ask a question…",
+  "send": "Send",
+  "thinking": "Thinking…",
+  "unavailable": "Sorry, the assistant isn't available right now. Please try again later."
+ },
  "dashboard": {
   "stats": {
    "totalEmployees": {
@@ -481,7 +512,24 @@
   },
   "rolesTab": {
    "title": "Roles & permissions",
-   "subtitle": "Change an account's role between Employee, Manager (department-scoped), HR (company-wide) and Admin. Fine-grained permission editing isn't available yet — access is controlled by these four roles."
+   "subtitle": "Change an account's role between Employee, Manager (department-scoped), HR (company-wide) and Admin. The permissions matrix below can further restrict what a Manager can do — it can only make Manager stricter, never grant it more than its role already allows."
+  },
+  "permissions": {
+   "title": "Manager capabilities",
+   "subtitle": "Turn off a capability to block it for every Manager, company-wide. This can only make Manager stricter — it never grants Manager, HR, or Admin anything beyond what their role already allows.",
+   "loading": "Loading permissions…",
+   "loadFailed": "Failed to load permissions.",
+   "updateFailed": "Failed to update permission.",
+   "capabilityColumn": "Capability",
+   "managerColumn": "Manager",
+   "enabled": "Enabled",
+   "disabled": "Disabled",
+   "capabilities": {
+    "approveLeaveRequests": "Approve/reject leave requests",
+    "reviewProfileEdits": "Approve/reject profile-edit requests",
+    "manageAttendanceRecords": "Update/delete attendance records",
+    "proposePromotions": "Propose a promotion"
+   }
   }
  },
  "performance": {
@@ -626,8 +674,8 @@
    "appealNewRatingLabel": "Adjusted rating",
    "appealUphold": "Uphold",
    "appealAdjustAndResolve": "Adjust & resolve",
-   "askAi": "Ask AI",
-   "aiInsightTitle": "AI Insight",
+   "askAi": "Summary",
+   "aiInsightTitle": "Performance Summary",
    "aiThinking": "Thinking…",
    "aiUnavailable": "AI insight is unavailable right now. Try again later.",
    "aiStrengthsLabel": "Strengths",

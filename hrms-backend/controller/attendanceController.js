@@ -4,6 +4,7 @@ import { attendanceToClient, attendanceFromClient } from "../utils/mappers.js";
 import { closeAttendanceDay } from "../jobs/closeAttendanceDay.js";
 import { dateKeyInTz } from "../utils/workday.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
 
 const attendanceController = {
   getAll: async (req, res) => {
@@ -152,6 +153,9 @@ const attendanceController = {
       const data = attendanceFromClient(req.body);
 
       if (req.user.role === "MANAGER") {
+        if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+        }
         const existing = await AttendanceModel.findById(req.params.id, "employee");
         if (!existing) throw new Error("Attendance record not found.");
         const deptId = await getManagerDepartmentId(req);
@@ -178,6 +182,9 @@ const attendanceController = {
   remove: async (req, res) => {
     try {
       if (req.user.role === "MANAGER") {
+        if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+        }
         const existing = await AttendanceModel.findById(req.params.id, "employee");
         if (!existing) throw new Error("Attendance record not found.");
         const deptId = await getManagerDepartmentId(req);

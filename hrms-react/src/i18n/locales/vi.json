@@ -32,6 +32,37 @@
    "Rejected": "Từ chối"
   }
  },
+ "documents": {
+  "title": "Tài liệu",
+  "addDocument": "Thêm tài liệu",
+  "labelPlaceholder": "Nhãn (tùy chọn)",
+  "typeFieldLabel": "Loại",
+  "typeOfferLetter": "Thư mời làm việc",
+  "typeIdScan": "Bản scan CMND/CCCD",
+  "typeOther": "Khác",
+  "chooseFiles": "Chọn tệp",
+  "uploading": "Đang tải lên…",
+  "cancel": "Hủy",
+  "noDocuments": "Chưa có tài liệu nào được tải lên.",
+  "view": "Xem",
+  "delete": "Xóa",
+  "deleteConfirm": "Xóa tài liệu này? Không thể hoàn tác.",
+  "typeError": "Vui lòng chỉ chọn tệp PDF.",
+  "sizeError": "Mỗi tài liệu phải nhỏ hơn hoặc bằng 10MB.",
+  "tooManyError": "Bạn chỉ có thể tải lên tối đa 5 tệp cùng lúc.",
+  "uploadError": "Tải tài liệu lên thất bại.",
+  "deleteError": "Xóa tài liệu thất bại."
+ },
+ "chat": {
+  "openLabel": "Mở trợ lý",
+  "closeLabel": "Đóng trợ lý",
+  "title": "Trợ Lý HRMS",
+  "greeting": "Xin chào! Hỏi tôi cách sử dụng HRMS — ví dụ: \"làm sao để xin nghỉ phép?\"",
+  "placeholder": "Đặt câu hỏi…",
+  "send": "Gửi",
+  "thinking": "Đang suy nghĩ…",
+  "unavailable": "Xin lỗi, trợ lý hiện không khả dụng. Vui lòng thử lại sau."
+ },
  "dashboard": {
   "stats": {
    "totalEmployees": {
@@ -475,7 +506,24 @@
   },
   "rolesTab": {
    "title": "Vai trò & quyền",
-   "subtitle": "Đổi vai trò của tài khoản giữa Nhân viên, Quản lý (giới hạn một phòng ban), HR (toàn công ty) và Quản trị viên. Tính năng chỉnh quyền chi tiết chưa khả dụng — quyền truy cập được kiểm soát bởi bốn vai trò này."
+   "subtitle": "Đổi vai trò của tài khoản giữa Nhân viên, Quản lý (giới hạn một phòng ban), HR (toàn công ty) và Quản trị viên. Bảng quyền bên dưới có thể giới hạn thêm những gì Quản lý được làm — chỉ có thể siết chặt Quản lý, không bao giờ cấp thêm quyền vượt quá vai trò hiện tại."
+  },
+  "permissions": {
+   "title": "Quyền hạn của Quản lý",
+   "subtitle": "Tắt một quyền để chặn nó với mọi Quản lý trong toàn công ty. Chức năng này chỉ có thể siết chặt Quản lý — không bao giờ cấp thêm quyền cho Quản lý, HR hay Quản trị viên vượt quá những gì vai trò của họ đã cho phép.",
+   "loading": "Đang tải quyền hạn…",
+   "loadFailed": "Không thể tải quyền hạn.",
+   "updateFailed": "Không thể cập nhật quyền hạn.",
+   "capabilityColumn": "Quyền hạn",
+   "managerColumn": "Quản lý",
+   "enabled": "Đang bật",
+   "disabled": "Đã tắt",
+   "capabilities": {
+    "approveLeaveRequests": "Duyệt/từ chối đơn xin nghỉ phép",
+    "reviewProfileEdits": "Duyệt/từ chối yêu cầu chỉnh sửa hồ sơ",
+    "manageAttendanceRecords": "Cập nhật/xóa bản ghi chấm công",
+    "proposePromotions": "Đề xuất thăng chức"
+   }
   }
  },
  "performance": {
@@ -620,8 +668,8 @@
    "appealNewRatingLabel": "Điểm đã điều chỉnh",
    "appealUphold": "Giữ nguyên",
    "appealAdjustAndResolve": "Điều chỉnh & xử lý",
-   "askAi": "Hỏi AI",
-   "aiInsightTitle": "Nhận Định AI",
+   "askAi": "Tóm tắt",
+   "aiInsightTitle": "Tóm Tắt Hiệu Suất",
    "aiThinking": "Đang phân tích…",
    "aiUnavailable": "Nhận định AI hiện không khả dụng. Vui lòng thử lại sau.",
    "aiStrengthsLabel": "Điểm mạnh",

@@ -325,7 +325,7 @@ describe("PerformanceReviewDialog", () => {
     renderDialog();
     await screen.findByText("Self Review");
 
-    fireEvent.click(screen.getByText("Ask AI"));
+    fireEvent.click(screen.getByText("Summary"));
     expect(await screen.findByText("Thinking…")).toBeInTheDocument();
 
     resolveAsk({
@@ -348,7 +348,7 @@ describe("PerformanceReviewDialog", () => {
     renderDialog();
     await screen.findByText("Self Review");
 
-    fireEvent.click(screen.getByText("Ask AI"));
+    fireEvent.click(screen.getByText("Summary"));
 
     expect(await screen.findByText("AI insight is unavailable right now. Try again later.")).toBeInTheDocument();
     expect(screen.queryByText(/GEMINI_API_KEY/)).not.toBeInTheDocument();
@@ -362,7 +362,7 @@ describe("PerformanceReviewDialog", () => {
     renderDialog();
     await screen.findByText("Self Review");
 
-    fireEvent.click(screen.getByText("Ask AI"));
+    fireEvent.click(screen.getByText("Summary"));
 
     expect(await screen.findByText("AI insight is unavailable right now. Try again later.")).toBeInTheDocument();
     expect(screen.queryByText("old-shape response")).not.toBeInTheDocument();

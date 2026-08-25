@@ -3,7 +3,11 @@ import UserModel from "../model/User.js";
 import DepartmentModel from "../model/Department.js";
 import { employeeToClient, employeeFromClient } from "../utils/mappers.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
-import { uploadBufferToCloudinary, isCloudinaryConfigured } from "../utils/cloudinary.js";
+import {
+  uploadBufferToCloudinary,
+  isCloudinaryConfigured,
+  destroyCloudinaryAsset,
+} from "../utils/cloudinary.js";
 import { notifyHR } from "./notificationController.js";
 import { logAction } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
@@ -15,6 +19,7 @@ import {
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 
 const SALT_ROUNDS = 10;
+const DOCUMENT_TYPES = ["offer_letter", "id_scan", "other"];
 
 const employeeController = {
   getAll: async (req, res) => {
@@ -389,6 +394,118 @@ const employeeController = {
         resource: "employee",
         resourceId: employee._id,
         label: `${employee.name} (${employee.employeeId}) — contract uploaded`,
+      });
+
+      res.json({ success: true, data: employeeToClient(employee) });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Solo Gaps Milestone 1 — arbitrary multi-document upload. Additive
+  // alongside uploadContract above, not a replacement: each document gets
+  // its own Cloudinary asset (unique public_id) since, unlike a contract,
+  // there's no single "current" document to overwrite. label/type apply to
+  // the whole batch (one upload action, up to 5 files at once).
+  uploadDocuments: async (req, res) => {
+    try {
+      if (!isCloudinaryConfigured()) {
+        throw new Error(
+          "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        );
+      }
+      if (!req.files?.length) throw new Error("No document files were uploaded.");
+
+      const employee = await EmployeeModel.findById(req.params.id);
+      if (!employee) throw new Error("Employee not found.");
+
+      // MANAGER can only manage documents for their own department
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        if (!employee.department || String(employee.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only manage documents for employees in your own department.",
+          });
+        }
+      }
+
+      const label = typeof req.body.label === "string" ? req.body.label.trim() : "";
+      const type = DOCUMENT_TYPES.includes(req.body.type) ? req.body.type : "other";
+
+      for (let i = 0; i < req.files.length; i += 1) {
+        const file = req.files[i];
+        const result = await uploadBufferToCloudinary(file.buffer, {
+          folder: "hrms/documents",
+          public_id: `employee_${employee._id}_doc_${Date.now()}_${i}`,
+          resource_type: "raw",
+          format: "pdf",
+        });
+        employee.documents.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          label,
+          type,
+          uploadedAt: new Date(),
+          uploadedBy: req.user.id,
+        });
+      }
+
+      await employee.save();
+      await employee.populate("department", "name");
+
+      await logAction(req, {
+        action: "updated",
+        resource: "employee",
+        resourceId: employee._id,
+        label: `${employee.name} (${employee.employeeId}) — ${req.files.length} document(s) uploaded`,
+      });
+
+      res.json({ success: true, data: employeeToClient(employee) });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  },
+
+  // Solo Gaps Milestone 1 — deletes one document from the array. Best-effort
+  // Cloudinary cleanup: a failure there logs but doesn't block the user's
+  // delete, matching logAction's fire-and-forget philosophy — an orphaned
+  // Cloudinary asset is a minor leak, not worth failing the request over.
+  removeDocument: async (req, res) => {
+    try {
+      const employee = await EmployeeModel.findById(req.params.id);
+      if (!employee) throw new Error("Employee not found.");
+
+      // MANAGER can only manage documents for their own department
+      if (req.user.role === "MANAGER") {
+        const deptId = await getManagerDepartmentId(req);
+        if (!employee.department || String(employee.department) !== String(deptId)) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only manage documents for employees in your own department.",
+          });
+        }
+      }
+
+      const doc = employee.documents.id(req.params.docId);
+      if (!doc) return res.status(404).json({ success: false, message: "Document not found." });
+
+      const publicId = doc.publicId;
+      doc.deleteOne();
+      await employee.save();
+      await employee.populate("department", "name");
+
+      try {
+        await destroyCloudinaryAsset(publicId);
+      } catch (err) {
+        console.error("[uploadDocuments] Failed to delete Cloudinary asset:", err.message);
+      }
+
+      await logAction(req, {
+        action: "deleted",
+        resource: "employee",
+        resourceId: employee._id,
+        label: `${employee.name} (${employee.employeeId}) — document removed`,
       });
 
       res.json({ success: true, data: employeeToClient(employee) });

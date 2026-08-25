@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { formatDate, formatDateTime } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
-import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI } from '../api'
+import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI, PermissionsAPI } from '../api'
 import { apiFetch } from '../api/client'
 import { getRoleLabel } from '../utils/roles'
 import Button from "../components/Button";
@@ -22,6 +22,16 @@ const ROLE_STYLE = {
 // aren't "greater/lesser" than each other — different scope, not rank), so
 // role changes below use a plain select instead of a promote/demote ladder.
 const ASSIGNABLE_ROLES = ['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']
+
+// Solo Gaps Milestone 3 — the 4 MANAGER capabilities the permissions
+// matrix can toggle. Keep in sync with
+// hrms-backend/utils/permissions.js's MANAGER_CAPABILITIES.
+const MANAGER_CAPABILITIES = [
+  'approveLeaveRequests',
+  'reviewProfileEdits',
+  'manageAttendanceRecords',
+  'proposePromotions',
+]
 function RolePill({ role }) {
   const s = ROLE_STYLE[role] ?? ROLE_STYLE.EMPLOYEE
   return (
@@ -772,11 +782,9 @@ function AuditLogTab() {
 /* ─────────────────────────────────────────────
    Roles & permissions tab — Admin-only. Real
    role changes (EMPLOYEE/MANAGER/ADMIN) via
-   /auth/users/:id/promote. The mockup's checkbox
-   permission-matrix has no backend equivalent
-   (roles are fixed, not per-action configurable),
-   so this tab keeps the real role-management UI
-   instead of faking a matrix.
+   /auth/users/:id/promote, plus (Solo Gaps
+   Milestone 3) a real per-capability toggle for
+   MANAGER below it — see PermissionsMatrix.
 ───────────────────────────────────────────── */
 function PromoteUsersPanel() {
   const { t } = useTranslation()
@@ -894,11 +902,120 @@ function PromoteUsersPanel() {
   )
 }
 
+/* ─────────────────────────────────────────────
+   Permissions matrix (Solo Gaps Milestone 3) —
+   a second, additional gate that can only make
+   MANAGER stricter than authorize() already
+   allows; never grants anything wider. ADMIN and
+   HR are never affected by any toggle here — see
+   hrms-backend/utils/permissions.js.
+───────────────────────────────────────────── */
+function PermissionsMatrix() {
+  const { t } = useTranslation()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [toggling, setToggling] = useState(null)
+
+  const fetchPermissions = useCallback(async () => {
+    setLoading(true); setError('')
+    try {
+      const res = await PermissionsAPI.list()
+      setItems(res.items || [])
+    } catch (err) {
+      setError(err.message || t('settings.permissions.loadFailed'))
+    }
+    setLoading(false)
+  }, [t])
+
+  useEffect(() => { fetchPermissions() }, [fetchPermissions])
+
+  const handleToggle = async (capability, current) => {
+    setToggling(capability)
+    try {
+      const res = await PermissionsAPI.toggle('MANAGER', capability, !current)
+      setItems((prev) => {
+        const next = prev.filter((i) => i.capability !== capability)
+        return [...next, res.data]
+      })
+    } catch (err) {
+      setError(err.message || t('settings.permissions.updateFailed'))
+    }
+    setToggling(null)
+  }
+
+  return (
+    <div style={{ marginTop: 'var(--sp-6)' }}>
+      <h4 style={{ fontSize: 'var(--fs-md)', fontWeight: 'var(--fw-semibold)', color: 'var(--txt-primary)', margin: 0 }}>
+        {t('settings.permissions.title')}
+      </h4>
+      <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', marginTop: '4px', marginBottom: 'var(--sp-4)' }}>
+        {t('settings.permissions.subtitle')}
+      </p>
+
+      {error && (
+        <div style={{
+          marginBottom: 'var(--sp-3)', padding: 'var(--sp-3) var(--sp-4)',
+          background: 'var(--bg-danger-subtle)', border: '1px solid var(--bdr-danger)',
+          borderRadius: 'var(--radius-md)', color: 'var(--txt-danger)', fontSize: 'var(--fs-sm)',
+        }}>
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 'var(--sp-5)', textAlign: 'center', color: 'var(--txt-secondary)', fontSize: 'var(--fs-sm)' }}>
+          {t('settings.permissions.loading')}
+        </div>
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>{t('settings.permissions.capabilityColumn')}</th>
+              <th>{t('settings.permissions.managerColumn')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MANAGER_CAPABILITIES.map((capability) => {
+              const row = items.find((i) => i.capability === capability)
+              const enabled = row ? row.enabled : true
+              const isToggling = toggling === capability
+              return (
+                <tr key={capability}>
+                  <td>{t(`settings.permissions.capabilities.${capability}`)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle(capability, enabled)}
+                      disabled={isToggling}
+                      style={{
+                        fontFamily: 'var(--font-family)', fontWeight: 'var(--fw-bold)', fontSize: 'var(--fs-sm)',
+                        padding: '6px 14px', cursor: isToggling ? 'default' : 'pointer',
+                        background: enabled ? 'var(--bg-success-subtle)' : 'var(--bg-danger-subtle)',
+                        color: enabled ? 'var(--txt-success)' : 'var(--txt-danger)',
+                        border: `1px solid ${enabled ? 'var(--bdr-success)' : 'var(--bdr-danger)'}`,
+                        opacity: isToggling ? 0.6 : 1,
+                      }}
+                    >
+                      {enabled ? t('settings.permissions.enabled') : t('settings.permissions.disabled')}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
 function RolesTab() {
   const { t } = useTranslation()
   return (
     <Panel title={t('settings.rolesTab.title')} subtitle={t('settings.rolesTab.subtitle')}>
       <PromoteUsersPanel />
+      <PermissionsMatrix />
     </Panel>
   )
 }

@@ -46,6 +46,15 @@ export const uploadPdf = multer({
   limits: { fileSize: MAX_PDF_SIZE_BYTES, files: 1 },
 });
 
+// Solo Gaps Milestone 1 — multi-document upload. Same storage/filter as
+// uploadPdf above, just a higher files cap (a batch of offer letters/ID
+// scans/etc, not a single contract).
+export const uploadDocuments = multer({
+  storage,
+  fileFilter: pdfFileFilter,
+  limits: { fileSize: MAX_PDF_SIZE_BYTES, files: 5 },
+});
+
 /**
  * handleUploadErrors — wraps a multer middleware (e.g. `uploadImage.single("avatar")`)
  * so its errors (wrong mimetype from fileFilter, file too large, too many files, ...)

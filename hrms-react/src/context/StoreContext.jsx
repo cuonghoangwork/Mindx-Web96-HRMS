@@ -161,6 +161,23 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
+  // Solo Gaps Milestone 1 — arbitrary multi-document upload/removal.
+  const uploadEmployeeDocuments = useCallback(async (id, files, options) => {
+    const res = await EmployeesAPI.uploadDocuments(id, files, options);
+    setEmployees((prev) =>
+      prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
+    );
+    return res.data;
+  }, []);
+
+  const removeEmployeeDocument = useCallback(async (id, docId) => {
+    const res = await EmployeesAPI.removeDocument(id, docId);
+    setEmployees((prev) =>
+      prev.map((emp) => (idsMatch(emp.id, id) ? res.data : emp)),
+    );
+    return res.data;
+  }, []);
+
   const selectEmployee = useCallback((employee) => {
     setSelectedEmployee(employee);
   }, []);
@@ -417,6 +434,8 @@ export function StoreProvider({ children }) {
     updateEmployee,
     uploadEmployeeAvatar,
     uploadEmployeeContract,
+    uploadEmployeeDocuments,
+    removeEmployeeDocument,
     selectEmployee,
     openModal,
     closeModal,

@@ -8,6 +8,7 @@ import { createReviewRequestController, assertNoPendingRequest } from "../utils/
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { logAction } from "../utils/auditLog.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
@@ -123,6 +124,9 @@ const promotionRequestController = {
       // MANAGER can only propose promotions for employees in their own
       // department, and can't use a promotion to move someone to another one.
       if (req.user.role === "MANAGER") {
+        if (!(await hasCapability("MANAGER", "proposePromotions"))) {
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+        }
         const deptId = await getManagerDepartmentId(req);
         const empDeptId = employee.department?._id ?? employee.department;
         if (!empDeptId || String(empDeptId) !== String(deptId)) {

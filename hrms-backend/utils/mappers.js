@@ -137,6 +137,15 @@ export function employeeToClient(doc) {
     // carried in employeeFromClient — see model/Employee.js's comment).
     contractUrl: o.contractUrl ?? null,
     contractUploadedAt: o.contractUploadedAt ?? null,
+    // Solo Gaps Milestone 1 — publicId is intentionally omitted, an
+    // internal Cloudinary detail the client never needs.
+    documents: (o.documents || []).map((d) => ({
+      id: idOf(d._id),
+      url: d.url,
+      label: d.label,
+      type: d.type,
+      uploadedAt: d.uploadedAt,
+    })),
     createdAt: o.createdAt,
   };
 }
@@ -157,8 +166,9 @@ export function employeeFromClient(body = {}) {
   carry(body, "salary", out, "annualSalary", (v) => Number(v) || 0);
   carry(body, "avatar", out, "avatar");
   carry(body, "positionLevel", out, "positionLevel");
-  // contractUrl/contractUploadedAt intentionally NOT carried here — see
-  // model/Employee.js's comment. Only uploadContract() may set them.
+  // contractUrl/contractUploadedAt/documents intentionally NOT carried
+  // here — see model/Employee.js's comment. Only uploadContract() /
+  // uploadDocuments() / removeDocument() may set them.
   return out;
 }
 

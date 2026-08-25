@@ -40,6 +40,7 @@ function toClientRequest(doc) {
 const { list, review } = createReviewRequestController({
   Model: ProfileEditRequestModel,
   resourceLabel: "profile edit request",
+  capability: "reviewProfileEdits",
   toClient: toClientRequest,
   onApprove: async (request) => {
     // Apply the requested changes to the employee record

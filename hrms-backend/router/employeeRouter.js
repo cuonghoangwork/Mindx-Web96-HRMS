@@ -1,7 +1,7 @@
 import { Router } from "express";
 import employeeController from "../controller/employeeController.js";
 import { verifyToken, authorize } from "../middleware/auth.js";
-import { uploadImage, uploadPdf, handleUploadErrors } from "../middleware/upload.js";
+import { uploadImage, uploadPdf, uploadDocuments, handleUploadErrors } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
 
 const router = Router();
@@ -58,6 +58,24 @@ router.post(
   authorize("ADMIN", "MANAGER", "HR"),
   handleUploadErrors(uploadPdf.single("contract")),
   employeeController.uploadContract,
+);
+
+// Multi-document upload (Solo Gaps Milestone 1) — offer letters/ID
+// scans/other, additive alongside the single-contract flow above. Same
+// gating as the contract route (MANAGER own-department, enforced in the
+// controller).
+router.post(
+  "/:id/documents",
+  verifyToken,
+  authorize("ADMIN", "MANAGER", "HR"),
+  handleUploadErrors(uploadDocuments.array("documents", 5)),
+  employeeController.uploadDocuments,
+);
+router.delete(
+  "/:id/documents/:docId",
+  verifyToken,
+  authorize("ADMIN", "MANAGER", "HR"),
+  employeeController.removeDocument,
 );
 
 export default router;

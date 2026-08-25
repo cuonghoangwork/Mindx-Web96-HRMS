@@ -44,6 +44,7 @@ function toClientRequest(doc) {
 const { list, review } = createReviewRequestController({
   Model: LeaveRequestModel,
   resourceLabel: "leave request",
+  capability: "approveLeaveRequests",
   toClient: toClientRequest,
   onApprove: async (request) => {
     const employeeId = request.employee._id ?? request.employee;

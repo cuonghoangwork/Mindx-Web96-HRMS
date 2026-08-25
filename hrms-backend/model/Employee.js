@@ -43,6 +43,22 @@ const employeeSchema = new mongoose.Schema(
     // Contract collection" note — out of scope for this effort size).
     contractUrl: { type: String, default: null },
     contractUploadedAt: { type: Date, default: null },
+    // Solo Gaps Milestone 1 — arbitrary multi-document uploads (offer
+    // letters, ID scans, other), additive alongside contractUrl above
+    // rather than a migration of it. publicId is stored (not just url) so
+    // removeDocument() can delete the matching Cloudinary asset — unlike
+    // the single-contract flow, which never deletes (it just overwrites
+    // one fixed public_id) and so never needed to keep one.
+    documents: [
+      {
+        url: { type: String, required: true },
+        publicId: { type: String, required: true },
+        label: { type: String, default: "" },
+        type: { type: String, enum: ["offer_letter", "id_scan", "other"], default: "other" },
+        uploadedAt: { type: Date, default: Date.now },
+        uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      },
+    ],
     // Back-link to the User account that belongs to this employee (optional 1:1)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },

@@ -4,6 +4,7 @@ import SideMenu from "./SideMenu";
 import Header from "./Header";
 import { useStore } from "../context/StoreContext";
 import Button from "./Button";
+import ChatWidget from "./ChatWidget";
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -113,6 +114,8 @@ function Layout() {
           </button>
         </div>
       )}
+
+      <ChatWidget />
     </div>
   );
 }

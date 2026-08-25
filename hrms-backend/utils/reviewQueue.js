@@ -40,6 +40,7 @@ import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
 import { getManagerDepartmentId, resolveEmployeeForUser } from "./managerScope.js";
+import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "./permissions.js";
 
 export const REVIEW_STATUSES = ["pending", "approved", "rejected"];
 
@@ -128,6 +129,14 @@ export async function assertNoPendingRequest(Model, employeeId, message) {
  *   send the employee.
  * @param {string} [options.employeeLinkLabel] - label for `employeeLink`,
  *   same override rule as above.
+ * @param {string} [options.capability] - Solo Gaps Milestone 3: an optional
+ *   RolePermission capability key (see utils/permissions.js). When set,
+ *   MANAGER additionally needs this capability enabled to review — never
+ *   affects HR/ADMIN, who already passed authorize() unconditionally.
+ *   Needed because this one `review` function backs multiple resources
+ *   (leave requests, profile-edit requests) that must be toggled
+ *   independently — the capability key is supplied per call site instead
+ *   of being hardcoded here.
  */
 export function createReviewRequestController({
   Model,
@@ -138,6 +147,7 @@ export function createReviewRequestController({
   notifyEmployee,
   employeeLink,
   employeeLinkLabel,
+  capability,
 }) {
   function applyPopulate(query) {
     for (const [path, select] of populate) query.populate(path, select);
@@ -195,6 +205,10 @@ export function createReviewRequestController({
         }
         if (request.status !== "pending") {
           return res.status(409).json({ success: false, message: "This request has already been reviewed." });
+        }
+
+        if (req.user.role === "MANAGER" && capability && !(await hasCapability("MANAGER", capability))) {
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
         }
 
         if (req.user.role === "MANAGER") {

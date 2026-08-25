@@ -10,6 +10,7 @@ import { connectDB } from "./config/db.js";
 import rootRouter from "./router/index.js";
 import { startScheduler } from "./jobs/index.js";
 import { runStartupMigrations } from "./utils/startupMigrations.js";
+import { seedRolePermissions } from "./utils/permissions.js";
 
 const app = express();
 
@@ -42,6 +43,14 @@ connectDB()
     // reason to refuse to serve traffic — log it and keep booting.
     runStartupMigrations().catch((err) => {
       console.error("Startup migrations failed (continuing to start server):", err);
+    }),
+  )
+  .then(() =>
+    // Solo Gaps Milestone 3 — ensure the 4 toggleable capability rows
+    // exist (enabled: true) so the permissions matrix has something to
+    // show on first load. Same "don't block boot" reasoning as above.
+    seedRolePermissions().catch((err) => {
+      console.error("Seeding role permissions failed (continuing to start server):", err);
     }),
   )
   .then(() => {
