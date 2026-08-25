@@ -48,7 +48,9 @@ export const GOAL_PROGRESS_MAX = 100;
 const competencyRatingSchema = new mongoose.Schema(
   {
     self: { type: Number, min: 1, max: 5, default: null },
+    selfComment: { type: String, default: "" },
     manager: { type: Number, min: 1, max: 5, default: null },
+    managerComment: { type: String, default: "" },
   },
   { _id: false },
 );

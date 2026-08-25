@@ -22,6 +22,7 @@ vi.mock("../api", () => ({
     cycles: vi.fn(),
     roster: vi.fn(),
     analytics: vi.fn(),
+    comparison: vi.fn(),
     createCycle: vi.fn(),
     setCycleStatus: vi.fn(),
     getReview: vi.fn(),
@@ -59,6 +60,31 @@ const ANALYTICS_EMPTY = {
   competencyAverages: [],
   deptCompare: null,
 };
+const COMPARISON_NO_PREVIOUS = {
+  success: true,
+  cycle: CYCLES[1],
+  previous: null,
+  data: {
+    current: {},
+    previous: null,
+    deltas: { avgManagerDelta: null, completionRateDelta: null, appealRateDelta: null, competencyDeltas: [] },
+  },
+};
+const COMPARISON_DATA = {
+  success: true,
+  cycle: CYCLES[1],
+  previous: { key: "2025-h2", label: "H2 2025" },
+  data: {
+    current: {},
+    previous: {},
+    deltas: {
+      avgManagerDelta: 0.5,
+      completionRateDelta: 0.25,
+      appealRateDelta: -0.1,
+      competencyDeltas: [{ key: "communication", selfDelta: 0.3, managerDelta: 0.8 }],
+    },
+  },
+};
 
 describe("Performance", () => {
   beforeEach(() => {
@@ -68,6 +94,9 @@ describe("Performance", () => {
     PerformanceReviewsAPI.cycles.mockResolvedValue({ success: true, items: CYCLES });
     PerformanceReviewsAPI.roster.mockResolvedValue({ success: true, items: ROSTER });
     PerformanceReviewsAPI.analytics.mockResolvedValue({ success: true, data: ANALYTICS_EMPTY });
+    // Default: 403, same as apiFetch throws for any non-Admin/HR caller —
+    // the comparison card is gated entirely server-side, not by useAuth().
+    PerformanceReviewsAPI.comparison.mockRejectedValue(new Error("Forbidden"));
   });
 
   it("defaults to the Open cycle and renders the roster", async () => {
@@ -185,5 +214,65 @@ describe("Performance", () => {
     expect(screen.getByText("Rating Distribution")).toBeInTheDocument();
     expect(screen.getByText("Competency Averages")).toBeInTheDocument();
     expect(screen.queryByText("Department Comparison")).not.toBeInTheDocument();
+  });
+
+  it("renders the cycle comparison deltas, with inverted coloring on appeal rate", async () => {
+    PerformanceReviewsAPI.analytics.mockResolvedValue({
+      success: true,
+      data: {
+        totals: { employees: 2, notStarted: 0, selfSubmitted: 0, managerSubmitted: 1, completed: 1 },
+        ratingDistribution: { self: { 4: 1 }, manager: { 3: 1, 4: 1 } },
+        averages: { self: 4, manager: 3.5 },
+        competencyAverages: [{ key: "communication", self: 4, manager: null, selfCount: 1, managerCount: 0 }],
+        deptCompare: null,
+      },
+    });
+    PerformanceReviewsAPI.comparison.mockResolvedValue(COMPARISON_DATA);
+    renderPage();
+
+    await screen.findByText("Cycle Comparison");
+    expect(screen.getByText("vs. H2 2025")).toBeInTheDocument();
+    expect(screen.getByText("↑ +0.5")).toBeInTheDocument();
+    expect(screen.getByText("↑ +25%")).toBeInTheDocument();
+    expect(screen.getByText("↑ +0.8")).toBeInTheDocument();
+    // appeal rate improved (went down) — still shown as "good" (up-colored), not literally an up arrow
+    const appealDelta = screen.getByText("↓ -10%");
+    expect(appealDelta).toHaveClass("up");
+  });
+
+  it("shows a 'no previous cycle' empty state instead of deltas when there's nothing to compare", async () => {
+    PerformanceReviewsAPI.analytics.mockResolvedValue({
+      success: true,
+      data: {
+        totals: { employees: 2, notStarted: 0, selfSubmitted: 0, managerSubmitted: 1, completed: 1 },
+        ratingDistribution: { self: { 4: 1 }, manager: {} },
+        averages: { self: 4, manager: null },
+        competencyAverages: [],
+        deptCompare: null,
+      },
+    });
+    PerformanceReviewsAPI.comparison.mockResolvedValue(COMPARISON_NO_PREVIOUS);
+    renderPage();
+
+    await screen.findByText("Cycle Comparison");
+    expect(screen.getByText("No previous cycle to compare against.")).toBeInTheDocument();
+    expect(screen.queryByText("Avg. Rating Change")).not.toBeInTheDocument();
+  });
+
+  it("doesn't render a comparison card for a non-admin/HR viewer (403)", async () => {
+    PerformanceReviewsAPI.analytics.mockResolvedValue({
+      success: true,
+      data: {
+        totals: { employees: 2, notStarted: 0, selfSubmitted: 0, managerSubmitted: 1, completed: 1 },
+        ratingDistribution: { self: { 4: 1 }, manager: {} },
+        averages: { self: 4, manager: null },
+        competencyAverages: [],
+        deptCompare: null,
+      },
+    });
+    renderPage();
+
+    await screen.findByText("Analytics");
+    expect(screen.queryByText("Cycle Comparison")).not.toBeInTheDocument();
   });
 });

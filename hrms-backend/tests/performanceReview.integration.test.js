@@ -58,7 +58,12 @@ describe("GET /performance/reviews/:cycleKey/:employeeId", () => {
     expect(res.body.data.appealDeadline).toBe(null);
     expect(Object.keys(res.body.data.competencies)).toEqual(COMPETENCIES);
     for (const key of COMPETENCIES) {
-      expect(res.body.data.competencies[key]).toEqual({ self: null, manager: null });
+      expect(res.body.data.competencies[key]).toEqual({
+        self: null,
+        selfComment: "",
+        manager: null,
+        managerComment: "",
+      });
     }
 
     expect(await PerformanceReviewModel.countDocuments({})).toBe(0);
@@ -465,8 +470,18 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .send({ key: "communication", value: 4 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.competencies.communication).toEqual({ self: 4, manager: null });
-    expect(res.body.data.competencies.execution).toEqual({ self: null, manager: null });
+    expect(res.body.data.competencies.communication).toEqual({
+      self: 4,
+      selfComment: "",
+      manager: null,
+      managerComment: "",
+    });
+    expect(res.body.data.competencies.execution).toEqual({
+      self: null,
+      selfComment: "",
+      manager: null,
+      managerComment: "",
+    });
   });
 
   it("writes the manager half for the department manager without touching the self half", async (ctx) => {
@@ -483,7 +498,12 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .send({ key: "communication", value: 2 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.competencies.communication).toEqual({ self: 4, manager: 2 });
+    expect(res.body.data.competencies.communication).toEqual({
+      self: 4,
+      selfComment: "",
+      manager: 2,
+      managerComment: "",
+    });
   });
 
   it("ignores a client-supplied rater field", async (ctx) => {
@@ -495,7 +515,12 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .send({ key: "ownership", value: 5, rater: "manager" });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.competencies.ownership).toEqual({ self: 5, manager: null });
+    expect(res.body.data.competencies.ownership).toEqual({
+      self: 5,
+      selfComment: "",
+      manager: null,
+      managerComment: "",
+    });
   });
 
   it("treats a manager rating their own competencies as the self half", async (ctx) => {
@@ -507,7 +532,12 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .send({ key: "leadership", value: 3 });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.competencies.leadership).toEqual({ self: 3, manager: null });
+    expect(res.body.data.competencies.leadership).toEqual({
+      self: 3,
+      selfComment: "",
+      manager: null,
+      managerComment: "",
+    });
   });
 
   it("lets HR fill the manager half only for an orphan manager", async (ctx) => {
@@ -518,7 +548,12 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .set(auth(org.tokens.hr))
       .send({ key: "leadership", value: 4 });
     expect(orphan.status).toBe(200);
-    expect(orphan.body.data.competencies.leadership).toEqual({ self: null, manager: 4 });
+    expect(orphan.body.data.competencies.leadership).toEqual({
+      self: null,
+      selfComment: "",
+      manager: 4,
+      managerComment: "",
+    });
 
     const blocked = await request
       .patch(url(org.employees.dev))
@@ -569,6 +604,64 @@ describe("PATCH /performance/reviews/:cycleKey/:employeeId/competencies", () => 
       .send({ key: "execution", value: 3 });
 
     expect(await AuditLogModel.countDocuments({ resource: "performance" })).toBe(0);
+  });
+
+  it("infers the comment rater the same way it infers the rating rater", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const self = await request
+      .patch(url(org.employees.dev))
+      .set(auth(org.tokens.dev))
+      .send({ key: "communication", comment: "Clear and concise.", rater: "manager" });
+    expect(self.status).toBe(200);
+    expect(self.body.data.competencies.communication.selfComment).toBe("Clear and concise.");
+    expect(self.body.data.competencies.communication.managerComment).toBe("");
+
+    const manager = await request
+      .patch(url(org.employees.dev))
+      .set(auth(org.tokens.manager))
+      .send({ key: "communication", comment: "Agreed, well done." });
+    expect(manager.status).toBe(200);
+    expect(manager.body.data.competencies.communication.managerComment).toBe("Agreed, well done.");
+  });
+
+  it("saves a comment standalone, without a rating, and vice versa", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const commentOnly = await request
+      .patch(url(org.employees.dev))
+      .set(auth(org.tokens.dev))
+      .send({ key: "execution", comment: "Consistently delivers on time." });
+    expect(commentOnly.status).toBe(200);
+    expect(commentOnly.body.data.competencies.execution).toEqual({
+      self: null,
+      selfComment: "Consistently delivers on time.",
+      manager: null,
+      managerComment: "",
+    });
+
+    const ratingOnly = await request
+      .patch(url(org.employees.dev))
+      .set(auth(org.tokens.dev))
+      .send({ key: "execution", value: 4 });
+    expect(ratingOnly.status).toBe(200);
+    expect(ratingOnly.body.data.competencies.execution).toEqual({
+      self: 4,
+      selfComment: "Consistently delivers on time.",
+      manager: null,
+      managerComment: "",
+    });
+  });
+
+  it("400s when neither a rating nor a comment is provided", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const res = await request
+      .patch(url(org.employees.dev))
+      .set(auth(org.tokens.dev))
+      .send({ key: "ownership" });
+
+    expect(res.status).toBe(400);
   });
 });
 

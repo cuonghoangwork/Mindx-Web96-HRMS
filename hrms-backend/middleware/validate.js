@@ -460,8 +460,9 @@ const performanceManagerReview = makeValidator([
 const performanceCompetency = makeValidator([
   required("key", "Competency"),
   isOneOf("key", "Competency", VALID_COMPETENCIES),
-  (body) => (provided(body.value) ? null : "Rating is required."),
   (body) => (provided(body.value) ? isIntInRange("value", "Rating", 1, 5)(body) : null),
+  isOptionalText("comment", "Comment", 2000),
+  (body) => (provided(body.value) || provided(body.comment) ? null : "Provide a rating, a comment, or both."),
 ]);
 
 const performanceGoalCreate = makeValidator([

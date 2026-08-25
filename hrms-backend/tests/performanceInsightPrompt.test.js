@@ -56,6 +56,33 @@ describe("buildInsightPrompt", () => {
     expect(prompt).toMatch(/Peer feedback:\nNone/);
   });
 
+  it("asks for a JSON object matching the summary/strengths/growthAreas shape", () => {
+    const prompt = buildInsightPrompt({ employee: { name: "Dev One" }, cycle: { label: "H2 2026" }, review: REVIEW });
+    expect(prompt).toMatch(/ONLY a JSON object/);
+    expect(prompt).toContain('"summary": string, "strengths": string[], "growthAreas": string[]');
+  });
+
+  it("includes competency comments in the competency lines when present", () => {
+    const prompt = buildInsightPrompt({
+      employee: { name: "Dev One" },
+      cycle: { label: "H2 2026" },
+      review: {
+        ...REVIEW,
+        competencies: {
+          ...REVIEW.competencies,
+          communication: { self: 4, selfComment: "Very clear in standups.", manager: 3, managerComment: "Could write more concise updates." },
+        },
+      },
+    });
+    expect(prompt).toContain("Communication: self 4, manager 3 | self note: Very clear in standups. | manager note: Could write more concise updates.");
+  });
+
+  it("omits the comment segment entirely when no comment is present", () => {
+    const prompt = buildInsightPrompt({ employee: { name: "Dev One" }, cycle: { label: "H2 2026" }, review: REVIEW });
+    expect(prompt).toContain("Communication: self 4, manager 3\n");
+    expect(prompt).not.toContain("Communication: self 4, manager 3 |");
+  });
+
   it("falls back gracefully when review is the empty shaped default", () => {
     const prompt = buildInsightPrompt({
       employee: { name: "Dev One" },

@@ -31,7 +31,10 @@ const META = {
 const EMPTY_REVIEW = {
   selfRating: null, selfComments: "", selfSubmittedDate: null,
   managerRating: null, managerComments: "", managerSubmittedDate: null,
-  competencies: { communication: { self: null, manager: null }, execution: { self: null, manager: null } },
+  competencies: {
+    communication: { self: null, selfComment: "", manager: null, managerComment: "" },
+    execution: { self: null, selfComment: "", manager: null, managerComment: "" },
+  },
   goals: [], peerFeedback: [], appeal: null, appealDeadline: null,
 };
 
@@ -146,6 +149,80 @@ describe("PerformanceReviewDialog", () => {
     );
   });
 
+  it("saves a standalone competency comment without a rating when canEditCompetencySelf", async () => {
+    PerformanceReviewsAPI.getReview.mockResolvedValue({
+      success: true, data: EMPTY_REVIEW, permissions: permissionsFor({ canEditCompetencySelf: true }),
+    });
+    PerformanceReviewsAPI.setCompetency.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_REVIEW,
+        competencies: {
+          ...EMPTY_REVIEW.competencies,
+          communication: { self: null, selfComment: "Clear and concise.", manager: null, managerComment: "" },
+        },
+      },
+    });
+    renderDialog();
+    await screen.findByText("Competencies");
+
+    fireEvent.click(screen.getAllByText("Comment")[0]);
+    fireEvent.change(screen.getByPlaceholderText("Why this rating?"), { target: { value: "Clear and concise." } });
+    fireEvent.click(screen.getByText("Save comment"));
+
+    await waitFor(() =>
+      expect(PerformanceReviewsAPI.setCompetency).toHaveBeenCalledWith("2026-h1", "e1", {
+        key: "communication", comment: "Clear and concise.",
+      })
+    );
+  });
+
+  it("shows an existing competency comment read-only when the viewer can't edit it", async () => {
+    PerformanceReviewsAPI.getReview.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_REVIEW,
+        competencies: {
+          ...EMPTY_REVIEW.competencies,
+          communication: { self: 4, selfComment: "Clear and concise.", manager: null, managerComment: "" },
+        },
+      },
+      permissions: permissionsFor({}),
+    });
+    renderDialog();
+    await screen.findByText("Competencies");
+
+    fireEvent.click(screen.getAllByText("Comment")[0]);
+    expect(await screen.findByText("Clear and concise.")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Why this rating?")).not.toBeInTheDocument();
+  });
+
+  it("shows an editable competency's existing comment as a read view first, with an Edit action to reveal the textarea", async () => {
+    PerformanceReviewsAPI.getReview.mockResolvedValue({
+      success: true,
+      data: {
+        ...EMPTY_REVIEW,
+        competencies: {
+          ...EMPTY_REVIEW.competencies,
+          communication: { self: 4, selfComment: "Clear and concise.", manager: null, managerComment: "" },
+        },
+      },
+      permissions: permissionsFor({ canEditCompetencySelf: true }),
+    });
+    renderDialog();
+    await screen.findByText("Competencies");
+
+    fireEvent.click(screen.getAllByText("Comment")[0]);
+    // Read view first, not straight into an editable textarea.
+    expect(await screen.findByText("Clear and concise.")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Why this rating?")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Edit"));
+    const textarea = await screen.findByPlaceholderText("Why this rating?");
+    expect(textarea).toHaveValue("Clear and concise.");
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
+  });
+
   it("renders goals and adds a new one when canAddGoals", async () => {
     PerformanceReviewsAPI.getReview.mockResolvedValue({
       success: true,
@@ -239,7 +316,7 @@ describe("PerformanceReviewDialog", () => {
     expect(onSubmitted).toHaveBeenCalled();
   });
 
-  it("shows a loading state then the AI insight text on success", async () => {
+  it("shows a loading state then the structured AI insight on success", async () => {
     PerformanceReviewsAPI.getReview.mockResolvedValue({
       success: true, data: EMPTY_REVIEW, permissions: permissionsFor({}),
     });
@@ -251,8 +328,15 @@ describe("PerformanceReviewDialog", () => {
     fireEvent.click(screen.getByText("Ask AI"));
     expect(await screen.findByText("Thinking…")).toBeInTheDocument();
 
-    resolveAsk({ success: true, text: "A neutral summary and one growth suggestion." });
-    expect(await screen.findByText("A neutral summary and one growth suggestion.")).toBeInTheDocument();
+    resolveAsk({
+      success: true,
+      summary: "A neutral summary.",
+      strengths: ["Clear communicator"],
+      growthAreas: ["Delegate more"],
+    });
+    expect(await screen.findByText("A neutral summary.")).toBeInTheDocument();
+    expect(screen.getByText("Clear communicator")).toBeInTheDocument();
+    expect(screen.getByText("Delegate more")).toBeInTheDocument();
     expect(PerformanceReviewsAPI.askAI).toHaveBeenCalledWith("2026-h1", "e1");
   });
 
@@ -268,5 +352,19 @@ describe("PerformanceReviewDialog", () => {
 
     expect(await screen.findByText("AI insight is unavailable right now. Try again later.")).toBeInTheDocument();
     expect(screen.queryByText(/GEMINI_API_KEY/)).not.toBeInTheDocument();
+  });
+
+  it("shows the static unavailable message when the response doesn't match the expected shape", async () => {
+    PerformanceReviewsAPI.getReview.mockResolvedValue({
+      success: true, data: EMPTY_REVIEW, permissions: permissionsFor({}),
+    });
+    PerformanceReviewsAPI.askAI.mockResolvedValue({ success: true, text: "old-shape response" });
+    renderDialog();
+    await screen.findByText("Self Review");
+
+    fireEvent.click(screen.getByText("Ask AI"));
+
+    expect(await screen.findByText("AI insight is unavailable right now. Try again later.")).toBeInTheDocument();
+    expect(screen.queryByText("old-shape response")).not.toBeInTheDocument();
   });
 });

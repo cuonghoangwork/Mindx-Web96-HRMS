@@ -26,6 +26,7 @@ router.patch(
 );
 router.get("/cycles/:key/roster", verifyToken, performanceController.getRoster);
 router.get("/cycles/:key/analytics", verifyToken, performanceController.getAnalytics);
+router.get("/cycles/:key/comparison", ...hr, performanceController.getComparison);
 
 router.get("/reviews/:cycleKey/:employeeId", verifyToken, performanceController.getReview);
 

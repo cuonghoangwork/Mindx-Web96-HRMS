@@ -33,6 +33,14 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
   const [submittingManager, setSubmittingManager] = useState(false);
 
   const [savingCompetency, setSavingCompetency] = useState(false);
+  const [expandedComment, setExpandedComment] = useState(null);
+  const [commentDraft, setCommentDraft] = useState({ self: "", manager: "" });
+  // Whether each side is showing its editable textarea vs. its saved-comment
+  // read view — starts on the read view when a comment already exists (see
+  // toggleCompetencyComment), same read-then-edit pattern the self-review
+  // section above already uses (canEditSelf ? <form> : <readonly display>).
+  const [editingSide, setEditingSide] = useState({ self: false, manager: false });
+  const [savingCommentFor, setSavingCommentFor] = useState(null);
   const [savingGoalId, setSavingGoalId] = useState(null);
   const [goalTextDraft, setGoalTextDraft] = useState("");
   const [addingGoal, setAddingGoal] = useState(false);
@@ -50,7 +58,9 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
 
   const [aiInsightLoading, setAiInsightLoading] = useState(false);
   const [aiInsightError, setAiInsightError] = useState(false);
-  const [aiInsightText, setAiInsightText] = useState("");
+  const [aiInsightSummary, setAiInsightSummary] = useState("");
+  const [aiInsightStrengths, setAiInsightStrengths] = useState([]);
+  const [aiInsightGrowthAreas, setAiInsightGrowthAreas] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +155,30 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
     setSavingCompetency(false);
   };
 
+  const toggleCompetencyComment = (key, value) => {
+    if (expandedComment === key) {
+      setExpandedComment(null);
+    } else {
+      setCommentDraft({ self: value.selfComment ?? "", manager: value.managerComment ?? "" });
+      // Land on the edit box only when there's nothing saved yet to show instead.
+      setEditingSide({ self: !value.selfComment, manager: !value.managerComment });
+      setExpandedComment(key);
+    }
+  };
+
+  const handleSaveCompetencyComment = async (key, rater, comment) => {
+    setSavingCommentFor(`${key}:${rater}`);
+    setError("");
+    try {
+      const res = await PerformanceReviewsAPI.setCompetency(cycleKey, employeeId, { key, comment });
+      setReview(res.data ?? review);
+      setEditingSide((s) => ({ ...s, [rater]: false }));
+    } catch (err) {
+      setError(err.message || t("performance.dialog.submitFailed"));
+    }
+    setSavingCommentFor(null);
+  };
+
   const handleGoalProgressChange = async (goalId, progress) => {
     setSavingGoalId(goalId);
     setError("");
@@ -234,10 +268,17 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
   const handleAskAI = async () => {
     setAiInsightLoading(true);
     setAiInsightError(false);
-    setAiInsightText("");
+    setAiInsightSummary("");
+    setAiInsightStrengths([]);
+    setAiInsightGrowthAreas([]);
     try {
       const res = await PerformanceReviewsAPI.askAI(cycleKey, employeeId);
-      setAiInsightText(res.text ?? "");
+      if (typeof res.summary !== "string" || !Array.isArray(res.strengths) || !Array.isArray(res.growthAreas)) {
+        throw new Error("Malformed AI insight response.");
+      }
+      setAiInsightSummary(res.summary);
+      setAiInsightStrengths(res.strengths);
+      setAiInsightGrowthAreas(res.growthAreas);
     } catch {
       // Never surface the raw server error here — it may leak config details
       // (e.g. "GEMINI_API_KEY is unset"); the UI only ever shows a static,
@@ -249,12 +290,71 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
 
   const sectionTitleStyle = { fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-secondary)", marginTop: "var(--sp-4)", marginBottom: "var(--sp-2)" };
   const readonlyCommentsStyle = { fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", lineHeight: 1.5 };
+  const smallLabelStyle = { fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase", marginBottom: "4px" };
   const dotStyle = (filled, editable) => ({
     width: "14px", height: "14px", borderRadius: "50%", boxSizing: "border-box",
     cursor: editable ? "pointer" : "default",
     background: filled ? "var(--bg-primary)" : "transparent",
     border: "2px solid " + (filled ? "var(--bg-primary)" : "var(--bdr-default)"),
   });
+
+  // One side (self or manager) of a competency's comment: a saved-comment
+  // read view with an Edit action, or the editable form-group textarea —
+  // never both at once. Mirrors the self-review section's own
+  // canEditSelf ? <form> : <readonly display> split above.
+  const renderCompetencyCommentSide = (key, side, value) => {
+    const canEdit = side === "self" ? canEditCompetencySelf : canEditCompetencyManager;
+    const existing = side === "self" ? value.selfComment : value.managerComment;
+    const label = side === "self" ? t("performance.dialog.selfColumn") : t("performance.dialog.managerColumn");
+
+    if (!canEdit) {
+      return existing ? (
+        <div key={side}>
+          <div style={smallLabelStyle}>{label}</div>
+          <p style={readonlyCommentsStyle}>{existing}</p>
+        </div>
+      ) : null;
+    }
+
+    if (existing && !editingSide[side]) {
+      return (
+        <div key={side}>
+          <div style={smallLabelStyle}>{label}</div>
+          <p style={readonlyCommentsStyle}>{existing}</p>
+          <Button variant="link" size="sm" type="button" onClick={() => setEditingSide((s) => ({ ...s, [side]: true }))}>
+            {t("performance.dialog.competencyCommentEdit")}
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div key={side} className="form-group" style={{ marginBottom: 0 }}>
+        <label>{label}</label>
+        <textarea
+          rows={2}
+          value={commentDraft[side]}
+          onChange={(e) => setCommentDraft((d) => ({ ...d, [side]: e.target.value }))}
+          placeholder={t("performance.dialog.competencyCommentPlaceholder")}
+          style={{ resize: "vertical" }}
+        />
+        <div style={{ display: "flex", gap: "var(--sp-2)", marginTop: "var(--sp-2)" }}>
+          <Button
+            variant="secondary" size="sm" type="button"
+            loading={savingCommentFor === `${key}:${side}`}
+            onClick={() => handleSaveCompetencyComment(key, side, commentDraft[side])}
+          >
+            {t("performance.dialog.competencyCommentSave")}
+          </Button>
+          {existing && (
+            <Button variant="ghost" size="sm" type="button" onClick={() => setEditingSide((s) => ({ ...s, [side]: false }))}>
+              {t("performance.dialog.competencyCommentCancel")}
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -277,14 +377,44 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
 
         {error && <p className="form-error">{error}</p>}
 
-        {(aiInsightLoading || aiInsightError || aiInsightText) && (
+        {(aiInsightLoading || aiInsightError || aiInsightSummary) && (
           <div style={{ marginTop: "var(--sp-3)", padding: "var(--sp-3)", background: "var(--bg-primary-subtle)", border: "1px solid var(--bdr-brand)" }}>
             <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-primary-brand)", marginBottom: "var(--sp-2)" }}>
               {t("performance.dialog.aiInsightTitle")}
             </div>
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-              {aiInsightLoading ? t("performance.dialog.aiThinking") : aiInsightError ? t("performance.dialog.aiUnavailable") : aiInsightText}
-            </div>
+            {aiInsightLoading ? (
+              <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)", lineHeight: 1.5 }}>
+                {t("performance.dialog.aiThinking")}
+              </div>
+            ) : aiInsightError ? (
+              <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)", lineHeight: 1.5 }}>
+                {t("performance.dialog.aiUnavailable")}
+              </div>
+            ) : (
+              <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)", lineHeight: 1.5 }}>
+                <p style={{ margin: "0 0 var(--sp-2)" }}>{aiInsightSummary}</p>
+                {aiInsightStrengths.length > 0 && (
+                  <>
+                    <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>
+                      {t("performance.dialog.aiStrengthsLabel")}
+                    </div>
+                    <ul style={{ margin: "4px 0 var(--sp-2)", paddingLeft: "18px" }}>
+                      {aiInsightStrengths.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </>
+                )}
+                {aiInsightGrowthAreas.length > 0 && (
+                  <>
+                    <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>
+                      {t("performance.dialog.aiGrowthAreasLabel")}
+                    </div>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: "18px" }}>
+                      {aiInsightGrowthAreas.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -329,40 +459,62 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
             <section>
               <h3 style={sectionTitleStyle}>{t("performance.dialog.competenciesTitle")}</h3>
               {(meta?.competencies ?? []).map((key) => {
-                const value = review?.competencies?.[key] ?? { self: null, manager: null };
+                const value = review?.competencies?.[key] ?? { self: null, manager: null, selfComment: "", managerComment: "" };
+                const canComment = canEditCompetencySelf || canEditCompetencyManager;
+                const hasComment = Boolean(value.selfComment || value.managerComment);
+                const expanded = expandedComment === key;
                 return (
-                  <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
-                    <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>{competencyLabel(key)}</div>
-                    <div style={{ display: "flex", gap: "var(--sp-5)" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-1)" }}>
-                        <div style={{ display: "flex", gap: "4px" }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <div
-                              key={n}
-                              role={canEditCompetencySelf ? "button" : undefined}
-                              aria-label={canEditCompetencySelf ? `${competencyLabel(key)} — ${t("performance.dialog.selfColumn")} ${n}` : undefined}
-                              style={dotStyle(n <= (value.self ?? 0), canEditCompetencySelf)}
-                              onClick={canEditCompetencySelf && !savingCompetency ? () => handleSetCompetency(key, n) : undefined}
-                            />
-                          ))}
-                        </div>
-                        <div style={{ fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>{t("performance.dialog.selfColumn")}</div>
+                  <div key={key} style={{ padding: "9px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                        <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>{competencyLabel(key)}</div>
+                        {(canComment || hasComment) && (
+                          <button
+                            type="button"
+                            onClick={() => toggleCompetencyComment(key, value)}
+                            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)" }}
+                          >
+                            {expanded ? t("performance.dialog.competencyCommentHide") : t("performance.dialog.competencyCommentShow")}
+                          </button>
+                        )}
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-1)" }}>
-                        <div style={{ display: "flex", gap: "4px" }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <div
-                              key={n}
-                              role={canEditCompetencyManager ? "button" : undefined}
-                              aria-label={canEditCompetencyManager ? `${competencyLabel(key)} — ${t("performance.dialog.managerColumn")} ${n}` : undefined}
-                              style={dotStyle(n <= (value.manager ?? 0), canEditCompetencyManager)}
-                              onClick={canEditCompetencyManager && !savingCompetency ? () => handleSetCompetency(key, n) : undefined}
-                            />
-                          ))}
+                      <div style={{ display: "flex", gap: "var(--sp-5)" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-1)" }}>
+                          <div style={{ display: "flex", gap: "4px" }}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <div
+                                key={n}
+                                role={canEditCompetencySelf ? "button" : undefined}
+                                aria-label={canEditCompetencySelf ? `${competencyLabel(key)} — ${t("performance.dialog.selfColumn")} ${n}` : undefined}
+                                style={dotStyle(n <= (value.self ?? 0), canEditCompetencySelf)}
+                                onClick={canEditCompetencySelf && !savingCompetency ? () => handleSetCompetency(key, n) : undefined}
+                              />
+                            ))}
+                          </div>
+                          <div style={{ fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>{t("performance.dialog.selfColumn")}</div>
                         </div>
-                        <div style={{ fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>{t("performance.dialog.managerColumn")}</div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-1)" }}>
+                          <div style={{ display: "flex", gap: "4px" }}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <div
+                                key={n}
+                                role={canEditCompetencyManager ? "button" : undefined}
+                                aria-label={canEditCompetencyManager ? `${competencyLabel(key)} — ${t("performance.dialog.managerColumn")} ${n}` : undefined}
+                                style={dotStyle(n <= (value.manager ?? 0), canEditCompetencyManager)}
+                                onClick={canEditCompetencyManager && !savingCompetency ? () => handleSetCompetency(key, n) : undefined}
+                              />
+                            ))}
+                          </div>
+                          <div style={{ fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase" }}>{t("performance.dialog.managerColumn")}</div>
+                        </div>
                       </div>
                     </div>
+                    {expanded && (
+                      <div style={{ marginTop: "var(--sp-3)", display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+                        {renderCompetencyCommentSide(key, "self", value)}
+                        {renderCompetencyCommentSide(key, "manager", value)}
+                      </div>
+                    )}
                   </div>
                 );
               })}

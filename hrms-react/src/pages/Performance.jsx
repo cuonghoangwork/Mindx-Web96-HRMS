@@ -28,6 +28,20 @@ const STATUS_DISPLAY = {
   Completed: { key: "completed", variant: "success" },
 };
 
+// Reuses Dashboard.jsx's .stat-card-trend/.up/.down CSS classes (global in
+// index.css, otherwise unused on this page) rather than inventing new ones.
+// `invert` flips which sign counts as "good" — a lower appeal rate is the
+// improvement, unlike every rating/completion delta where higher is better.
+function formatDelta(value, { invert = false, percent = false } = {}) {
+  if (value === null || value === undefined) return { text: "—", cls: "" };
+  if (value === 0) return { text: percent ? "0%" : "0", cls: "" };
+  const shown = percent ? Math.round(value * 100) : value;
+  const sign = value > 0 ? "+" : "";
+  const arrow = value > 0 ? "↑" : "↓";
+  const good = invert ? value < 0 : value > 0;
+  return { text: `${arrow} ${sign}${shown}${percent ? "%" : ""}`, cls: good ? "up" : "down" };
+}
+
 // isAdmin here only gates button *visibility* — the real enforcement is the
 // backend's admin middleware on POST/PATCH /performance/cycles. Unlike
 // PerformanceReviewDialog's canEdit* flags (which need server-side lookups
@@ -43,6 +57,7 @@ function Performance() {
   const [selectedCycleKey, setSelectedCycleKey] = useState(null);
   const [roster, setRoster] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [comparison, setComparison] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -85,6 +100,20 @@ function Performance() {
 
   useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
 
+  // ADMIN/HR only server-side — a 403 for anyone else just means no
+  // comparison card renders, same silent-to-null handling as loadAnalytics.
+  // Keeps the whole response (not just `.data`, unlike loadAnalytics) since
+  // the previous cycle's label lives at the top level while its stats and
+  // the computed deltas live under `data`.
+  const loadComparison = useCallback(() => {
+    if (!selectedCycleKey) return;
+    PerformanceReviewsAPI.comparison(selectedCycleKey)
+      .then((res) => setComparison(res))
+      .catch(() => setComparison(null));
+  }, [selectedCycleKey]);
+
+  useEffect(() => { loadComparison(); }, [loadComparison]);
+
   const selectedCycle = cycles.find((c) => c.key === selectedCycleKey) ?? null;
 
   const handleCycleCreated = (cycle) => {
@@ -103,6 +132,7 @@ function Performance() {
         const updated = res.data;
         if (updated) setCycles((prev) => prev.map((c) => (c.key === updated.key ? updated : c)));
         loadAnalytics();
+        loadComparison();
       })
       .catch((err) => setError(err.message || t("performance.loadFailed")))
       .finally(() => setTogglingCycle(false));
@@ -150,7 +180,7 @@ function Performance() {
   const deptCompareRows = analytics?.deptCompare ?? null;
 
   const handleCloseDialog = () => setOpenReview(null);
-  const handleSubmitted = () => { loadRoster(); loadAnalytics(); };
+  const handleSubmitted = () => { loadRoster(); loadAnalytics(); loadComparison(); };
 
   if (loading) {
     return <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.loading")}</p>;
@@ -385,6 +415,51 @@ function Performance() {
                   </div>
                 ))}
               </div>
+
+              {comparison && (
+                <div className="content-card">
+                  <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.comparison.title")}</h3>
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>
+                    {comparison.previous
+                      ? t("performance.comparison.sub", { label: comparison.previous.label })
+                      : t("performance.comparison.noPrevious")}
+                  </div>
+
+                  {comparison.previous && (
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--sp-4)", marginBottom: "var(--sp-5)" }}>
+                        {[
+                          { label: t("performance.comparison.avgRatingDelta"), delta: formatDelta(comparison.data.deltas.avgManagerDelta) },
+                          { label: t("performance.comparison.completionRateDelta"), delta: formatDelta(comparison.data.deltas.completionRateDelta, { percent: true }) },
+                          { label: t("performance.comparison.appealRateDelta"), delta: formatDelta(comparison.data.deltas.appealRateDelta, { percent: true, invert: true }) },
+                        ].map((row) => (
+                          <div key={row.label}>
+                            <div style={{ fontSize: "10px", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase", marginBottom: "4px" }}>
+                              {row.label}
+                            </div>
+                            <div className={`stat-card-trend ${row.delta.cls}`} style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)" }}>
+                              {row.delta.text}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", color: "var(--txt-secondary)", textTransform: "uppercase", marginBottom: "var(--sp-2)" }}>
+                        {t("performance.comparison.competencyDelta")}
+                      </div>
+                      {comparison.data.deltas.competencyDeltas.map((row) => {
+                        const managerDelta = formatDelta(row.managerDelta);
+                        return (
+                          <div key={row.key} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
+                            <span style={{ fontSize: "var(--fs-sm)" }}>{t(`performance.competencies.${row.key}`, { defaultValue: row.key })}</span>
+                            <span className={`stat-card-trend ${managerDelta.cls}`}>{managerDelta.text}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </>

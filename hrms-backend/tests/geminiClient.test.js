@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { extractGeminiText, askGemini, DEFAULT_GEMINI_MODEL } from "../utils/geminiClient.js";
+import { extractGeminiText, extractGeminiJson, askGemini, DEFAULT_GEMINI_MODEL } from "../utils/geminiClient.js";
 
 describe("extractGeminiText", () => {
   it("reads the first candidate's text", () => {
@@ -21,6 +21,28 @@ describe("extractGeminiText", () => {
   it("throws when the text is empty or whitespace-only", () => {
     expect(() => extractGeminiText({ candidates: [{ content: { parts: [{ text: "   " }] } }] })).toThrow();
     expect(() => extractGeminiText({ candidates: [{ content: { parts: [] } }] })).toThrow();
+  });
+});
+
+describe("extractGeminiJson", () => {
+  it("parses a JSON-string text part into an object", () => {
+    const json = {
+      candidates: [{ content: { parts: [{ text: '{"summary":"Solid quarter.","strengths":["Communication"],"growthAreas":["Delegation"]}' }] } }],
+    };
+    expect(extractGeminiJson(json)).toEqual({
+      summary: "Solid quarter.",
+      strengths: ["Communication"],
+      growthAreas: ["Delegation"],
+    });
+  });
+
+  it("throws a clear error when the text part is not valid JSON", () => {
+    const json = { candidates: [{ content: { parts: [{ text: "not json at all" }] } }] };
+    expect(() => extractGeminiJson(json)).toThrow(/not valid JSON/);
+  });
+
+  it("still throws when there's no text at all (delegates to extractGeminiText)", () => {
+    expect(() => extractGeminiJson({})).toThrow();
   });
 });
 
@@ -46,6 +68,32 @@ describe("askGemini", () => {
     expect(url).toContain("key=test-key");
     expect(options.method).toBe("POST");
     expect(JSON.parse(options.body).contents[0].parts[0].text).toBe("Summarize this review.");
+  });
+
+  it("requests JSON output and returns the parsed object when json:true", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: '{"summary":"Good.","strengths":[],"growthAreas":[]}' }] } }],
+      }),
+    });
+
+    const result = await askGemini("prompt", { apiKey: "test-key", fetchImpl, json: true });
+
+    expect(result).toEqual({ summary: "Good.", strengths: [], growthAreas: [] });
+    const [, options] = fetchImpl.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.generationConfig.responseMimeType).toBe("application/json");
+  });
+
+  it("does not request JSON output by default", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "plain text" }] } }] }),
+    });
+    await askGemini("prompt", { apiKey: "test-key", fetchImpl });
+    const [, options] = fetchImpl.mock.calls[0];
+    expect(JSON.parse(options.body).generationConfig.responseMimeType).toBeUndefined();
   });
 
   it("uses the given model instead of the default", async () => {

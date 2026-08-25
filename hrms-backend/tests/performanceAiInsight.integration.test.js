@@ -53,22 +53,29 @@ const insightUrl = (employee, key = cycleKey) =>
   `/api/v1/performance/reviews/${key}/${employee._id}/ai-insight`;
 
 describe("POST /performance/reviews/:cycleKey/:employeeId/ai-insight", () => {
-  it("returns the generated text for a viewer with access", async (ctx) => {
+  it("returns the structured insight for a viewer with access", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    askGemini.mockResolvedValue("A neutral summary and one growth suggestion.");
+    askGemini.mockResolvedValue({
+      summary: "A neutral summary.",
+      strengths: ["Communication"],
+      growthAreas: ["Delegation"],
+    });
 
     const res = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.text).toBe("A neutral summary and one growth suggestion.");
+    expect(res.body.summary).toBe("A neutral summary.");
+    expect(res.body.strengths).toEqual(["Communication"]);
+    expect(res.body.growthAreas).toEqual(["Delegation"]);
     expect(askGemini).toHaveBeenCalledTimes(1);
     expect(askGemini.mock.calls[0][0]).toContain("Dev One");
+    expect(askGemini.mock.calls[0][1]).toEqual({ json: true });
   });
 
   it("also allows the employee's manager and an admin", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    askGemini.mockResolvedValue("Insight text.");
+    askGemini.mockResolvedValue({ summary: "Insight.", strengths: [], growthAreas: [] });
 
     const asManager = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.manager));
     expect(asManager.status).toBe(200);
@@ -79,7 +86,7 @@ describe("POST /performance/reviews/:cycleKey/:employeeId/ai-insight", () => {
 
   it("refuses an unrelated employee (403)", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    askGemini.mockResolvedValue("Insight text.");
+    askGemini.mockResolvedValue({ summary: "Insight.", strengths: [], growthAreas: [] });
 
     const res = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.designer));
 
@@ -98,5 +105,16 @@ describe("POST /performance/reviews/:cycleKey/:employeeId/ai-insight", () => {
     expect(res.status).toBe(503);
     expect(res.body.success).toBe(false);
     expect(res.body.message).toMatch(/GEMINI_API_KEY/);
+  });
+
+  it("returns a generic 502 (not the raw model output) when Gemini's JSON is missing expected fields", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    askGemini.mockResolvedValue({ summary: "Only a summary, no arrays." });
+
+    const res = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+
+    expect(res.status).toBe(502);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).not.toContain("Only a summary");
   });
 });

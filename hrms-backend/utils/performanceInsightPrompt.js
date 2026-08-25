@@ -14,7 +14,10 @@ import { COMPETENCIES, COMPETENCY_LABELS } from "../model/PerformanceReview.js";
 function competencyLines(competencies) {
   return COMPETENCIES.map((key) => {
     const v = competencies?.[key] ?? {};
-    return `${COMPETENCY_LABELS[key]}: self ${v.self ?? "—"}, manager ${v.manager ?? "—"}`;
+    let line = `${COMPETENCY_LABELS[key]}: self ${v.self ?? "—"}, manager ${v.manager ?? "—"}`;
+    if (v.selfComment) line += ` | self note: ${v.selfComment}`;
+    if (v.managerComment) line += ` | manager note: ${v.managerComment}`;
+    return line;
   }).join("\n");
 }
 
@@ -39,8 +42,12 @@ export function buildInsightPrompt({ employee, cycle, review }) {
     `Competency ratings (1-5):\n${competencyLines(review?.competencies)}\n\n` +
     `Goals this cycle:\n${goalLines(review?.goals)}\n\n` +
     `Peer feedback:\n${peerFeedbackLines(review?.peerFeedback)}\n\n` +
-    `Write, in plain text with no markdown: (1) a neutral 2-3 sentence summary, (2) one specific growth suggestion, ` +
-    `(3) a one-line note on whether the review content is detailed enough or too vague. Keep it under 120 words total.`
+    `Respond with ONLY a JSON object, no markdown and no code fences, matching exactly this shape: ` +
+    `{"summary": string, "strengths": string[], "growthAreas": string[]}. ` +
+    `"summary" is a neutral 2-3 sentence overview of the review. "strengths" is 1-3 short phrases naming what ` +
+    `stood out positively. "growthAreas" is 1-2 short, specific, actionable suggestions. If the review content is ` +
+    `too sparse to say anything meaningful, note that plainly in "summary" instead of inventing detail. Keep the ` +
+    `total response under 120 words.`
   );
 }
 

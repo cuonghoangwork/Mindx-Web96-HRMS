@@ -17,13 +17,14 @@ import { notifyHR } from "./notificationController.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
 import { askGemini } from "../utils/geminiClient.js";
 import { buildInsightPrompt } from "../utils/performanceInsightPrompt.js";
-import { computeAnalytics, reviewStatusOf } from "../utils/performanceAnalytics.js";
+import { computeAnalytics, computeAppealRate, computeComparison, reviewStatusOf } from "../utils/performanceAnalytics.js";
 import {
   APPEAL_WINDOW_DAYS,
   appealDeadlineKey,
   ensureStandardCycles,
   isWithinAppealWindow,
   loadCycleOrThrow,
+  previousStandardCycleKey,
 } from "../utils/performanceCycles.js";
 import {
   assertCanRateAsManager,
@@ -59,7 +60,12 @@ function competenciesToClient(value) {
   return Object.fromEntries(
     COMPETENCIES.map((key) => [
       key,
-      { self: source?.[key]?.self ?? null, manager: source?.[key]?.manager ?? null },
+      {
+        self: source?.[key]?.self ?? null,
+        selfComment: source?.[key]?.selfComment ?? "",
+        manager: source?.[key]?.manager ?? null,
+        managerComment: source?.[key]?.managerComment ?? "",
+      },
     ]),
   );
 }
@@ -212,6 +218,17 @@ async function loadScopedReviewData(cycleKey, employeeCondition) {
     employee: { $in: employees.map((employee) => employee._id) },
   });
   return { employees, reviews };
+}
+
+/** computeAnalytics + appeal rate for one cycle — the pair every comparison
+ * side (current and previous) needs. No department breakdown; comparison is
+ * about cycle-over-cycle deltas, not a per-department view. */
+async function computeCycleStats(cycleKey, employeeCondition) {
+  const { employees, reviews } = await loadScopedReviewData(cycleKey, employeeCondition);
+  return {
+    ...computeAnalytics({ employees, reviews, includeDeptCompare: false }),
+    appealRate: computeAppealRate(reviews, employees.length),
+  };
 }
 
 export async function findUserForEmployee(employee) {
@@ -372,6 +389,36 @@ const performanceController = {
     }
   },
 
+  getComparison: async (req, res) => {
+    try {
+      const cycle = await loadCycleOrThrow(req.params.key);
+      const { employeeCondition } = await resolveRosterScope(req);
+
+      const previousKey = req.query.compareTo || previousStandardCycleKey(cycle.key) || null;
+      let previousCycle = null;
+      let previousStats = null;
+      if (previousKey) {
+        previousCycle = await loadCycleOrThrow(previousKey);
+        previousStats = await computeCycleStats(previousCycle.key, employeeCondition);
+      }
+
+      const currentStats = await computeCycleStats(cycle.key, employeeCondition);
+
+      res.json({
+        success: true,
+        cycle: cycleToClient(cycle),
+        previous: previousCycle ? cycleToClient(previousCycle) : null,
+        data: {
+          current: currentStats,
+          previous: previousStats,
+          deltas: computeComparison(currentStats, previousStats),
+        },
+      });
+    } catch (error) {
+      res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+  },
+
   getRoster: async (req, res) => {
     try {
       const cycle = await loadCycleOrThrow(req.params.key);
@@ -439,9 +486,23 @@ const performanceController = {
         cycle,
         review: reviewToClient(review ?? emptyReviewDoc(cycle.key, employee._id)),
       });
-      const text = await askGemini(prompt);
+      const insight = await askGemini(prompt, { json: true });
+      if (
+        typeof insight?.summary !== "string" ||
+        !Array.isArray(insight?.strengths) ||
+        !Array.isArray(insight?.growthAreas)
+      ) {
+        const err = new Error("Gemini response did not match the expected shape.");
+        err.status = 502;
+        throw err;
+      }
 
-      res.json({ success: true, text });
+      res.json({
+        success: true,
+        summary: insight.summary,
+        strengths: insight.strengths,
+        growthAreas: insight.growthAreas,
+      });
     } catch (error) {
       res.status(error.status || 502).json({ success: false, message: error.message });
     }
@@ -546,9 +607,22 @@ const performanceController = {
       if (!access.isSelf) assertCanRateAsManager(access);
       assertCycleOpen(cycle);
 
+      const update = {};
+      if (req.body.value !== undefined && req.body.value !== null && req.body.value !== "") {
+        update[`competencies.${req.body.key}.${rater}`] = Number(req.body.value);
+      }
+      if (req.body.comment !== undefined && req.body.comment !== null && req.body.comment !== "") {
+        update[`competencies.${req.body.key}.${rater}Comment`] = String(req.body.comment).trim();
+      }
+      if (!Object.keys(update).length) {
+        const err = new Error("Nothing to update.");
+        err.status = 400;
+        throw err;
+      }
+
       const review = await PerformanceReviewModel.findOneAndUpdate(
         { cycleKey: cycle.key, employee: employee._id },
-        { $set: { [`competencies.${req.body.key}.${rater}`]: Number(req.body.value) } },
+        { $set: update },
         { new: true, upsert: true, runValidators: true },
       );
 

@@ -37,6 +37,17 @@ export function previousHalf({ year, half }) {
   return half === 1 ? { year: year - 1, half: 2 } : { year, half: 1 };
 }
 
+/** The chronological predecessor key for a standard cycle (e.g. "2026-h2" ->
+ * "2026-h1"), or null for a key that isn't a standard H1/H2 cycle — custom
+ * cycles have no inherent predecessor. */
+export function previousStandardCycleKey(key) {
+  if (!STANDARD_KEY_RE.test(key)) return null;
+  const year = Number(key.slice(0, 4));
+  const half = Number(key.slice(6, 7));
+  const prev = previousHalf({ year, half });
+  return standardCycleKey(prev.year, prev.half);
+}
+
 export function rollingStandardCycles(asOf = new Date()) {
   let cursor = halfOf(asOf);
   const cycles = [];

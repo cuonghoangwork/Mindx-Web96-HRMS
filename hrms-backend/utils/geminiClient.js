@@ -34,15 +34,33 @@ export function extractGeminiText(json) {
 }
 
 /**
- * Sends `prompt` to Gemini and returns the plain-text response.
- * Throws on any failure (missing API key, network error, non-2xx,
- * unparseable body, timeout) — callers decide what to do about that.
+ * Same as extractGeminiText, but for a request made with `askGemini(..., {json: true})`
+ * — Gemini still returns the JSON as the `text` part (guaranteed parseable by
+ * responseMimeType: "application/json"), so this just adds a JSON.parse with
+ * a clear error on malformed/truncated output instead of a raw SyntaxError.
+ */
+export function extractGeminiJson(json) {
+  const text = extractGeminiText(json);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Gemini response was not valid JSON.");
+  }
+}
+
+/**
+ * Sends `prompt` to Gemini and returns the response — plain text by default,
+ * or a parsed JSON object when called with `{json: true}` (adds
+ * responseMimeType: "application/json" to the request). Throws on any
+ * failure (missing API key, network error, non-2xx, unparseable/malformed
+ * body, timeout) — callers decide what to do about that.
  */
 export async function askGemini(prompt, {
   apiKey = process.env.GEMINI_API_KEY,
   model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
   fetchImpl = globalThis.fetch,
   timeoutMs = GEMINI_FETCH_TIMEOUT_MS,
+  json = false,
 } = {}) {
   if (!apiKey) {
     const err = new Error("AI insight isn't configured yet (GEMINI_API_KEY is unset).");
@@ -58,12 +76,21 @@ export async function askGemini(prompt, {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // gemini-3.6-flash's "thinking" tokens come out of the same budget as
+    // the visible output and can't be disabled for this model (see the
+    // DEFAULT_GEMINI_MODEL comment above) — measured ~700-800 thinking
+    // tokens for a realistic review prompt, so the JSON path needs real
+    // headroom above that or the response gets cut off mid-JSON
+    // (finishReason: "MAX_TOKENS") instead of ever reaching "STOP".
+    const generationConfig = { temperature: 0.4, maxOutputTokens: json ? 2000 : 400 };
+    if (json) generationConfig.responseMimeType = "application/json";
+
     const response = await fetchImpl(apiUrlFor(model, apiKey), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+        generationConfig,
       }),
       signal: controller.signal,
     });
@@ -72,8 +99,8 @@ export async function askGemini(prompt, {
       err.status = 502;
       throw err;
     }
-    const json = await response.json();
-    return extractGeminiText(json);
+    const body = await response.json();
+    return json ? extractGeminiJson(body) : extractGeminiText(body);
   } catch (err) {
     if (!err.status) err.status = 502;
     throw err;

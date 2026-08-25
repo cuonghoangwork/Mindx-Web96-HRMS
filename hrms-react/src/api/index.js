@@ -219,6 +219,10 @@ export const PerformanceReviewsAPI = {
   setCycleStatus: (key, status) => apiFetch(`/performance/cycles/${key}`, { method: "PATCH", body: { status } }),
   /** deptCompare is null unless the caller is ADMIN/HR — server-scoped, not client-hidden */
   analytics: (cycleKey) => apiFetch(`/performance/cycles/${cycleKey}/analytics`),
+  /** ADMIN/HR only (403 for everyone else — the page treats that the same as no data).
+   * compareTo is optional: omitted, standard cycles auto-resolve to their predecessor. */
+  comparison: (cycleKey, compareTo) =>
+    apiFetch(`/performance/cycles/${cycleKey}/comparison${qs({ compareTo })}`),
   /** Backend builds the prompt server-side from the stored review — no prompt logic on the client */
   askAI: (cycleKey, employeeId) =>
     apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST" }),

@@ -128,11 +128,55 @@ export function computeAnalytics({ employees = [], reviews = [], includeDeptComp
         .sort((a, b) => String(a.department ?? "").localeCompare(String(b.department ?? "")))
     : null;
 
+  totals.completionRate = totals.employees > 0 ? round2(totals.completed / totals.employees) : null;
+
   return {
     totals,
     ratingDistribution,
     averages: { self: average(selfRatings), manager: average(managerRatings) },
     competencyAverages,
     deptCompare,
+  };
+}
+
+/** Fraction of reviews carrying a filed appeal, or null for a zero-employee cycle. */
+export function computeAppealRate(reviews, employeeCount) {
+  if (!employeeCount) return null;
+  const appealed = reviews.filter((review) => review?.appeal).length;
+  return round2(appealed / employeeCount);
+}
+
+function delta(current, previous) {
+  if (current === null || current === undefined || previous === null || previous === undefined) {
+    return null;
+  }
+  return round2(current - previous);
+}
+
+/**
+ * Compares two computeAnalytics()-shaped results (plus each cycle's appeal
+ * rate, computed separately via computeAppealRate since it isn't part of
+ * computeAnalytics's own contract). `previous` may be null (no prior cycle
+ * to compare against) — every delta is then null, not computed against 0.
+ */
+export function computeComparison(current, previous) {
+  const prevAverages = previous?.averages ?? { self: null, manager: null };
+  const prevTotals = previous?.totals ?? { completionRate: null };
+  const prevAppealRate = previous?.appealRate ?? null;
+  const prevCompetencyByKey = new Map((previous?.competencyAverages ?? []).map((row) => [row.key, row]));
+
+  return {
+    avgSelfDelta: delta(current.averages.self, prevAverages.self),
+    avgManagerDelta: delta(current.averages.manager, prevAverages.manager),
+    completionRateDelta: delta(current.totals.completionRate, prevTotals.completionRate),
+    appealRateDelta: delta(current.appealRate ?? null, prevAppealRate),
+    competencyDeltas: current.competencyAverages.map((row) => {
+      const prevRow = prevCompetencyByKey.get(row.key);
+      return {
+        key: row.key,
+        selfDelta: delta(row.self, prevRow?.self ?? null),
+        managerDelta: delta(row.manager, prevRow?.manager ?? null),
+      };
+    }),
   };
 }

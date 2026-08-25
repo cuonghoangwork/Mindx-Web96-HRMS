@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeAnalytics, reviewStatusOf } from "../utils/performanceAnalytics.js";
+import { computeAnalytics, computeAppealRate, computeComparison, reviewStatusOf } from "../utils/performanceAnalytics.js";
 import { COMPETENCIES } from "../model/PerformanceReview.js";
 
 const ENG = { _id: "dept-eng", name: "Engineering" };
@@ -43,6 +43,7 @@ describe("computeAnalytics on an empty sample", () => {
       selfSubmitted: 0,
       managerSubmitted: 0,
       completed: 0,
+      completionRate: null,
     });
     expect(result.ratingDistribution.self).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
     expect(result.ratingDistribution.manager).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
@@ -84,6 +85,7 @@ describe("computeAnalytics totals and distribution", () => {
       selfSubmitted: 1,
       managerSubmitted: 1,
       completed: 1,
+      completionRate: 0.25,
     });
     const summed =
       totals.notStarted + totals.selfSubmitted + totals.managerSubmitted + totals.completed;
@@ -242,5 +244,80 @@ describe("computeAnalytics department comparison", () => {
     expect(result.deptCompare).toHaveLength(1);
     expect(result.deptCompare[0].departmentId).toBe("64f0000000000000000000aa");
     expect(result.deptCompare[0].department).toBe(null);
+  });
+});
+
+describe("computeAppealRate", () => {
+  it("returns null for a zero-employee cycle instead of dividing by zero", () => {
+    expect(computeAppealRate([], 0)).toBe(null);
+  });
+
+  it("counts reviews carrying an appeal, divided by the full employee count", () => {
+    const reviews = [
+      review("e1", { appeal: { status: "Pending" } }),
+      review("e2", { appeal: null }),
+      review("e3", {}),
+    ];
+    expect(computeAppealRate(reviews, 4)).toBe(0.25);
+  });
+
+  it("treats employees with no review document as non-appealed", () => {
+    expect(computeAppealRate([review("e1", { appeal: { status: "Resolved" } })], 5)).toBe(0.2);
+  });
+});
+
+describe("computeComparison", () => {
+  const currentAnalytics = (overrides = {}) => ({
+    totals: { employees: 4, notStarted: 0, selfSubmitted: 0, managerSubmitted: 4, completed: 4, completionRate: 1 },
+    averages: { self: 4, manager: 3.5 },
+    competencyAverages: [
+      { key: "communication", self: 4, manager: 3, selfCount: 4, managerCount: 4 },
+      { key: "execution", self: null, manager: null, selfCount: 0, managerCount: 0 },
+    ],
+    appealRate: 0.25,
+    ...overrides,
+  });
+
+  it("returns every delta as null when there is no previous cycle", () => {
+    const result = computeComparison(currentAnalytics(), null);
+    expect(result.avgSelfDelta).toBe(null);
+    expect(result.avgManagerDelta).toBe(null);
+    expect(result.completionRateDelta).toBe(null);
+    expect(result.appealRateDelta).toBe(null);
+    expect(result.competencyDeltas).toEqual([
+      { key: "communication", selfDelta: null, managerDelta: null },
+      { key: "execution", selfDelta: null, managerDelta: null },
+    ]);
+  });
+
+  it("computes rounded deltas against a real previous cycle", () => {
+    const previous = currentAnalytics({
+      totals: { employees: 4, notStarted: 1, selfSubmitted: 0, managerSubmitted: 0, completed: 3, completionRate: 0.75 },
+      averages: { self: 3.7, manager: 3.2 },
+      competencyAverages: [
+        { key: "communication", self: 3.5, manager: 2.5, selfCount: 4, managerCount: 4 },
+        { key: "execution", self: 4, manager: 4, selfCount: 2, managerCount: 2 },
+      ],
+      appealRate: 0.5,
+    });
+
+    const result = computeComparison(currentAnalytics(), previous);
+
+    expect(result.avgSelfDelta).toBe(0.3);
+    expect(result.avgManagerDelta).toBe(0.3);
+    expect(result.completionRateDelta).toBe(0.25);
+    expect(result.appealRateDelta).toBe(-0.25);
+    expect(result.competencyDeltas).toEqual([
+      { key: "communication", selfDelta: 0.5, managerDelta: 0.5 },
+      // current has no execution ratings at all (null) — delta stays null, not -4.
+      { key: "execution", selfDelta: null, managerDelta: null },
+    ]);
+  });
+
+  it("leaves a delta null when only one side has data, rather than comparing against 0", () => {
+    const previous = currentAnalytics({ averages: { self: null, manager: null } });
+    const result = computeComparison(currentAnalytics(), previous);
+    expect(result.avgSelfDelta).toBe(null);
+    expect(result.avgManagerDelta).toBe(null);
   });
 });

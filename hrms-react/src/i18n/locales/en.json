@@ -542,6 +542,15 @@
    "self": "Self",
    "manager": "Manager"
   },
+  "comparison": {
+   "title": "Cycle Comparison",
+   "sub": "vs. {{label}}",
+   "noPrevious": "No previous cycle to compare against.",
+   "avgRatingDelta": "Avg. Rating Change",
+   "completionRateDelta": "Completion Rate",
+   "appealRateDelta": "Appeal Rate",
+   "competencyDelta": "Competency Change (Manager)"
+  },
   "ratingLabels": {
    "1": "Needs improvement",
    "2": "Developing",
@@ -573,6 +582,12 @@
    "competenciesTitle": "Competencies",
    "selfColumn": "Self",
    "managerColumn": "Manager",
+   "competencyCommentShow": "Comment",
+   "competencyCommentHide": "Hide comment",
+   "competencyCommentPlaceholder": "Why this rating?",
+   "competencyCommentSave": "Save comment",
+   "competencyCommentEdit": "Edit",
+   "competencyCommentCancel": "Cancel",
    "goalsTitle": "Goals",
    "noGoalsYet": "No goals yet.",
    "goalPlaceholder": "Describe a goal…",
@@ -614,7 +629,9 @@
    "askAi": "Ask AI",
    "aiInsightTitle": "AI Insight",
    "aiThinking": "Thinking…",
-   "aiUnavailable": "AI insight is unavailable right now. Try again later."
+   "aiUnavailable": "AI insight is unavailable right now. Try again later.",
+   "aiStrengthsLabel": "Strengths",
+   "aiGrowthAreasLabel": "Growth areas"
   }
  },
  "orgChart": {

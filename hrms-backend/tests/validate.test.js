@@ -562,11 +562,24 @@ describe("validate.performance.competency", () => {
   it("rejects a rating outside the 1-5 scale", async () => {
     expect(await failsWith(v, { key: "execution", value: 0 }, "between 1 and 5")).toBe(true);
     expect(await failsWith(v, { key: "execution", value: 6 }, "between 1 and 5")).toBe(true);
-    expect(await failsWith(v, { key: "execution" }, "Rating is required")).toBe(true);
   });
 
   it("ignores a client-supplied rater field", async () => {
     expect(await passes(v, { key: "ownership", value: 2, rater: "manager" })).toBe(true);
+  });
+
+  it("accepts a comment with no rating, and a rating with no comment", async () => {
+    expect(await passes(v, { key: "execution", comment: "Consistently delivers." })).toBe(true);
+    expect(await passes(v, { key: "execution", value: 3 })).toBe(true);
+    expect(await passes(v, { key: "execution", value: 3, comment: "Consistently delivers." })).toBe(true);
+  });
+
+  it("rejects a comment over the length limit", async () => {
+    expect(await failsWith(v, { key: "execution", comment: "x".repeat(2001) }, "at most 2000")).toBe(true);
+  });
+
+  it("rejects a request with neither a rating nor a comment", async () => {
+    expect(await failsWith(v, { key: "execution" }, "Provide a rating, a comment, or both")).toBe(true);
   });
 });
 

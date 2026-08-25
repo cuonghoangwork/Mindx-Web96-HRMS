@@ -536,6 +536,15 @@
    "self": "Tự đánh giá",
    "manager": "Quản lý"
   },
+  "comparison": {
+   "title": "So sánh chu kỳ",
+   "sub": "So với {{label}}",
+   "noPrevious": "Không có chu kỳ trước để so sánh.",
+   "avgRatingDelta": "Thay đổi điểm TB",
+   "completionRateDelta": "Tỷ lệ hoàn thành",
+   "appealRateDelta": "Tỷ lệ khiếu nại",
+   "competencyDelta": "Thay đổi năng lực (Quản lý)"
+  },
   "ratingLabels": {
    "1": "Cần cải thiện",
    "2": "Đang phát triển",
@@ -567,6 +576,12 @@
    "competenciesTitle": "Năng lực",
    "selfColumn": "Tự đánh giá",
    "managerColumn": "Quản lý",
+   "competencyCommentShow": "Nhận xét",
+   "competencyCommentHide": "Ẩn nhận xét",
+   "competencyCommentPlaceholder": "Vì sao có đánh giá này?",
+   "competencyCommentSave": "Lưu nhận xét",
+   "competencyCommentEdit": "Sửa",
+   "competencyCommentCancel": "Hủy",
    "goalsTitle": "Mục tiêu",
    "noGoalsYet": "Chưa có mục tiêu nào.",
    "goalPlaceholder": "Mô tả một mục tiêu…",
@@ -608,7 +623,9 @@
    "askAi": "Hỏi AI",
    "aiInsightTitle": "Nhận Định AI",
    "aiThinking": "Đang phân tích…",
-   "aiUnavailable": "Nhận định AI hiện không khả dụng. Vui lòng thử lại sau."
+   "aiUnavailable": "Nhận định AI hiện không khả dụng. Vui lòng thử lại sau.",
+   "aiStrengthsLabel": "Điểm mạnh",
+   "aiGrowthAreasLabel": "Cần cải thiện"
   }
  },
  "orgChart": {
