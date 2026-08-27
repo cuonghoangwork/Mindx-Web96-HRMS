@@ -95,6 +95,14 @@ export async function generateMonthlyPayrollDraft({ asOf = new Date() } = {}) {
         `${generated} draft payslip${generated === 1 ? "" : "s"} auto-generated for ${periodLabel(created)} ` +
         `at ${fxSnapshot.rateVndPerUsd} VND/USD (${fxSnapshot.source === "api" ? "live rate" : "fallback rate"}). ` +
         "Review before the 10th-of-month payroll run.",
+      titleKey: "monthlyPayrollDraftReady",
+      messageKey: "monthlyPayrollDraftReady",
+      params: {
+        count: generated,
+        periodLabel: periodLabel(created),
+        rate: fxSnapshot.rateVndPerUsd,
+        rateSource: fxSnapshot.source === "api" ? "live" : "fallback",
+      },
       category: "payroll",
       link: "/payroll",
       linkLabel: "Review draft",

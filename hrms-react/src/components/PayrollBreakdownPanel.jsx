@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { fmtMoney } from "../utils/payroll";
 
 /**
@@ -9,18 +10,34 @@ import { fmtMoney } from "../utils/payroll";
  * instead of duplicating it, per the sprint plan.
  */
 function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
+  const { t } = useTranslation();
+  const exemptSuffix = slip.insuranceExempt ? t("payrollBreakdown.exemptSuffix", { defaultValue: " — exempt" }) : "";
   const rows = [
-    { label: "Base salary", value: slip.baseSalary, sign: 1 },
-    { label: "Bonus", value: slip.bonus, sign: 1 },
-    { label: "Allowance", value: slip.allowance, sign: 1 },
-    { label: "Deduction", value: slip.deduction, sign: -1 },
-    { label: "Gross pay", value: slip.grossPay, total: true },
-    { label: `Social insurance (BHXH 8%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhxh, sign: -1 },
-    { label: `Health insurance (BHYT 1.5%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhyt, sign: -1 },
-    { label: `Unemployment (BHTN 1%)${slip.insuranceExempt ? " — exempt" : ""}`, value: slip.bhtn, sign: -1 },
-    { label: "Personal income tax", value: slip.pit, sign: -1 },
-    { label: "Net pay", value: slip.netPay, total: true },
+    { label: t("payrollBreakdown.rows.baseSalary", { defaultValue: "Base salary" }), value: slip.baseSalary, sign: 1 },
+    { label: t("payrollBreakdown.rows.bonus", { defaultValue: "Bonus" }), value: slip.bonus, sign: 1 },
+    { label: t("payrollBreakdown.rows.allowance", { defaultValue: "Allowance" }), value: slip.allowance, sign: 1 },
+    { label: t("payrollBreakdown.rows.deduction", { defaultValue: "Deduction" }), value: slip.deduction, sign: -1 },
+    { label: t("payrollBreakdown.rows.grossPay", { defaultValue: "Gross pay" }), value: slip.grossPay, total: true },
+    { label: `${t("payrollBreakdown.rows.socialInsurance", { defaultValue: "Social insurance (BHXH 8%)" })}${exemptSuffix}`, value: slip.bhxh, sign: -1 },
+    { label: `${t("payrollBreakdown.rows.healthInsurance", { defaultValue: "Health insurance (BHYT 1.5%)" })}${exemptSuffix}`, value: slip.bhyt, sign: -1 },
+    { label: `${t("payrollBreakdown.rows.unemployment", { defaultValue: "Unemployment (BHTN 1%)" })}${exemptSuffix}`, value: slip.bhtn, sign: -1 },
+    { label: t("payrollBreakdown.rows.personalIncomeTax", { defaultValue: "Personal income tax" }), value: slip.pit, sign: -1 },
+    { label: t("payrollBreakdown.rows.netPay", { defaultValue: "Net pay" }), value: slip.netPay, total: true },
   ];
+
+  const rateSourceSuffix = period.fxRateSource && period.fxRateSource !== "manual"
+    ? ` (${period.fxRateSource === "api" ? t("payroll.rateType.live", { defaultValue: "live rate" }) : t("payroll.rateType.fallback", { defaultValue: "fallback rate" })})`
+    : "";
+  const leaveClause = t("payrollBreakdown.unpaidLeaveDay", {
+    count: slip.unpaidLeaveDays,
+    defaultValue_one: "{{count}} unpaid leave day",
+    defaultValue_other: "{{count}} unpaid leave days",
+  });
+  const absentClause = t("payrollBreakdown.absentDay", {
+    count: slip.absentDays,
+    defaultValue_one: "{{count}} absent day",
+    defaultValue_other: "{{count}} absent days",
+  });
 
   return (
     <div style={{
@@ -28,7 +45,7 @@ function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
       borderRadius: "var(--radius-md)", border: "1px solid var(--bdr-subtle)",
     }}>
       <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-        Salary breakdown — {slip.employeeName}
+        {t("payrollBreakdown.heading", { name: slip.employeeName, defaultValue: "Salary breakdown — {{name}}" })}
       </div>
 
       <div style={{ maxWidth: "520px" }}>
@@ -56,13 +73,15 @@ function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
         background: "var(--bg-info-subtle)", border: "1px solid var(--bdr-info)",
         borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-info)",
       }}>
-        Period {period.label} · {period.standardWorkingDays} standard working days · FX rate locked at{" "}
-        {Number(period.fxRate).toLocaleString("vi-VN")} VND/USD
-        {period.fxRateSource && period.fxRateSource !== "manual"
-          ? ` (${period.fxRateSource === "api" ? "live" : "fallback"} rate)`
-          : ""} · {slip.unpaidLeaveDays} unpaid leave day
-        {slip.unpaidLeaveDays === 1 ? "" : "s"} · {slip.absentDays} absent day
-        {slip.absentDays === 1 ? "" : "s"} · assumes 0 registered dependents.
+        {t("payrollBreakdown.disclosure", {
+          label: period.label,
+          workDays: period.standardWorkingDays,
+          rate: Number(period.fxRate).toLocaleString("vi-VN"),
+          rateSourceSuffix,
+          leaveClause,
+          absentClause,
+          defaultValue: "Period {{label}} · {{workDays}} standard working days · FX rate locked at {{rate}} VND/USD{{rateSourceSuffix}} · {{leaveClause}} · {{absentClause}} · assumes 0 registered dependents.",
+        })}
       </div>
 
       {slip.insuranceExempt && (
@@ -71,8 +90,10 @@ function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
           background: "var(--bg-warning-subtle)", border: "1px solid var(--bdr-default)",
           borderRadius: "var(--radius-md)", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
         }}>
-          No social, health or unemployment insurance is charged this period: {slip.unpaidLeaveDays + slip.absentDays} unpaid
-          working days reached the 14-day statutory exemption. Personal income tax still applies.
+          {t("payrollBreakdown.insuranceExemptWarning", {
+            days: slip.unpaidLeaveDays + slip.absentDays,
+            defaultValue: "No social, health or unemployment insurance is charged this period: {{days}} unpaid working days reached the 14-day statutory exemption. Personal income tax still applies.",
+          })}
         </div>
       )}
     </div>

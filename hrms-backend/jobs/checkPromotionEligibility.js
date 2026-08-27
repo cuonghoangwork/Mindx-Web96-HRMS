@@ -87,6 +87,9 @@ export async function checkPromotionEligibility({ asOf = new Date() } = {}) {
       category: "employee",
       link: "/employees",
       linkLabel: "Review promotion queue",
+      titleKey: "promotionEligibilityFlagged",
+      messageKey: "promotionEligibilityFlagged",
+      params: { employeeName: employee.name, nextLevel },
     });
   }
 

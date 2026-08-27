@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Button from "./Button";
 
 /**
@@ -11,6 +12,7 @@ import Button from "./Button";
  *   existing   — array of existing holidays, used for duplicate-name check
  */
 function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
+  const { t } = useTranslation();
   const isEdit = Boolean(holiday);
 
   const [formData, setFormData] = useState({
@@ -36,11 +38,11 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
     const type = formData.type;
 
     if (!name) {
-      setError("Holiday name is required.");
+      setError(t("holidays.addHolidayModal.nameRequired", { defaultValue: "Holiday name is required." }));
       return;
     }
     if (!date) {
-      setError("Date is required.");
+      setError(t("holidays.addHolidayModal.dateRequired", { defaultValue: "Date is required." }));
       return;
     }
 
@@ -51,7 +53,7 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
         h.date === date,
     );
     if (duplicate) {
-      setError("A holiday with this name and date already exists.");
+      setError(t("holidays.addHolidayModal.duplicate", { defaultValue: "A holiday with this name and date already exists." }));
       return;
     }
 
@@ -68,12 +70,12 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEdit ? "Edit Holiday" : "Add Holiday"}</h2>
+          <h2>{isEdit ? t("holidays.addHolidayModal.titleEdit", { defaultValue: "Edit Holiday" }) : t("holidays.addHolidayModal.titleAdd", { defaultValue: "Add Holiday" })}</h2>
           <button
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.actions.close", { defaultValue: "Close" })}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
@@ -84,7 +86,7 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label" htmlFor="holiday-name">
-              Holiday Name<span className="required">*</span>
+              {t("holidays.addHolidayModal.nameLabel", { defaultValue: "Holiday Name" })}<span className="required">*</span>
             </label>
             <input
               type="text"
@@ -92,14 +94,14 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              placeholder="e.g. Tet Holiday"
+              placeholder={t("holidays.addHolidayModal.namePlaceholder", { defaultValue: "e.g. Tet Holiday" })}
               required
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="holiday-date">
-              Date<span className="required">*</span>
+              {t("holidays.addHolidayModal.dateLabel", { defaultValue: "Date" })}<span className="required">*</span>
             </label>
             <input
               type="date"
@@ -113,7 +115,7 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="holiday-type">
-              Type
+              {t("holidays.addHolidayModal.typeLabel", { defaultValue: "Type" })}
             </label>
             <select
               id="holiday-type"
@@ -121,9 +123,9 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
               value={formData.type}
               onChange={handleChange}
             >
-              <option value="Public">Public</option>
-              <option value="Company">Company</option>
-              <option value="Optional">Optional</option>
+              <option value="Public">{t("common.holidayType.Public", { defaultValue: "Public" })}</option>
+              <option value="Company">{t("common.holidayType.Company", { defaultValue: "Company" })}</option>
+              <option value="Optional">{t("common.holidayType.Optional", { defaultValue: "Optional" })}</option>
             </select>
           </div>
 
@@ -132,10 +134,10 @@ function AddHolidayModal({ onClose, onSave, holiday = null, existing = [] }) {
               variant="secondary"
               onClick={onClose}
             >
-              Cancel
+              {t("common.actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button variant="primary" type="submit">
-              {isEdit ? "Save Changes" : "Add Holiday"}
+              {isEdit ? t("holidays.addHolidayModal.saveChanges", { defaultValue: "Save Changes" }) : t("holidays.addHolidayModal.addHoliday", { defaultValue: "Add Holiday" })}
             </Button>
           </div>
         </form>

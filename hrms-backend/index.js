@@ -20,7 +20,7 @@ app.use(express.json());
 app.use("/api/v1", rootRouter);
 
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
+  res.status(404).json({ success: false, message: "Route not found", code: "ROUTE_NOT_FOUND" });
 });
 
 // Final error handler - catches anything thrown/passed via next(err) outside controller try/catch
@@ -32,6 +32,7 @@ app.use((err, req, res, next) => {
   res.status(status).json({
     success: false,
     message: err.message || "Internal server error",
+    code: err.code || (isMulterError ? "FILE_UPLOAD_ERROR" : "INTERNAL_ERROR"),
   });
 });
 

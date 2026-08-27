@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/Button";
@@ -6,6 +7,7 @@ import AuthBrandPanel from "../components/AuthBrandPanel";
 import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, publicRegistration, configLoading } = useAuth();
@@ -42,9 +44,9 @@ function Login() {
 
         <div className="login-card">
           <div className="login-header">
-            <h1>Sign in</h1>
+            <h1>{t("auth.common.signIn", { defaultValue: "Sign in" })}</h1>
           </div>
-          <p className="login-subtitle">Enter your credentials to access your HRMS dashboard</p>
+          <p className="login-subtitle">{t("auth.login.subtitle", { defaultValue: "Enter your credentials to access your HRMS dashboard" })}</p>
 
           {justRegistered && (
             <div
@@ -59,7 +61,7 @@ function Login() {
                 <path d="M9 11l3 3L22 4" />
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
               </svg>
-              Account created. Sign in with the demo credentials below to continue.
+              {t("auth.login.registeredBanner", { defaultValue: "Account created. Sign in with the demo credentials below to continue." })}
             </div>
           )}
 
@@ -71,20 +73,20 @@ function Login() {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="email">{t("auth.common.emailAddressLabel", { defaultValue: "Email Address" })}</label>
               <input
                 type="email"
                 id="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@hrms.com"
+                placeholder={t("auth.common.emailPlaceholderDemo", { defaultValue: "admin@hrms.com" })}
                 required
                 autoComplete="email"
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">{t("auth.common.passwordLabel", { defaultValue: "Password" })}</label>
               <input
                 type="password"
                 id="password"
@@ -99,10 +101,10 @@ function Login() {
             <div className="login-form-options">
               <label className="login-remember">
                 <input type="checkbox" />
-                <span>Remember me</span>
+                <span>{t("auth.login.rememberMe", { defaultValue: "Remember me" })}</span>
               </label>
               <Link to="/forgot-password" className="link-primary">
-                Forgot password?
+                {t("auth.login.forgotPasswordLink", { defaultValue: "Forgot password?" })}
               </Link>
             </div>
 
@@ -112,26 +114,26 @@ function Login() {
               style={{ width: "100%" }}
               disabled={isLoading}
             >
-              {isLoading ? "Signing In..." : "Sign In"}
+              {isLoading ? t("auth.login.signingIn", { defaultValue: "Signing In..." }) : t("auth.login.submitButton", { defaultValue: "Sign In" })}
             </Button>
           </form>
 
           {!configLoading && publicRegistration && (
             <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
-              Don&apos;t have an account?{" "}
+              {t("auth.login.noAccountPrefix", { defaultValue: "Don't have an account?" })}{" "}
               <Link to="/register" className="link-primary">
-                Create one
+                {t("auth.login.createOneLink", { defaultValue: "Create one" })}
               </Link>
             </p>
           )}
 
           <div className="login-demo-credentials">
             <p>
-              <strong>Demo Credentials:</strong>
+              <strong>{t("auth.login.demoCredentialsTitle", { defaultValue: "Demo Credentials:" })}</strong>
               <br />
-              Email: admin@hrms.com
+              {t("auth.login.demoEmailLabel", { defaultValue: "Email:" })} admin@hrms.com
               <br />
-              Password: admin123
+              {t("auth.login.demoPasswordLabel", { defaultValue: "Password:" })} admin123
             </p>
           </div>
         </div>

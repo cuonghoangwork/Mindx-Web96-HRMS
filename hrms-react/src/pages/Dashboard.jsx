@@ -15,6 +15,7 @@ import Badge, { StatusBadge } from "../components/Badge";
 import Button from "../components/Button";
 import AttendanceTrendChart from "../components/AttendanceTrendChart";
 import ApplyLeaveModal from "../components/ApplyLeaveModal";
+import { translateApiError } from "../utils/apiError";
 
 /* ─────────────────────────────────────────
    SVG Sparkline (pure SVG, no lib needed)
@@ -347,30 +348,30 @@ function AdminDashboard() {
       <div className="stat-strip" style={{ marginTop: "var(--sp-5)" }}>
         <StripStatCell
           small
-          label="Pending Leave Requests"
+          label={t("dashboard.opsStats.pendingLeaveRequests", { defaultValue: "Pending Leave Requests" })}
           value={pendingLeaveCount}
-          trend="Awaiting review"
+          trend={t("dashboard.opsStats.awaitingReview", { defaultValue: "Awaiting review" })}
           onClick={() => navigate("/holidays")}
         />
         <StripStatCell
           small
-          label="Open Pipeline"
+          label={t("dashboard.opsStats.openPipeline", { defaultValue: "Open Pipeline" })}
           value={openPipelineCount}
-          trend="Active candidates"
+          trend={t("dashboard.opsStats.activeCandidates", { defaultValue: "Active candidates" })}
           onClick={() => navigate("/candidates")}
         />
         <StripStatCell
           small
-          label="Unread Notifications"
+          label={t("dashboard.opsStats.unreadNotifications", { defaultValue: "Unread Notifications" })}
           value={unreadNotificationCount}
-          trend="Since last visit"
+          trend={t("dashboard.opsStats.sinceLastVisit", { defaultValue: "Since last visit" })}
           onClick={() => navigate("/notifications")}
         />
         <StripStatCell
           small
-          label="Performance Reviews"
+          label={t("dashboard.opsStats.performanceReviews", { defaultValue: "Performance Reviews" })}
           value={`${performanceStats.completed}/${performanceStats.total}`}
-          trend="Completed this cycle"
+          trend={t("dashboard.opsStats.completedThisCycle", { defaultValue: "Completed this cycle" })}
           onClick={() => navigate("/performance")}
         />
       </div>
@@ -547,11 +548,11 @@ function SelfServiceDashboard() {
       setLeaveBalance(balRes.data ?? null);
       setLastPayslip((payslipsRes.items || [])[0] ?? null);
     } catch (err) {
-      setLeaveError(err.message || "Could not load leave data.");
+      setLeaveError(translateApiError(err, t) || t("dashboard.myLeave.loadFailed", { defaultValue: "Could not load leave data." }));
     } finally {
       setLoadingLeave(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadLeaveData();
@@ -606,11 +607,11 @@ function SelfServiceDashboard() {
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0 }}>{t("dashboard.title", { defaultValue: "Dashboard" })}</h2>
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            Welcome back{user?.name ? `, ${user.name}` : ""}.
+            {t("dashboard.welcomeBack", { nameSuffix: user?.name ? `, ${user.name}` : "", defaultValue: "Welcome back{{nameSuffix}}." })}
           </p>
         </div>
         <Button variant="primary" onClick={() => setApplyOpen(true)}>
-          Apply for Leave
+          {t("dashboard.myLeave.applyButton", { defaultValue: "Apply for Leave" })}
         </Button>
       </div>
 
@@ -619,21 +620,21 @@ function SelfServiceDashboard() {
           design's PTO/Pending/Last Payslip row. */}
       <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
         <StatCard
-          title="PTO Days Remaining"
+          title={t("dashboard.myStats.ptoRemaining", { defaultValue: "PTO Days Remaining" })}
           value={leaveBalance ? leaveBalance.remaining : "—"}
-          hint={leaveBalance ? `of ${leaveBalance.total} Annual/PTO` : "Leave balance unavailable"}
+          hint={leaveBalance ? t("dashboard.myStats.ptoHintWithTotal", { total: leaveBalance.total, defaultValue: "of {{total}} Annual/PTO" }) : t("dashboard.myStats.ptoHintUnavailable", { defaultValue: "Leave balance unavailable" })}
           accentColor="var(--clr-primary-400)"
         />
         <StatCard
-          title="Pending Leave Requests"
+          title={t("dashboard.opsStats.pendingLeaveRequests", { defaultValue: "Pending Leave Requests" })}
           value={myPendingLeaveCount}
-          hint="Awaiting review"
+          hint={t("dashboard.opsStats.awaitingReview", { defaultValue: "Awaiting review" })}
           accentColor="var(--clr-warning-600)"
         />
         <StatCard
-          title="Last Payslip (Net)"
+          title={t("dashboard.myStats.lastPayslip", { defaultValue: "Last Payslip (Net)" })}
           value={lastPayslip ? fmtMoney(lastPayslip.netPay, currency, lastPayslip.fxRate) : "—"}
-          hint={lastPayslip ? lastPayslip.periodLabel : "No payslips yet"}
+          hint={lastPayslip ? lastPayslip.periodLabel : t("dashboard.myStats.noPayslipsYet", { defaultValue: "No payslips yet" })}
           accentColor="var(--clr-success-600)"
         />
       </div>
@@ -641,21 +642,21 @@ function SelfServiceDashboard() {
       {isManager && (
         <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
           <StatCard
-            title="Your Team"
+            title={t("dashboard.teamStats.yourTeam", { defaultValue: "Your Team" })}
             value={teamHeadcount}
-            hint={myDepartment ? `${myDepartment} department` : "No department linked to your profile"}
+            hint={myDepartment ? t("dashboard.teamStats.deptSuffix", { dept: myDepartment, defaultValue: "{{dept}} department" }) : t("dashboard.teamStats.noDeptLinked", { defaultValue: "No department linked to your profile" })}
             accentColor="var(--clr-primary-400)"
           />
           <StatCard
-            title="Pending Approvals"
+            title={t("dashboard.teamStats.pendingApprovals", { defaultValue: "Pending Approvals" })}
             value={teamPendingApprovals}
-            hint="Leave requests awaiting your review"
+            hint={t("dashboard.teamStats.pendingApprovalsHint", { defaultValue: "Leave requests awaiting your review" })}
             accentColor="var(--clr-warning-600)"
           />
           <StatCard
-            title="Team Attendance"
+            title={t("dashboard.teamStats.teamAttendance", { defaultValue: "Team Attendance" })}
             value={`${teamAttendanceRate}%`}
-            hint={`${teamPresentCount} of ${teamAttendanceRecords.length} records present`}
+            hint={t("dashboard.teamStats.teamAttendanceHint", { present: teamPresentCount, total: teamAttendanceRecords.length, defaultValue: "{{present}} of {{total}} records present" })}
             accentColor="var(--clr-success-600)"
           />
         </div>
@@ -666,9 +667,9 @@ function SelfServiceDashboard() {
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
-              <h3 className="section-title" style={{ margin: 0 }}>My leave requests</h3>
+              <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.myLeave.heading", { defaultValue: "My leave requests" })}</h3>
               <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                Recent requests and their status
+                {t("dashboard.myLeave.subtitle", { defaultValue: "Recent requests and their status" })}
               </p>
             </div>
             {user?.employeeId && (
@@ -676,7 +677,7 @@ function SelfServiceDashboard() {
                 to={`/employees/${user.employeeId}?tab=leave`}
                 style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}
               >
-                View leave →
+                {t("dashboard.myLeave.viewLeaveLink", { defaultValue: "View leave →" })}
               </Link>
             )}
           </div>
@@ -693,17 +694,17 @@ function SelfServiceDashboard() {
                   <path d="M16 2v4M8 2v4M3 10h18" />
                 </svg>
               </div>
-              <div className="empty-state-title">No leave requests yet</div>
-              <div className="empty-state-description">Apply for leave and it&apos;ll show up here.</div>
+              <div className="empty-state-title">{t("dashboard.myLeave.emptyTitle", { defaultValue: "No leave requests yet" })}</div>
+              <div className="empty-state-description">{t("dashboard.myLeave.emptyDescription", { defaultValue: "Apply for leave and it'll show up here." })}</div>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Dates</th>
-                  <th>Days</th>
-                  <th>Type</th>
-                  <th>Status</th>
+                  <th>{t("holidays.leaveRequests.table.dates", { defaultValue: "Dates" })}</th>
+                  <th>{t("holidays.leaveRequests.table.days", { defaultValue: "Days" })}</th>
+                  <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                  <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -714,7 +715,7 @@ function SelfServiceDashboard() {
                     </td>
                     <td style={{ fontSize: "var(--fs-sm)" }}>{r.days}</td>
                     <td style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
-                      {leaveTypeLabel(r.type)}
+                      {leaveTypeLabel(r.type, t)}
                     </td>
                     <td><LeaveStatusBadge status={r.status} /></td>
                   </tr>
@@ -727,7 +728,7 @@ function SelfServiceDashboard() {
         {/* Upcoming holidays */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-4)" }}>
-            <h3 className="section-title" style={{ margin: 0 }}>Upcoming company holidays</h3>
+            <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.holidaysWidget.heading", { defaultValue: "Upcoming company holidays" })}</h3>
             {/* /holidays is requireManager (App.jsx) — plain Employee has no
                 reachable destination for a full list, so the link is
                 omitted rather than pointing at a dead end. */}
@@ -736,13 +737,13 @@ function SelfServiceDashboard() {
                 to="/holidays"
                 style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", textDecoration: "none", fontWeight: "var(--fw-medium)", whiteSpace: "nowrap" }}
               >
-                View all →
+                {t("dashboard.headcount.viewAll", { defaultValue: "View all →" })}
               </Link>
             )}
           </div>
           {upcomingHolidays.length === 0 ? (
             <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
-              No upcoming holidays scheduled.
+              {t("dashboard.holidaysWidget.noneScheduled", { defaultValue: "No upcoming holidays scheduled." })}
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>

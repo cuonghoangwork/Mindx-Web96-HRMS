@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { PerformanceReviewsAPI } from "../api";
 import { useAuth } from "../context/AuthContext";
+import { translateApiError } from "../utils/apiError";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import CreateCycleDialog from "../components/CreateCycleDialog";
@@ -76,7 +77,7 @@ function Performance() {
         const openCycle = cycleList.find((c) => c.status === "Open");
         setSelectedCycleKey((openCycle ?? cycleList[cycleList.length - 1])?.key ?? null);
       })
-      .catch((err) => { if (!cancelled) setError(err.message || t("performance.loadFailed")); })
+      .catch((err) => { if (!cancelled) setError(translateApiError(err, t) || t("performance.loadFailed", { defaultValue: "Failed to load performance reviews." })); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [t]);
@@ -86,7 +87,7 @@ function Performance() {
     setError("");
     PerformanceReviewsAPI.roster(selectedCycleKey)
       .then((res) => setRoster(res.items ?? res.data ?? []))
-      .catch((err) => setError(err.message || t("performance.loadFailed")));
+      .catch((err) => setError(translateApiError(err, t) || t("performance.loadFailed", { defaultValue: "Failed to load performance reviews." })));
   }, [selectedCycleKey, t]);
 
   useEffect(() => { loadRoster(); }, [loadRoster]);
@@ -134,7 +135,7 @@ function Performance() {
         loadAnalytics();
         loadComparison();
       })
-      .catch((err) => setError(err.message || t("performance.loadFailed")))
+      .catch((err) => setError(translateApiError(err, t) || t("performance.loadFailed", { defaultValue: "Failed to load performance reviews." })))
       .finally(() => setTogglingCycle(false));
   };
 
@@ -274,7 +275,7 @@ function Performance() {
               </div>
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("common2.searchEmployeesPlaceholder", { defaultValue: "Search employees…" })}
+                placeholder={t("common.placeholders.searchEmployees", { defaultValue: "Search employees…" })}
                 style={{
                   fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", padding: "9px var(--sp-4)",
                   background: "var(--bg-surface)", color: "var(--txt-primary)",

@@ -5,6 +5,7 @@ import { closeAttendanceDay } from "../jobs/closeAttendanceDay.js";
 import { dateKeyInTz } from "../utils/workday.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
+import { AppError } from "../utils/appError.js";
 
 const attendanceController = {
   getAll: async (req, res) => {
@@ -62,7 +63,7 @@ const attendanceController = {
         items: items.map(attendanceToClient),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -74,22 +75,23 @@ const attendanceController = {
       if (req.user.role === "EMPLOYEE") {
         const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
         if (!myEmp) {
-          return res.status(400).json({ success: false, message: "No employee profile linked to your account. Please ask an admin to link one." });
+          return res.status(400).json({ success: false, message: "No employee profile linked to your account. Please ask an admin to link one.", code: "NO_LINKED_EMPLOYEE_FOR_CLOCK_IN" });
         }
         employeeId = String(myEmp._id); // override whatever was sent
       } else if (req.user.role === "MANAGER") {
-        if (!employeeId) throw new Error("employeeId and date are required.");
+        if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
         const deptId = await getManagerDepartmentId(req);
         const target = await EmployeeModel.findById(employeeId, "department");
         if (!target || String(target.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You can only check in employees in your own department.",
+            code: "MANAGER_CHECKIN_OUT_OF_DEPARTMENT",
           });
         }
       }
 
-      if (!employeeId || !date) throw new Error("employeeId and date are required.");
+      if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
 
       const data = attendanceFromClient({ ...req.body, employeeId });
       const record = await AttendanceModel.findOneAndUpdate(
@@ -100,7 +102,7 @@ const attendanceController = {
 
       res.status(201).json({ success: true, data: attendanceToClient(record) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -112,26 +114,27 @@ const attendanceController = {
       if (req.user.role === "EMPLOYEE") {
         const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
         if (!myEmp) {
-          return res.status(400).json({ success: false, message: "No employee profile linked to your account." });
+          return res.status(400).json({ success: false, message: "No employee profile linked to your account.", code: "NO_LINKED_EMPLOYEE_PROFILE" });
         }
         employeeId = String(myEmp._id);
       } else if (req.user.role === "MANAGER") {
-        if (!employeeId) throw new Error("employeeId and date are required.");
+        if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
         const deptId = await getManagerDepartmentId(req);
         const target = await EmployeeModel.findById(employeeId, "department");
         if (!target || String(target.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You can only check out employees in your own department.",
+            code: "MANAGER_CHECKOUT_OUT_OF_DEPARTMENT",
           });
         }
       }
 
-      if (!employeeId || !date) throw new Error("employeeId and date are required.");
+      if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
 
       const data = attendanceFromClient({ ...req.body, employeeId });
       const record = await AttendanceModel.findOne({ employee: data.employee, date: data.date });
-      if (!record) throw new Error("No check-in record found for this employee/date.");
+      if (!record) throw new AppError("No check-in record found for this employee/date.", "NO_CHECKIN_RECORD");
 
       record.checkOut = data.checkOut || new Date().toTimeString().slice(0, 5);
       if (record.checkIn) {
@@ -144,7 +147,7 @@ const attendanceController = {
 
       res.json({ success: true, data: attendanceToClient(record) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -154,16 +157,17 @@ const attendanceController = {
 
       if (req.user.role === "MANAGER") {
         if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
         }
         const existing = await AttendanceModel.findById(req.params.id, "employee");
-        if (!existing) throw new Error("Attendance record not found.");
+        if (!existing) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
         const deptId = await getManagerDepartmentId(req);
         const emp = await EmployeeModel.findById(existing.employee, "department");
         if (!emp || String(emp.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You can only edit attendance for your own department.",
+            code: "MANAGER_EDIT_ATTENDANCE_OUT_OF_DEPARTMENT",
           });
         }
       }
@@ -172,10 +176,10 @@ const attendanceController = {
         new: true,
         runValidators: true,
       }).populate("employee", "name");
-      if (!record) throw new Error("Attendance record not found.");
+      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
       res.json({ success: true, data: attendanceToClient(record) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -183,25 +187,26 @@ const attendanceController = {
     try {
       if (req.user.role === "MANAGER") {
         if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
         }
         const existing = await AttendanceModel.findById(req.params.id, "employee");
-        if (!existing) throw new Error("Attendance record not found.");
+        if (!existing) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
         const deptId = await getManagerDepartmentId(req);
         const emp = await EmployeeModel.findById(existing.employee, "department");
         if (!emp || String(emp.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You can only delete attendance for your own department.",
+            code: "MANAGER_DELETE_ATTENDANCE_OUT_OF_DEPARTMENT",
           });
         }
       }
 
       const record = await AttendanceModel.findByIdAndDelete(req.params.id);
-      if (!record) throw new Error("Attendance record not found.");
+      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
       res.json({ success: true, message: "Attendance record deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -212,7 +217,7 @@ const attendanceController = {
       const result = await closeAttendanceDay({ dateKey });
       res.json({ success: true, data: result });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

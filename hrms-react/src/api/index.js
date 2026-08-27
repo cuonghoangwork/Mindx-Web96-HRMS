@@ -236,14 +236,14 @@ export const PerformanceReviewsAPI = {
   comparison: (cycleKey, compareTo) =>
     apiFetch(`/performance/cycles/${cycleKey}/comparison${qs({ compareTo })}`),
   /** Backend builds the prompt server-side from the stored review — no prompt logic on the client */
-  askAI: (cycleKey, employeeId) =>
-    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST" }),
+  askAI: (cycleKey, employeeId, language) =>
+    apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST", body: { language } }),
 };
 
 // Solo Gaps Milestone 2 — scoped product-help chat widget, no live data
 // access (see hrms-backend/utils/appChatPrompt.js).
 export const AiAPI = {
-  chat: (message, history) => apiFetch("/ai/chat", { method: "POST", body: { message, history } }),
+  chat: (message, history, language) => apiFetch("/ai/chat", { method: "POST", body: { message, history, language } }),
 };
 
 // Solo Gaps Milestone 3 — permissions matrix. ADMIN-only both ways; can

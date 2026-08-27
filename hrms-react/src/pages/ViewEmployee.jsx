@@ -16,6 +16,7 @@ import { idsMatch } from "../utils/id";
 import { leaveTypeLabel } from "../utils/leaveTypes";
 import Button from "../components/Button";
 import ApplyLeaveModal from "../components/ApplyLeaveModal";
+import { translateApiError } from "../utils/apiError";
 
 // Task 4.3: per-employee attendance log/report view. Data already exists in
 // the attendance collection (via StoreContext); this maps each recorded
@@ -56,7 +57,15 @@ const DETAIL_TABS = [
   { key: "activity", label: "Activity" },
 ];
 
+function detailTabLabel(t, tab) {
+  if (tab.key === "attendance") return t("sideMenu.attendance", { defaultValue: tab.label });
+  if (tab.key === "leave") return t("sideMenu.leave", { defaultValue: tab.label });
+  if (tab.key === "documents") return t("documents.title", { defaultValue: tab.label });
+  return t(`employees.viewEmployee.tabs.${tab.key}`, { defaultValue: tab.label });
+}
+
 function ViewEmployee() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const {
@@ -119,7 +128,7 @@ function ViewEmployee() {
   };
 
   const handleDeleteEmployee = () => {
-    if (!confirm(`Delete ${employee.name}? This cannot be undone.`)) return;
+    if (!confirm(t("common.confirmDeleteEmployee", { defaultValue: "Delete {{name}}? This cannot be undone.", name: employee.name }))) return;
     removeEmployee(employee.id);
     navigate("/employees");
   };
@@ -127,16 +136,16 @@ function ViewEmployee() {
   if (!employee) {
     return (
       <div className="content-card">
-        <h2>Employee Not Found</h2>
+        <h2>{t("employees.viewEmployee.notFoundTitle", { defaultValue: "Employee Not Found" })}</h2>
         <p style={{ color: "var(--text-muted)", marginTop: "12px" }}>
-          The employee you are looking for does not exist.
+          {t("employees.viewEmployee.notFoundDescription", { defaultValue: "The employee you are looking for does not exist." })}
         </p>
         <Button
           variant="primary"
           style={{ marginTop: "20px" }}
           onClick={() => navigate("/employees")}
         >
-          Back to Employees
+          {t("employees.viewEmployee.backToEmployees", { defaultValue: "Back to Employees" })}
         </Button>
       </div>
     );
@@ -150,11 +159,11 @@ function ViewEmployee() {
     if (!file) return;
 
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
-      setAvatarError("Please choose a JPEG, PNG, WEBP, or GIF image.");
+      setAvatarError(t("employees.viewEmployee.avatarErrors.invalidType", { defaultValue: "Please choose a JPEG, PNG, WEBP, or GIF image." }));
       return;
     }
     if (file.size > MAX_AVATAR_BYTES) {
-      setAvatarError("Image must be 5MB or smaller.");
+      setAvatarError(t("employees.viewEmployee.avatarErrors.tooLarge", { defaultValue: "Image must be 5MB or smaller." }));
       return;
     }
 
@@ -163,7 +172,7 @@ function ViewEmployee() {
     try {
       await uploadEmployeeAvatar(employee.id, file);
     } catch (err) {
-      setAvatarError(err.message || "Failed to upload photo.");
+      setAvatarError(translateApiError(err, t) || t("employees.viewEmployee.avatarErrors.uploadFailed", { defaultValue: "Failed to upload photo." }));
     } finally {
       setAvatarUploading(false);
     }
@@ -206,8 +215,8 @@ function ViewEmployee() {
               type="button"
               onClick={handleAvatarPick}
               disabled={avatarUploading}
-              aria-label="Change profile photo"
-              title="Change profile photo"
+              aria-label={t("employees.viewEmployee.changePhotoAria", { defaultValue: "Change profile photo" })}
+              title={t("employees.viewEmployee.changePhotoAria", { defaultValue: "Change profile photo" })}
               style={{
                 position: "absolute",
                 inset: 0,
@@ -267,7 +276,7 @@ function ViewEmployee() {
           <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }}>
             {isOwnRecord && (
               <Button variant="primary" onClick={() => setShowApplyLeave(true)}>
-                + Apply for leave
+                + {t("employees.viewEmployee.applyForLeave", { defaultValue: "Apply for leave" })}
               </Button>
             )}
             {isOwnRecord && (
@@ -275,7 +284,7 @@ function ViewEmployee() {
                 <StatusBadge status="pending" />
               ) : (
                 <Button variant="secondary" onClick={() => setShowRequestEdit(true)}>
-                  Request edit
+                  {t("employees.viewEmployee.requestEdit", { defaultValue: "Request edit" })}
                 </Button>
               )
             )}
@@ -283,19 +292,19 @@ function ViewEmployee() {
               variant="secondary"
               onClick={() => navigate("/employees")}
             >
-              Back
+              {t("common.actions.back", { defaultValue: "Back" })}
             </Button>
             {/* employeeController.remove is ADMIN-only (employeeRouter.js) —
                 gated on isAdmin here to match, not isHRTier/isManagerTier. */}
             {isAdmin && (
               <Button variant="danger" onClick={handleDeleteEmployee}>
-                Delete
+                {t("common.actions.delete", { defaultValue: "Delete" })}
               </Button>
             )}
           </div>
         </div>
 
-        <div className="detail-tabs" role="tablist" aria-label="Employee detail sections">
+        <div className="detail-tabs" role="tablist" aria-label={t("employees.viewEmployee.detailSectionsAria", { defaultValue: "Employee detail sections" })}>
           {DETAIL_TABS.map((tab) => (
             <button
               key={tab.key}
@@ -305,7 +314,7 @@ function ViewEmployee() {
               className={`detail-tab ${activeTab === tab.key ? "active" : ""}`}
               onClick={() => selectTab(tab.key)}
             >
-              {tab.label}
+              {detailTabLabel(t, tab)}
             </button>
           ))}
         </div>
@@ -317,42 +326,44 @@ function ViewEmployee() {
                   there's no manager/reportsTo concept anywhere in this app's
                   backend (only a per-department manager, not per-employee),
                   so it's omitted rather than shown with a fabricated name. */}
-              <InfoItem label="Employee ID" value={employee.employeeId} />
-              <InfoItem label="Department" value={employee.department} />
+              <InfoItem label={t("common.fieldLabels.employeeId", { defaultValue: "Employee ID" })} value={employee.employeeId} />
+              <InfoItem label={t("common.fieldLabels.department", { defaultValue: "Department" })} value={employee.department} />
 
-              <InfoItem label="Designation" value={employee.designation} />
-              <InfoItem label="Position Level" value={employee.positionLevel || "—"} />
+              <InfoItem label={t("common.fieldLabels.designation", { defaultValue: "Designation" })} value={employee.designation} />
+              <InfoItem label={t("employees.viewEmployee.positionLevel", { defaultValue: "Position Level" })} value={employee.positionLevel || "—"} />
 
               <EditableSelect
-                label="Employment Type"
+                label={t("common.fieldLabels.employmentType", { defaultValue: "Employment Type" })}
                 id="employee-type"
                 value={employee.type}
                 options={EMPLOYEE_TYPES}
+                optionLabel={(o) => t(`common.contractType.${o}`, { defaultValue: o })}
                 onChange={(value) =>
-                  handleFieldChange("type", "Employment Type", value)
+                  handleFieldChange("type", t("common.fieldLabels.employmentType", { defaultValue: "Employment Type" }), value)
                 }
               />
               <EditableSelect
-                label="Status"
+                label={t("common.fieldLabels.status", { defaultValue: "Status" })}
                 id="employee-status"
                 value={employee.status}
                 options={EMPLOYEE_STATUSES}
-                onChange={(value) => handleFieldChange("status", "Status", value)}
+                optionLabel={(o) => t(`common.employeeStatus.${o}`, { defaultValue: o })}
+                onChange={(value) => handleFieldChange("status", t("common.fieldLabels.status", { defaultValue: "Status" }), value)}
               />
 
-              <InfoItem label="Age" value={employee.age || "—"} />
-              <InfoItem label="Sex" value={employee.sex || "—"} />
+              <InfoItem label={t("common.fieldLabels.age", { defaultValue: "Age" })} value={employee.age || "—"} />
+              <InfoItem label={t("common.fieldLabels.sex", { defaultValue: "Sex" })} value={employee.sex ? t(`common.gender.${employee.sex}`, { defaultValue: employee.sex }) : "—"} />
 
               <div className="employee-detail-grid-span">
-                <InfoItem label="Address" value={employee.address || "—"} />
+                <InfoItem label={t("common.fieldLabels.address", { defaultValue: "Address" })} value={employee.address || "—"} />
               </div>
 
-              <InfoItem label="Email" value={employee.email || "—"} />
-              <InfoItem label="Phone" value={employee.phone || "—"} />
+              <InfoItem label={t("common.fieldLabels.email", { defaultValue: "Email" })} value={employee.email || "—"} />
+              <InfoItem label={t("common.fieldLabels.phone", { defaultValue: "Phone" })} value={employee.phone || "—"} />
 
               <div className="employee-detail-grid-span">
                 <InfoItem
-                  label="Annual Salary"
+                  label={t("common.fieldLabels.annualSalary", { defaultValue: "Annual Salary" })}
                   value={
                     employee.salary ? `$${employee.salary.toLocaleString("en-US")}` : "—"
                   }
@@ -425,11 +436,11 @@ function ViewEmployee() {
 }
 
 const EDIT_REQUEST_FIELDS = [
-  { key: "name", label: "Full Name" },
-  { key: "phone", label: "Phone" },
-  { key: "address", label: "Address" },
-  { key: "age", label: "Age" },
-  { key: "sex", label: "Gender" },
+  { key: "name", labelKey: "common.fieldLabels.fullName", label: "Full Name" },
+  { key: "phone", labelKey: "common.fieldLabels.phone", label: "Phone" },
+  { key: "address", labelKey: "common.fieldLabels.address", label: "Address" },
+  { key: "age", labelKey: "common.fieldLabels.age", label: "Age" },
+  { key: "sex", labelKey: "common.fieldLabels.gender", label: "Gender" },
 ];
 
 /**
@@ -441,6 +452,7 @@ const EDIT_REQUEST_FIELDS = [
  * of someone else.
  */
 function RequestEditModal({ employee, onClose, onSubmitted }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     name: employee.name ?? "",
     phone: employee.phone ?? "",
@@ -467,7 +479,7 @@ function RequestEditModal({ employee, onClose, onSubmitted }) {
     if (form.sex !== (employee.sex ?? "")) changes.sex = form.sex;
 
     if (Object.keys(changes).length === 0) {
-      setError("No changes to submit.");
+      setError(t("employees.viewEmployee.requestEditModal.noChangesError", { defaultValue: "No changes to submit." }));
       return;
     }
     setSubmitting(true);
@@ -476,7 +488,7 @@ function RequestEditModal({ employee, onClose, onSubmitted }) {
       onSubmitted();
       onClose();
     } catch (err) {
-      setError(err.message || "Failed to submit request.");
+      setError(translateApiError(err, t) || t("employees.viewEmployee.requestEditModal.submitFailed", { defaultValue: "Failed to submit request." }));
     }
     setSubmitting(false);
   };
@@ -485,8 +497,8 @@ function RequestEditModal({ employee, onClose, onSubmitted }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "440px" }}>
         <div className="modal-header">
-          <h2>Request edit</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <h2>{t("employees.viewEmployee.requestEdit", { defaultValue: "Request edit" })}</h2>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("common.actions.close", { defaultValue: "Close" })}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
@@ -494,15 +506,15 @@ function RequestEditModal({ employee, onClose, onSubmitted }) {
         </div>
 
         <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "-8px", marginBottom: "var(--sp-4)" }}>
-          Changes to these fields need HR/Admin approval before they take effect.
+          {t("employees.viewEmployee.requestEditModal.approvalNotice", { defaultValue: "Changes to these fields need HR/Admin approval before they take effect." })}
         </p>
 
         {error && <p className="form-error">{error}</p>}
 
         <form onSubmit={handleSubmit}>
-          {EDIT_REQUEST_FIELDS.map(({ key, label }) => (
+          {EDIT_REQUEST_FIELDS.map(({ key, labelKey, label }) => (
             <div className="form-group" key={key}>
-              <label className="form-label" htmlFor={`req-edit-${key}`}>{label}</label>
+              <label className="form-label" htmlFor={`req-edit-${key}`}>{t(labelKey, { defaultValue: label })}</label>
               <input
                 id={`req-edit-${key}`}
                 name={key}
@@ -513,8 +525,8 @@ function RequestEditModal({ employee, onClose, onSubmitted }) {
           ))}
 
           <div className="modal-actions">
-            <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" type="submit" loading={submitting}>Submit request</Button>
+            <Button variant="secondary" type="button" onClick={onClose}>{t("common.actions.cancel", { defaultValue: "Cancel" })}</Button>
+            <Button variant="primary" type="submit" loading={submitting}>{t("employees.viewEmployee.requestEditModal.submit", { defaultValue: "Submit request" })}</Button>
           </div>
         </form>
       </div>
@@ -593,11 +605,11 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
       >
         <div>
           <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
-            Attendance Report
+            {t("employees.viewEmployee.attendanceReport.title", { defaultValue: "Attendance Report" })}
           </h3>
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            {total} record{total === 1 ? "" : "s"} on file
-            {rate !== null ? ` · ${rate}% attendance rate` : ""}
+            {t("employees.viewEmployee.attendanceReport.recordsOnFile", { count: total, defaultValue_one: "{{count}} record on file", defaultValue_other: "{{count}} records on file" })}
+            {rate !== null ? t("employees.viewEmployee.attendanceReport.attendanceRateSuffix", { defaultValue: " · {{rate}}% attendance rate", rate }) : ""}
           </p>
         </div>
         <Button
@@ -605,7 +617,7 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
           size="sm"
           onClick={() => navigate(`/attendance?employee=${employee.id}`)}
         >
-          Open full calendar
+          {t("employees.viewEmployee.attendanceReport.openFullCalendar", { defaultValue: "Open full calendar" })}
         </Button>
       </div>
 
@@ -618,14 +630,14 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
             fontSize: "var(--fs-sm)",
           }}
         >
-          No attendance records for this employee yet.
+          {t("employees.viewEmployee.attendanceReport.noRecords", { defaultValue: "No attendance records for this employee yet." })}
         </div>
       ) : (
         <>
           <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
             {Object.entries(counts).map(([label, count]) => (
               <Badge key={label} variant={ATTENDANCE_STATUS_VARIANT[label] ?? "neutral"} dot>
-                {count} {label}
+                {count} {t(`employees.viewEmployee.attendanceReport.statusLabels.${label}`, { defaultValue: label })}
               </Badge>
             ))}
           </div>
@@ -656,10 +668,10 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
             <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Check In</th>
-                  <th>Check Out</th>
-                  <th>Status</th>
+                  <th>{t("employees.viewEmployee.attendanceReport.date", { defaultValue: "Date" })}</th>
+                  <th>{t("employees.viewEmployee.attendanceReport.checkIn", { defaultValue: "Check In" })}</th>
+                  <th>{t("employees.viewEmployee.attendanceReport.checkOut", { defaultValue: "Check Out" })}</th>
+                  <th>{t("common.fieldLabels.status", { defaultValue: "Status" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -670,7 +682,7 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
                     <td>{r.checkOut ?? "—"}</td>
                     <td>
                       <Badge variant={ATTENDANCE_STATUS_VARIANT[r.status] ?? "neutral"} size="sm">
-                        {r.status}
+                        {t(`employees.viewEmployee.attendanceReport.statusLabels.${r.status}`, { defaultValue: r.status })}
                       </Badge>
                     </td>
                   </tr>
@@ -686,7 +698,7 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
               style={{ marginTop: "var(--sp-4)" }}
               onClick={() => setShowAll((v) => !v)}
             >
-              {showAll ? "Show recent only" : `Show all ${records.length} records`}
+              {showAll ? t("employees.viewEmployee.attendanceReport.showRecentOnly", { defaultValue: "Show recent only" }) : t("employees.viewEmployee.attendanceReport.showAllRecords", { defaultValue: "Show all {{count}} records", count: records.length })}
             </Button>
           )}
         </>
@@ -695,9 +707,14 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
   );
 }
 
+function capitalizeFirst(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
 function LeaveStatusBadge({ status }) {
+  const { t } = useTranslation();
   const variant = status === "approved" ? "success" : status === "rejected" ? "danger" : "warning";
-  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
+  const label = status ? capitalizeFirst(t(`employees.allEmployees.editRequests.tabs.${status}`, { defaultValue: status })) : "—";
   return <Badge variant={variant} size="sm" dot>{label}</Badge>;
 }
 
@@ -710,6 +727,7 @@ function LeaveStatusBadge({ status }) {
  * exists, so this is a display convenience, not an access boundary).
  */
 function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
+  const { t } = useTranslation();
   const { language } = useLanguage();
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [leaveBalance, setLeaveBalance] = useState(null);
@@ -728,11 +746,11 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
       setLeaveRequests(listRes.items || []);
       setLeaveBalance(balRes.data ?? null);
     } catch (err) {
-      setError(err.message || "Could not load leave data.");
+      setError(translateApiError(err, t) || t("employees.viewEmployee.leaveTab.loadError", { defaultValue: "Could not load leave data." }));
     } finally {
       setLoading(false);
     }
-  }, [employee.id]);
+  }, [employee.id, t]);
 
   useEffect(() => {
     load();
@@ -762,7 +780,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
       await LeaveRequestsAPI.review(id, decision);
       await load();
     } catch (err) {
-      setError(err.message || "Could not update the request.");
+      setError(translateApiError(err, t) || t("employees.viewEmployee.leaveTab.updateError", { defaultValue: "Could not update the request." }));
     } finally {
       setReviewingId(null);
     }
@@ -783,10 +801,10 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
           marginBottom: "var(--sp-5)",
         }}>
           <h4 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
-            Pending Approvals — Your Team
+            {t("employees.viewEmployee.leaveTab.teamPendingTitle", { defaultValue: "Pending Approvals — Your Team" })}
           </h4>
           <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px", marginBottom: "var(--sp-3)" }}>
-            {teamPending.length} request{teamPending.length === 1 ? "" : "s"} from {employee.department} awaiting review
+            {t("employees.viewEmployee.leaveTab.teamPendingDesc", { count: teamPending.length, department: employee.department, defaultValue_one: "{{count}} request from {{department}} awaiting review", defaultValue_other: "{{count}} requests from {{department}} awaiting review" })}
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
             {teamPending.map((r) => {
@@ -800,7 +818,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                 }}>
                   <span style={{ fontWeight: "var(--fw-medium)" }}>{r.employeeName}</span>
                   <span style={{ color: "var(--txt-secondary)" }}>
-                    {formatDate(r.startDate, language)} – {formatDate(r.endDate, language)} · {r.days}d · {leaveTypeLabel(r.type)}
+                    {formatDate(r.startDate, language)} – {formatDate(r.endDate, language)} · {r.days}d · {leaveTypeLabel(r.type, t)}
                   </span>
                   <div style={{ display: "flex", gap: "var(--sp-1)" }}>
                     <Button
@@ -808,7 +826,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                       disabled={isReviewing}
                       onClick={() => handleTeamReview(r.id, "approved")}
                     >
-                      {isReviewing ? "…" : "Approve"}
+                      {isReviewing ? "…" : t("common.actions.approve", { defaultValue: "Approve" })}
                     </Button>
                     <Button
                       variant="link"
@@ -816,7 +834,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                       disabled={isReviewing}
                       onClick={() => handleTeamReview(r.id, "rejected")}
                     >
-                      {isReviewing ? "…" : "Reject"}
+                      {isReviewing ? "…" : t("common.actions.reject", { defaultValue: "Reject" })}
                     </Button>
                   </div>
                 </div>
@@ -828,27 +846,27 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
 
       <div style={{ marginBottom: "var(--sp-6)" }}>
         <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
-          Leave balance
+          {t("employees.viewEmployee.leaveTab.balanceTitle", { defaultValue: "Leave balance" })}
         </h3>
         <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px", marginBottom: "var(--sp-4)" }}>
-          {leaveBalance ? `For ${leaveBalance.year}` : "Paid and unpaid leave usage"}
+          {leaveBalance ? t("employees.viewEmployee.leaveTab.balanceForYear", { defaultValue: "For {{year}}", year: leaveBalance.year }) : t("employees.viewEmployee.leaveTab.balanceGeneric", { defaultValue: "Paid and unpaid leave usage" })}
         </p>
 
         <div className="table-wrap">
           <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Accrued</th>
-                <th>Used</th>
-                <th>Remaining</th>
+                <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                <th>{t("employees.viewEmployee.leaveTab.colAccrued", { defaultValue: "Accrued" })}</th>
+                <th>{t("employees.viewEmployee.leaveTab.colUsed", { defaultValue: "Used" })}</th>
+                <th>{t("employees.viewEmployee.leaveTab.colRemaining", { defaultValue: "Remaining" })}</th>
               </tr>
             </thead>
             <tbody>
               {(leaveBalance?.balances ?? []).map((b) => (
                 <tr key={b.type}>
                   <td>{b.label}</td>
-                  <td>{b.accrued ?? "Unlimited"}</td>
+                  <td>{b.accrued ?? t("employees.viewEmployee.leaveTab.unlimited", { defaultValue: "Unlimited" })}</td>
                   <td>{b.used}</td>
                   <td>{b.remaining ?? "—"}</td>
                 </tr>
@@ -860,7 +878,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
 
       <div>
         <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0, marginBottom: "var(--sp-4)" }}>
-          Request history
+          {t("employees.viewEmployee.leaveTab.historyTitle", { defaultValue: "Request history" })}
         </h3>
 
         {employeeRequests.length === 0 ? (
@@ -871,19 +889,19 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                 <path d="M16 2v4M8 2v4M3 10h18" />
               </svg>
             </div>
-            <div className="empty-state-title">No leave requests on file</div>
-            <div className="empty-state-description">Requests this employee submits will show up here.</div>
+            <div className="empty-state-title">{t("employees.viewEmployee.leaveTab.noRequestsTitle", { defaultValue: "No leave requests on file" })}</div>
+            <div className="empty-state-description">{t("employees.viewEmployee.leaveTab.noRequestsDesc", { defaultValue: "Requests this employee submits will show up here." })}</div>
           </div>
         ) : (
           <div className="table-wrap">
             <table className="data-table" style={{ fontSize: "var(--fs-sm)" }}>
               <thead>
                 <tr>
-                  <th>Dates</th>
-                  <th>Days</th>
-                  <th>Type</th>
-                  <th>Reason</th>
-                  <th>Status</th>
+                  <th>{t("employees.viewEmployee.leaveTab.colDates", { defaultValue: "Dates" })}</th>
+                  <th>{t("employees.viewEmployee.leaveTab.colDays", { defaultValue: "Days" })}</th>
+                  <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                  <th>{t("employees.viewEmployee.leaveTab.colReason", { defaultValue: "Reason" })}</th>
+                  <th>{t("common.fieldLabels.status", { defaultValue: "Status" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -891,7 +909,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                   <tr key={r.id}>
                     <td>{formatDate(r.startDate, language)} – {formatDate(r.endDate, language)}</td>
                     <td>{r.days}</td>
-                    <td style={{ color: "var(--txt-secondary)" }}>{leaveTypeLabel(r.type)}</td>
+                    <td style={{ color: "var(--txt-secondary)" }}>{leaveTypeLabel(r.type, t)}</td>
                     <td style={{ color: "var(--txt-secondary)" }}>{r.reason || "—"}</td>
                     <td><LeaveStatusBadge status={r.status} /></td>
                   </tr>
@@ -918,6 +936,7 @@ function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
  * approved/paid periods (a draft's numbers are still subject to HR edits).
  */
 function SalaryTab({ employee, isManagerTier }) {
+  const { t } = useTranslation();
   const { currency } = useCurrency();
   const [records, setRecords] = useState([]); // [{ period, slip }]
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -965,13 +984,13 @@ function SalaryTab({ employee, isManagerTier }) {
           setSelectedIdx(0);
         }
       } catch (err) {
-        if (!cancelled) setError(err.message || "Could not load payroll data.");
+        if (!cancelled) setError(translateApiError(err, t) || t("employees.viewEmployee.salaryTab.loadError", { defaultValue: "Could not load payroll data." }));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [isManagerTier, employee.id]);
+  }, [isManagerTier, employee.id, t]);
 
   if (loading) return <div className="skeleton skeleton-text" style={{ width: "50%" }} />;
   if (error) return <p className="form-error">{error}</p>;
@@ -985,8 +1004,8 @@ function SalaryTab({ employee, isManagerTier }) {
             <circle cx="12" cy="12" r="2.5" />
           </svg>
         </div>
-        <div className="empty-state-title">No payslips on file</div>
-        <div className="empty-state-description">This employee hasn&apos;t been included in a payroll run yet.</div>
+        <div className="empty-state-title">{t("employees.viewEmployee.salaryTab.noPayslipsTitle", { defaultValue: "No payslips on file" })}</div>
+        <div className="empty-state-description">{t("employees.viewEmployee.salaryTab.noPayslipsDesc", { defaultValue: "This employee hasn't been included in a payroll run yet." })}</div>
       </div>
     );
   }
@@ -997,7 +1016,7 @@ function SalaryTab({ employee, isManagerTier }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-4)" }}>
         <label htmlFor="salary-period" style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
-          Period
+          {t("employees.viewEmployee.salaryTab.periodLabel", { defaultValue: "Period" })}
         </label>
         <select
           id="salary-period"
@@ -1033,6 +1052,7 @@ function SalaryTab({ employee, isManagerTier }) {
  * query param.
  */
 function ActivityTab({ employee }) {
+  const { t } = useTranslation();
   const { language } = useLanguage();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1046,10 +1066,10 @@ function ActivityTab({ employee }) {
         const mine = (res.items ?? []).filter((e) => idsMatch(e.resourceId, employee.id));
         setEntries(mine);
       })
-      .catch((err) => { if (!cancelled) setError(err.message || "Could not load activity."); })
+      .catch((err) => { if (!cancelled) setError(translateApiError(err, t) || t("employees.viewEmployee.activityTab.loadError", { defaultValue: "Could not load activity." })); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [employee.id]);
+  }, [employee.id, t]);
 
   if (loading) return <div className="skeleton skeleton-text" style={{ width: "50%" }} />;
   if (error) return <p className="form-error">{error}</p>;
@@ -1063,9 +1083,9 @@ function ActivityTab({ employee }) {
             <path d="M7 16l4-6 3 3 5-8" />
           </svg>
         </div>
-        <div className="empty-state-title">No recent activity</div>
+        <div className="empty-state-title">{t("employees.viewEmployee.activityTab.noActivityTitle", { defaultValue: "No recent activity" })}</div>
         <div className="empty-state-description">
-          Changes to this employee&apos;s record will show up here (from the last 50 system-wide events).
+          {t("employees.viewEmployee.activityTab.noActivityDesc", { defaultValue: "Changes to this employee's record will show up here (from the last 50 system-wide events)." })}
         </div>
       </div>
     );
@@ -1091,6 +1111,7 @@ function ActivityTab({ employee }) {
 }
 
 function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = false }) {
+  const { t } = useTranslation();
   const { language } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -1104,11 +1125,11 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
     if (!file) return;
 
     if (file.type !== "application/pdf") {
-      setError("Please choose a PDF file.");
+      setError(t("employees.viewEmployee.contractCard.errors.typeError", { defaultValue: "Please choose a PDF file." }));
       return;
     }
     if (file.size > MAX_CONTRACT_BYTES) {
-      setError("Contract must be 10MB or smaller.");
+      setError(t("employees.viewEmployee.contractCard.errors.sizeError", { defaultValue: "Contract must be 10MB or smaller." }));
       return;
     }
 
@@ -1117,7 +1138,7 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
     try {
       await uploadEmployeeContract(employee.id, file);
     } catch (err) {
-      setError(err.message || "Failed to upload contract.");
+      setError(translateApiError(err, t) || t("employees.viewEmployee.contractCard.errors.uploadFailed", { defaultValue: "Failed to upload contract." }));
     } finally {
       setUploading(false);
     }
@@ -1136,12 +1157,12 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
       >
         <div>
           <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
-            Contract
+            {t("employees.viewEmployee.contractCard.title", { defaultValue: "Contract" })}
           </h3>
           <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
             {employee.contractUrl
-              ? `Uploaded ${formatDate(employee.contractUploadedAt, language)}`
-              : "No contract on file yet."}
+              ? t("employees.viewEmployee.contractCard.uploaded", { defaultValue: "Uploaded {{date}}", date: formatDate(employee.contractUploadedAt, language) })
+              : t("employees.viewEmployee.contractCard.noContract", { defaultValue: "No contract on file yet." })}
           </p>
         </div>
 
@@ -1153,7 +1174,7 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
               rel="noopener noreferrer"
               className="btn btn-secondary btn-sm"
             >
-              View Contract
+              {t("employees.viewEmployee.contractCard.viewContract", { defaultValue: "View Contract" })}
             </a>
           )}
           {canManage && (
@@ -1164,7 +1185,7 @@ function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = 
                 onClick={handlePick}
                 disabled={uploading}
               >
-                {uploading ? "Uploading…" : employee.contractUrl ? "Replace Contract" : "Upload Contract"}
+                {uploading ? t("employees.viewEmployee.contractCard.uploading", { defaultValue: "Uploading…" }) : employee.contractUrl ? t("employees.viewEmployee.contractCard.replace", { defaultValue: "Replace Contract" }) : t("employees.viewEmployee.contractCard.upload", { defaultValue: "Upload Contract" })}
               </Button>
               <input
                 ref={fileInputRef}
@@ -1240,7 +1261,7 @@ function DocumentsList({ employee, canManage, uploadEmployeeDocuments, removeEmp
       await uploadEmployeeDocuments(employee.id, files, { label, type: docType });
       closeAddForm();
     } catch (err) {
-      setError(err.message || t("documents.uploadError"));
+      setError(translateApiError(err, t) || t("documents.uploadError", { defaultValue: "Failed to upload document(s)." }));
     } finally {
       setUploading(false);
     }
@@ -1253,7 +1274,7 @@ function DocumentsList({ employee, canManage, uploadEmployeeDocuments, removeEmp
     try {
       await removeEmployeeDocument(employee.id, docId);
     } catch (err) {
-      setError(err.message || t("documents.deleteError"));
+      setError(translateApiError(err, t) || t("documents.deleteError", { defaultValue: "Failed to delete document." }));
     } finally {
       setDeletingId(null);
     }
@@ -1375,7 +1396,7 @@ function InfoItem({ label, value }) {
   );
 }
 
-function EditableSelect({ label, id, value, options, onChange }) {
+function EditableSelect({ label, id, value, options, onChange, optionLabel = (o) => o }) {
   return (
     <div className="employee-detail-field">
       <label htmlFor={id} className="detail-label">
@@ -1389,7 +1410,7 @@ function EditableSelect({ label, id, value, options, onChange }) {
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabel(option)}
           </option>
         ))}
       </select>
@@ -1398,36 +1419,37 @@ function EditableSelect({ label, id, value, options, onChange }) {
 }
 
 function ConfirmChangeModal({ change, employeeName, onConfirm, onCancel }) {
+  const { t } = useTranslation();
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Confirm change</h2>
+          <h2>{t("employees.viewEmployee.confirmChangeModal.title", { defaultValue: "Confirm change" })}</h2>
           <button
             type="button"
             className="modal-close"
             onClick={onCancel}
-            aria-label="Close"
+            aria-label={t("common.actions.close", { defaultValue: "Close" })}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
 
         <p style={{ fontSize: "14px", color: "var(--text-muted)" }}>
-          Update <strong>{change.label}</strong> for{" "}
-          <strong>{employeeName}</strong>?
+          {t("employees.viewEmployee.confirmChangeModal.updatePromptPrefix", { defaultValue: "Update" })} <strong>{change.label}</strong> {t("employees.viewEmployee.confirmChangeModal.updatePromptMiddle", { defaultValue: "for" })}{" "}
+          <strong>{employeeName}</strong>{t("employees.viewEmployee.confirmChangeModal.updatePromptSuffix", { defaultValue: "?" })}
         </p>
 
         <div className="confirm-change-summary">
           <div>
-            <span className="detail-label">Current</span>
+            <span className="detail-label">{t("employees.viewEmployee.confirmChangeModal.current", { defaultValue: "Current" })}</span>
             <span className="detail-value">{change.from}</span>
           </div>
           <span className="confirm-change-arrow" aria-hidden="true">
             →
           </span>
           <div>
-            <span className="detail-label">New</span>
+            <span className="detail-label">{t("employees.viewEmployee.confirmChangeModal.new", { defaultValue: "New" })}</span>
             <span className="detail-value">{change.to}</span>
           </div>
         </div>
@@ -1437,10 +1459,10 @@ function ConfirmChangeModal({ change, employeeName, onConfirm, onCancel }) {
             variant="secondary"
             onClick={onCancel}
           >
-            Cancel
+            {t("common.actions.cancel", { defaultValue: "Cancel" })}
           </Button>
           <Button variant="primary" onClick={onConfirm}>
-            Confirm
+            {t("common.actions.confirm", { defaultValue: "Confirm" })}
           </Button>
         </div>
       </div>

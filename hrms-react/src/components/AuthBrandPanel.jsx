@@ -12,7 +12,10 @@
  *     <div className="login-form-panel"> ... </div>
  *   </div>
  */
+import { useTranslation } from "react-i18next";
+
 function AuthBrandPanel() {
+  const { t } = useTranslation();
   return (
     <div className="login-brand-panel">
       <div className="login-brand-top">
@@ -22,17 +25,16 @@ function AuthBrandPanel() {
 
       <div>
         <div className="login-hero-number" aria-hidden="true">01</div>
-        <h1 className="login-headline">One ledger for every person on the roster.</h1>
+        <h1 className="login-headline">{t("auth.brand.headline", { defaultValue: "One ledger for every person on the roster." })}</h1>
         <p className="login-hero-copy">
-          Headcount, attendance and pay in a single flat record — built for
-          teams who read numbers, not dashboards.
+          {t("auth.brand.heroCopy", { defaultValue: "Headcount, attendance and pay in a single flat record — built for teams who read numbers, not dashboards." })}
         </p>
       </div>
 
       <div className="login-hero-foot">
-        <div>HR</div>
-        <div>Attendance</div>
-        <div>Payroll</div>
+        <div>{t("common.roles.HR", { defaultValue: "HR" })}</div>
+        <div>{t("sideMenu.attendance", { defaultValue: "Attendance" })}</div>
+        <div>{t("sideMenu.payroll", { defaultValue: "Payroll" })}</div>
       </div>
     </div>
   );

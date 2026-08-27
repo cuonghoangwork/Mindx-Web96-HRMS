@@ -17,6 +17,8 @@ import {
   assertCanAssignRole,
 } from "../utils/credentials.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { AppError } from "../utils/appError.js";
+import { actorNotifyKeys } from "../utils/notifyActor.js";
 
 const SALT_ROUNDS = 10;
 const DOCUMENT_TYPES = ["offer_letter", "id_scan", "other"];
@@ -86,20 +88,25 @@ const employeeController = {
         items: docs.map(employeeToClient),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Error getting employees", error: error.message });
+      res.status(500).json({
+        success: false,
+        message: "Error getting employees",
+        error: error.message,
+        code: "GET_EMPLOYEES_FAILED",
+      });
     }
   },
 
   getDetail: async (req, res) => {
     try {
       const employee = await EmployeeModel.findById(req.params.id).populate("department", "name");
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // EMPLOYEE role users can only view their own profile
       if (req.user.role === "EMPLOYEE") {
         const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
         if (!myEmp || String(myEmp._id) !== String(employee._id)) {
-          return res.status(403).json({ success: false, message: "Access denied." });
+          return res.status(403).json({ success: false, message: "Access denied.", code: "ACCESS_DENIED" });
         }
       }
 
@@ -109,7 +116,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(404).json({ success: false, message: error.message });
+      res.status(404).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -117,7 +124,7 @@ const employeeController = {
   getMyProfile: async (req, res) => {
     try {
       const user = await UserModel.findById(req.user.id);
-      if (!user) throw new Error("User not found.");
+      if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
 
       let employee = null;
       if (user.employee) {
@@ -138,7 +145,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -146,11 +153,11 @@ const employeeController = {
     let createdUserId = null;
     try {
       const { employeeId, name, email, createAccount, accountRole = "EMPLOYEE" } = req.body;
-      if (!employeeId) throw new Error("employeeId is required.");
-      if (!name) throw new Error("name is required.");
+      if (!employeeId) throw new AppError("employeeId is required.", "EMPLOYEE_ID_REQUIRED");
+      if (!name) throw new AppError("name is required.", "NAME_REQUIRED");
 
       const wantsAccount = createAccount === true || createAccount === "true";
-      if (!wantsAccount && !email) throw new Error("email is required.");
+      if (!wantsAccount && !email) throw new AppError("email is required.", "EMAIL_REQUIRED");
 
       if (wantsAccount) assertCanAssignRole(req.user.role, accountRole);
 
@@ -161,6 +168,8 @@ const employeeController = {
         return res.status(409).json({
           success: false,
           message: `An employee already uses the email ${accountEmail}.`,
+          code: "EMPLOYEE_EMAIL_EXISTS",
+          params: { email: accountEmail },
         });
       }
 
@@ -228,6 +237,11 @@ const employeeController = {
         category: "employee",
         link: `/employees/${employee._id}`,
         linkLabel: "View profile",
+        titleKey: "employeeAdded",
+        messageKey: createdUserId ? "employeeAddedWithAccount" : "employeeAdded",
+        params: createdUserId
+          ? { employeeName: employee.name, employeeId: employee.employeeId, accountRole }
+          : { employeeName: employee.name, employeeId: employee.employeeId },
       });
 
       res.status(201).json({ success: true, data: employeeToClient(employee), account });
@@ -235,7 +249,7 @@ const employeeController = {
       if (createdUserId) {
         await UserModel.findByIdAndDelete(createdUserId).catch(() => {});
       }
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -253,17 +267,19 @@ const employeeController = {
       if (req.user.role === "MANAGER") {
         const deptId = await getManagerDepartmentId(req);
         const existing = await EmployeeModel.findById(req.params.id, "department");
-        if (!existing) throw new Error("Employee not found.");
+        if (!existing) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
         if (String(existing.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You can only update employees in your own department.",
+            code: "MANAGER_UPDATE_OUT_OF_DEPARTMENT",
           });
         }
         if (data.department !== undefined && data.department !== null && String(data.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
             message: "You cannot move an employee to a different department.",
+            code: "CANNOT_MOVE_DEPARTMENT",
           });
         }
       }
@@ -272,17 +288,17 @@ const employeeController = {
         new: true,
         runValidators: true,
       }).populate("department", "name");
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   remove: async (req, res) => {
     try {
       const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // Unlink the user account if one was linked
       if (employee.userId) {
@@ -291,32 +307,38 @@ const employeeController = {
 
       notifyHR({
         title: "Employee removed",
-        message: `${employee.name} (${employee.employeeId}) was removed by ${req.user.name}.`,
+        message: `${employee.name} (${employee.employeeId}) was removed by ${req.user?.name ?? "a team member"}.`,
         category: "employee",
+        ...actorNotifyKeys(req, "employeeRemoved", { employeeName: employee.name, employeeId: employee.employeeId }),
       });
 
       res.json({ success: true, message: "Employee deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   uploadAvatar: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error(
+        throw new AppError(
           "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+          "IMAGE_UPLOAD_NOT_CONFIGURED",
         );
       }
-      if (!req.file) throw new Error("No image file was uploaded.");
+      if (!req.file) throw new AppError("No image file was uploaded.", "NO_IMAGE_FILE");
 
       const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // EMPLOYEE role can only upload their own avatar
       if (req.user.role === "EMPLOYEE") {
         if (!employee.userId || String(employee.userId) !== String(req.user.id)) {
-          return res.status(403).json({ success: false, message: "You can only update your own avatar." });
+          return res.status(403).json({
+            success: false,
+            message: "You can only update your own avatar.",
+            code: "AVATAR_ACCESS_DENIED",
+          });
         }
       }
 
@@ -327,6 +349,7 @@ const employeeController = {
           return res.status(403).json({
             success: false,
             message: "You can only update avatars for employees in your own department.",
+            code: "MANAGER_AVATAR_OUT_OF_DEPARTMENT",
           });
         }
       }
@@ -344,7 +367,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -356,14 +379,15 @@ const employeeController = {
   uploadContract: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error(
+        throw new AppError(
           "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+          "DOCUMENT_UPLOAD_NOT_CONFIGURED",
         );
       }
-      if (!req.file) throw new Error("No contract file was uploaded.");
+      if (!req.file) throw new AppError("No contract file was uploaded.", "NO_CONTRACT_FILE");
 
       const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // MANAGER can only manage contracts for their own department
       if (req.user.role === "MANAGER") {
@@ -372,6 +396,7 @@ const employeeController = {
           return res.status(403).json({
             success: false,
             message: "You can only manage contracts for employees in your own department.",
+            code: "MANAGER_CONTRACT_OUT_OF_DEPARTMENT",
           });
         }
       }
@@ -398,7 +423,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -410,14 +435,15 @@ const employeeController = {
   uploadDocuments: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error(
+        throw new AppError(
           "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+          "DOCUMENT_UPLOAD_NOT_CONFIGURED",
         );
       }
-      if (!req.files?.length) throw new Error("No document files were uploaded.");
+      if (!req.files?.length) throw new AppError("No document files were uploaded.", "NO_DOCUMENT_FILES");
 
       const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // MANAGER can only manage documents for their own department
       if (req.user.role === "MANAGER") {
@@ -426,6 +452,7 @@ const employeeController = {
           return res.status(403).json({
             success: false,
             message: "You can only manage documents for employees in your own department.",
+            code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
           });
         }
       }
@@ -463,7 +490,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -474,7 +501,7 @@ const employeeController = {
   removeDocument: async (req, res) => {
     try {
       const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new Error("Employee not found.");
+      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
       // MANAGER can only manage documents for their own department
       if (req.user.role === "MANAGER") {
@@ -483,12 +510,13 @@ const employeeController = {
           return res.status(403).json({
             success: false,
             message: "You can only manage documents for employees in your own department.",
+            code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
           });
         }
       }
 
       const doc = employee.documents.id(req.params.docId);
-      if (!doc) return res.status(404).json({ success: false, message: "Document not found." });
+      if (!doc) return res.status(404).json({ success: false, message: "Document not found.", code: "DOCUMENT_NOT_FOUND" });
 
       const publicId = doc.publicId;
       doc.deleteOne();
@@ -510,7 +538,7 @@ const employeeController = {
 
       res.json({ success: true, data: employeeToClient(employee) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

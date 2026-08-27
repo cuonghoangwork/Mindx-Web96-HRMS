@@ -110,6 +110,7 @@ function Badge({
 
 /* ─── StatusBadge: auto-selects variant from status string ─── */
 export function StatusBadge({ status, size, dot = false, ...rest }) {
+  const { t } = useTranslation();
   const map = {
     "Active":     "active",
     "On Leave":   "leave",
@@ -118,13 +119,14 @@ export function StatusBadge({ status, size, dot = false, ...rest }) {
   };
   return (
     <Badge variant={map[status] ?? "neutral"} size={size} dot={dot} {...rest}>
-      {status}
+      {t(`common.employeeStatus.${status}`, { defaultValue: status })}
     </Badge>
   );
 }
 
 /* ─── TypeBadge: contract type badge ─── */
 export function TypeBadge({ type, size, ...rest }) {
+  const { t } = useTranslation();
   const map = {
     "Full-time": "full-time",
     "Part-time": "part-time",
@@ -133,7 +135,7 @@ export function TypeBadge({ type, size, ...rest }) {
   };
   return (
     <Badge variant={map[type] ?? "neutral"} size={size} {...rest}>
-      {type}
+      {t(`common.contractType.${type}`, { defaultValue: type })}
     </Badge>
   );
 }

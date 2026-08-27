@@ -1,17 +1,19 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import Button from "../components/Button";
 import AuthBrandPanel from "../components/AuthBrandPanel";
 import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function EnterOTP() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [otp, setOtp] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
     // Demo - redirect to success page
-    alert('OTP verified! (Demo)')
+    alert(t('auth.enterOtp.demoAlert', { defaultValue: 'OTP verified! (Demo)' }))
     navigate('/login-successful')
   }
 
@@ -24,13 +26,13 @@ function EnterOTP() {
 
         <div className="login-card">
           <div className="login-header">
-            <h1>Enter OTP</h1>
+            <h1>{t('auth.enterOtp.heading', { defaultValue: 'Enter OTP' })}</h1>
           </div>
-          <p className="login-subtitle">Enter the 6-digit code sent to your email</p>
+          <p className="login-subtitle">{t('auth.enterOtp.subtitle', { defaultValue: 'Enter the 6-digit code sent to your email' })}</p>
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label htmlFor="otp">Verification Code</label>
+              <label htmlFor="otp">{t('auth.enterOtp.codeLabel', { defaultValue: 'Verification Code' })}</label>
               <input
                 type="text"
                 id="otp"
@@ -44,12 +46,12 @@ function EnterOTP() {
             </div>
 
             <Button variant="primary" type="submit" style={{ width: '100%' }}>
-              Verify
+              {t('auth.enterOtp.submitButton', { defaultValue: 'Verify' })}
             </Button>
           </form>
 
           <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '14px', color: 'var(--txt-secondary)' }}>
-            Didn&apos;t receive the code?{' '}
+            {t('auth.enterOtp.noCodePrefix', { defaultValue: "Didn't receive the code?" })}{' '}
             <button type="button" className="link-primary" style={{
               background: 'none',
               border: 'none',
@@ -57,7 +59,7 @@ function EnterOTP() {
               fontSize: '14px',
               fontFamily: 'inherit',
             }}>
-              Resend
+              {t('auth.enterOtp.resendButton', { defaultValue: 'Resend' })}
             </button>
           </p>
         </div>

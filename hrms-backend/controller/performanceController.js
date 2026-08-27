@@ -36,6 +36,7 @@ import {
   idOf,
   resolveRosterScope,
 } from "../utils/performanceScope.js";
+import { AppError } from "../utils/appError.js";
 
 const REVIEW_LINK = "/performance";
 const REVIEW_LINK_LABEL = "Open review";
@@ -168,7 +169,7 @@ function numberOr(value, fallback) {
 
 function assertObjectId(value, label) {
   if (!mongoose.Types.ObjectId.isValid(value)) {
-    const err = new Error(`${label} is not a valid id.`);
+    const err = new AppError(`${label} is not a valid id.`, "INVALID_OBJECT_ID", { label });
     err.status = 400;
     throw err;
   }
@@ -176,8 +177,9 @@ function assertObjectId(value, label) {
 
 function assertCycleOpen(cycle) {
   if (cycle.status !== "Open") {
-    const err = new Error(
+    const err = new AppError(
       "This review cycle is closed. Ask an admin to reopen it before making changes.",
+      "PERFORMANCE_CYCLE_CLOSED",
     );
     err.status = 409;
     throw err;
@@ -191,7 +193,7 @@ async function loadEmployeeOrThrow(employeeId) {
     "name email employeeId department",
   ).populate("department", "name");
   if (!employee) {
-    const err = new Error("Employee not found.");
+    const err = new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
     err.status = 404;
     throw err;
   }
@@ -249,6 +251,9 @@ async function broadcastCycleOpen(cycle) {
       link: REVIEW_LINK,
       linkLabel: REVIEW_LINK_LABEL,
       isCustom: false,
+      titleKey: "reviewCycleOpen",
+      messageKey: "reviewCycleOpen",
+      params: { cycleLabel: cycle.label },
     });
   } catch (err) {
     console.error("[performance] Failed to broadcast cycle status:", err.message);
@@ -266,6 +271,9 @@ async function notifyUsers(userIds, payload) {
         link: REVIEW_LINK,
         linkLabel: REVIEW_LINK_LABEL,
         isCustom: false,
+        titleKey: payload.titleKey ?? null,
+        messageKey: payload.messageKey ?? null,
+        params: payload.params ?? null,
       }).catch((err) =>
         console.error("[performance] Failed to create notification:", err.message),
       ),
@@ -291,7 +299,7 @@ const performanceController = {
         },
       });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -301,7 +309,7 @@ const performanceController = {
       const cycles = await PerformanceCycleModel.find().sort({ start: -1, createdAt: -1 });
       res.json({ success: true, items: cycles.map(cycleToClient) });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -341,7 +349,7 @@ const performanceController = {
 
       res.status(201).json({ success: true, data: cycleToClient(cycle) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -368,7 +376,7 @@ const performanceController = {
 
       res.json({ success: true, data: cycleToClient(cycle) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -385,7 +393,7 @@ const performanceController = {
         data: computeAnalytics({ employees, reviews, includeDeptCompare: scope === "all" }),
       });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -415,7 +423,7 @@ const performanceController = {
         },
       });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -442,7 +450,7 @@ const performanceController = {
 
       res.json({ success: true, cycle: cycleToClient(cycle), scope, items });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -467,7 +475,7 @@ const performanceController = {
         ),
       });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -485,6 +493,7 @@ const performanceController = {
         employee,
         cycle,
         review: reviewToClient(review ?? emptyReviewDoc(cycle.key, employee._id)),
+        language: req.body.language,
       });
       const insight = await askGemini(prompt, { json: true });
       if (
@@ -492,9 +501,7 @@ const performanceController = {
         !Array.isArray(insight?.strengths) ||
         !Array.isArray(insight?.growthAreas)
       ) {
-        const err = new Error("Gemini response did not match the expected shape.");
-        err.status = 502;
-        throw err;
+        throw new AppError("Gemini response did not match the expected shape.", "AI_INSIGHT_INVALID_RESPONSE", null, 502);
       }
 
       res.json({
@@ -504,7 +511,7 @@ const performanceController = {
         growthAreas: insight.growthAreas,
       });
     } catch (error) {
-      res.status(error.status || 502).json({ success: false, message: error.message });
+      res.status(error.status || 502).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -541,6 +548,9 @@ const performanceController = {
         const copy = {
           title: "Self review submitted",
           message: `${employee.name} submitted their ${cycle.label} self review.`,
+          titleKey: "selfReviewSubmitted",
+          messageKey: "selfReviewSubmitted",
+          params: { employeeName: employee.name, cycleLabel: cycle.label },
         };
         if (managerIds.length) {
           await notifyUsers(managerIds, copy);
@@ -551,7 +561,7 @@ const performanceController = {
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -590,13 +600,16 @@ const performanceController = {
           await notifyUsers([employeeUser._id], {
             title: "Manager review submitted",
             message: `Your ${cycle.label} manager review is ready to read.`,
+            titleKey: "managerReviewSubmitted",
+            messageKey: "managerReviewSubmitted",
+            params: { cycleLabel: cycle.label },
           });
         }
       }
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -615,7 +628,7 @@ const performanceController = {
         update[`competencies.${req.body.key}.${rater}Comment`] = String(req.body.comment).trim();
       }
       if (!Object.keys(update).length) {
-        const err = new Error("Nothing to update.");
+        const err = new AppError("Nothing to update.", "NOTHING_TO_UPDATE");
         err.status = 400;
         throw err;
       }
@@ -628,7 +641,7 @@ const performanceController = {
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -657,7 +670,7 @@ const performanceController = {
         data: reviewToClient(review, access.isAdmin || access.isHR),
       });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -675,14 +688,14 @@ const performanceController = {
       );
 
       if (!review) {
-        const err = new Error("Goal not found.");
+        const err = new AppError("Goal not found.", "PERFORMANCE_GOAL_NOT_FOUND");
         err.status = 404;
         throw err;
       }
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -712,7 +725,7 @@ const performanceController = {
         data: reviewToClient(review, access.isAdmin || access.isHR),
       });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -725,20 +738,23 @@ const performanceController = {
       const existing = await PerformanceReviewModel.findOne(filter, "managerSubmittedDate appeal");
 
       if (!existing?.managerSubmittedDate) {
-        const err = new Error(
+        const err = new AppError(
           "You can only appeal once the manager review has been submitted.",
+          "MANAGER_REVIEW_NOT_SUBMITTED",
         );
         err.status = 400;
         throw err;
       }
       if (existing.appeal) {
-        const err = new Error("An appeal has already been filed for this review.");
+        const err = new AppError("An appeal has already been filed for this review.", "APPEAL_ALREADY_FILED");
         err.status = 409;
         throw err;
       }
       if (!isWithinAppealWindow(existing.managerSubmittedDate)) {
-        const err = new Error(
+        const err = new AppError(
           `Appeals close ${APPEAL_WINDOW_DAYS} days after the manager review was submitted.`,
+          "APPEAL_WINDOW_CLOSED",
+          { days: APPEAL_WINDOW_DAYS },
         );
         err.status = 400;
         throw err;
@@ -761,7 +777,7 @@ const performanceController = {
       );
 
       if (!review) {
-        const err = new Error("An appeal has already been filed for this review.");
+        const err = new AppError("An appeal has already been filed for this review.", "APPEAL_ALREADY_FILED");
         err.status = 409;
         throw err;
       }
@@ -779,6 +795,9 @@ const performanceController = {
         category: "performance",
         link: REVIEW_LINK,
         linkLabel: REVIEW_LINK_LABEL,
+        titleKey: "appealFiled",
+        messageKey: "appealFiled",
+        params: { employeeName: employee.name, cycleLabel: cycle.label },
       });
 
       res.status(201).json({
@@ -786,7 +805,7 @@ const performanceController = {
         data: reviewToClient(review, access.isAdmin || access.isHR),
       });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -798,12 +817,12 @@ const performanceController = {
       const existing = await PerformanceReviewModel.findOne(filter, "appeal managerRating");
 
       if (!existing?.appeal) {
-        const err = new Error("No appeal has been filed for this review.");
+        const err = new AppError("No appeal has been filed for this review.", "APPEAL_NOT_FOUND");
         err.status = 404;
         throw err;
       }
       if (existing.appeal.status !== "Pending") {
-        const err = new Error("This appeal has already been resolved.");
+        const err = new AppError("This appeal has already been resolved.", "APPEAL_ALREADY_RESOLVED");
         err.status = 409;
         throw err;
       }
@@ -828,7 +847,7 @@ const performanceController = {
       );
 
       if (!review) {
-        const err = new Error("This appeal has already been resolved.");
+        const err = new AppError("This appeal has already been resolved.", "APPEAL_ALREADY_RESOLVED");
         err.status = 409;
         throw err;
       }
@@ -851,12 +870,15 @@ const performanceController = {
         await notifyUsers([employeeUser._id], {
           title: "Performance appeal resolved",
           message: `Your ${cycle.label} appeal was ${req.body.resolution.toLowerCase()}.`,
+          titleKey: "appealResolved",
+          messageKey: "appealResolved",
+          params: { cycleLabel: cycle.label, resolution: req.body.resolution.toLowerCase() },
         });
       }
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

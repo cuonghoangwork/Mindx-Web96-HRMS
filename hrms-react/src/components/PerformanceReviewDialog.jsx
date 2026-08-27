@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { PerformanceReviewsAPI } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate } from "../utils/format";
+import { translateApiError } from "../utils/apiError";
 import Badge from "./Badge";
 import Button from "./Button";
 
@@ -77,7 +78,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
         setManagerRating(rec?.managerRating != null ? String(rec.managerRating) : "");
         setManagerComments(rec?.managerComments ?? "");
       })
-      .catch((err) => { if (!cancelled) setError(err.message || t("performance.dialog.loadFailed")); })
+      .catch((err) => { if (!cancelled) setError(translateApiError(err, t) || t("performance.dialog.loadFailed")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [cycleKey, employeeId, t]);
@@ -121,7 +122,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setReview(res.data ?? review);
       onSubmitted?.();
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setSubmittingSelf(false);
   };
@@ -138,7 +139,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setReview(res.data ?? review);
       onSubmitted?.();
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setSubmittingManager(false);
   };
@@ -150,7 +151,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       const res = await PerformanceReviewsAPI.setCompetency(cycleKey, employeeId, { key, value });
       setReview(res.data ?? review);
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setSavingCompetency(false);
   };
@@ -174,7 +175,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setReview(res.data ?? review);
       setEditingSide((s) => ({ ...s, [rater]: false }));
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setSavingCommentFor(null);
   };
@@ -186,7 +187,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       const res = await PerformanceReviewsAPI.updateGoal(cycleKey, employeeId, goalId, { progress });
       setReview(res.data ?? review);
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setSavingGoalId(null);
   };
@@ -200,7 +201,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setReview(res.data ?? review);
       setGoalTextDraft("");
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setAddingGoal(false);
   };
@@ -220,7 +221,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setPeerRelationDraft("");
       setPeerCommentsDraft("");
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setAddingPeerFeedback(false);
   };
@@ -241,7 +242,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setAppealDetailDraft("");
       onSubmitted?.();
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setFilingAppeal(false);
   };
@@ -260,7 +261,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setAppealResolverNoteDraft("");
       onSubmitted?.();
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
     }
     setResolvingAppeal(false);
   };
@@ -272,7 +273,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
     setAiInsightStrengths([]);
     setAiInsightGrowthAreas([]);
     try {
-      const res = await PerformanceReviewsAPI.askAI(cycleKey, employeeId);
+      const res = await PerformanceReviewsAPI.askAI(cycleKey, employeeId, language);
       if (typeof res.summary !== "string" || !Array.isArray(res.strengths) || !Array.isArray(res.growthAreas)) {
         throw new Error("Malformed AI insight response.");
       }
@@ -367,7 +368,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
                 {t("performance.dialog.askAi")}
               </Button>
             )}
-            <button type="button" className="modal-close" onClick={onClose} aria-label={t("common2.close", { defaultValue: "Close" })}>
+            <button type="button" className="modal-close" onClick={onClose} aria-label={t("common.actions.close", { defaultValue: "Close" })}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>

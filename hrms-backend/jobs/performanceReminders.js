@@ -23,7 +23,7 @@ const REVIEW_LINK = "/performance";
 const REVIEW_LINK_LABEL = "Open review";
 const REMINDER_WINDOW_DAYS = 7;
 
-async function notifyOnceForUser(userId, title, message) {
+async function notifyOnceForUser(userId, { title, message, titleKey, messageKey, params }) {
   const existing = await NotificationModel.findOne({ user: userId, category: "performance", title });
   if (existing) return false;
   await NotificationModel.create({
@@ -34,14 +34,26 @@ async function notifyOnceForUser(userId, title, message) {
     link: REVIEW_LINK,
     linkLabel: REVIEW_LINK_LABEL,
     isCustom: false,
+    titleKey: titleKey ?? null,
+    messageKey: messageKey ?? null,
+    params: params ?? null,
   });
   return true;
 }
 
-async function notifyHrOnce(title, message) {
+async function notifyHrOnce({ title, message, titleKey, messageKey, params }) {
   const existing = await NotificationModel.findOne({ user: null, audience: "hr", category: "performance", title });
   if (existing) return false;
-  await notifyHR({ title, message, category: "performance", link: REVIEW_LINK, linkLabel: REVIEW_LINK_LABEL });
+  await notifyHR({
+    title,
+    message,
+    category: "performance",
+    link: REVIEW_LINK,
+    linkLabel: REVIEW_LINK_LABEL,
+    titleKey,
+    messageKey,
+    params,
+  });
   return true;
 }
 
@@ -74,11 +86,13 @@ export async function sendPerformanceReminders({ asOf = new Date() } = {}) {
         pendingSelf += 1;
         const user = await findUserForEmployee(employee);
         if (user) {
-          const sent = await notifyOnceForUser(
-            user._id,
-            `Self review reminder — ${cycle.key}`,
-            `Your ${cycle.label} self review is due in ${days} day${days === 1 ? "" : "s"}.`,
-          );
+          const sent = await notifyOnceForUser(user._id, {
+            title: `Self review reminder — ${cycle.key}`,
+            message: `Your ${cycle.label} self review is due in ${days} day${days === 1 ? "" : "s"}.`,
+            titleKey: "selfReviewReminder",
+            messageKey: "selfReviewReminder",
+            params: { cycleKey: cycle.key, cycleLabel: cycle.label, days },
+          });
           if (sent) remindersSent += 1;
         }
       }
@@ -94,20 +108,25 @@ export async function sendPerformanceReminders({ asOf = new Date() } = {}) {
     }
 
     for (const [managerId, count] of managerPendingCounts) {
-      const sent = await notifyOnceForUser(
-        managerId,
-        `Manager review reminder — ${cycle.key}`,
-        `You have ${count} pending manager review${count === 1 ? "" : "s"} for ${cycle.label}, due in ${days} day${days === 1 ? "" : "s"}.`,
-      );
+      const sent = await notifyOnceForUser(managerId, {
+        title: `Manager review reminder — ${cycle.key}`,
+        message: `You have ${count} pending manager review${count === 1 ? "" : "s"} for ${cycle.label}, due in ${days} day${days === 1 ? "" : "s"}.`,
+        titleKey: "managerReviewReminder",
+        messageKey: "managerReviewReminder",
+        params: { cycleKey: cycle.key, cycleLabel: cycle.label, count, days },
+      });
       if (sent) remindersSent += 1;
     }
 
     const totalPending = pendingSelf + pendingManager;
     if (totalPending > 0) {
-      const sent = await notifyHrOnce(
-        `Performance reviews due soon — ${cycle.key}`,
-        `${totalPending} performance review action${totalPending === 1 ? "" : "s"} still pending for ${cycle.label}, due in ${days} day${days === 1 ? "" : "s"}.`,
-      );
+      const sent = await notifyHrOnce({
+        title: `Performance reviews due soon — ${cycle.key}`,
+        message: `${totalPending} performance review action${totalPending === 1 ? "" : "s"} still pending for ${cycle.label}, due in ${days} day${days === 1 ? "" : "s"}.`,
+        titleKey: "performanceReviewsDueSoon",
+        messageKey: "performanceReviewsDueSoon",
+        params: { cycleKey: cycle.key, cycleLabel: cycle.label, totalPending, days },
+      });
       if (sent) remindersSent += 1;
     }
   }

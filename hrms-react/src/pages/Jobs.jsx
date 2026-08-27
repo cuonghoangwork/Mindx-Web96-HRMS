@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate as formatDateLocalized } from "../utils/format";
 import Badge, { TypeBadge } from "../components/Badge";
 import AddJobModal from "../components/AddJobModal";
 import Button from "../components/Button";
+import { translateApiError } from "../utils/apiError";
 
 const STATUS_VARIANT = {
   Open: "success",
@@ -39,6 +41,7 @@ function formatSalaryRange(job) {
 }
 
 function Jobs() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { language } = useLanguage();
   const { departments, jobs, addJob, updateJob, removeJob, getApplicantCount } =
@@ -108,12 +111,12 @@ function Jobs() {
       setEditingJob(null);
       setModalOpen(false);
     } catch (err) {
-      setJobError(err.message || "Failed to save job.");
+      setJobError(translateApiError(err, t) || t("jobs.saveFailed", { defaultValue: "Failed to save job." }));
     }
   };
 
   const handleDelete = (id) => {
-    if (confirm("Delete this job posting? Linked candidates will remain in the pipeline but will show as unassigned.")) {
+    if (confirm(t("jobs.confirmDelete", { defaultValue: "Delete this job posting? Linked candidates will remain in the pipeline but will show as unassigned." }))) {
       removeJob(id);
     }
   };
@@ -126,7 +129,7 @@ function Jobs() {
         </div>
       )}
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
-        <h2 style={{ flex: 1 }}>Job Openings</h2>
+        <h2 style={{ flex: 1 }}>{t("jobs.heading", { defaultValue: "Job Openings" })}</h2>
         <Button
           variant="primary"
           onClick={() => {
@@ -134,7 +137,7 @@ function Jobs() {
             setModalOpen(true);
           }}
         >
-          + Post New Job
+          {t("jobs.postNewJob", { defaultValue: "+ Post New Job" })}
         </Button>
       </div>
 
@@ -147,27 +150,27 @@ function Jobs() {
         }}
       >
         <div className="stat-card">
-          <div className="stat-card-label">Open Positions</div>
+          <div className="stat-card-label">{t("jobs.stats.openPositions", { defaultValue: "Open Positions" })}</div>
           <div className="stat-card-value">{stats.openCount}</div>
-          <div className="stat-card-hint">Currently hiring</div>
+          <div className="stat-card-hint">{t("jobs.stats.currentlyHiring", { defaultValue: "Currently hiring" })}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Total Applicants</div>
+          <div className="stat-card-label">{t("jobs.stats.totalApplicants", { defaultValue: "Total Applicants" })}</div>
           <div className="stat-card-value">{stats.totalApplicants}</div>
-          <div className="stat-card-hint">Across all postings</div>
+          <div className="stat-card-hint">{t("jobs.stats.acrossPostings", { defaultValue: "Across all postings" })}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Filled Roles</div>
+          <div className="stat-card-label">{t("jobs.stats.filledRoles", { defaultValue: "Filled Roles" })}</div>
           <div className="stat-card-value">{stats.filledCount}</div>
-          <div className="stat-card-hint">Positions closed with a hire</div>
+          <div className="stat-card-hint">{t("jobs.stats.positionsClosedWithHire", { defaultValue: "Positions closed with a hire" })}</div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-card-label">Total Postings</div>
+          <div className="stat-card-label">{t("jobs.stats.totalPostings", { defaultValue: "Total Postings" })}</div>
           <div className="stat-card-value">{stats.totalJobs}</div>
-          <div className="stat-card-hint">All job openings</div>
+          <div className="stat-card-hint">{t("jobs.stats.allJobOpenings", { defaultValue: "All job openings" })}</div>
         </div>
       </div>
 
@@ -176,7 +179,7 @@ function Jobs() {
           <input
             type="text"
             className="search-input"
-            placeholder="Search by title, department, location..."
+            placeholder={t("jobs.searchPlaceholder", { defaultValue: "Search by title, department, location..." })}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -194,10 +197,10 @@ function Jobs() {
               fontSize: "var(--fs-md)",
             }}
           >
-            <option value="all">All Statuses</option>
-            <option value="Open">Open</option>
-            <option value="Filled">Filled</option>
-            <option value="Closed">Closed</option>
+            <option value="all">{t("jobs.allStatuses", { defaultValue: "All Statuses" })}</option>
+            <option value="Open">{t("common.jobStatus.Open", { defaultValue: "Open" })}</option>
+            <option value="Filled">{t("common.jobStatus.Filled", { defaultValue: "Filled" })}</option>
+            <option value="Closed">{t("common.jobStatus.Closed", { defaultValue: "Closed" })}</option>
           </select>
 
           <select
@@ -213,7 +216,7 @@ function Jobs() {
               fontSize: "var(--fs-md)",
             }}
           >
-            <option value="all">All Departments</option>
+            <option value="all">{t("jobs.allDepartments", { defaultValue: "All Departments" })}</option>
             {departmentNames.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -225,9 +228,9 @@ function Jobs() {
             variant="secondary"
             onClick={handleReset}
             disabled={!hasActiveFilters}
-            title="Reset search and filters"
+            title={t("candidates.resetTooltip", { defaultValue: "Reset search and filters" })}
           >
-            Reset
+            {t("filterModal.reset", { defaultValue: "Reset" })}
           </Button>
         </div>
 
@@ -241,25 +244,25 @@ function Jobs() {
                 <line x1="10" y1="14" x2="14" y2="14" />
               </svg>
             </div>
-            <div className="empty-state-title">No job openings found</div>
+            <div className="empty-state-title">{t("jobs.empty.title", { defaultValue: "No job openings found" })}</div>
             <div className="empty-state-description">
               {hasActiveFilters
-                ? "Try adjusting your search or filters to find what you're looking for."
-                : "Post a new job to start building your hiring pipeline."}
+                ? t("candidates.empty.filtered", { defaultValue: "Try adjusting your search or filters to find what you're looking for." })
+                : t("jobs.empty.unfiltered", { defaultValue: "Post a new job to start building your hiring pipeline." })}
             </div>
             {hasActiveFilters ? (
               <Button
                 variant="secondary"
                 onClick={handleReset}
               >
-                Clear filters
+                {t("candidates.empty.clearFilters", { defaultValue: "Clear filters" })}
               </Button>
             ) : (
               <Button
                 variant="primary"
                 onClick={() => setModalOpen(true)}
               >
-                + Post New Job
+                {t("jobs.postNewJob", { defaultValue: "+ Post New Job" })}
               </Button>
             )}
           </div>
@@ -298,12 +301,12 @@ function Jobs() {
                           marginTop: "var(--sp-1)",
                         }}
                       >
-                        {job.department} • {job.location} • Posted {formatDate(job.postedDate, language)}
-                        {job.deadline ? ` • Apply by ${formatDate(job.deadline, language)}` : ""}
+                        {t("jobs.card.metaLine", { department: job.department, location: job.location, date: formatDate(job.postedDate, language), defaultValue: "{{department}} • {{location}} • Posted {{date}}" })}
+                        {job.deadline ? t("jobs.card.applyBySuffix", { date: formatDate(job.deadline, language), defaultValue: " • Apply by {{date}}" }) : ""}
                       </p>
                       <div style={{ marginTop: "var(--sp-2)", display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                         <Badge variant={STATUS_VARIANT[job.status] ?? "neutral"} size="sm">
-                          {job.status}
+                          {t(`common.jobStatus.${job.status}`, { defaultValue: job.status })}
                         </Badge>
                         <TypeBadge type={job.type} size="sm" />
                         {salaryRange && <Badge variant="info" size="sm">{salaryRange}</Badge>}
@@ -316,7 +319,7 @@ function Jobs() {
                           {applicantCount}
                         </div>
                         <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-                          applicant{applicantCount === 1 ? "" : "s"}
+                          {t("jobs.card.applicantCount", { count: applicantCount, defaultValue_one: "{{count}} applicant", defaultValue_other: "{{count}} applicants" })}
                         </div>
                       </div>
 
@@ -326,7 +329,7 @@ function Jobs() {
                           className="btn-link-emphasis"
                           onClick={() => navigate(`/candidates?job=${job.id}`)}
                         >
-                          View Applicants
+                          {t("jobs.card.viewApplicants", { defaultValue: "View Applicants" })}
                         </Button>
                         <div style={{ display: "flex", gap: "var(--sp-1)" }}>
                           {hasDetails && (
@@ -334,7 +337,7 @@ function Jobs() {
                               variant="link"
                               onClick={() => setExpandedId(isExpanded ? null : job.id)}
                             >
-                              {isExpanded ? "Hide Details" : "Details"}
+                              {isExpanded ? t("jobs.card.hideDetails", { defaultValue: "Hide Details" }) : t("jobs.card.showDetails", { defaultValue: "Details" })}
                             </Button>
                           )}
                           <Button
@@ -344,14 +347,14 @@ function Jobs() {
                               setModalOpen(true);
                             }}
                           >
-                            Edit
+                            {t("common.actions.edit", { defaultValue: "Edit" })}
                           </Button>
                           <Button
                             variant="link"
                             className="btn-link-muted"
                             onClick={() => handleDelete(job.id)}
                           >
-                            Delete
+                            {t("common.actions.delete", { defaultValue: "Delete" })}
                           </Button>
                         </div>
                       </div>
@@ -368,7 +371,7 @@ function Jobs() {
                       {job.description && (
                         <div>
                           <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
-                            Job Description
+                            {t("jobs.card.sections.jobDescription", { defaultValue: "Job Description" })}
                           </div>
                           <p style={{ whiteSpace: "pre-wrap" }}>{job.description}</p>
                         </div>
@@ -376,7 +379,7 @@ function Jobs() {
                       {job.requirements?.length > 0 && (
                         <div>
                           <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
-                            Requirements
+                            {t("jobs.card.sections.requirements", { defaultValue: "Requirements" })}
                           </div>
                           <ul style={{ margin: 0, paddingLeft: "18px" }}>
                             {job.requirements.map((r, i) => <li key={i}>{r}</li>)}
@@ -386,7 +389,7 @@ function Jobs() {
                       {job.benefits?.length > 0 && (
                         <div>
                           <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
-                            Pay &amp; Benefits
+                            {t("jobs.card.sections.payBenefits", { defaultValue: "Pay & Benefits" })}
                           </div>
                           <ul style={{ margin: 0, paddingLeft: "18px" }}>
                             {job.benefits.map((b, i) => <li key={i}>{b}</li>)}
@@ -396,7 +399,7 @@ function Jobs() {
                       {job.companyInfo && (
                         <div>
                           <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
-                            About the Company
+                            {t("jobs.card.sections.aboutCompany", { defaultValue: "About the Company" })}
                           </div>
                           <p style={{ whiteSpace: "pre-wrap" }}>{job.companyInfo}</p>
                         </div>
@@ -404,7 +407,7 @@ function Jobs() {
                       {job.applicationInstructions && (
                         <div>
                           <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", marginBottom: "var(--sp-1)" }}>
-                            How to Apply
+                            {t("jobs.card.sections.howToApply", { defaultValue: "How to Apply" })}
                           </div>
                           <p style={{ whiteSpace: "pre-wrap" }}>{job.applicationInstructions}</p>
                         </div>

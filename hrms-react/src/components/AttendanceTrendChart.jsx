@@ -17,18 +17,16 @@
  */
 
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
-/* ─── Helpers ─── */
-const DAY_LABELS = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-
-function formatDateLabel(dateStr) {
+function formatDateLabel(dateStr, dayLabels) {
   const d = new Date(dateStr);
-  return `${DAY_LABELS[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+  return `${dayLabels[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
 }
 
-function formatDateShort(dateStr) {
+function formatDateShort(dateStr, dayLabels) {
   const d = new Date(dateStr);
-  return DAY_LABELS[d.getDay()];
+  return dayLabels[d.getDay()];
 }
 
 /* Determine Late status from checkIn (mirrors Attendance.jsx logic) */
@@ -42,7 +40,7 @@ function resolveStatus(record) {
 }
 
 /* Generate last 7 days from real data + fallback mock */
-function buildChartData(attendance, totalStaff) {
+function buildChartData(attendance, totalStaff, dayLabels) {
   const grouped = {};
   attendance.forEach((r) => {
     if (!grouped[r.date]) grouped[r.date] = [];
@@ -90,8 +88,8 @@ function buildChartData(attendance, totalStaff) {
 
     result.push({
       date: key,
-      label: formatDateShort(key),
-      fullLabel: formatDateLabel(key),
+      label: formatDateShort(key, dayLabels),
+      fullLabel: formatDateLabel(key, dayLabels),
       present,
       late,
       leave,
@@ -106,25 +104,27 @@ function buildChartData(attendance, totalStaff) {
 }
 
 /* ─── Tooltip ─── */
-function Tooltip({ x, y, data, svgW }) {
+function Tooltip({ x, y, data, svgW, t }) {
   if (!data) return null;
   const W = 148, H = 96;
   const tx = Math.min(Math.max(x - W / 2, 4), svgW - W - 4);
   const ty = y - H - 12 < 0 ? y + 16 : y - H - 12;
+
+  const rows = [
+    { label: t("attendance.status.present", { defaultValue: "Present" }), value: data.present, color: "var(--clr-success-500)" },
+    { label: t("attendance.status.late", { defaultValue: "Late" }), value: data.late, color: "var(--clr-warning-500)" },
+    { label: t("attendance.status.onLeave", { defaultValue: "On Leave" }), value: data.leave, color: "var(--clr-info-500)" },
+    { label: t("attendance.status.absent", { defaultValue: "Absent" }), value: data.absent, color: "var(--clr-danger-500)" },
+  ];
 
   return (
     <g>
       <rect x={tx} y={ty} width={W} height={H}
         fill="var(--bg-surface)" stroke="var(--bdr-default)" strokeWidth="1" />
       <text x={tx + 10} y={ty + 18} fontSize="11" fontWeight="600" fill="var(--txt-primary)">
-        {data.fullLabel}{data.isToday ? " (today)" : ""}
+        {data.fullLabel}{data.isToday ? t("attendanceTrendChart.todaySuffix", { defaultValue: " (today)" }) : ""}
       </text>
-      {[
-        { label: "Present",  value: data.present, color: "var(--clr-success-500)" },
-        { label: "Late",     value: data.late,    color: "var(--clr-warning-500)" },
-        { label: "On Leave", value: data.leave,  color: "var(--clr-info-500)" },
-        { label: "Absent",   value: data.absent,  color: "var(--clr-danger-500)" },
-      ].map((row, i) => (
+      {rows.map((row, i) => (
         <g key={row.label}>
           <rect x={tx + 10} y={ty + 28 + i * 16} width="7" height="7" fill={row.color} />
           <text x={tx + 22} y={ty + 36 + i * 16} fontSize="11" fill="var(--txt-secondary)">{row.label}</text>
@@ -133,7 +133,7 @@ function Tooltip({ x, y, data, svgW }) {
         </g>
       ))}
       <text x={tx + 10} y={ty + H - 8} fontSize="10" fill="var(--txt-secondary)">
-        Rate: {data.pct}% / {data.total} staff
+        {t("attendanceTrendChart.rateFooter", { pct: data.pct, total: data.total, defaultValue: "Rate: {{pct}}% / {{total}} staff" })}
       </text>
     </g>
   );
@@ -147,11 +147,13 @@ export default function AttendanceTrendChart({
   showLegend  = true,
   showTooltip = true,
 }) {
+  const { t } = useTranslation();
+  const dayLabels = t("common.days", { returnObjects: true });
   const [hovered, setHovered] = useState(null);
 
   const data = useMemo(
-    () => buildChartData(attendance, totalStaff),
-    [attendance, totalStaff]
+    () => buildChartData(attendance, totalStaff, dayLabels),
+    [attendance, totalStaff, dayLabels]
   );
 
   /* SVG dimensions */
@@ -181,13 +183,20 @@ export default function AttendanceTrendChart({
   /* Status bar (stacked) at bottom of each point */
   const barW = Math.min(28, (innerW / data.length) * 0.55);
 
+  const legendItems = [
+    { label: t("attendance.status.present", { defaultValue: "Present" }), color: "var(--clr-success-400)" },
+    { label: t("attendance.status.late", { defaultValue: "Late" }), color: "var(--clr-warning-400)" },
+    { label: t("attendance.status.onLeave", { defaultValue: "On Leave" }), color: "var(--clr-info-300)" },
+    { label: t("attendance.status.absent", { defaultValue: "Absent" }), color: "var(--clr-danger-300)" },
+  ];
+
   return (
     <div style={{ width: "100%" }}>
       <svg
         viewBox={`0 0 ${W} ${H + (showLegend ? 0 : 0)}`}
         style={{ width: "100%", height, display: "block", overflow: "visible" }}
         role="img"
-        aria-label="Attendance trend chart — last 7 days"
+        aria-label={t("attendanceTrendChart.ariaLabel", { defaultValue: "Attendance trend chart — last 7 days" })}
         onMouseLeave={() => setHovered(null)}
       >
         {/* ── Grid lines ── */}
@@ -302,6 +311,7 @@ export default function AttendanceTrendChart({
             x={hovered.cx} y={hovered.cy}
             data={hovered}
             svgW={W} svgH={H}
+            t={t}
           />
         )}
       </svg>
@@ -312,12 +322,7 @@ export default function AttendanceTrendChart({
           display: "flex", gap: "var(--sp-5)", flexWrap: "wrap",
           marginTop: "var(--sp-2)",
         }}>
-          {[
-            { label: "Present",  color: "var(--clr-success-400)" },
-            { label: "Late",     color: "var(--clr-warning-400)" },
-            { label: "On Leave", color: "var(--clr-info-300)" },
-            { label: "Absent",   color: "var(--clr-danger-300)" },
-          ].map((l) => (
+          {legendItems.map((l) => (
             <div key={l.label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
               <span style={{
                 width: "10px", height: "10px",

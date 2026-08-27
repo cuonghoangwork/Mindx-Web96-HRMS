@@ -107,6 +107,29 @@ describe("POST /performance/reviews/:cycleKey/:employeeId/ai-insight", () => {
     expect(res.body.message).toMatch(/GEMINI_API_KEY/);
   });
 
+  it("asks Gemini to write the insight text in Vietnamese when the client's language is 'vi'", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    askGemini.mockResolvedValue({ summary: "Tóm tắt.", strengths: [], growthAreas: [] });
+
+    await request
+      .post(insightUrl(org.employees.dev))
+      .set(auth(org.tokens.dev))
+      .send({ language: "vi" });
+
+    const prompt = askGemini.mock.calls[0][0];
+    expect(prompt).toContain('Write the "summary", "strengths", and "growthAreas" text in Vietnamese.');
+  });
+
+  it("defaults to English when no language is sent", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    askGemini.mockResolvedValue({ summary: "Summary.", strengths: [], growthAreas: [] });
+
+    await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+
+    const prompt = askGemini.mock.calls[0][0];
+    expect(prompt).toContain('Write the "summary", "strengths", and "growthAreas" text in English.');
+  });
+
   it("returns a generic 502 (not the raw model output) when Gemini's JSON is missing expected fields", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     askGemini.mockResolvedValue({ summary: "Only a summary, no arrays." });

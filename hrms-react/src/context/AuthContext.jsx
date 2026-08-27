@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AuthAPI } from '../api'
 import { setTokens, clearTokens, getTokens } from '../api/client'
+import { translateApiError } from '../utils/apiError'
 
 const AuthContext = createContext(null)
 
@@ -15,6 +17,7 @@ function readStoredUser() {
 }
 
 export function AuthProvider({ children }) {
+  const { t } = useTranslation()
   const [user, setUser] = useState(readStoredUser)
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getTokens().access))
   const [loading, setLoading] = useState(() => Boolean(getTokens().access))
@@ -35,7 +38,7 @@ export function AuthProvider({ children }) {
       .catch((err) => {
         if (cancelled) return
         setPublicRegistration(false)
-        setConfigError(err.message || 'Could not load server configuration')
+        setConfigError(translateApiError(err, t) || 'Could not load server configuration')
       })
       .finally(() => {
         if (!cancelled) setConfigLoading(false)
@@ -43,6 +46,7 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -75,7 +79,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       return { success: true, mustChangePassword: Boolean(res.data.user?.mustChangePassword) }
     } catch (err) {
-      return { success: false, error: err.message || 'Invalid email or password' }
+      return { success: false, error: translateApiError(err, t) || 'Invalid email or password' }
     }
   }
 
@@ -86,7 +90,7 @@ export function AuthProvider({ children }) {
       const res = await AuthAPI.register({ name, email, password })
       return { success: true, data: res.data }
     } catch (err) {
-      return { success: false, error: err.message || 'Registration failed' }
+      return { success: false, error: translateApiError(err, t) || 'Registration failed' }
     }
   }
 
@@ -99,7 +103,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       return { success: true }
     } catch (err) {
-      return { success: false, error: err.message || 'Could not update password' }
+      return { success: false, error: translateApiError(err, t) || 'Could not update password' }
     }
   }
 

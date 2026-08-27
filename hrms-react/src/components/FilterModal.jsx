@@ -1,15 +1,10 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import Button from "./Button";
 
-const EMPLOYMENT_TYPES = [
-  { value: "all", label: "All" },
-  { value: "Full-time", label: "Full Time" },
-  { value: "Part-time", label: "Part Time" },
-  { value: "Contract", label: "Contract" },
-];
-
 function FilterModal({ onClose }) {
+  const { t } = useTranslation();
   const {
     filters,
     departments,
@@ -18,6 +13,13 @@ function FilterModal({ onClose }) {
     setSearchFilter,
     clearFilters,
   } = useStore();
+
+  const EMPLOYMENT_TYPES = [
+    { value: "all", label: t("filterModal.employmentTypes.all", { defaultValue: "All" }) },
+    { value: "Full-time", label: t("filterModal.employmentTypes.Full-time", { defaultValue: "Full Time" }) },
+    { value: "Part-time", label: t("filterModal.employmentTypes.Part-time", { defaultValue: "Part Time" }) },
+    { value: "Contract", label: t("filterModal.employmentTypes.Contract", { defaultValue: "Contract" }) },
+  ];
 
   const [selectedDepartments, setSelectedDepartments] = useState(
     filters.department ? filters.department.split(",") : [],
@@ -56,12 +58,12 @@ function FilterModal({ onClose }) {
         style={{ maxWidth: "400px" }}
       >
         <div className="modal-header">
-          <h2>Filter</h2>
+          <h2>{t("filterModal.title", { defaultValue: "Filter" })}</h2>
           <button
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.actions.close", { defaultValue: "Close" })}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -88,7 +90,7 @@ function FilterModal({ onClose }) {
             </svg>
             <input
               type="text"
-              placeholder="Search by name, employee ID, department..."
+              placeholder={t("filterModal.searchPlaceholder", { defaultValue: "Search by name, employee ID, department..." })}
               value={filters.search}
               onChange={(e) => setSearchFilter(e.target.value)}
               style={{
@@ -115,7 +117,7 @@ function FilterModal({ onClose }) {
               marginBottom: "16px",
             }}
           >
-            Department
+            {t("filterModal.departmentHeading", { defaultValue: "Department" })}
           </h3>
 
           <div
@@ -173,7 +175,7 @@ function FilterModal({ onClose }) {
               marginBottom: "16px",
             }}
           >
-            Select Type
+            {t("filterModal.selectTypeHeading", { defaultValue: "Select Type" })}
           </h3>
 
           <div
@@ -196,10 +198,10 @@ function FilterModal({ onClose }) {
 
         <div className="modal-actions" style={{ marginTop: 0, paddingTop: "var(--sp-5)" }}>
           <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
-            Reset
+            {t("filterModal.reset", { defaultValue: "Reset" })}
           </Button>
           <Button variant="primary" onClick={handleApply} style={{ flex: 1 }}>
-            Apply
+            {t("filterModal.apply", { defaultValue: "Apply" })}
           </Button>
         </div>
       </div>

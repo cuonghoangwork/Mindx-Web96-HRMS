@@ -30,6 +30,239 @@
    "Offer": "Offer",
    "Hired": "Hired",
    "Rejected": "Rejected"
+  },
+  "employeeStatus": {
+   "Active": "Active",
+   "On Leave": "On Leave",
+   "Remote": "Remote",
+   "Terminated": "Terminated"
+  },
+  "contractType": {
+   "Full-time": "Full-time",
+   "Part-time": "Part-time",
+   "Contract": "Contract",
+   "Intern": "Intern"
+  },
+  "payrollStatus": {
+   "draft": "Draft",
+   "approved": "Approved",
+   "paid": "Paid"
+  },
+  "roles": {
+   "ADMIN": "Administrator",
+   "HR": "HR",
+   "MANAGER": "Manager",
+   "EMPLOYEE": "Employee"
+  },
+  "gender": {
+   "Male": "Male",
+   "Female": "Female",
+   "Other": "Other"
+  },
+  "holidayType": {
+   "Public": "Public",
+   "Company": "Company",
+   "Optional": "Optional"
+  },
+  "leaveType": {
+   "annual": "Annual/PTO",
+   "sick": "Sick",
+   "parental": "Parental",
+   "bereavement": "Bereavement",
+   "unpaid": "Unpaid"
+  },
+  "jobStatus": {
+   "Open": "Open",
+   "Filled": "Filled",
+   "Closed": "Closed"
+  },
+  "positionLevel": {
+   "Intern": "Intern",
+   "Full-time": "Full-time",
+   "Senior": "Senior",
+   "Manager": "Manager"
+  },
+  "fieldLabels": {
+   "fullName": "Full Name",
+   "email": "Email",
+   "phone": "Phone",
+   "address": "Address",
+   "employeeId": "Employee ID",
+   "department": "Department",
+   "designation": "Designation",
+   "age": "Age",
+   "gender": "Gender",
+   "sex": "Sex",
+   "contractType": "Contract Type",
+   "startDate": "Start Date",
+   "status": "Status",
+   "annualSalary": "Annual Salary",
+   "notes": "Notes",
+   "employmentType": "Employment Type",
+   "role": "Role",
+   "salary": "Salary"
+  },
+  "columns": {
+   "employee": "Employee",
+   "designation": "Designation",
+   "email": "Email",
+   "joined": "Joined",
+   "type": "Type",
+   "status": "Status",
+   "action": "Action",
+   "id": "ID"
+  },
+  "actions": {
+   "cancel": "Cancel",
+   "save": "Save",
+   "delete": "Delete",
+   "view": "View",
+   "edit": "Edit",
+   "approve": "Approve",
+   "reject": "Reject",
+   "back": "Back",
+   "close": "Close",
+   "confirm": "Confirm"
+  },
+  "placeholders": {
+   "streetCityStateZip": "Street, City, State, ZIP",
+   "searchEmployees": "Search employees…"
+  },
+  "confirmDeleteEmployee": "Delete {{name}}? This cannot be undone.",
+  "confirmDeleteEmployees": "Delete {{count}} employee(s)?",
+  "errors": {
+   "ACCESS_DENIED": "Access denied.",
+   "ACCOUNT_EMAIL_EXISTS": "An account with this email already exists.",
+   "ADMIN_ONLY_REOPEN_PERIOD": "Only an Administrator can reopen an approved period.",
+   "AI_INSIGHT_INVALID_RESPONSE": "Gemini response did not match the expected shape.",
+   "APPEAL_ALREADY_FILED": "An appeal has already been filed for this review.",
+   "APPEAL_ALREADY_RESOLVED": "This appeal has already been resolved.",
+   "APPEAL_NOT_FOUND": "No appeal has been filed for this review.",
+   "APPEAL_WINDOW_CLOSED": "Appeals close {{days}} days after the manager review was submitted.",
+   "ATTENDANCE_RECORD_NOT_FOUND": "Attendance record not found.",
+   "AUTH_EMAIL_REQUIRED": "email is required!",
+   "AUTH_NAME_REQUIRED": "name is required!",
+   "AVATAR_ACCESS_DENIED": "You can only update your own avatar.",
+   "BASE_SALARY_INVALID": "baseSalary must be a non-negative number.",
+   "CANDIDATE_EMAIL_REQUIRED": "Candidate email is required.",
+   "CANDIDATE_NAME_REQUIRED": "Candidate name is required.",
+   "CANDIDATE_NOT_FOUND": "Candidate not found.",
+   "CANNOT_APPROVE_EMPTY_PERIOD": "Cannot approve a period with no payslips.",
+   "CANNOT_CHANGE_OWN_ROLE": "You cannot change your own role.",
+   "CANNOT_MOVE_DEPARTMENT": "You cannot move an employee to a different department.",
+   "CANNOT_PROPOSE_DEPARTMENT_CHANGE": "You cannot propose moving an employee to a different department.",
+   "CANNOT_REVIEW_OWN_PROMOTION": "You cannot review a promotion proposal you created yourself. Ask another Administrator to review it.",
+   "CAPABILITY_DISABLED": "This action has been disabled for your role by an administrator.",
+   "CAPABILITY_INVALID": "capability must be one of: {{capabilities}}.",
+   "CURRENT_PASSWORD_INCORRECT": "Current password is incorrect.",
+   "CURRENT_PASSWORD_REQUIRED": "currentPassword is required.",
+   "CV_FILE_REQUIRED": "No CV/resume file was uploaded.",
+   "DATE_REQUIRED": "Date is required.",
+   "DEDUCTION_EXCEEDS_LIMIT": "Deduction cannot exceed base salary plus bonus plus allowance.",
+   "DEPARTMENT_NAME_EXISTS": "A department with this name already exists.",
+   "DEPARTMENT_NAME_REQUIRED": "Department name is required.",
+   "DEPARTMENT_NOT_FOUND": "Department not found.",
+   "DOCUMENT_NOT_FOUND": "Document not found.",
+   "DOCUMENT_UPLOAD_NOT_CONFIGURED": "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+   "EMAIL_AND_PASSWORD_REQUIRED": "email and password are required.",
+   "EMAIL_REQUIRED": "email is required.",
+   "EMPLOYEE_EMAIL_EXISTS": "An employee already uses the email {{email}}.",
+   "EMPLOYEE_ID_AND_DATE_REQUIRED": "employeeId and date are required.",
+   "EMPLOYEE_ID_REQUIRED": "employeeId is required.",
+   "EMPLOYEE_NOT_FOUND": "Employee not found.",
+   "EMPLOYEE_PROFILE_NOT_LINKED": "No employee profile is linked to your account. Ask HR to link your profile.",
+   "ENABLED_MUST_BE_BOOLEAN": "enabled must be true or false.",
+   "END_DATE_BEFORE_START_DATE": "endDate cannot be before startDate.",
+   "END_DATE_REQUIRED": "endDate is required.",
+   "FIELDS_NOT_SELF_EDITABLE": "The following fields cannot be self-edited: {{fields}}",
+   "GET_EMPLOYEES_FAILED": "Error getting employees",
+   "HOLIDAY_ALREADY_EXISTS": "A holiday with this name and date already exists.",
+   "HOLIDAY_NAME_REQUIRED": "Holiday name is required.",
+   "HOLIDAY_NOT_FOUND": "Holiday not found.",
+   "IMAGE_UPLOAD_NOT_CONFIGURED": "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+   "INSUFFICIENT_LEAVE_BALANCE": "Not enough {{type}} balance: {{remaining}} day(s) remaining, {{days}} requested. Choose fewer days or apply as Unpaid.",
+   "INSUFFICIENT_LEAVE_BALANCE_CONCURRENT": "Not enough {{type}} balance: a concurrent request already used it. Choose fewer days or apply as Unpaid.",
+   "INVALID_CREDENTIALS": "Email or password is incorrect.",
+   "INVALID_LEAVE_DATES": "startDate/endDate must be valid dates.",
+   "INVALID_LEAVE_TYPE": "type must be one of: {{types}}.",
+   "INVALID_OBJECT_ID": "{{label}} is not a valid id.",
+   "INVALID_POSITION_LEVEL": "positionLevel must be one of: {{levels}}.",
+   "INVALID_REVIEW_DECISION": "decision must be 'approved' or 'rejected'.",
+   "INVALID_ROLE": "role must be one of EMPLOYEE, MANAGER, HR or ADMIN.",
+   "INVALID_TOKEN_TYPE": "Invalid token type.",
+   "INVALID_YEAR_MONTH": "Invalid year/month.",
+   "JOB_ID_REQUIRED": "jobId is required.",
+   "JOB_NOT_FOUND": "Job not found.",
+   "JOB_TITLE_REQUIRED": "Job title is required.",
+   "LEAVE_BALANCE_ACCESS_DENIED": "You can only view leave balances for your own department.",
+   "MANAGER_AVATAR_OUT_OF_DEPARTMENT": "You can only update avatars for employees in your own department.",
+   "MANAGER_CHECKIN_OUT_OF_DEPARTMENT": "You can only check in employees in your own department.",
+   "MANAGER_CHECKOUT_OUT_OF_DEPARTMENT": "You can only check out employees in your own department.",
+   "MANAGER_CONTRACT_OUT_OF_DEPARTMENT": "You can only manage contracts for employees in your own department.",
+   "MANAGER_DELETE_ATTENDANCE_OUT_OF_DEPARTMENT": "You can only delete attendance for your own department.",
+   "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT": "You can only manage documents for employees in your own department.",
+   "MANAGER_EDIT_ATTENDANCE_OUT_OF_DEPARTMENT": "You can only edit attendance for your own department.",
+   "MANAGER_REVIEW_NOT_SUBMITTED": "You can only appeal once the manager review has been submitted.",
+   "MANAGER_REVIEW_OUT_OF_DEPARTMENT": "You can only review requests for employees in your own department.",
+   "MANAGER_UPDATE_OUT_OF_DEPARTMENT": "You can only update employees in your own department.",
+   "NAME_REQUIRED": "name is required.",
+   "NETWORK_UNREACHABLE": "Could not reach the server. Please check your connection and try again.",
+   "NEW_PASSWORD_REQUIRED": "newPassword is required.",
+   "NEW_PASSWORD_SAME_AS_CURRENT": "New password must be different from the current password.",
+   "NEW_PASSWORD_TOO_SHORT": "New password must be at least 8 characters.",
+   "NOTHING_TO_UPDATE": "Nothing to update.",
+   "NOTIFICATION_NOT_FOUND": "Notification not found.",
+   "NO_CHANGES_SUBMITTED": "No changes were submitted.",
+   "NO_CHECKIN_RECORD": "No check-in record found for this employee/date.",
+   "NO_CONTRACT_FILE": "No contract file was uploaded.",
+   "NO_DOCUMENT_FILES": "No document files were uploaded.",
+   "NO_IMAGE_FILE": "No image file was uploaded.",
+   "NO_LINKED_EMPLOYEE_FOR_CLOCK_IN": "No employee profile linked to your account. Please ask an admin to link one.",
+   "NO_LINKED_EMPLOYEE_PROFILE": "No employee profile linked to your account.",
+   "NO_PAYABLE_EMPLOYEES": "No payable employees exist for this period. Add employees first.",
+   "NO_REFRESH_TOKEN": "No refresh token provided.",
+   "NO_TOKEN_PROVIDED": "No token provided.",
+   "NO_WORKING_DAYS_IN_RANGE": "The selected range contains no working days.",
+   "ONLY_DRAFT_PERIOD_DELETABLE": "Only a draft period can be deleted.",
+   "ONLY_DRAFT_PERIOD_REGENERATABLE": "Only a draft period can be regenerated.",
+   "ONLY_MANAGER_CAPABILITIES_TOGGLEABLE": "Only MANAGER capabilities can be toggled.",
+   "PAID_PERIOD_LOCKED": "A paid period is closed and cannot change status.",
+   "PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
+   "PASSWORD_REQUIRED": "password is required!",
+   "PASSWORD_TOO_SHORT": "Password must be at least 8 characters.",
+   "PAYROLL_PERIOD_ALREADY_EXISTS": "A payroll period for {{year}}-{{month}} already exists.",
+   "PAYROLL_PERIOD_DUPLICATE_KEY": "A payroll period for that month already exists.",
+   "PAYROLL_PERIOD_NOT_FOUND": "Payroll period not found.",
+   "PAYROLL_STATUS_INVALID": "status must be one of {{statuses}}.",
+   "PAYSLIP_LOCKED": "Payslips can only be edited while the pay period is a draft.",
+   "PAYSLIP_NOT_FOUND": "Payslip not found.",
+   "PENDING_LEAVE_REQUEST_EXISTS": "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+   "PENDING_PROFILE_EDIT_REQUEST_EXISTS": "You already have a pending profile edit request. Wait for HR to review it before submitting another.",
+   "PENDING_PROMOTION_REQUEST_EXISTS": "{{name}} already has a pending promotion proposal. It must be reviewed before another is submitted.",
+   "PERFORMANCE_CYCLE_CLOSED": "This review cycle is closed. Ask an admin to reopen it before making changes.",
+   "PERFORMANCE_GOAL_NOT_FOUND": "Goal not found.",
+   "PERIOD_ALREADY_IN_STATUS": "This period is already {{status}}.",
+   "PERIOD_NOT_APPROVED": "Approve the period before marking it paid.",
+   "POSITION_LEVEL_INVALID": "level must be one of: {{levels}}.",
+   "POSITION_LEVEL_NOT_SEEDED": "PositionLevel \"{{level}}\" hasn't been seeded yet.",
+   "PROFILE_EDIT_NO_ACTUAL_CHANGES": "The submitted values are the same as your current profile — nothing to change.",
+   "PROMOTION_DEPARTMENT_NOT_FOUND": "Department \"{{department}}\" no longer exists. Recreate it or reject this proposal.",
+   "PROMOTION_EMPLOYEE_NOT_FOUND": "The employee for this proposal no longer exists.",
+   "PROMOTION_OUTSIDE_MANAGER_DEPARTMENT": "You can only propose promotions for employees in your own department.",
+   "PROMOTION_PROPOSAL_NO_CHANGES": "The proposal matches the employee's current designation, department and salary — nothing to change.",
+   "PROMOTION_REQUEST_ALREADY_REVIEWED": "This request has already been reviewed.",
+   "PROMOTION_REQUEST_NOT_FOUND": "Promotion request not found.",
+   "REFRESH_TOKEN_INVALID": "Refresh token is invalid or expired.",
+   "REFRESH_TOKEN_REVOKED": "Refresh token is no longer valid.",
+   "REVIEW_REQUEST_ALREADY_REVIEWED": "This request has already been reviewed.",
+   "REVIEW_REQUEST_NOT_FOUND": "Request not found.",
+   "ROUTE_NOT_FOUND": "Route not found",
+   "SAME_DAY_LEAVE_CUTOFF": "Same-day leave must be requested before 9:00 AM. Please choose a future date.",
+   "SESSION_EXPIRED": "Your session has expired. Please sign in again.",
+   "START_DATE_REQUIRED": "startDate is required.",
+   "TITLE_REQUIRED": "title is required.",
+   "TOKEN_INVALID_OR_EXPIRED": "Token is invalid or expired.",
+   "USER_NOT_FOUND": "User not found."
   }
  },
  "documents": {
@@ -64,6 +297,47 @@
   "unavailable": "Sorry, the assistant isn't available right now. Please try again later."
  },
  "dashboard": {
+  "title": "Dashboard",
+  "welcomeBack": "Welcome back{{nameSuffix}}.",
+  "opsStats": {
+   "pendingLeaveRequests": "Pending Leave Requests",
+   "awaitingReview": "Awaiting review",
+   "openPipeline": "Open Pipeline",
+   "activeCandidates": "Active candidates",
+   "unreadNotifications": "Unread Notifications",
+   "sinceLastVisit": "Since last visit",
+   "performanceReviews": "Performance Reviews",
+   "completedThisCycle": "Completed this cycle"
+  },
+  "myStats": {
+   "ptoRemaining": "PTO Days Remaining",
+   "ptoHintWithTotal": "of {{total}} Annual/PTO",
+   "ptoHintUnavailable": "Leave balance unavailable",
+   "lastPayslip": "Last Payslip (Net)",
+   "noPayslipsYet": "No payslips yet"
+  },
+  "teamStats": {
+   "yourTeam": "Your Team",
+   "deptSuffix": "{{dept}} department",
+   "noDeptLinked": "No department linked to your profile",
+   "pendingApprovals": "Pending Approvals",
+   "pendingApprovalsHint": "Leave requests awaiting your review",
+   "teamAttendance": "Team Attendance",
+   "teamAttendanceHint": "{{present}} of {{total}} records present"
+  },
+  "myLeave": {
+   "applyButton": "Apply for Leave",
+   "heading": "My leave requests",
+   "subtitle": "Recent requests and their status",
+   "viewLeaveLink": "View leave →",
+   "emptyTitle": "No leave requests yet",
+   "emptyDescription": "Apply for leave and it'll show up here.",
+   "loadFailed": "Could not load leave data."
+  },
+  "holidaysWidget": {
+   "heading": "Upcoming company holidays",
+   "noneScheduled": "No upcoming holidays scheduled."
+  },
   "stats": {
    "totalEmployees": {
     "title": "Total Employees",
@@ -213,6 +487,58 @@
     "status": "Status"
    },
    "showingFirst": "Showing first 50 of {{count}} records"
+  },
+  "today": "Today",
+  "stats": {
+   "checkedIn": "Checked In",
+   "attendanceRateTrend": "{{pct}}% attendance",
+   "present": "Present",
+   "presentTrend": "On time",
+   "late": "Late",
+   "lateTrend": "Checked in late",
+   "absentLeave": "Absent / Leave",
+   "onLeaveTrend": "{{count}} on leave"
+  },
+  "tabs": {
+   "roster": "Roster",
+   "noShowQueue": "No-show queue"
+  },
+  "scope": {
+   "team_one": "Showing your team{{deptSuffix}} — {{count}} employee",
+   "team_other": "Showing your team{{deptSuffix}} — {{count}} employees",
+   "own": "Showing your own attendance"
+  },
+  "granularity": {
+   "monthlyHeading": "Monthly attendance",
+   "weeklyHeading": "Weekly attendance",
+   "clickToViewRoster": "Click a day to view its roster",
+   "weekly": "Weekly",
+   "monthly": "Monthly",
+   "reportButton": "Report"
+  },
+  "roster": {
+   "eyebrow": "Roster",
+   "heading": "{{day}} roster",
+   "checkInButton": "Check-in",
+   "checkOutButton": "Check-out",
+   "empty": {
+    "title": "No employees match",
+    "description": "Try a different search, or pick another day."
+   }
+  },
+  "report": {
+   "heading": "{{month}} {{year}} attendance summary",
+   "monthToDate": "Month to date",
+   "avgAttendance": "Avg. attendance",
+   "bestDay": "Best day",
+   "toughestDay": "Toughest day",
+   "daysLogged": "Days logged",
+   "mostMissed": "Most missed this week",
+   "noneRecorded": "No absences or late check-ins recorded this week.",
+   "absentBadge_one": "{{count}} absent",
+   "absentBadge_other": "{{count}} absent",
+   "lateBadge_one": "{{count}} late",
+   "lateBadge_other": "{{count}} late"
   }
  },
  "notifications": {
@@ -260,6 +586,39 @@
    "from": "from {{name}}",
    "open": "Open"
   },
+  "addModal": {
+   "title": "Send Notice",
+   "titleLabel": "Title",
+   "titlePlaceholder": "e.g. Office closed Friday",
+   "messageLabel": "Message",
+   "messagePlaceholder": "Details for the recipient(s)...",
+   "linkLabel": "Link",
+   "linkPlaceholder": "e.g. /holidays",
+   "linkHint": "An in-app path the notice will open when clicked, e.g. /holidays or /employees/123",
+   "recipientsLabel": "Recipients",
+   "recipientOptions": {
+    "all": "Everyone",
+    "employees": "All Employees (excludes HR/Admin)",
+    "hr": "HR & Admin only",
+    "individual": "Specific employee(s)"
+   },
+   "loadingEmployees": "Loading employees…",
+   "recipientSearchPlaceholder": "Search by name, ID, or email...",
+   "noEmployeesFound": "No employees found.",
+   "noSearchMatches": "No matches for your search.",
+   "selectedCount_one": "{{count}} selected",
+   "selectedCount_other": "{{count}} selected",
+   "noAccountSuffix": " · no account",
+   "sendingEllipsis": "Sending…",
+   "errors": {
+    "titleRequired": "A title is required.",
+    "titleTooLong": "Title must be {{max}} characters or fewer.",
+    "messageTooLong": "Message must be {{max}} characters or fewer.",
+    "selectRecipient": "Select at least one recipient.",
+    "loadEmployeesFailed": "Failed to load employees.",
+    "sendFailed": "Failed to send notice."
+   }
+  },
   "timeAgo": {
    "justNow": "Just now",
    "minutesAgo_one": "{{count}} minute ago",
@@ -268,6 +627,176 @@
    "hoursAgo_other": "{{count}} hours ago",
    "yesterday": "Yesterday",
    "daysAgo": "{{count}} days ago"
+  },
+  "generated": {
+   "accountRegistered": {
+    "title": "New account registered",
+    "message": "{{userName}} ({{userEmail}}) created an Employee account."
+   },
+   "employeeAdded": {
+    "title": "New employee added",
+    "message": "{{employeeName}} ({{employeeId}}) was added."
+   },
+   "employeeAddedWithAccount": {
+    "message": "{{employeeName}} ({{employeeId}}) was added with a {{accountRole}} login account."
+   },
+   "employeeRemoved": {
+    "title": "Employee removed",
+    "message": "{{employeeName}} ({{employeeId}}) was removed by {{actorName}}."
+   },
+   "employeeRemovedByUnknown": {
+    "message": "{{employeeName}} ({{employeeId}}) was removed by a team member."
+   },
+   "departmentCreated": {
+    "title": "New department created",
+    "message": "{{departmentName}} was added by {{actorName}}."
+   },
+   "departmentCreatedByUnknown": {
+    "message": "{{departmentName}} was added by a team member."
+   },
+   "departmentRemoved": {
+    "title": "Department removed",
+    "message": "{{departmentName}} was removed by {{actorName}}."
+   },
+   "departmentRemovedByUnknown": {
+    "message": "{{departmentName}} was removed by a team member."
+   },
+   "leaveApproved": {
+    "title": "Leave request approved",
+    "message": "Your {{leaveType}} leave from {{startDate}} to {{endDate}} has been approved."
+   },
+   "leaveRejected": {
+    "title": "Leave request rejected",
+    "message": "Your leave request was rejected."
+   },
+   "leaveRejectedWithNote": {
+    "message": "Your leave request was rejected. Note: {{note}}"
+   },
+   "leaveRequestSubmitted": {
+    "title": "New leave request",
+    "message": "{{employeeName}} requested {{days}} {{leaveType}} leave day(s) ({{startDate}} → {{endDate}})."
+   },
+   "payrollDraftsGenerated": {
+    "title": "Payroll drafts generated",
+    "message": "{{count}} draft payslip(s) generated for {{periodLabel}}."
+   },
+   "payrollPaid": {
+    "title": "Payroll paid",
+    "message": "{{periodLabel}} payroll has been paid."
+   },
+   "reviewCycleOpen": {
+    "title": "Review cycle open",
+    "message": "{{cycleLabel}} is now open for performance reviews."
+   },
+   "selfReviewSubmitted": {
+    "title": "Self review submitted",
+    "message": "{{employeeName}} submitted their {{cycleLabel}} self review."
+   },
+   "managerReviewSubmitted": {
+    "title": "Manager review submitted",
+    "message": "Your {{cycleLabel}} manager review is ready to read."
+   },
+   "appealFiled": {
+    "title": "Performance appeal filed",
+    "message": "{{employeeName}} appealed their {{cycleLabel}} manager rating."
+   },
+   "appealResolved": {
+    "title": "Performance appeal resolved",
+    "message": "Your {{cycleLabel}} appeal was {{resolution}}."
+   },
+   "promotionRejected": {
+    "title": "Promotion request rejected",
+    "message": "Your promotion request was not approved."
+   },
+   "promotionRejectedWithNote": {
+    "message": "Your promotion request was not approved. Note: {{note}}"
+   },
+   "promotionApproved": {
+    "title": "Promotion approved"
+   },
+   "promotionApprovedBoth": {
+    "message": "Your promotion has been approved — new level: {{newLevel}}, new title: {{newDesignation}}. Your HR record has been updated."
+   },
+   "promotionApprovedLevelOnly": {
+    "message": "Your promotion has been approved — new level: {{newLevel}}. Your HR record has been updated."
+   },
+   "promotionApprovedDesignationOnly": {
+    "message": "Your promotion has been approved — new title: {{newDesignation}}. Your HR record has been updated."
+   },
+   "promotionApprovedOther": {
+    "message": "Your promotion has been approved. Your HR record has been updated."
+   },
+   "promotionProposalAwaitingReview": {
+    "title": "Promotion proposal awaiting review",
+    "message": "A promotion was proposed for {{employeeName}} ({{employeeId}})."
+   },
+   "profileUpdateApproved": {
+    "title": "Profile update approved",
+    "message": "Your profile edit request has been approved and your information has been updated."
+   },
+   "profileUpdateRejected": {
+    "title": "Profile update rejected",
+    "message": "Your profile edit request was rejected."
+   },
+   "profileUpdateRejectedWithNote": {
+    "message": "Your profile edit request was rejected. Note: {{note}}"
+   },
+   "profileEditRequestSubmitted": {
+    "title": "Profile edit request",
+    "message": "{{employeeName}} has submitted a request to update their profile."
+   },
+   "monthlyPayrollRunSkipped": {
+    "title": "Monthly payroll run skipped"
+   },
+   "monthlyPayrollRunSkippedNoPeriod": {
+    "message": "No payroll period exists for {{monthLabel}}. Create it before payroll can be run for that month."
+   },
+   "monthlyPayrollRunSkippedNoPayslips": {
+    "message": "The {{monthLabel}} payroll period has no payslips, so it was not paid."
+   },
+   "monthlyPayrollDraftReady": {
+    "title": "Monthly payroll draft ready",
+    "message": "{{count}} draft payslip(s) auto-generated for {{periodLabel}} at {{rate}} VND/USD ({{rateSource}}). Review before the 10th-of-month payroll run."
+   },
+   "noShowPatternFlagged": {
+    "title": "No-show pattern flagged for review",
+    "message": "{{employeeName}} ({{employeeId}}) has {{count}} no-show day(s) on record and needs HR review."
+   },
+   "attendanceClosed": {
+    "title": "Attendance closed for {{date}}",
+    "message": "{{autoCheckedOut}} auto checked out, {{markedLate}} marked late ({{markedLateUnpaid}} unpaid), {{markedNoShow}} marked no-show."
+   },
+   "attendanceClosedWithFlagged": {
+    "message": "{{autoCheckedOut}} auto checked out, {{markedLate}} marked late ({{markedLateUnpaid}} unpaid), {{markedNoShow}} marked no-show, {{flaggedForReview}} flagged for no-show review."
+   },
+   "promotionEligibilityFlagged": {
+    "title": "Promotion eligibility flagged",
+    "message": "{{employeeName}} is now eligible for promotion to {{nextLevel}} and needs review."
+   },
+   "annualRaiseAwaiting": {
+    "title": "Annual raise awaiting review",
+    "message": "{{employeeName}} has completed {{years}} year(s) of service. A {{percent}}% raise has been proposed for review."
+   },
+   "selfReviewReminder": {
+    "title": "Self review reminder — {{cycleKey}}",
+    "message": "Your {{cycleLabel}} self review is due in {{days}} day(s)."
+   },
+   "managerReviewReminder": {
+    "title": "Manager review reminder — {{cycleKey}}",
+    "message": "You have {{count}} pending manager review(s) for {{cycleLabel}}, due in {{days}} day(s)."
+   },
+   "performanceReviewsDueSoon": {
+    "title": "Performance reviews due soon — {{cycleKey}}",
+    "message": "{{totalPending}} performance review action(s) still pending for {{cycleLabel}}, due in {{days}} day(s)."
+   },
+   "resolutionLabels": {
+    "adjusted": "adjusted",
+    "upheld": "upheld"
+   },
+   "rateSourceLabels": {
+    "live": "live rate",
+    "fallback": "fallback rate"
+   }
   }
  },
  "settings": {
@@ -379,6 +908,8 @@
    "submitRequest": "Submit Request",
    "requestHistory": "Request History",
    "hrNote": "HR note: {{note}}",
+   "addressPlaceholder": "Street, City, State",
+   "phonePlaceholder": "+84 90 123 4567",
    "noChanges": "No changes detected.",
    "submitSuccess": "Your profile edit request has been submitted and is pending HR approval.",
    "submitFailed": "Failed to submit request."
@@ -774,5 +1305,941 @@
    "cvUploadError": "Failed to upload CV.",
    "noValue": "—"
   }
+ },
+ "sideMenu": {
+  "overview": "Overview",
+  "dashboard": "Dashboard",
+  "myInfo": "My Info",
+  "people": "People",
+  "myProfile": "My Profile",
+  "directory": "Directory",
+  "allEmployees": "All Employees",
+  "addEmployee": "Add Employee",
+  "myDepartment": "My Department",
+  "allDepartments": "All Departments",
+  "orgChart": "Org Chart",
+  "timePay": "Time & Pay",
+  "attendance": "Attendance",
+  "performanceReviews": "Performance Reviews",
+  "payroll": "Payroll",
+  "leave": "Leave",
+  "holidays": "Holidays",
+  "hiring": "Hiring",
+  "candidates": "Candidates",
+  "jobOpenings": "Job Openings",
+  "account": "Account",
+  "system": "System",
+  "notifications": "Notifications",
+  "settings": "Settings",
+  "employeeAccessBadge": "Employee access",
+  "themeSwitcherLabel": "Theme switcher",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "goToSettings": "Go to Settings",
+  "goToDashboard": "Go to Dashboard",
+  "signOut": "Sign Out"
+ },
+ "header": {
+  "pageTitle": {
+   "employeeDetails": "Employee Details",
+   "departmentDetails": "Department Details",
+   "jobs": "Jobs"
+  },
+  "kicker": {
+   "withSuffix": "{{group}} / {{suffix}}",
+   "newSuffix": "New",
+   "profileSuffix": "Profile"
+  },
+  "openNavMenu": "Open navigation menu",
+  "toggleCurrencyTitle": "Toggle payroll display currency",
+  "notifications": "Notifications",
+  "notificationsUnreadSuffix": ", {{count}} unread"
+ },
+ "globalSearch": {
+  "placeholder": "Search employees, candidates, jobs...",
+  "noMatches": "No matches",
+  "kind": {
+   "employee": "Employee",
+   "candidate": "Candidate",
+   "job": "Job"
+  }
+ },
+ "clockIn": {
+  "buttonDefault": "Clock in",
+  "inProgress": "Clocking in…",
+  "clockedIn": "Clocked in {{time}}",
+  "clockedInAtTitle": "Clocked in at {{time}}",
+  "noProfileTitle": "No employee profile is linked to your account",
+  "clockInTodayTitle": "Clock in for today",
+  "failedGeneric": "Failed to clock in"
+ },
+ "headerDateTime": {
+  "adjustAriaLabel": "Adjust date and time",
+  "adjustedBadge": "Adjusted",
+  "closePanelAriaLabel": "Close date and time panel",
+  "panelTitle": "Set date & time",
+  "dateLabel": "Date",
+  "timeLabel": "Time",
+  "resetButton": "Reset to now",
+  "applyButton": "Apply"
+ },
+ "auth": {
+  "common": {
+   "emailAddressLabel": "Email Address",
+   "emailPlaceholderDemo": "admin@hrms.com",
+   "passwordLabel": "Password",
+   "atLeast8CharsHint": "At least 8 characters",
+   "signIn": "Sign in"
+  },
+  "brand": {
+   "headline": "One ledger for every person on the roster.",
+   "heroCopy": "Headcount, attendance and pay in a single flat record — built for teams who read numbers, not dashboards."
+  },
+  "login": {
+   "subtitle": "Enter your credentials to access your HRMS dashboard",
+   "registeredBanner": "Account created. Sign in with the demo credentials below to continue.",
+   "rememberMe": "Remember me",
+   "forgotPasswordLink": "Forgot password?",
+   "signingIn": "Signing In...",
+   "submitButton": "Sign In",
+   "noAccountPrefix": "Don't have an account?",
+   "createOneLink": "Create one",
+   "demoCredentialsTitle": "Demo Credentials:",
+   "demoEmailLabel": "Email:",
+   "demoPasswordLabel": "Password:"
+  },
+  "register": {
+   "heading": "Create Account",
+   "subtitle": "Set up your HRMS Employee account",
+   "genericError": "Registration failed. Please try again.",
+   "fullNameLabel": "Full Name",
+   "fullNamePlaceholder": "Jane Doe",
+   "emailPlaceholder": "jane.doe@company.com",
+   "hidePasswordAria": "Hide password",
+   "showPasswordAria": "Show password",
+   "strengthLabel": "Password strength",
+   "strength": {
+    "weak": "Weak",
+    "fair": "Fair",
+    "good": "Good",
+    "strong": "Strong"
+   },
+   "confirmPasswordLabel": "Confirm Password",
+   "roleInfoTitle": "Employee Account",
+   "roleInfoDescription": "All new accounts start as Employee. An Admin can promote you to HR/Manager.",
+   "termsPrefix": "I agree to the ",
+   "termsOfService": "Terms of Service",
+   "termsAnd": " and ",
+   "privacyPolicy": "Privacy Policy",
+   "termsRequiredError": "Please accept the terms to continue",
+   "submittingButton": "Creating Account...",
+   "alreadyHaveAccount": "Already have an account?",
+   "errors": {
+    "nameRequired": "Full name is required",
+    "nameTooShort": "Name is too short",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordTooShort": "Use at least 8 characters",
+    "confirmRequired": "Please confirm your password",
+    "passwordsMismatch": "Passwords don't match"
+   }
+  },
+  "changePassword": {
+   "setPasswordHeading": "Set your password",
+   "changePasswordHeading": "Change password",
+   "mustChangeSubtitle": "Your account uses a temporary password. Choose a new one to continue.",
+   "subtitle": "Choose a new password for your account.",
+   "signedInAsPrefix": "Signed in as",
+   "currentPasswordLabel": "Current password",
+   "newPasswordLabel": "New password",
+   "confirmNewPasswordLabel": "Confirm new password",
+   "confirmPlaceholder": "Repeat the new password",
+   "savingButton": "Saving...",
+   "submitButton": "Update password",
+   "signOutLink": "Sign out",
+   "errors": {
+    "currentRequired": "Enter your current password.",
+    "tooShort": "New password must be at least 8 characters.",
+    "sameAsCurrent": "New password must be different from the current one.",
+    "mismatch": "The two new passwords do not match."
+   }
+  },
+  "forgotPassword": {
+   "heading": "Forgot Password",
+   "subtitle": "Enter your email and we'll send you a reset link",
+   "submitButton": "Send Reset Link",
+   "demoAlert": "OTP sent to your email! (Demo)",
+   "rememberPasswordPrefix": "Remember your password?"
+  },
+  "enterOtp": {
+   "heading": "Enter OTP",
+   "subtitle": "Enter the 6-digit code sent to your email",
+   "codeLabel": "Verification Code",
+   "submitButton": "Verify",
+   "demoAlert": "OTP verified! (Demo)",
+   "noCodePrefix": "Didn't receive the code?",
+   "resendButton": "Resend"
+  }
+ },
+ "employees": {
+  "addEmployee": {
+   "errors": {
+    "nameRequired": "Full name is required",
+    "nameTooShort": "Name is too short",
+    "ageRequired": "Age is required",
+    "ageRange": "Age must be 18–80",
+    "genderRequired": "Please select a gender",
+    "emailInvalid": "Invalid email address",
+    "employeeIdRequired": "Employee ID is required",
+    "employeeIdFormat": "Format: EMP001",
+    "departmentRequired": "Please select a department",
+    "designationRequired": "Designation is required",
+    "salaryRequired": "Salary is required",
+    "salaryPositive": "Salary must be greater than 0"
+   },
+   "roleLabels": {
+    "EMPLOYEE": "Employee",
+    "MANAGER": "HR / Manager",
+    "ADMIN": "Administrator"
+   },
+   "steps": {
+    "personal": {
+     "label": "Personal",
+     "desc": "Basic information"
+    },
+    "job": {
+     "label": "Job",
+     "desc": "Position & contract"
+    },
+    "finance": {
+     "label": "Finance",
+     "desc": "Salary & benefits"
+    },
+    "review": {
+     "label": "Review",
+     "desc": "Check & save"
+    }
+   },
+   "submitFailed": "Failed to create employee.",
+   "goBackAria": "Go back",
+   "header": {
+    "title": "Add New Employee",
+    "stepProgress": "Step {{step}}/{{total}} · {{desc}}",
+    "stepCompletion": "Step completion"
+   },
+   "step1": {
+    "heading": "Personal Information",
+    "fullNamePlaceholder": "John Smith",
+    "agePlaceholder": "25",
+    "genderSelectPlaceholder": "Select...",
+    "phoneNumberLabel": "Phone Number",
+    "phonePlaceholder": "+1 555 123 4567",
+    "emailHint": "Used for system login",
+    "emailPlaceholder": "john.smith@company.com"
+   },
+   "step2": {
+    "heading": "Job Information",
+    "employeeIdHint": "Format: EMP001",
+    "employeeIdPlaceholder": "EMP009",
+    "departmentSelectPlaceholder": "Select department...",
+    "designationPlaceholder": "Frontend Developer",
+    "initialStatusLabel": "Initial Status",
+    "accountAccessTitle": "Account access",
+    "createAccountLabel": "Create a login account",
+    "createAccountHint": "A temporary password is generated and shown once after saving. The employee must change it at first sign-in.",
+    "roleHintRestricted": "Only an Administrator can create HR or Admin accounts",
+    "loginEmailLabel": "Login email",
+    "loginEmailHintFromPersonal": "Taken from the Personal step",
+    "loginEmailHintDerived": "Derived from the Employee ID",
+    "loginEmailPlaceholder": "Enter an Employee ID or email"
+   },
+   "step3": {
+    "heading": "Finance Information",
+    "annualSalaryLabel": "Annual Salary (USD)",
+    "salaryHint": "Gross salary, before tax",
+    "salaryPlaceholder": "60000",
+    "breakdownTitle": "Salary Breakdown",
+    "annual": "Annual",
+    "weekly": "Weekly",
+    "notesPlaceholder": "Additional information about the employee..."
+   },
+   "review": {
+    "sectionPersonal": "Personal",
+    "sectionJob": "Job",
+    "sectionAccount": "Account",
+    "sectionFinance": "Finance",
+    "loginAccount": "Login account",
+    "willBeCreated": "Will be created",
+    "notCreated": "Not created",
+    "loginEmail": "Login email",
+    "monthly": "Monthly",
+    "notFilled": "Not filled",
+    "newEmployee": "New Employee",
+    "infoBannerPrefix": "Please review carefully before clicking",
+    "infoBannerMiddle": ". Click",
+    "infoBannerSuffix": " on any section to go back and make changes."
+   },
+   "successScreen": {
+    "copied": "Copied",
+    "copy": "Copy",
+    "title": "Added successfully!",
+    "addedToSystem": "has been added to the system.",
+    "redirecting": "Redirecting to employee list...",
+    "linkedToExisting": "Linked to the existing account",
+    "loginDetailsTitle": "Login details",
+    "tempPasswordLabel": "Temp password",
+    "passwordWarning": "This password is shown once only and is not stored anywhere. Copy it now and hand it over securely. The employee must change it at first sign-in.",
+    "doneButton": "Done"
+   },
+   "nav": {
+    "next": "Next",
+    "createEmployee": "Create Employee"
+   },
+   "toastSuccess": "Employee added successfully!"
+  },
+  "allEmployees": {
+   "sidePanel": {
+    "title": "Employee Details",
+    "closeAria": "Close panel",
+    "changeStatus": "Change Status",
+    "viewFullProfile": "View Full Profile"
+   },
+   "bulkBar": {
+    "selected": "{{count}} selected",
+    "setStatus": "Set status:",
+    "deleteSelected": "Delete selected",
+    "clearSelectionAria": "Clear selection"
+   },
+   "pendingPromotions": {
+    "title": "Pending promotions",
+    "effective": "Effective {{date}}"
+   },
+   "editRequests": {
+    "tabs": {
+     "pending": "pending",
+     "approved": "approved",
+     "rejected": "rejected",
+     "all": "all"
+    },
+    "refresh": "Refresh",
+    "requestCount_one": "{{count}} request",
+    "requestCount_other": "{{count}} requests",
+    "noRequestsAll": "No requests",
+    "noRequestsFiltered": "No {{status}} requests",
+    "emptyDescription": "Profile edit requests submitted by employees will show up here for review.",
+    "loading": "Loading requests…",
+    "loadFailed": "Failed to load requests.",
+    "unknownEmployee": "Unknown employee",
+    "requestedChanges": "Requested changes",
+    "reviewNoteLabel": "Review note",
+    "optional": "(optional)",
+    "reviewNotePlaceholder": "Add a note for the employee…",
+    "approveApply": "Approve & apply",
+    "approving": "Approving…",
+    "rejecting": "Rejecting…",
+    "review": "Review",
+    "hrNotePrefix": "HR note:",
+    "toastApproved": "Profile update approved and applied.",
+    "toastRejected": "Request rejected.",
+    "toastErrorPrefix": "Error: {{message}}"
+   },
+   "toolbar": {
+    "filter": "Filter",
+    "searchPlaceholder": "Search by name, employee ID, department...",
+    "reset": "Reset",
+    "exportCsv": "Export CSV"
+   },
+   "table": {
+    "details": "Details",
+    "promote": "Promote",
+    "deleteAria": "Delete employee",
+    "selectAllAria": "Select all on this page",
+    "selectRowAria": "Select {{name}}"
+   },
+   "emptyState": {
+    "title": "No employees found",
+    "tryAdjusting": "Try adjusting your search or filters.",
+    "getStarted": "Get started by adding your first employee.",
+    "clearFilters": "Clear filters"
+   },
+   "pagination": {
+    "showing": "Showing {{start}}–{{end}} of {{total}} employees",
+    "filteredFrom": "(filtered from {{total}})",
+    "selectedSuffix": "· {{count}} selected"
+   },
+   "rosterTab": "Roster",
+   "editRequestsTab": "Edit requests ({{count}})",
+   "sortBy": "Sort by {{label}}"
+  },
+  "viewEmployee": {
+   "tabs": {
+    "profile": "Profile",
+    "salary": "Salary",
+    "activity": "Activity"
+   },
+   "notFoundTitle": "Employee Not Found",
+   "notFoundDescription": "The employee you are looking for does not exist.",
+   "backToEmployees": "Back to Employees",
+   "avatarErrors": {
+    "invalidType": "Please choose a JPEG, PNG, WEBP, or GIF image.",
+    "tooLarge": "Image must be 5MB or smaller.",
+    "uploadFailed": "Failed to upload photo."
+   },
+   "changePhotoAria": "Change profile photo",
+   "applyForLeave": "Apply for leave",
+   "requestEdit": "Request edit",
+   "detailSectionsAria": "Employee detail sections",
+   "positionLevel": "Position Level",
+   "requestEditModal": {
+    "noChangesError": "No changes to submit.",
+    "submitFailed": "Failed to submit request.",
+    "approvalNotice": "Changes to these fields need HR/Admin approval before they take effect.",
+    "submit": "Submit request"
+   },
+   "attendanceReport": {
+    "title": "Attendance Report",
+    "recordsOnFile_one": "{{count}} record on file",
+    "recordsOnFile_other": "{{count}} records on file",
+    "attendanceRateSuffix": " · {{rate}}% attendance rate",
+    "openFullCalendar": "Open full calendar",
+    "noRecords": "No attendance records for this employee yet.",
+    "date": "Date",
+    "checkIn": "Check In",
+    "checkOut": "Check Out",
+    "showRecentOnly": "Show recent only",
+    "showAllRecords": "Show all {{count}} records",
+    "statusLabels": {
+     "Present": "Present",
+     "Late": "Late",
+     "On Leave": "On Leave",
+     "Absent": "Absent",
+     "No-show": "No-show"
+    }
+   },
+   "leaveTab": {
+    "loadError": "Could not load leave data.",
+    "updateError": "Could not update the request.",
+    "teamPendingTitle": "Pending Approvals — Your Team",
+    "teamPendingDesc_one": "{{count}} request from {{department}} awaiting review",
+    "teamPendingDesc_other": "{{count}} requests from {{department}} awaiting review",
+    "balanceTitle": "Leave balance",
+    "balanceForYear": "For {{year}}",
+    "balanceGeneric": "Paid and unpaid leave usage",
+    "colAccrued": "Accrued",
+    "colUsed": "Used",
+    "colRemaining": "Remaining",
+    "unlimited": "Unlimited",
+    "historyTitle": "Request history",
+    "noRequestsTitle": "No leave requests on file",
+    "noRequestsDesc": "Requests this employee submits will show up here.",
+    "colDates": "Dates",
+    "colDays": "Days",
+    "colReason": "Reason"
+   },
+   "salaryTab": {
+    "loadError": "Could not load payroll data.",
+    "noPayslipsTitle": "No payslips on file",
+    "noPayslipsDesc": "This employee hasn't been included in a payroll run yet.",
+    "periodLabel": "Period"
+   },
+   "activityTab": {
+    "loadError": "Could not load activity.",
+    "noActivityTitle": "No recent activity",
+    "noActivityDesc": "Changes to this employee's record will show up here (from the last 50 system-wide events)."
+   },
+   "contractCard": {
+    "title": "Contract",
+    "noContract": "No contract on file yet.",
+    "uploaded": "Uploaded {{date}}",
+    "viewContract": "View Contract",
+    "uploading": "Uploading…",
+    "replace": "Replace Contract",
+    "upload": "Upload Contract",
+    "errors": {
+     "typeError": "Please choose a PDF file.",
+     "sizeError": "Contract must be 10MB or smaller.",
+     "uploadFailed": "Failed to upload contract."
+    }
+   },
+   "confirmChangeModal": {
+    "title": "Confirm change",
+    "current": "Current",
+    "new": "New",
+    "updatePromptPrefix": "Update",
+    "updatePromptMiddle": "for",
+    "updatePromptSuffix": "?"
+   }
+  },
+  "employeeModal": {
+   "title": "Add Employee",
+   "closeAria": "Close modal",
+   "fullNameLabel": "Full Name *",
+   "employeeIdLabel": "Employee ID *",
+   "departmentLabel": "Department *",
+   "designationLabel": "Designation *",
+   "selectDepartmentOption": "Select Department",
+   "selectOption": "Select",
+   "salaryPlaceholder": "Annual salary",
+   "submitFailed": "Failed to add employee.",
+   "errors": {
+    "departmentRequired": "Department is required"
+   }
+  },
+  "addDepartmentModal": {
+   "title": "Add Department",
+   "duplicateNameError": "A department with this name already exists.",
+   "submitFailed": "Failed to create department.",
+   "nameLabel": "Department Name *",
+   "managerLabel": "Manager *",
+   "budgetLabel": "Budget (USD)",
+   "budgetPlaceholder": "0"
+  },
+  "department": {
+   "roster": "Roster",
+   "peopleCount_one": "{{count}} person",
+   "peopleCount_other": "{{count}} people",
+   "departmentManager": "Department Manager",
+   "budget": "Budget",
+   "notAssigned": "Not assigned",
+   "noEmployeesTitle": "No employees in this department yet",
+   "noEmployeesDesc": "Add an employee and set their department to {{name}}.",
+   "managerSuffix": " · Manager"
+  },
+  "viewDepartment": {
+   "notFoundTitle": "Department Not Found"
+  },
+  "allDepartments": {
+   "emptyTitle": "No departments yet",
+   "emptyDesc": "Create your first department to get started with organizing your workforce.",
+   "summaryLine": "{{count}} departments · {{total}} people",
+   "stats": {
+    "departments": "Departments",
+    "acrossOrg": "across the org",
+    "totalHeadcount": "Total Headcount",
+    "activeRoster": "active roster",
+    "avgTeamSize": "Avg Team Size",
+    "peoplePerTeam": "people per team",
+    "largestTeam": "Largest Team"
+   },
+   "card": {
+    "departmentLabel": "Department",
+    "viewingBadge": "Viewing",
+    "peopleWord": "people",
+    "peopleSuffix": "{{count}} people",
+    "noManagerAssigned": "No manager assigned",
+    "managerPrefix": "Manager: {{name}}",
+    "viewRoster": "View roster →",
+    "moreRolesSuffix": " +{{count}} more"
+   }
+  },
+  "myDepartmentRedirect": {
+   "loading": "Loading your department…",
+   "notLinked": "You aren't linked to a department yet. Ask an admin to fix this.",
+   "loadFailed": "Could not load your department."
+  }
+ },
+ "holidays": {
+  "stats": {
+   "nextHoliday": "Next holiday",
+   "noUpcoming": "No upcoming holidays",
+   "pendingRequests": "Pending requests",
+   "awaitingReview": "Awaiting review",
+   "onLeaveToday": "On leave today",
+   "employees": "Employees",
+   "approvedThisMonth": "Approved this month"
+  },
+  "companyHolidays": {
+   "heading": "Company holidays",
+   "scheduledCount": "{{count}} scheduled",
+   "addButton": "+ Add Holiday",
+   "empty": {
+    "title": "No holidays yet",
+    "descriptionCanManage": "Add a holiday to start building the calendar.",
+    "descriptionReadOnly": "None scheduled yet."
+   },
+   "table": {
+    "name": "Holiday Name",
+    "date": "Date"
+   },
+   "status": {
+    "past": "Past",
+    "upcoming": "Upcoming"
+   },
+   "editDateTitle": "Click to edit date",
+   "confirmDateAria": "Confirm date",
+   "cancelDateAria": "Cancel"
+  },
+  "leaveRequests": {
+   "heading": "Leave requests",
+   "subtitle": "Pending requests need your review",
+   "loading": "Loading leave requests…",
+   "loadFailed": "Failed to load leave requests.",
+   "reviewFailed": "Failed to review leave request.",
+   "empty": {
+    "title": "No leave requests",
+    "description": "New requests will appear here for review."
+   },
+   "table": {
+    "dates": "Dates",
+    "days": "Days",
+    "reason": "Reason"
+   }
+  },
+  "balances": {
+   "heading": "Leave balances",
+   "hint": "Click a row for the full ledger",
+   "loading": "Loading leave balances…",
+   "loadFailed": "Failed to load leave balances.",
+   "empty": {
+    "title": "No employees match",
+    "description": "Try a different search."
+   },
+   "table": {
+    "pto": "PTO remaining",
+    "sick": "Sick remaining"
+   },
+   "left": "{{remaining}} left",
+   "usedOf": "{{used}} used of {{accrued}}",
+   "unlimited": "Unlimited"
+  },
+  "saveFailed": "Failed to save holiday.",
+  "deleteFailed": "Failed to delete holiday.",
+  "updateDateFailed": "Failed to update date.",
+  "addHolidayModal": {
+   "titleAdd": "Add Holiday",
+   "titleEdit": "Edit Holiday",
+   "nameLabel": "Holiday Name",
+   "namePlaceholder": "e.g. Tet Holiday",
+   "dateLabel": "Date",
+   "typeLabel": "Type",
+   "nameRequired": "Holiday name is required.",
+   "dateRequired": "Date is required.",
+   "duplicate": "A holiday with this name and date already exists.",
+   "saveChanges": "Save Changes",
+   "addHoliday": "Add Holiday"
+  }
+ },
+ "payroll": {
+  "heading": "Payroll",
+  "loadingPeriods": "Loading pay periods…",
+  "empty": {
+   "noPeriodsTitle": "No pay periods yet",
+   "noPeriodsDescription": "Create your first pay period to generate draft payslips for every employee."
+  },
+  "rateType": {
+   "live": "live rate",
+   "fallback": "fallback rate"
+  },
+  "rateSourceCap": {
+   "live": "Live",
+   "fallback": "Fallback"
+  },
+  "autoDrafted": "Auto-drafted · {{rateType}}",
+  "fxRateSourceTitle": "FX rate source: {{rateType}}",
+  "actions": {
+   "generateMonthlyDraft": "Generate this month's draft",
+   "generatingEllipsis": "Generating…",
+   "fetchingEllipsis": "Fetching…",
+   "runLastMonth": "Run last month’s payroll",
+   "regenerateDrafts": "Regenerate drafts",
+   "approvePayroll": "Approve payroll",
+   "deletePeriod": "Delete period",
+   "markAsPaid": "Mark as paid",
+   "reopenToDraft": "Reopen to draft"
+  },
+  "tooltips": {
+   "generateMonthlyDraft": "Runs the same start-of-month job the scheduler runs automatically",
+   "runLastMonth": "Runs the same 10th-of-month job the scheduler runs automatically, for last month",
+   "regenerateDraftsManager": "Regenerates drafts for the whole company's payroll this period, not just your department.",
+   "approvePayrollManager": "Approves the whole company's payroll for this period, not just your department.",
+   "markAsPaidManager": "Marks the whole company's payroll as paid for this period, not just your department."
+  },
+  "banners": {
+   "closed": "This period is closed. Payslips are read-only.",
+   "approvedLocked": "This period is approved and locked. An Administrator can reopen it to make changes."
+  },
+  "newPeriodForm": {
+   "month": "Month",
+   "year": "Year",
+   "fxRateLabel": "FX rate (VND per USD)",
+   "fetchLiveRate": "Fetch live rate",
+   "fxHintWithPreview": "{{sourceLabel}} rate as of {{date}} — locked once the period is created.",
+   "fxHintDefault": "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses.",
+   "actionLabelHidden": "Action",
+   "createButton": "Create & generate drafts"
+  },
+  "errorPrefix": "Error:",
+  "errors": {
+   "loadPeriods": "Failed to load pay periods.",
+   "loadPayslips": "Failed to load payslips.",
+   "refreshTotals": "Could not refresh period totals."
+  },
+  "prompts": {
+   "adjustmentReason": "Reason for this salary adjustment (recorded in the audit log):"
+  },
+  "confirms": {
+   "runMonthly": "Run last month's payroll now? Approved payslips are marked paid and can never be edited again.",
+   "regenerate": "Regenerate discards every manual bonus, allowance and deduction edit for this period. Continue?",
+   "deletePeriod": "Delete this draft period and all of its payslips?",
+   "markPaid": "Mark this period as paid? It cannot be reopened afterwards."
+  },
+  "toast": {
+   "deductionRecomputed": "Deduction recomputed from attendance and leave.",
+   "draftsGenerated_one": "{{count}} draft payslip generated.",
+   "draftsGenerated_other": "{{count}} draft payslips generated.",
+   "fxFallbackUsed": "Live FX provider was unreachable — using the fallback rate. You can still edit it manually.",
+   "autoGenerated_one": "{{count}} draft payslip auto-generated at {{rate}} VND/USD ({{rateType}}).",
+   "autoGenerated_other": "{{count}} draft payslips auto-generated at {{rate}} VND/USD ({{rateType}}).",
+   "monthlyPaid_one": "{{period}} payroll paid — {{count}} payslip.",
+   "monthlyPaid_other": "{{period}} payroll paid — {{count}} payslips.",
+   "periodMarked": "Period marked {{status}}.",
+   "regenerated_one": "{{count}} payslip regenerated.",
+   "regenerated_other": "{{count}} payslips regenerated.",
+   "periodDeleted": "Period deleted."
+  },
+  "skipReasons": {
+   "draft": {
+    "alreadyDrafted": "This month already has an auto-drafted period.",
+    "alreadyExists": "This month already has a manually-created period.",
+    "noPayableEmployees": "No active employees to pay this month.",
+    "nothingToGenerate": "Nothing to generate."
+   },
+   "runMonthly": {
+    "noPeriod": "Last month has no payroll period. Create one first.",
+    "alreadyPaid": "Last month's payroll has already been paid.",
+    "noPayslips": "Last month's period has no payslips, so nothing was paid.",
+    "nothingToRun": "Nothing to run."
+   }
+  },
+  "history": {
+   "heading": "Pay run history",
+   "subtitle": "Click a run to view its breakdown",
+   "newDraftButton": "+ New draft",
+   "table": {
+    "period": "Period",
+    "payDate": "Pay date",
+    "employees": "Employees",
+    "gross": "Gross",
+    "net": "Net"
+   }
+  },
+  "scope": {
+   "team_one": "Showing your team{{deptSuffix}} — {{count}} payslip this period",
+   "team_other": "Showing your team{{deptSuffix}} — {{count}} payslips this period"
+  },
+  "stats": {
+   "grossPayout": "Gross payout",
+   "netPayout": "Net payout",
+   "afterDeductions": "After deductions",
+   "paid": "Paid",
+   "employeesSettled": "Employees settled",
+   "pending": "Pending",
+   "awaitingPayment": "Awaiting payment",
+   "awaitingRun": "Awaiting run"
+  },
+  "currentPeriod": {
+   "eyebrow": "Current period",
+   "searchPlaceholder": "Search employee…",
+   "allDepartments": "All departments",
+   "allTypes": "All types",
+   "exportCsv": "↓ Export CSV",
+   "exportCsvTooltip": "CSV export is always raw VND, regardless of the currency toggle in the top bar.",
+   "loadingPayslips": "Loading payslips…",
+   "empty": {
+    "noPayslipsManager": "No payslips for your department in this period",
+    "noPayslipsGeneral": "No payslips in this period",
+    "otherDeptsHavePayslips": "Other departments have payslips this period, but none in yours yet.",
+    "useRegenerateDrafts": "Use Regenerate drafts to build them.",
+    "periodHasNoPayslips": "This period has no payslips.",
+    "noResultsTitle": "No results",
+    "noResultsDescription": "Try adjusting your search or filters."
+   }
+  },
+  "table": {
+   "base": "Base",
+   "bonus": "Bonus",
+   "allowance": "Allowance",
+   "deduction": "Deduction",
+   "gross": "Gross",
+   "insurance": "Insurance",
+   "pit": "PIT",
+   "net": "Net",
+   "unpaidAbsentLine": "{{unpaid}} unpaid + {{absent}} absent",
+   "recompute": "recompute",
+   "exempt": "Exempt",
+   "exemptTooltip": "Exempt — {{days}} unpaid working days reached the 14-day threshold",
+   "matchFilters_one": "{{count}} payslip match filters",
+   "matchFilters_other": "{{count}} payslips match filters"
+  },
+  "pagination": {
+   "showing": "Showing {{start}}–{{end}} of {{total}}"
+  },
+  "charts": {
+   "grossByDept": "Gross pay by department",
+   "byContractType": "By contract type",
+   "noDeptData": "No department data for this period.",
+   "staffLabel": "staff"
+  }
+ },
+ "payrollBreakdown": {
+  "heading": "Salary breakdown — {{name}}",
+  "rows": {
+   "baseSalary": "Base salary",
+   "bonus": "Bonus",
+   "allowance": "Allowance",
+   "deduction": "Deduction",
+   "grossPay": "Gross pay",
+   "socialInsurance": "Social insurance (BHXH 8%)",
+   "healthInsurance": "Health insurance (BHYT 1.5%)",
+   "unemployment": "Unemployment (BHTN 1%)",
+   "personalIncomeTax": "Personal income tax",
+   "netPay": "Net pay"
+  },
+  "exemptSuffix": " — exempt",
+  "disclosure": "Period {{label}} · {{workDays}} standard working days · FX rate locked at {{rate}} VND/USD{{rateSourceSuffix}} · {{leaveClause}} · {{absentClause}} · assumes 0 registered dependents.",
+  "unpaidLeaveDay_one": "{{count}} unpaid leave day",
+  "unpaidLeaveDay_other": "{{count}} unpaid leave days",
+  "absentDay_one": "{{count}} absent day",
+  "absentDay_other": "{{count}} absent days",
+  "insuranceExemptWarning": "No social, health or unemployment insurance is charged this period: {{days}} unpaid working days reached the 14-day statutory exemption. Personal income tax still applies."
+ },
+ "filterModal": {
+  "title": "Filter",
+  "searchPlaceholder": "Search by name, employee ID, department...",
+  "departmentHeading": "Department",
+  "selectTypeHeading": "Select Type",
+  "reset": "Reset",
+  "apply": "Apply",
+  "employmentTypes": {
+   "all": "All",
+   "Full-time": "Full Time",
+   "Part-time": "Part Time",
+   "Contract": "Contract"
+  }
+ },
+ "applyLeaveModal": {
+  "title": "Apply for Leave",
+  "typeLabel": "Leave Type *",
+  "startDateLabel": "Start Date *",
+  "endDateLabel": "End Date *",
+  "reasonLabel": "Reason",
+  "reasonPlaceholder": "Optional",
+  "unlimited": "Unlimited",
+  "remaining_one": "{{remaining}} of {{accrued}} day remaining this year",
+  "remaining_other": "{{remaining}} of {{accrued}} days remaining this year",
+  "datesRequired": "Start and end dates are required.",
+  "submitFailed": "Failed to submit leave request.",
+  "submitButton": "Submit Request"
+ },
+ "attendanceTrendChart": {
+  "ariaLabel": "Attendance trend chart — last 7 days",
+  "todaySuffix": " (today)",
+  "rateFooter": "Rate: {{pct}}% / {{total}} staff"
+ },
+ "jobs": {
+  "heading": "Job Openings",
+  "postNewJob": "+ Post New Job",
+  "stats": {
+   "openPositions": "Open Positions",
+   "currentlyHiring": "Currently hiring",
+   "totalApplicants": "Total Applicants",
+   "acrossPostings": "Across all postings",
+   "filledRoles": "Filled Roles",
+   "positionsClosedWithHire": "Positions closed with a hire",
+   "totalPostings": "Total Postings",
+   "allJobOpenings": "All job openings"
+  },
+  "searchPlaceholder": "Search by title, department, location...",
+  "allStatuses": "All Statuses",
+  "allDepartments": "All Departments",
+  "empty": {
+   "title": "No job openings found",
+   "unfiltered": "Post a new job to start building your hiring pipeline."
+  },
+  "card": {
+   "metaLine": "{{department}} • {{location}} • Posted {{date}}",
+   "applyBySuffix": " • Apply by {{date}}",
+   "applicantCount_one": "{{count}} applicant",
+   "applicantCount_other": "{{count}} applicants",
+   "viewApplicants": "View Applicants",
+   "hideDetails": "Hide Details",
+   "showDetails": "Details",
+   "sections": {
+    "jobDescription": "Job Description",
+    "requirements": "Requirements",
+    "payBenefits": "Pay & Benefits",
+    "aboutCompany": "About the Company",
+    "howToApply": "How to Apply"
+   }
+  },
+  "confirmDelete": "Delete this job posting? Linked candidates will remain in the pipeline but will show as unassigned.",
+  "saveFailed": "Failed to save job.",
+  "addJobModal": {
+   "titleEdit": "Edit Job",
+   "titleAdd": "Post New Job",
+   "titleLabel": "Job Title",
+   "titlePlaceholder": "e.g. Senior Software Engineer",
+   "locationLabel": "Location",
+   "locationPlaceholder": "e.g. Remote, Hanoi, New York",
+   "employmentTypeLabel": "Employment Type",
+   "descriptionLabel": "Job Description",
+   "descriptionPlaceholder": "What this role does day-to-day…",
+   "requirementsLabel": "Requirements",
+   "onePerLine": "(one per line)",
+   "requirementsPlaceholder": "3+ years of relevant experience\nStrong communication skills",
+   "benefitsLabel": "Pay & Benefits",
+   "benefitsPlaceholder": "Health insurance\n13th-month bonus",
+   "minSalaryLabel": "Min Salary",
+   "minSalaryPlaceholder": "e.g. 50000",
+   "maxSalaryLabel": "Max Salary",
+   "maxSalaryPlaceholder": "e.g. 70000",
+   "currencyLabel": "Currency",
+   "deadlineLabel": "Application Deadline",
+   "companyInfoLabel": "Company Info",
+   "companyInfoPlaceholder": "A short blurb about the company shown on the posting…",
+   "applicationInstructionsLabel": "How to Apply",
+   "applicationInstructionsPlaceholder": "Application link, email, or instructions…",
+   "titleRequired": "Job title is required.",
+   "locationRequired": "Location is required.",
+   "salaryRangeInvalid": "Minimum salary cannot be greater than maximum salary.",
+   "saveChanges": "Save Changes",
+   "postJob": "Post Job"
+  }
+ },
+ "promotionModal": {
+  "title": "Propose a promotion",
+  "intro": "Propose a new designation, department, level or salary for an employee. An administrator must approve it before it takes effect.",
+  "employeeLabel": "Employee",
+  "selectEmployeePlaceholder": "Select an employee",
+  "effectiveDateLabel": "Effective date",
+  "newDesignationLabel": "New designation",
+  "newDepartmentLabel": "New department",
+  "leaveUnchanged": "Leave unchanged",
+  "newPositionLevelLabel": "New position level",
+  "newSalaryLabel": "New annual salary (USD)",
+  "reasonLabel": "Reason",
+  "reasonPlaceholder": "Why this promotion is justified...",
+  "currentlyValue": "Currently: {{value}}",
+  "pickEmployeeFirst": "Pick an employee first.",
+  "submitFailed": "Failed to submit proposal.",
+  "submitProposal": "Submit proposal"
+ },
+ "searchBar": {
+  "defaultPlaceholder": "Search...",
+  "clearSearchAriaLabel": "Clear search",
+  "searchAriaLabel": "Search"
+ },
+ "formField": {
+  "valid": "Valid"
+ },
+ "avatar": {
+  "fallbackLabel": "Avatar",
+  "moreAriaLabel_one": "+{{count}} more",
+  "moreAriaLabel_other": "+{{count}} more"
+ },
+ "layout": {
+  "closeMenuAriaLabel": "Close menu",
+  "loadError": "Couldn't load data: {{error}}"
  }
 }

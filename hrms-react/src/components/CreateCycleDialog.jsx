@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PerformanceReviewsAPI } from "../api";
 import Button from "./Button";
+import { translateApiError } from "../utils/apiError";
 
 // Milestone 4 — ADMIN-only custom cycle creation. Same bespoke
 // .modal-overlay/.modal pattern as PerformanceReviewDialog.jsx and
@@ -27,7 +28,7 @@ function CreateCycleDialog({ onClose, onCreated }) {
       onCreated?.(res.data);
       onClose?.();
     } catch (err) {
-      setError(err.message || t("performance.dialog.submitFailed"));
+      setError(translateApiError(err, t) || t("performance.dialog.submitFailed", { defaultValue: "Failed to submit." }));
       setSubmitting(false);
     }
   };
@@ -37,7 +38,7 @@ function CreateCycleDialog({ onClose, onCreated }) {
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "400px" }}>
         <div className="modal-header">
           <h2>{t("performance.createCycleDialog.title")}</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label={t("common2.close", { defaultValue: "Close" })}>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("common.actions.close", { defaultValue: "Close" })}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>

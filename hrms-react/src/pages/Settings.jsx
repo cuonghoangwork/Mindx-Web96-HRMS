@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI, PermissionsAPI } from '../api'
 import { apiFetch } from '../api/client'
 import { getRoleLabel } from '../utils/roles'
+import { translateApiError } from '../utils/apiError'
 import Button from "../components/Button";
 
 /* ─────────────────────────────────────────────
@@ -134,7 +135,7 @@ function AvatarUploader({ profile, onUploaded }) {
       const res = await EmployeesAPI.uploadAvatar(profile.id, file)
       onUploaded(res.data)
     } catch (err) {
-      setError(err.message || t('settings.profile.uploadFailed'))
+      setError(translateApiError(err, t) || t('settings.profile.uploadFailed', { defaultValue: 'Failed to upload photo.' }))
     }
     setUploading(false)
   }
@@ -249,7 +250,7 @@ function MyProfileEditSection() {
       setIsEditing(false)
       loadRequests()
     } catch (err) {
-      setError(err.message || t('settings.myProfile.submitFailed'))
+      setError(translateApiError(err, t) || t('settings.myProfile.submitFailed', { defaultValue: 'Failed to submit request.' }))
     }
     setSubmitting(false)
   }
@@ -444,7 +445,7 @@ function MyProfileEditSection() {
                 type="tel"
                 value={editForm.phone}
                 onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
-                placeholder="+84 90 123 4567"
+                placeholder={t('settings.myProfile.phonePlaceholder', { defaultValue: '+84 90 123 4567' })}
               />
             </div>
 
@@ -481,7 +482,7 @@ function MyProfileEditSection() {
                 type="text"
                 value={editForm.address}
                 onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
-                placeholder="Street, City, State"
+                placeholder={t('settings.myProfile.addressPlaceholder', { defaultValue: 'Street, City, State' })}
               />
             </div>
           </div>
@@ -720,7 +721,7 @@ function AuditLogTab() {
       const res = await AuditLogAPI.list({ limit: lim })
       setItems(res.items ?? [])
     } catch (err) {
-      setError(err.message || t('settings.auditLogTab.title'))
+      setError(translateApiError(err, t) || t('settings.auditLogTab.title', { defaultValue: 'Audit log' }))
     }
     setLoading(false)
   }, [t])
@@ -801,7 +802,7 @@ function PromoteUsersPanel() {
       const res = await apiFetch('/auth/users')
       setUsers(res.items || [])
     } catch (err) {
-      setError(err.message || t('settings.promoteUsers.loadFailed'))
+      setError(translateApiError(err, t) || t('settings.promoteUsers.loadFailed', { defaultValue: 'Failed to load users.' }))
     }
     setLoading(false)
   }, [t])
@@ -820,7 +821,7 @@ function PromoteUsersPanel() {
       setToast(res.message || t('settings.promoteUsers.roleUpdated'))
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
     } catch (err) {
-      setToast(`Error: ${err.message}`)
+      setToast(`${t('payroll.errorPrefix', { defaultValue: 'Error:' })} ${translateApiError(err, t)}`)
     }
     setPromoting(null)
   }
@@ -837,10 +838,10 @@ function PromoteUsersPanel() {
       {toast && (
         <div style={{
           marginBottom: 'var(--sp-4)', padding: 'var(--sp-3) var(--sp-4)',
-          background: toast.startsWith('Error') ? 'var(--bg-danger-subtle)' : 'var(--bg-success-subtle)',
-          border: `1px solid ${toast.startsWith('Error') ? 'var(--bdr-danger)' : 'var(--bdr-success)'}`,
+          background: toast.startsWith(t('payroll.errorPrefix', { defaultValue: 'Error:' })) ? 'var(--bg-danger-subtle)' : 'var(--bg-success-subtle)',
+          border: `1px solid ${toast.startsWith(t('payroll.errorPrefix', { defaultValue: 'Error:' })) ? 'var(--bdr-danger)' : 'var(--bdr-success)'}`,
           borderRadius: 'var(--radius-md)',
-          color: toast.startsWith('Error') ? 'var(--txt-danger)' : 'var(--txt-success)',
+          color: toast.startsWith(t('payroll.errorPrefix', { defaultValue: 'Error:' })) ? 'var(--txt-danger)' : 'var(--txt-success)',
           fontSize: 'var(--fs-sm)',
         }}>{toast}</div>
       )}
@@ -923,7 +924,7 @@ function PermissionsMatrix() {
       const res = await PermissionsAPI.list()
       setItems(res.items || [])
     } catch (err) {
-      setError(err.message || t('settings.permissions.loadFailed'))
+      setError(translateApiError(err, t) || t('settings.permissions.loadFailed', { defaultValue: 'Failed to load permissions.' }))
     }
     setLoading(false)
   }, [t])
@@ -939,7 +940,7 @@ function PermissionsMatrix() {
         return [...next, res.data]
       })
     } catch (err) {
-      setError(err.message || t('settings.permissions.updateFailed'))
+      setError(translateApiError(err, t) || t('settings.permissions.updateFailed', { defaultValue: 'Failed to update permission.' }))
     }
     setToggling(null)
   }

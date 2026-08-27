@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate } from "react-router-dom";
 import { EmployeesAPI, DepartmentsAPI } from "../api";
+import { translateApiError } from "../utils/apiError";
 
 /**
  * MyDepartmentRedirect — MANAGER's and EMPLOYEE's "My Department" nav
@@ -15,6 +17,7 @@ import { EmployeesAPI, DepartmentsAPI } from "../api";
  * this redirect is a convenience, not the security boundary.
  */
 function MyDepartmentRedirect() {
+  const { t } = useTranslation();
   const [departmentId, setDepartmentId] = useState(undefined); // undefined = loading, null = not found
   const [error, setError] = useState("");
 
@@ -32,18 +35,18 @@ function MyDepartmentRedirect() {
         setDepartmentId(match ? match.id : null);
       } catch (err) {
         if (!cancelled) {
-          setError(err.message || "Could not load your department.");
+          setError(translateApiError(err, t) || t("employees.myDepartmentRedirect.loadFailed", { defaultValue: "Could not load your department." }));
           setDepartmentId(null);
         }
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [t]);
 
   if (departmentId === undefined) {
     return (
       <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>
-        Loading your department…
+        {t("employees.myDepartmentRedirect.loading", { defaultValue: "Loading your department…" })}
       </div>
     );
   }
@@ -51,7 +54,7 @@ function MyDepartmentRedirect() {
   if (departmentId === null) {
     return (
       <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>
-        {error || "You aren't linked to a department yet. Ask an admin to fix this."}
+        {error || t("employees.myDepartmentRedirect.notLinked", { defaultValue: "You aren't linked to a department yet. Ask an admin to fix this." })}
       </div>
     );
   }

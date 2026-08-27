@@ -236,6 +236,9 @@ async function flagRepeatedNoShows(employeeIds) {
       category: "employee",
       link: "/attendance",
       linkLabel: "Review no-show flags",
+      titleKey: "noShowPatternFlagged",
+      messageKey: "noShowPatternFlagged",
+      params: { employeeName: employee.name, employeeId: employee.employeeId, count },
     });
   }
   return flagged;
@@ -288,6 +291,9 @@ export async function closeAttendanceDay({ dateKey } = {}) {
       category: "system",
       link: "/attendance",
       linkLabel: "View attendance",
+      titleKey: "attendanceClosed",
+      messageKey: flaggedForReview > 0 ? "attendanceClosedWithFlagged" : "attendanceClosed",
+      params: { date: dateKey, autoCheckedOut, markedLate, markedLateUnpaid, markedNoShow, flaggedForReview },
     });
   }
 

@@ -57,6 +57,13 @@ const { list, review } = createReviewRequestController({
     message: decision === "approved"
       ? "Your profile edit request has been approved and your information has been updated."
       : `Your profile edit request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+    titleKey: decision === "approved" ? "profileUpdateApproved" : "profileUpdateRejected",
+    messageKey: decision === "approved"
+      ? "profileUpdateApproved"
+      : (request.reviewNote ? "profileUpdateRejectedWithNote" : "profileUpdateRejected"),
+    params: decision === "approved"
+      ? undefined
+      : (request.reviewNote ? { note: request.reviewNote } : undefined),
   }),
   employeeLink: (request) => `/employees/${request.employee._id ?? request.employee}`,
   employeeLinkLabel: "View profile",
@@ -75,18 +82,27 @@ const profileEditRequestController = {
       const employee = await resolveRequestingEmployee(req);
 
       if (!employee) {
-        return res.status(404).json({ success: false, message: "No employee profile is linked to your account. Ask HR to link your profile." });
+        return res.status(404).json({
+          success: false,
+          message: "No employee profile is linked to your account. Ask HR to link your profile.",
+          code: "EMPLOYEE_PROFILE_NOT_LINKED",
+        });
       }
 
       const { changes } = req.body;
       if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
-        return res.status(400).json({ success: false, message: "No changes were submitted." });
+        return res.status(400).json({ success: false, message: "No changes were submitted.", code: "NO_CHANGES_SUBMITTED" });
       }
 
       // Validate only allowed fields
       const badFields = Object.keys(changes).filter((f) => !EDITABLE_FIELDS.includes(f));
       if (badFields.length) {
-        return res.status(400).json({ success: false, message: `The following fields cannot be self-edited: ${badFields.join(", ")}` });
+        return res.status(400).json({
+          success: false,
+          message: `The following fields cannot be self-edited: ${badFields.join(", ")}`,
+          code: "FIELDS_NOT_SELF_EDITABLE",
+          params: { fields: badFields.join(", ") },
+        });
       }
 
       // Build a diff: { fieldName: { from: current, to: requested } }
@@ -102,7 +118,11 @@ const profileEditRequestController = {
       }
 
       if (Object.keys(diff).length === 0) {
-        return res.status(400).json({ success: false, message: "The submitted values are the same as your current profile — nothing to change." });
+        return res.status(400).json({
+          success: false,
+          message: "The submitted values are the same as your current profile — nothing to change.",
+          code: "PROFILE_EDIT_NO_ACTUAL_CHANGES",
+        });
       }
 
       // Block if there's already a pending request for this employee
@@ -110,6 +130,7 @@ const profileEditRequestController = {
         ProfileEditRequestModel,
         employee._id,
         "You already have a pending profile edit request. Wait for HR to review it before submitting another.",
+        "PENDING_PROFILE_EDIT_REQUEST_EXISTS",
       );
 
       const request = await ProfileEditRequestModel.create({
@@ -130,12 +151,15 @@ const profileEditRequestController = {
           link: "/employees?tab=editRequests",
           linkLabel: "Review request",
           read: false,
+          titleKey: "profileEditRequestSubmitted",
+          messageKey: "profileEditRequestSubmitted",
+          params: { employeeName: employee.name },
         })
       ));
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 

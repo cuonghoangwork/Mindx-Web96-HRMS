@@ -1,21 +1,18 @@
 import { useState, useEffect, useMemo, useCallback, Fragment } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useCurrency } from "../context/CurrencyContext";
-import { formatDateTime } from "../utils/format";
+import { formatDateTime, formatDate as formatDateLocalized } from "../utils/format";
 import { PayrollAPI, EmployeesAPI } from "../api";
 import { fmtMoney, fmtMoneyK } from "../utils/payroll";
+import { translateApiError } from "../utils/apiError";
 import PayrollBreakdownPanel from "../components/PayrollBreakdownPanel";
 import Avatar from "../components/Avatar";
 import { TypeBadge } from "../components/Badge";
 import Button from "../components/Button";
 
 const PAYROLL_PER_PAGE = 10;
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 const STATUS_STYLE = {
   draft: { bg: "var(--bg-warning-subtle)", color: "var(--txt-warning)", border: "var(--bdr-warning)" },
@@ -45,6 +42,7 @@ function csvCell(value) {
 }
 
 function StatusPill({ status }) {
+  const { t } = useTranslation();
   const s = STATUS_STYLE[status] ?? STATUS_STYLE.draft;
   return (
     <span style={{
@@ -55,17 +53,18 @@ function StatusPill({ status }) {
       textTransform: "capitalize",
     }}>
       <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentColor" }} />
-      {status}
+      {t(`common.payrollStatus.${status}`, { defaultValue: status })}
     </span>
   );
 }
 
 function DeptChart({ data, currency, fxRate }) {
+  const { t } = useTranslation();
   const max = Math.max(...data.map((d) => d.total), 1);
   if (!data.length) {
     return (
       <div style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-sm)", padding: "var(--sp-4) 0" }}>
-        No department data for this period.
+        {t("payroll.charts.noDeptData", { defaultValue: "No department data for this period." })}
       </div>
     );
   }
@@ -96,6 +95,7 @@ function DeptChart({ data, currency, fxRate }) {
 }
 
 function TypeDonut({ segments, total, currency, fxRate }) {
+  const { t } = useTranslation();
   const sum = segments.reduce((acc, s) => acc + s.value, 0) || 1;
   let offset = 0;
   const circumference = 2 * Math.PI * 32;
@@ -124,7 +124,7 @@ function TypeDonut({ segments, total, currency, fxRate }) {
         }}>
           <div>
             <div style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>{total}</div>
-            <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>staff</div>
+            <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{t("payroll.charts.staffLabel", { defaultValue: "staff" })}</div>
           </div>
         </div>
       </div>
@@ -227,7 +227,9 @@ function MoneyInput({ value, disabled, onCommit, currency = "VND", fxRate = 0 })
 
 
 function Payroll() {
+  const { t } = useTranslation();
   const { language } = useLanguage();
+  const months = t("common.months", { returnObjects: true });
   const { isAdmin, isHRTier, isManager } = useAuth();
 
   // MANAGER gets a real, backend-enforced department-scoped view here (see
@@ -286,6 +288,9 @@ function Payroll() {
   const isDraft = period?.status === "draft";
   const canEdit = isDraft && isHRTier;
 
+  const rateTypeLabel = (source) => (source === "api" ? t("payroll.rateType.live", { defaultValue: "live rate" }) : t("payroll.rateType.fallback", { defaultValue: "fallback rate" }));
+  const rateSourceCapLabel = (source) => (source === "api" ? t("payroll.rateSourceCap.live", { defaultValue: "Live" }) : t("payroll.rateSourceCap.fallback", { defaultValue: "Fallback" }));
+
   useEffect(() => {
     if (!toast) return undefined;
     const id = setTimeout(() => setToast(""), 4000);
@@ -310,10 +315,10 @@ function Payroll() {
         return items[0]?.id ?? "";
       });
     } catch (err) {
-      setError(err.message || "Failed to load pay periods.");
+      setError(translateApiError(err, t) || t("payroll.errors.loadPeriods", { defaultValue: "Failed to load pay periods." }));
     }
     setLoadingPeriods(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadPeriods(); }, [loadPeriods]);
 
@@ -330,12 +335,12 @@ function Payroll() {
       setPeriod(res.period);
       setPayslips(res.items ?? []);
     } catch (err) {
-      setError(err.message || "Failed to load payslips.");
+      setError(translateApiError(err, t) || t("payroll.errors.loadPayslips", { defaultValue: "Failed to load payslips." }));
       setPeriod(null);
       setPayslips([]);
     }
     setLoadingSlips(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -420,7 +425,7 @@ function Payroll() {
   };
 
   const patchPayslip = async (id, body) => {
-    const reason = window.prompt("Reason for this salary adjustment (recorded in the audit log):");
+    const reason = window.prompt(t("payroll.prompts.adjustmentReason", { defaultValue: "Reason for this salary adjustment (recorded in the audit log):" }));
     if (!reason || !reason.trim()) return false;
     try {
       const res = await PayrollAPI.updatePayslip(id, { ...body, reason: reason.trim() });
@@ -428,7 +433,7 @@ function Payroll() {
       await refreshPeriodTotals();
       return true;
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
       return false;
     }
   };
@@ -441,7 +446,7 @@ function Payroll() {
       const fresh = items.find((p) => p.id === periodId);
       if (fresh) setPeriod((prev) => (prev ? { ...prev, totals: fresh.totals, payslipCount: fresh.payslipCount } : prev));
     } catch (err) {
-      setError(err.message || "Could not refresh period totals.");
+      setError(translateApiError(err, t) || t("payroll.errors.refreshTotals", { defaultValue: "Could not refresh period totals." }));
     }
   };
 
@@ -449,10 +454,10 @@ function Payroll() {
     try {
       const res = await PayrollAPI.recomputeDeduction(id);
       setPayslips((prev) => prev.map((p) => (p.id === id ? res.data : p)));
-      setToast("Deduction recomputed from attendance and leave.");
+      setToast(t("payroll.toast.deductionRecomputed", { defaultValue: "Deduction recomputed from attendance and leave." }));
       await refreshPeriodTotals();
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
   };
 
@@ -465,11 +470,15 @@ function Payroll() {
         month: Number(newPeriod.month),
         fxRate: Number(newPeriod.fxRate),
       });
-      setToast(`${res.generated} draft payslip${res.generated === 1 ? "" : "s"} generated.`);
+      setToast(t("payroll.toast.draftsGenerated", {
+        count: res.generated,
+        defaultValue_one: "{{count}} draft payslip generated.",
+        defaultValue_other: "{{count}} draft payslips generated.",
+      }));
       setShowNewForm(false);
       await loadPeriods(res.data.id);
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setBusy(false);
   };
@@ -484,10 +493,10 @@ function Payroll() {
       setFxPreview(res.data);
       setNewPeriod((p) => ({ ...p, fxRate: res.data.rateVndPerUsd }));
       if (res.data.source !== "api") {
-        setToast("Live FX provider was unreachable — using the fallback rate. You can still edit it manually.");
+        setToast(t("payroll.toast.fxFallbackUsed", { defaultValue: "Live FX provider was unreachable — using the fallback rate. You can still edit it manually." }));
       }
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setFxPreviewLoading(false);
   };
@@ -501,45 +510,55 @@ function Payroll() {
       const res = await PayrollAPI.generateMonthlyDraft();
       if (res.data.skipped) {
         const reasonText = {
-          "already-drafted": "This month already has an auto-drafted period.",
-          "already-exists": "This month already has a manually-created period.",
-          "no-payable-employees": "No active employees to pay this month.",
-        }[res.data.reason] ?? "Nothing to generate.";
+          "already-drafted": t("payroll.skipReasons.draft.alreadyDrafted", { defaultValue: "This month already has an auto-drafted period." }),
+          "already-exists": t("payroll.skipReasons.draft.alreadyExists", { defaultValue: "This month already has a manually-created period." }),
+          "no-payable-employees": t("payroll.skipReasons.draft.noPayableEmployees", { defaultValue: "No active employees to pay this month." }),
+        }[res.data.reason] ?? t("payroll.skipReasons.draft.nothingToGenerate", { defaultValue: "Nothing to generate." });
         setToast(reasonText);
       } else {
         setToast(
-          `${res.data.generated} draft payslip${res.data.generated === 1 ? "" : "s"} auto-generated ` +
-            `at ${res.data.fxRate.toLocaleString("vi-VN")} VND/USD (${res.data.fxRateSource === "api" ? "live" : "fallback"} rate).`,
+          t("payroll.toast.autoGenerated", {
+            count: res.data.generated,
+            rate: res.data.fxRate.toLocaleString("vi-VN"),
+            rateType: rateTypeLabel(res.data.fxRateSource),
+            defaultValue_one: "{{count}} draft payslip auto-generated at {{rate}} VND/USD ({{rateType}}).",
+            defaultValue_other: "{{count}} draft payslips auto-generated at {{rate}} VND/USD ({{rateType}}).",
+          }),
         );
         await loadPeriods(res.data.periodId);
       }
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setDraftBusy(false);
   };
 
   const handleRunMonthly = async () => {
     if (!window.confirm(
-      "Run last month's payroll now? Approved payslips are marked paid and can never be edited again.",
+      t("payroll.confirms.runMonthly", { defaultValue: "Run last month's payroll now? Approved payslips are marked paid and can never be edited again." }),
     )) return;
     setDraftBusy(true);
     try {
       const res = await PayrollAPI.runMonthly();
       if (res.data.skipped) {
         const reasonText = {
-          "no-period": "Last month has no payroll period. Create one first.",
-          "already-paid": "Last month's payroll has already been paid.",
-          "no-payslips": "Last month's period has no payslips, so nothing was paid.",
-        }[res.data.reason] ?? "Nothing to run.";
+          "no-period": t("payroll.skipReasons.runMonthly.noPeriod", { defaultValue: "Last month has no payroll period. Create one first." }),
+          "already-paid": t("payroll.skipReasons.runMonthly.alreadyPaid", { defaultValue: "Last month's payroll has already been paid." }),
+          "no-payslips": t("payroll.skipReasons.runMonthly.noPayslips", { defaultValue: "Last month's period has no payslips, so nothing was paid." }),
+        }[res.data.reason] ?? t("payroll.skipReasons.runMonthly.nothingToRun", { defaultValue: "Nothing to run." });
         setToast(reasonText);
       } else {
-        setToast(`${res.data.year}-${String(res.data.month).padStart(2, "0")} payroll paid — ${res.data.payslipCount} payslips.`);
+        setToast(t("payroll.toast.monthlyPaid", {
+          period: `${res.data.year}-${String(res.data.month).padStart(2, "0")}`,
+          count: res.data.payslipCount,
+          defaultValue_one: "{{period}} payroll paid — {{count}} payslip.",
+          defaultValue_other: "{{period}} payroll paid — {{count}} payslips.",
+        }));
       }
       await loadPeriods(res.data.periodId);
       await loadPayslips(periodId);
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setDraftBusy(false);
   };
@@ -549,39 +568,43 @@ function Payroll() {
     setBusy(true);
     try {
       await PayrollAPI.setPeriodStatus(periodId, status);
-      setToast(`Period marked ${status}.`);
+      setToast(t("payroll.toast.periodMarked", { status: t(`common.payrollStatus.${status}`, { defaultValue: status }), defaultValue: "Period marked {{status}}." }));
       await loadPeriods(periodId);
       await loadPayslips(periodId);
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setBusy(false);
   };
 
   const handleRegenerate = async () => {
-    if (!window.confirm("Regenerate discards every manual bonus, allowance and deduction edit for this period. Continue?")) return;
+    if (!window.confirm(t("payroll.confirms.regenerate", { defaultValue: "Regenerate discards every manual bonus, allowance and deduction edit for this period. Continue?" }))) return;
     setBusy(true);
     try {
       const res = await PayrollAPI.regenerate(periodId);
-      setToast(`${res.generated} payslip${res.generated === 1 ? "" : "s"} regenerated.`);
+      setToast(t("payroll.toast.regenerated", {
+        count: res.generated,
+        defaultValue_one: "{{count}} payslip regenerated.",
+        defaultValue_other: "{{count}} payslips regenerated.",
+      }));
       await loadPayslips(periodId);
       await refreshPeriodTotals();
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setBusy(false);
   };
 
   const handleDeletePeriod = async (id = periodId) => {
-    if (!window.confirm("Delete this draft period and all of its payslips?")) return;
+    if (!window.confirm(t("payroll.confirms.deletePeriod", { defaultValue: "Delete this draft period and all of its payslips?" }))) return;
     setBusy(true);
     try {
       await PayrollAPI.removePeriod(id);
-      setToast("Period deleted.");
+      setToast(t("payroll.toast.periodDeleted", { defaultValue: "Period deleted." }));
       if (id === periodId) setPeriodId("");
       await loadPeriods();
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`${t("payroll.errorPrefix", { defaultValue: "Error:" })} ${translateApiError(err, t)}`);
     }
     setBusy(false);
   };
@@ -617,19 +640,19 @@ function Payroll() {
       <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
           <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
-            Payroll
+            {t("payroll.heading", { defaultValue: "Payroll" })}
           </h2>
 
           {period && <StatusPill status={period.status} />}
           {period?.systemGenerated && (
-            <span title={`FX rate source: ${period.fxRateSource === "api" ? "live" : "fallback"}`} style={{
+            <span title={t("payroll.fxRateSourceTitle", { rateType: rateTypeLabel(period.fxRateSource), defaultValue: "FX rate source: {{rateType}}" })} style={{
               display: "inline-flex", alignItems: "center", gap: "5px",
               padding: "3px 10px", borderRadius: "var(--radius-full)",
               fontSize: "var(--fs-xs)", fontWeight: "var(--fw-medium)",
               background: "var(--bg-info-subtle)", color: "var(--txt-info)",
               border: "1px solid var(--bdr-info)",
             }}>
-              Auto-drafted · {period.fxRateSource === "api" ? "live rate" : "fallback rate"}
+              {t("payroll.autoDrafted", { rateType: rateTypeLabel(period.fxRateSource), defaultValue: "Auto-drafted · {{rateType}}" })}
             </span>
           )}
 
@@ -640,9 +663,9 @@ function Payroll() {
                 size="sm"
                 disabled={draftBusy}
                 onClick={handleGenerateMonthlyDraft}
-                title="Runs the same start-of-month job the scheduler runs automatically"
+                title={t("payroll.tooltips.generateMonthlyDraft", { defaultValue: "Runs the same start-of-month job the scheduler runs automatically" })}
               >
-                {draftBusy ? "Generating…" : "Generate this month's draft"}
+                {draftBusy ? t("payroll.actions.generatingEllipsis", { defaultValue: "Generating…" }) : t("payroll.actions.generateMonthlyDraft", { defaultValue: "Generate this month's draft" })}
               </Button>
             )}
             {isAdmin && (
@@ -651,9 +674,9 @@ function Payroll() {
                 size="sm"
                 disabled={draftBusy}
                 onClick={handleRunMonthly}
-                title="Runs the same 10th-of-month job the scheduler runs automatically, for last month"
+                title={t("payroll.tooltips.runLastMonth", { defaultValue: "Runs the same 10th-of-month job the scheduler runs automatically, for last month" })}
               >
-                Run last month&rsquo;s payroll
+                {t("payroll.actions.runLastMonth", { defaultValue: "Run last month’s payroll" })}
               </Button>
             )}
           </div>
@@ -665,7 +688,7 @@ function Payroll() {
             background: "var(--bg-success-subtle)", border: "1px solid var(--bdr-success)",
             borderRadius: "var(--radius-md)", color: "var(--txt-success)", fontSize: "var(--fs-sm)",
           }}>
-            This period is closed. Payslips are read-only.
+            {t("payroll.banners.closed", { defaultValue: "This period is closed. Payslips are read-only." })}
           </div>
         )}
         {period?.status === "approved" && (
@@ -674,7 +697,7 @@ function Payroll() {
             background: "var(--bg-info-subtle)", border: "1px solid var(--bdr-info)",
             borderRadius: "var(--radius-md)", color: "var(--txt-info)", fontSize: "var(--fs-sm)",
           }}>
-            This period is approved and locked. An Administrator can reopen it to make changes.
+            {t("payroll.banners.approvedLocked", { defaultValue: "This period is approved and locked. An Administrator can reopen it to make changes." })}
           </div>
         )}
 
@@ -684,19 +707,19 @@ function Payroll() {
             display: "flex", gap: "var(--sp-4)", alignItems: "flex-start", flexWrap: "wrap",
           }}>
             <div className="form-group" style={{ marginBottom: 0, width: "140px", flexShrink: 0 }}>
-              <label className="form-label" htmlFor="np-month">Month</label>
+              <label className="form-label" htmlFor="np-month">{t("payroll.newPeriodForm.month", { defaultValue: "Month" })}</label>
               <select id="np-month" value={newPeriod.month}
                 onChange={(e) => setNewPeriod((p) => ({ ...p, month: e.target.value }))}>
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0, width: "100px", flexShrink: 0 }}>
-              <label className="form-label" htmlFor="np-year">Year</label>
+              <label className="form-label" htmlFor="np-year">{t("payroll.newPeriodForm.year", { defaultValue: "Year" })}</label>
               <input id="np-year" type="number" min="2000" max="2100" value={newPeriod.year}
                 onChange={(e) => setNewPeriod((p) => ({ ...p, year: e.target.value }))} />
             </div>
             <div className="form-group" style={{ marginBottom: 0, width: "320px", flex: "1 1 320px" }}>
-              <label className="form-label" htmlFor="np-fx">FX rate (VND per USD)</label>
+              <label className="form-label" htmlFor="np-fx">{t("payroll.newPeriodForm.fxRateLabel", { defaultValue: "FX rate (VND per USD)" })}</label>
               <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "stretch" }}>
                 <input id="np-fx" type="number" min="1" step="any" value={newPeriod.fxRate}
                   style={{ flex: 1, minWidth: 0 }}
@@ -708,19 +731,23 @@ function Payroll() {
                   onClick={handleFetchLiveRate}
                   style={{ flexShrink: 0 }}
                 >
-                  {fxPreviewLoading ? "Fetching…" : "Fetch live rate"}
+                  {fxPreviewLoading ? t("payroll.actions.fetchingEllipsis", { defaultValue: "Fetching…" }) : t("payroll.newPeriodForm.fetchLiveRate", { defaultValue: "Fetch live rate" })}
                 </Button>
               </div>
               <span className="form-hint">
                 {fxPreview
-                  ? `${fxPreview.source === "api" ? "Live" : "Fallback"} rate as of ${formatDateTime(fxPreview.fetchedAt, language)} — locked once the period is created.`
-                  : "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses."}
+                  ? t("payroll.newPeriodForm.fxHintWithPreview", {
+                      sourceLabel: rateSourceCapLabel(fxPreview.source),
+                      date: formatDateTime(fxPreview.fetchedAt, language),
+                      defaultValue: "{{sourceLabel}} rate as of {{date}} — locked once the period is created.",
+                    })
+                  : t("payroll.newPeriodForm.fxHintDefault", { defaultValue: "Locked once the period is created. “Fetch live rate” pulls the same monthly snapshot the auto-draft job uses." })}
               </span>
             </div>
             <div className="form-group" style={{ marginBottom: 0, flexShrink: 0 }}>
-              <label className="form-label" style={{ visibility: "hidden" }}>Action</label>
+              <label className="form-label" style={{ visibility: "hidden" }}>{t("payroll.newPeriodForm.actionLabelHidden", { defaultValue: "Action" })}</label>
               <Button variant="primary" type="submit" disabled={busy} style={{ whiteSpace: "nowrap" }}>
-                {busy ? "Generating…" : "Create & generate drafts"}
+                {busy ? t("payroll.actions.generatingEllipsis", { defaultValue: "Generating…" }) : t("payroll.newPeriodForm.createButton", { defaultValue: "Create & generate drafts" })}
               </Button>
             </div>
           </form>
@@ -730,10 +757,10 @@ function Payroll() {
       {toast && (
         <div style={{
           marginBottom: "var(--sp-4)", padding: "var(--sp-3) var(--sp-4)",
-          background: toast.startsWith("Error") ? "var(--bg-danger-subtle)" : "var(--bg-success-subtle)",
-          border: `1px solid ${toast.startsWith("Error") ? "var(--bdr-danger)" : "var(--bdr-success)"}`,
+          background: toast.startsWith(t("payroll.errorPrefix", { defaultValue: "Error:" })) ? "var(--bg-danger-subtle)" : "var(--bg-success-subtle)",
+          border: `1px solid ${toast.startsWith(t("payroll.errorPrefix", { defaultValue: "Error:" })) ? "var(--bdr-danger)" : "var(--bdr-success)"}`,
           borderRadius: "var(--radius-md)", fontSize: "var(--fs-sm)",
-          color: toast.startsWith("Error") ? "var(--txt-danger)" : "var(--txt-success)",
+          color: toast.startsWith(t("payroll.errorPrefix", { defaultValue: "Error:" })) ? "var(--txt-danger)" : "var(--txt-success)",
         }}>{toast}</div>
       )}
 
@@ -747,7 +774,7 @@ function Payroll() {
 
       {loadingPeriods ? (
         <div className="content-card" style={{ textAlign: "center", color: "var(--txt-secondary)" }}>
-          Loading pay periods…
+          {t("payroll.loadingPeriods", { defaultValue: "Loading pay periods…" })}
         </div>
       ) : periods.length === 0 ? (
         <div className="content-card">
@@ -759,9 +786,9 @@ function Payroll() {
                 <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
               </svg>
             </div>
-            <div className="empty-state-title">No pay periods yet</div>
+            <div className="empty-state-title">{t("payroll.empty.noPeriodsTitle", { defaultValue: "No pay periods yet" })}</div>
             <div className="empty-state-description">
-              Create your first pay period to generate draft payslips for every employee.
+              {t("payroll.empty.noPeriodsDescription", { defaultValue: "Create your first pay period to generate draft payslips for every employee." })}
             </div>
           </div>
         </div>
@@ -769,7 +796,12 @@ function Payroll() {
         <>
           {isManager && (
             <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", margin: "0 0 var(--sp-3)" }}>
-              Showing your team{myEmployee?.department ? ` (${myEmployee.department})` : ""} — {scopedPayslips.length} payslip{scopedPayslips.length === 1 ? "" : "s"} this period
+              {t("payroll.scope.team", {
+                deptSuffix: myEmployee?.department ? ` (${myEmployee.department})` : "",
+                count: scopedPayslips.length,
+                defaultValue_one: "Showing your team{{deptSuffix}} — {{count}} payslip this period",
+                defaultValue_other: "Showing your team{{deptSuffix}} — {{count}} payslips this period",
+              })}
             </p>
           )}
 
@@ -788,12 +820,12 @@ function Payroll() {
             // that: everyone in a paid period, nobody otherwise.
             const paidCount = period?.status === "paid" ? totalSlips : 0;
             const pendingCount = totalSlips - paidCount;
-            const pendingTrend = period?.status === "approved" ? "Awaiting payment" : period?.status === "paid" ? "—" : "Awaiting run";
+            const pendingTrend = period?.status === "approved" ? t("payroll.stats.awaitingPayment", { defaultValue: "Awaiting payment" }) : period?.status === "paid" ? "—" : t("payroll.stats.awaitingRun", { defaultValue: "Awaiting run" });
             const statCells = [
-              { label: period ? `${MONTHS[period.month - 1]} ${period.year}` : "Payroll", value: fmtMoneyK(grossSum, currency, fxRate), trend: "Gross payout" },
-              { label: "Net payout", value: fmtMoneyK(netSum, currency, fxRate), trend: "After deductions" },
-              { label: "Paid", value: `${paidCount}/${totalSlips}`, trend: "Employees settled" },
-              { label: "Pending", value: String(pendingCount), trend: pendingTrend },
+              { label: period ? `${months[period.month - 1]} ${period.year}` : t("payroll.heading", { defaultValue: "Payroll" }), value: fmtMoneyK(grossSum, currency, fxRate), trend: t("payroll.stats.grossPayout", { defaultValue: "Gross payout" }) },
+              { label: t("payroll.stats.netPayout", { defaultValue: "Net payout" }), value: fmtMoneyK(netSum, currency, fxRate), trend: t("payroll.stats.afterDeductions", { defaultValue: "After deductions" }) },
+              { label: t("payroll.stats.paid", { defaultValue: "Paid" }), value: `${paidCount}/${totalSlips}`, trend: t("payroll.stats.employeesSettled", { defaultValue: "Employees settled" }) },
+              { label: t("payroll.stats.pending", { defaultValue: "Pending" }), value: String(pendingCount), trend: pendingTrend },
             ];
             return (
               <div className="stat-strip" style={{ marginBottom: "var(--sp-5)" }}>
@@ -813,12 +845,12 @@ function Payroll() {
           <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Pay run history</h3>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>Click a run to view its breakdown</div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("payroll.history.heading", { defaultValue: "Pay run history" })}</h3>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>{t("payroll.history.subtitle", { defaultValue: "Click a run to view its breakdown" })}</div>
               </div>
               {isHRTier && (
                 <Button variant="secondary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
-                  {showNewForm ? "Cancel" : "+ New draft"}
+                  {showNewForm ? t("common.actions.cancel", { defaultValue: "Cancel" }) : t("payroll.history.newDraftButton", { defaultValue: "+ New draft" })}
                 </Button>
               )}
             </div>
@@ -827,13 +859,13 @@ function Payroll() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Period</th>
-                    <th>Pay date</th>
-                    <th>Employees</th>
-                    <th>Gross</th>
-                    <th>Net</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{t("payroll.history.table.period", { defaultValue: "Period" })}</th>
+                    <th>{t("payroll.history.table.payDate", { defaultValue: "Pay date" })}</th>
+                    <th>{t("payroll.history.table.employees", { defaultValue: "Employees" })}</th>
+                    <th>{t("payroll.history.table.gross", { defaultValue: "Gross" })}</th>
+                    <th>{t("payroll.history.table.net", { defaultValue: "Net" })}</th>
+                    <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
+                    <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -846,8 +878,8 @@ function Payroll() {
                         onClick={() => setPeriodId(p.id)}
                         style={{ cursor: "pointer", background: p.id === periodId ? "var(--bg-primary-subtle)" : "transparent" }}
                       >
-                        <td style={{ fontWeight: p.id === periodId ? "var(--fw-semibold)" : "var(--fw-regular)" }}>{MONTHS[p.month - 1]} {p.year}</td>
-                        <td style={{ color: "var(--txt-secondary)" }}>{MONTHS[payDate.getMonth()].slice(0, 3)} {payDate.getDate()}, {payDate.getFullYear()}</td>
+                        <td style={{ fontWeight: p.id === periodId ? "var(--fw-semibold)" : "var(--fw-regular)" }}>{months[p.month - 1]} {p.year}</td>
+                        <td style={{ color: "var(--txt-secondary)" }}>{formatDateLocalized(payDate, language, { month: "short", day: "numeric", year: "numeric" })}</td>
                         <td style={{ color: "var(--txt-secondary)" }}>{p.payslipCount ?? 0}</td>
                         <td>{fmtMoney(p.totals?.grossPay, currency, p.fxRate ?? fxRate)}</td>
                         <td>{fmtMoney(p.totals?.netPay, currency, p.fxRate ?? fxRate)}</td>
@@ -855,14 +887,14 @@ function Payroll() {
                         <td onClick={(e) => e.stopPropagation()}>
                           {isAdmin && (
                             <>
-                              <Button variant="link" size="xs" onClick={() => setPeriodId(p.id)} style={{ marginRight: "var(--sp-3)" }}>Edit</Button>
+                              <Button variant="link" size="xs" onClick={() => setPeriodId(p.id)} style={{ marginRight: "var(--sp-3)" }}>{t("common.actions.edit", { defaultValue: "Edit" })}</Button>
                               {canDelete ? (
                                 <Button
                                   variant="link" size="xs" className="btn-link-muted"
                                   onClick={() => handleDeletePeriod(p.id)}
-                                >Delete</Button>
+                                >{t("common.actions.delete", { defaultValue: "Delete" })}</Button>
                               ) : (
-                                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)" }}>Delete</span>
+                                <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)" }}>{t("common.actions.delete", { defaultValue: "Delete" })}</span>
                               )}
                             </>
                           )}
@@ -879,16 +911,16 @@ function Payroll() {
           <div className="content-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Current period</div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("payroll.currentPeriod.eyebrow", { defaultValue: "Current period" })}</div>
                 <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
-                  {period ? `${MONTHS[period.month - 1]} ${period.year}` : "—"}
+                  {period ? `${months[period.month - 1]} ${period.year}` : "—"}
                 </h3>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                 <input
                   className="search-input"
                   style={{ width: "180px" }}
-                  placeholder="Search employee…"
+                  placeholder={t("payroll.currentPeriod.searchPlaceholder", { defaultValue: "Search employee…" })}
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
                 />
@@ -901,7 +933,7 @@ function Payroll() {
                     color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
                   }}
                 >
-                  <option value="all">All departments</option>
+                  <option value="all">{t("payroll.currentPeriod.allDepartments", { defaultValue: "All departments" })}</option>
                   {deptOptions.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <select
@@ -913,50 +945,50 @@ function Payroll() {
                     color: "var(--txt-primary)", fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)",
                   }}
                 >
-                  <option value="all">All types</option>
-                  {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                  <option value="all">{t("payroll.currentPeriod.allTypes", { defaultValue: "All types" })}</option>
+                  {typeOptions.map((t2) => <option key={t2} value={t2}>{t2}</option>)}
                 </select>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={exportCSV}
-                  title="CSV export is always raw VND, regardless of the currency toggle in the top bar."
+                  title={t("payroll.currentPeriod.exportCsvTooltip", { defaultValue: "CSV export is always raw VND, regardless of the currency toggle in the top bar." })}
                 >
-                  ↓ Export CSV
+                  {t("payroll.currentPeriod.exportCsv", { defaultValue: "↓ Export CSV" })}
                 </Button>
                 {period && isDraft && isHRTier && (
                   <>
                     <Button
                       variant="secondary" size="sm" disabled={busy} onClick={handleRegenerate}
-                      title={isManager ? "Regenerates drafts for the whole company's payroll this period, not just your department." : undefined}
-                    >Regenerate drafts</Button>
+                      title={isManager ? t("payroll.tooltips.regenerateDraftsManager", { defaultValue: "Regenerates drafts for the whole company's payroll this period, not just your department." }) : undefined}
+                    >{t("payroll.actions.regenerateDrafts", { defaultValue: "Regenerate drafts" })}</Button>
                     <Button
                       variant="primary" size="sm" disabled={busy} onClick={() => handleStatus("approved")}
-                      title={isManager ? "Approves the whole company's payroll for this period, not just your department." : undefined}
-                    >Approve payroll</Button>
+                      title={isManager ? t("payroll.tooltips.approvePayrollManager", { defaultValue: "Approves the whole company's payroll for this period, not just your department." }) : undefined}
+                    >{t("payroll.actions.approvePayroll", { defaultValue: "Approve payroll" })}</Button>
                   </>
                 )}
                 {period && isDraft && isAdmin && (
-                  <Button variant="danger" size="sm" disabled={busy} onClick={() => handleDeletePeriod()}>Delete period</Button>
+                  <Button variant="danger" size="sm" disabled={busy} onClick={() => handleDeletePeriod()}>{t("payroll.actions.deletePeriod", { defaultValue: "Delete period" })}</Button>
                 )}
                 {period?.status === "approved" && isHRTier && (
                   <Button
                     variant="primary" size="sm" disabled={busy}
-                    onClick={() => handleStatus("paid", "Mark this period as paid? It cannot be reopened afterwards.")}
-                    title={isManager ? "Marks the whole company's payroll as paid for this period, not just your department." : undefined}
+                    onClick={() => handleStatus("paid", t("payroll.confirms.markPaid", { defaultValue: "Mark this period as paid? It cannot be reopened afterwards." }))}
+                    title={isManager ? t("payroll.tooltips.markAsPaidManager", { defaultValue: "Marks the whole company's payroll as paid for this period, not just your department." }) : undefined}
                   >
-                    Mark as paid
+                    {t("payroll.actions.markAsPaid", { defaultValue: "Mark as paid" })}
                   </Button>
                 )}
                 {period?.status === "approved" && isAdmin && (
-                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleStatus("draft")}>Reopen to draft</Button>
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => handleStatus("draft")}>{t("payroll.actions.reopenToDraft", { defaultValue: "Reopen to draft" })}</Button>
                 )}
               </div>
             </div>
 
             {loadingSlips ? (
               <div style={{ padding: "var(--sp-8)", textAlign: "center", color: "var(--txt-secondary)" }}>
-                Loading payslips…
+                {t("payroll.currentPeriod.loadingPayslips", { defaultValue: "Loading payslips…" })}
               </div>
             ) : scopedPayslips.length === 0 ? (
               <div className="empty-state">
@@ -968,12 +1000,12 @@ function Payroll() {
                   </svg>
                 </div>
                 <div className="empty-state-title">
-                  {isManager && payslips.length > 0 ? "No payslips for your department in this period" : "No payslips in this period"}
+                  {isManager && payslips.length > 0 ? t("payroll.currentPeriod.empty.noPayslipsManager", { defaultValue: "No payslips for your department in this period" }) : t("payroll.currentPeriod.empty.noPayslipsGeneral", { defaultValue: "No payslips in this period" })}
                 </div>
                 <div className="empty-state-description">
                   {isManager && payslips.length > 0
-                    ? "Other departments have payslips this period, but none in yours yet."
-                    : isDraft && isHRTier ? "Use Regenerate drafts to build them." : "This period has no payslips."}
+                    ? t("payroll.currentPeriod.empty.otherDeptsHavePayslips", { defaultValue: "Other departments have payslips this period, but none in yours yet." })
+                    : isDraft && isHRTier ? t("payroll.currentPeriod.empty.useRegenerateDrafts", { defaultValue: "Use Regenerate drafts to build them." }) : t("payroll.currentPeriod.empty.periodHasNoPayslips", { defaultValue: "This period has no payslips." })}
                 </div>
               </div>
             ) : filtered.length === 0 ? (
@@ -984,8 +1016,8 @@ function Payroll() {
                     <path d="m21 21-4.3-4.3" />
                   </svg>
                 </div>
-                <div className="empty-state-title">No results</div>
-                <div className="empty-state-description">Try adjusting your search or filters.</div>
+                <div className="empty-state-title">{t("payroll.currentPeriod.empty.noResultsTitle", { defaultValue: "No results" })}</div>
+                <div className="empty-state-description">{t("payroll.currentPeriod.empty.noResultsDescription", { defaultValue: "Try adjusting your search or filters." })}</div>
               </div>
             ) : (
               <>
@@ -993,17 +1025,17 @@ function Payroll() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <SortableHeader field="employeeName" label="Employee" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                        <SortableHeader field="departmentName" label="Department" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                        <SortableHeader field="type" label="Type" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                        <SortableHeader field="baseSalary" label="Base" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
-                        <th style={{ textAlign: "right" }}>Bonus</th>
-                        <th style={{ textAlign: "right" }}>Allowance</th>
-                        <th style={{ textAlign: "right" }}>Deduction</th>
-                        <SortableHeader field="grossPay" label="Gross" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
-                        <th style={{ textAlign: "right" }}>Insurance</th>
-                        <th style={{ textAlign: "right" }}>PIT</th>
-                        <SortableHeader field="netPay" label="Net" sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <SortableHeader field="employeeName" label={t("common.columns.employee", { defaultValue: "Employee" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="departmentName" label={t("common.fieldLabels.department", { defaultValue: "Department" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="type" label={t("common.columns.type", { defaultValue: "Type" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                        <SortableHeader field="baseSalary" label={t("payroll.table.base", { defaultValue: "Base" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <th style={{ textAlign: "right" }}>{t("payroll.table.bonus", { defaultValue: "Bonus" })}</th>
+                        <th style={{ textAlign: "right" }}>{t("payroll.table.allowance", { defaultValue: "Allowance" })}</th>
+                        <th style={{ textAlign: "right" }}>{t("payroll.table.deduction", { defaultValue: "Deduction" })}</th>
+                        <SortableHeader field="grossPay" label={t("payroll.table.gross", { defaultValue: "Gross" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
+                        <th style={{ textAlign: "right" }}>{t("payroll.table.insurance", { defaultValue: "Insurance" })}</th>
+                        <th style={{ textAlign: "right" }}>{t("payroll.table.pit", { defaultValue: "PIT" })}</th>
+                        <SortableHeader field="netPay" label={t("payroll.table.net", { defaultValue: "Net" })} sortField={sortField} sortDir={sortDir} onSort={handleSort} align="right" />
                         <th />
                       </tr>
                     </thead>
@@ -1053,7 +1085,7 @@ function Payroll() {
                                 ? <MoneyInput value={p.deduction} currency={currency} fxRate={fxRate} onCommit={(v) => patchPayslip(p.id, { deduction: v })} />
                                 : fmtMoney(p.deduction, currency, fxRate)}
                               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                                {p.unpaidLeaveDays} unpaid + {p.absentDays} absent
+                                {t("payroll.table.unpaidAbsentLine", { unpaid: p.unpaidLeaveDays, absent: p.absentDays, defaultValue: "{{unpaid}} unpaid + {{absent}} absent" })}
                                 {p.deductionOverridden && canEdit && (
                                   <button
                                     type="button"
@@ -1063,7 +1095,7 @@ function Payroll() {
                                       cursor: "pointer", color: "var(--txt-primary-brand)",
                                       font: "inherit", textDecoration: "underline",
                                     }}
-                                  >recompute</button>
+                                  >{t("payroll.table.recompute", { defaultValue: "recompute" })}</button>
                                 )}
                               </div>
                               </div>
@@ -1072,10 +1104,10 @@ function Payroll() {
                             <td style={{ textAlign: "right", color: "var(--txt-danger)", whiteSpace: "nowrap", minWidth: "90px", verticalAlign: "top" }}>
                               {p.insuranceExempt ? (
                                 <span
-                                  title={`Exempt — ${p.unpaidLeaveDays + p.absentDays} unpaid working days reached the 14-day threshold`}
+                                  title={t("payroll.table.exemptTooltip", { days: p.unpaidLeaveDays + p.absentDays, defaultValue: "Exempt — {{days}} unpaid working days reached the 14-day threshold" })}
                                   style={{ color: "var(--txt-secondary)" }}
                                 >
-                                  Exempt
+                                  {t("payroll.table.exempt", { defaultValue: "Exempt" })}
                                 </span>
                               ) : (
                                 `−${fmtMoney(p.insuranceTotal, currency, fxRate)}`
@@ -1110,7 +1142,11 @@ function Payroll() {
                     <tfoot>
                       <tr>
                         <td colSpan={7} style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-                          {filtered.length} payslip{filtered.length === 1 ? "" : "s"} match filters
+                          {t("payroll.table.matchFilters", {
+                            count: filtered.length,
+                            defaultValue_one: "{{count}} payslip match filters",
+                            defaultValue_other: "{{count}} payslips match filters",
+                          })}
                         </td>
                         <td style={{ textAlign: "right", fontWeight: "var(--fw-semibold)" }}>
                           {fmtMoney(filtered.reduce((s, p) => s + p.grossPay, 0), currency, fxRate)}
@@ -1128,7 +1164,12 @@ function Payroll() {
                 {totalPages > 1 && (
                   <div className="pagination">
                     <div className="pagination-info">
-                      Showing {startIndex + 1}–{Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length)} of {filtered.length}
+                      {t("payroll.pagination.showing", {
+                        start: startIndex + 1,
+                        end: Math.min(startIndex + PAYROLL_PER_PAGE, filtered.length),
+                        total: filtered.length,
+                        defaultValue: "Showing {{start}}–{{end}} of {{total}}",
+                      })}
                     </div>
                     <div className="pagination-controls">
                       <Button
@@ -1166,13 +1207,13 @@ function Payroll() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "var(--sp-5)", marginTop: "var(--sp-5)" }}>
               <div className="content-card">
                 <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-                  Gross pay by department
+                  {t("payroll.charts.grossByDept", { defaultValue: "Gross pay by department" })}
                 </div>
                 <DeptChart data={deptData} currency={currency} fxRate={fxRate} />
               </div>
               <div className="content-card">
                 <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", marginBottom: "var(--sp-4)" }}>
-                  By contract type
+                  {t("payroll.charts.byContractType", { defaultValue: "By contract type" })}
                 </div>
                 <TypeDonut segments={typeSegs} total={scopedPayslips.length} currency={currency} fxRate={fxRate} />
               </div>

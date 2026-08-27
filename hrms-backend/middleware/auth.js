@@ -11,13 +11,13 @@ export const verifyToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // "Bearer <token>"
   if (!token) {
-    return res.status(401).json({ success: false, message: "No token provided." });
+    return res.status(401).json({ success: false, message: "No token provided.", code: "NO_TOKEN_PROVIDED" });
   }
 
   try {
     const decoded = jwt.verify(token, process.env.AT_SECRETKEY);
     if (decoded.tokenType !== "AT") {
-      return res.status(401).json({ success: false, message: "Invalid token type." });
+      return res.status(401).json({ success: false, message: "Invalid token type.", code: "INVALID_TOKEN_TYPE" });
     }
 
     if (decoded.mustChangePassword === true && !isPasswordGateAllowed(req.baseUrl, req.path)) {
@@ -31,14 +31,14 @@ export const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch {
-    return res.status(401).json({ success: false, message: "Token is invalid or expired." });
+    return res.status(401).json({ success: false, message: "Token is invalid or expired.", code: "TOKEN_INVALID_OR_EXPIRED" });
   }
 };
 
 // Variadic - supports any number of allowed roles per route, stacked after verifyToken.
 export const authorize = (...roles) => (req, res, next) => {
   if (!req.user || !roles.includes(req.user.role)) {
-    return res.status(403).json({ success: false, message: "Access denied." });
+    return res.status(403).json({ success: false, message: "Access denied.", code: "ACCESS_DENIED" });
   }
   next();
 };

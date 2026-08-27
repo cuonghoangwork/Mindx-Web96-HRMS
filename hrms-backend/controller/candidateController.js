@@ -2,6 +2,7 @@ import CandidateModel from "../model/Candidate.js";
 import { candidateToClient, candidateFromClient } from "../utils/mappers.js";
 import { logAction } from "../utils/auditLog.js";
 import { isCloudinaryConfigured, uploadBufferToCloudinary } from "../utils/cloudinary.js";
+import { AppError } from "../utils/appError.js";
 
 const candidateController = {
   getAll: async (req, res) => {
@@ -24,26 +25,26 @@ const candidateController = {
         .limit(Number(pageSize));
       res.json({ success: true, totalItems, totalPages, currentPage: +pageNumber, items: items.map(candidateToClient) });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   getDetail: async (req, res) => {
     try {
       const candidate = await CandidateModel.findById(req.params.id).populate("job", "title");
-      if (!candidate) throw new Error("Candidate not found.");
+      if (!candidate) throw new AppError("Candidate not found.", "CANDIDATE_NOT_FOUND");
       res.json({ success: true, data: candidateToClient(candidate) });
     } catch (error) {
-      res.status(404).json({ success: false, message: error.message });
+      res.status(404).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   create: async (req, res) => {
     try {
       const { name, email, jobId } = req.body;
-      if (!name) throw new Error("Candidate name is required.");
-      if (!email) throw new Error("Candidate email is required.");
-      if (!jobId) throw new Error("jobId is required.");
+      if (!name) throw new AppError("Candidate name is required.", "CANDIDATE_NAME_REQUIRED");
+      if (!email) throw new AppError("Candidate email is required.", "CANDIDATE_EMAIL_REQUIRED");
+      if (!jobId) throw new AppError("jobId is required.", "JOB_ID_REQUIRED");
       const data = candidateFromClient(req.body);
       const candidate = await CandidateModel.create(data);
       await candidate.populate("job", "title");
@@ -57,7 +58,7 @@ const candidateController = {
 
       res.status(201).json({ success: true, data: candidateToClient(candidate) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -71,7 +72,7 @@ const candidateController = {
       const candidate = await CandidateModel.findByIdAndUpdate(req.params.id, data, {
         new: true, runValidators: true,
       }).populate("job", "title");
-      if (!candidate) throw new Error("Candidate not found.");
+      if (!candidate) throw new AppError("Candidate not found.", "CANDIDATE_NOT_FOUND");
 
       const isStageChange = req.body.stage && beforeStage !== data.stage;
       await logAction(req, {
@@ -86,7 +87,7 @@ const candidateController = {
 
       res.json({ success: true, data: candidateToClient(candidate) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -98,14 +99,15 @@ const candidateController = {
   uploadCv: async (req, res) => {
     try {
       if (!isCloudinaryConfigured()) {
-        throw new Error(
+        throw new AppError(
           "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+          "DOCUMENT_UPLOAD_NOT_CONFIGURED",
         );
       }
-      if (!req.file) throw new Error("No CV/resume file was uploaded.");
+      if (!req.file) throw new AppError("No CV/resume file was uploaded.", "CV_FILE_REQUIRED");
 
       const candidate = await CandidateModel.findById(req.params.id);
-      if (!candidate) throw new Error("Candidate not found.");
+      if (!candidate) throw new AppError("Candidate not found.", "CANDIDATE_NOT_FOUND");
 
       const result = await uploadBufferToCloudinary(req.file.buffer, {
         folder: "hrms/candidate-resumes",
@@ -129,14 +131,14 @@ const candidateController = {
 
       res.json({ success: true, data: candidateToClient(candidate) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   remove: async (req, res) => {
     try {
       const candidate = await CandidateModel.findByIdAndDelete(req.params.id);
-      if (!candidate) throw new Error("Candidate not found.");
+      if (!candidate) throw new AppError("Candidate not found.", "CANDIDATE_NOT_FOUND");
 
       await logAction(req, {
         action:     "deleted",
@@ -147,7 +149,7 @@ const candidateController = {
 
       res.json({ success: true, message: "Candidate deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

@@ -5,6 +5,8 @@ import { resolveManagerRef } from "../utils/refResolvers.js";
 import { logAction, diffChanges } from "../utils/auditLog.js";
 import { notifyHR } from "./notificationController.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { AppError } from "../utils/appError.js";
+import { actorNotifyKeys } from "../utils/notifyActor.js";
 
 const departmentController = {
   getAll: async (req, res) => {
@@ -23,7 +25,7 @@ const departmentController = {
       );
       res.json({ success: true, items });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -35,12 +37,12 @@ const departmentController = {
   getDetail: async (req, res) => {
     try {
       const department = await DepartmentModel.findById(req.params.id).populate("manager", "name");
-      if (!department) throw new Error("Department not found.");
+      if (!department) throw new AppError("Department not found.", "DEPARTMENT_NOT_FOUND");
 
       if (req.user.role === "MANAGER" || req.user.role === "EMPLOYEE") {
         const deptId = await getManagerDepartmentId(req);
         if (String(department._id) !== String(deptId)) {
-          return res.status(403).json({ success: false, message: "Access denied." });
+          return res.status(403).json({ success: false, message: "Access denied.", code: "ACCESS_DENIED" });
         }
       }
 
@@ -59,16 +61,16 @@ const departmentController = {
         })),
       });
     } catch (error) {
-      res.status(404).json({ success: false, message: error.message });
+      res.status(404).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   create: async (req, res) => {
     try {
       const { name } = req.body;
-      if (!name) throw new Error("Department name is required.");
+      if (!name) throw new AppError("Department name is required.", "DEPARTMENT_NAME_REQUIRED");
       const exists = await DepartmentModel.findOne({ name });
-      if (exists) throw new Error("A department with this name already exists.");
+      if (exists) throw new AppError("A department with this name already exists.", "DEPARTMENT_NAME_EXISTS");
       const data = departmentFromClient(req.body);
       if (req.body.manager !== undefined) {
         Object.assign(data, await resolveManagerRef(req.body.manager));
@@ -89,11 +91,12 @@ const departmentController = {
         category: "employee",
         link: `/departments/${department._id}`,
         linkLabel: "View department",
+        ...actorNotifyKeys(req, "departmentCreated", { departmentName: department.name }),
       });
 
       res.status(201).json({ success: true, data: departmentToClient(department) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -109,7 +112,7 @@ const departmentController = {
       const department = await DepartmentModel.findByIdAndUpdate(req.params.id, data, {
         new: true, runValidators: true,
       }).populate("manager", "name");
-      if (!department) throw new Error("Department not found.");
+      if (!department) throw new AppError("Department not found.", "DEPARTMENT_NOT_FOUND");
 
       const afterClient = departmentToClient({ ...department.toObject(), employeeCount: 0, totalSalary: 0 });
       const action = req.body.budget !== undefined && beforeClient?.budget !== req.body.budget
@@ -126,14 +129,14 @@ const departmentController = {
 
       res.json({ success: true, data: departmentToClient(department) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   remove: async (req, res) => {
     try {
       const department = await DepartmentModel.findByIdAndDelete(req.params.id);
-      if (!department) throw new Error("Department not found.");
+      if (!department) throw new AppError("Department not found.", "DEPARTMENT_NOT_FOUND");
 
       await logAction(req, {
         action:     "deleted",
@@ -146,11 +149,12 @@ const departmentController = {
         title: "Department removed",
         message: `${department.name} was removed by ${req.user?.name ?? "a team member"}.`,
         category: "employee",
+        ...actorNotifyKeys(req, "departmentRemoved", { departmentName: department.name }),
       });
 
       res.json({ success: true, message: "Department deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

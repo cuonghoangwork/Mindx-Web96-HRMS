@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import Button from "./Button";
 
 /**
@@ -18,6 +19,7 @@ import Button from "./Button";
  * hrms-backend/utils/mappers.js toBulletList()).
  */
 function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
+  const { t } = useTranslation();
   const isEdit = Boolean(job);
 
   const [formData, setFormData] = useState({
@@ -53,11 +55,11 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
     const location = formData.location.trim();
 
     if (!title) {
-      setError("Job title is required.");
+      setError(t("jobs.addJobModal.titleRequired", { defaultValue: "Job title is required." }));
       return;
     }
     if (!location) {
-      setError("Location is required.");
+      setError(t("jobs.addJobModal.locationRequired", { defaultValue: "Location is required." }));
       return;
     }
     if (
@@ -65,7 +67,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       formData.salaryMax !== "" &&
       Number(formData.salaryMin) > Number(formData.salaryMax)
     ) {
-      setError("Minimum salary cannot be greater than maximum salary.");
+      setError(t("jobs.addJobModal.salaryRangeInvalid", { defaultValue: "Minimum salary cannot be greater than maximum salary." }));
       return;
     }
 
@@ -94,12 +96,12 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
         <div className="modal-header">
-          <h2>{isEdit ? "Edit Job" : "Post New Job"}</h2>
+          <h2>{isEdit ? t("jobs.addJobModal.titleEdit", { defaultValue: "Edit Job" }) : t("jobs.addJobModal.titleAdd", { defaultValue: "Post New Job" })}</h2>
           <button
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.actions.close", { defaultValue: "Close" })}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
@@ -110,7 +112,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label" htmlFor="job-title">
-              Job Title<span className="required">*</span>
+              {t("jobs.addJobModal.titleLabel", { defaultValue: "Job Title" })}<span className="required">*</span>
             </label>
             <input
               type="text"
@@ -118,14 +120,14 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              placeholder="e.g. Senior Software Engineer"
+              placeholder={t("jobs.addJobModal.titlePlaceholder", { defaultValue: "e.g. Senior Software Engineer" })}
               required
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-department">
-              Department
+              {t("common.fieldLabels.department", { defaultValue: "Department" })}
             </label>
             <select
               id="job-department"
@@ -143,7 +145,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-location">
-              Location<span className="required">*</span>
+              {t("jobs.addJobModal.locationLabel", { defaultValue: "Location" })}<span className="required">*</span>
             </label>
             <input
               type="text"
@@ -151,7 +153,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               name="location"
               value={formData.location}
               onChange={handleChange}
-              placeholder="e.g. Remote, Hanoi, New York"
+              placeholder={t("jobs.addJobModal.locationPlaceholder", { defaultValue: "e.g. Remote, Hanoi, New York" })}
               required
             />
           </div>
@@ -159,7 +161,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
           <div style={{ display: "flex", gap: "12px" }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="job-type">
-                Employment Type
+                {t("jobs.addJobModal.employmentTypeLabel", { defaultValue: "Employment Type" })}
               </label>
               <select
                 id="job-type"
@@ -167,16 +169,16 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
                 value={formData.type}
                 onChange={handleChange}
               >
-                <option value="Full-time">Full-time</option>
-                <option value="Part-time">Part-time</option>
-                <option value="Contract">Contract</option>
-                <option value="Intern">Intern</option>
+                <option value="Full-time">{t("common.contractType.Full-time", { defaultValue: "Full-time" })}</option>
+                <option value="Part-time">{t("common.contractType.Part-time", { defaultValue: "Part-time" })}</option>
+                <option value="Contract">{t("common.contractType.Contract", { defaultValue: "Contract" })}</option>
+                <option value="Intern">{t("common.contractType.Intern", { defaultValue: "Intern" })}</option>
               </select>
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="job-status">
-                Status
+                {t("common.fieldLabels.status", { defaultValue: "Status" })}
               </label>
               <select
                 id="job-status"
@@ -184,16 +186,16 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
                 value={formData.status}
                 onChange={handleChange}
               >
-                <option value="Open">Open</option>
-                <option value="Filled">Filled</option>
-                <option value="Closed">Closed</option>
+                <option value="Open">{t("common.jobStatus.Open", { defaultValue: "Open" })}</option>
+                <option value="Filled">{t("common.jobStatus.Filled", { defaultValue: "Filled" })}</option>
+                <option value="Closed">{t("common.jobStatus.Closed", { defaultValue: "Closed" })}</option>
               </select>
             </div>
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-description">
-              Job Description
+              {t("jobs.addJobModal.descriptionLabel", { defaultValue: "Job Description" })}
             </label>
             <textarea
               id="job-description"
@@ -201,14 +203,14 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               rows={3}
               value={formData.description}
               onChange={handleChange}
-              placeholder="What this role does day-to-day…"
+              placeholder={t("jobs.addJobModal.descriptionPlaceholder", { defaultValue: "What this role does day-to-day…" })}
               style={{ resize: "vertical" }}
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-requirements">
-              Requirements <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>(one per line)</span>
+              {t("jobs.addJobModal.requirementsLabel", { defaultValue: "Requirements" })} <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>{t("jobs.addJobModal.onePerLine", { defaultValue: "(one per line)" })}</span>
             </label>
             <textarea
               id="job-requirements"
@@ -216,14 +218,14 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               rows={3}
               value={formData.requirements}
               onChange={handleChange}
-              placeholder={"3+ years of relevant experience\nStrong communication skills"}
+              placeholder={t("jobs.addJobModal.requirementsPlaceholder", { defaultValue: "3+ years of relevant experience\nStrong communication skills" })}
               style={{ resize: "vertical" }}
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-benefits">
-              Pay &amp; Benefits <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>(one per line)</span>
+              {t("jobs.addJobModal.benefitsLabel", { defaultValue: "Pay & Benefits" })} <span style={{ fontWeight: 400, color: "var(--txt-secondary)" }}>{t("jobs.addJobModal.onePerLine", { defaultValue: "(one per line)" })}</span>
             </label>
             <textarea
               id="job-benefits"
@@ -231,7 +233,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               rows={3}
               value={formData.benefits}
               onChange={handleChange}
-              placeholder={"Health insurance\n13th-month bonus"}
+              placeholder={t("jobs.addJobModal.benefitsPlaceholder", { defaultValue: "Health insurance\n13th-month bonus" })}
               style={{ resize: "vertical" }}
             />
           </div>
@@ -239,7 +241,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
           <div style={{ display: "flex", gap: "12px" }}>
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="job-salary-min">
-                Min Salary
+                {t("jobs.addJobModal.minSalaryLabel", { defaultValue: "Min Salary" })}
               </label>
               <input
                 type="number"
@@ -248,12 +250,12 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
                 min="0"
                 value={formData.salaryMin}
                 onChange={handleChange}
-                placeholder="e.g. 50000"
+                placeholder={t("jobs.addJobModal.minSalaryPlaceholder", { defaultValue: "e.g. 50000" })}
               />
             </div>
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="job-salary-max">
-                Max Salary
+                {t("jobs.addJobModal.maxSalaryLabel", { defaultValue: "Max Salary" })}
               </label>
               <input
                 type="number"
@@ -262,12 +264,12 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
                 min="0"
                 value={formData.salaryMax}
                 onChange={handleChange}
-                placeholder="e.g. 70000"
+                placeholder={t("jobs.addJobModal.maxSalaryPlaceholder", { defaultValue: "e.g. 70000" })}
               />
             </div>
             <div className="form-group" style={{ flex: "0 0 100px" }}>
               <label className="form-label" htmlFor="job-salary-currency">
-                Currency
+                {t("jobs.addJobModal.currencyLabel", { defaultValue: "Currency" })}
               </label>
               <input
                 type="text"
@@ -282,7 +284,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-deadline">
-              Application Deadline
+              {t("jobs.addJobModal.deadlineLabel", { defaultValue: "Application Deadline" })}
             </label>
             <input
               type="date"
@@ -295,7 +297,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-company-info">
-              Company Info
+              {t("jobs.addJobModal.companyInfoLabel", { defaultValue: "Company Info" })}
             </label>
             <textarea
               id="job-company-info"
@@ -303,14 +305,14 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               rows={2}
               value={formData.companyInfo}
               onChange={handleChange}
-              placeholder="A short blurb about the company shown on the posting…"
+              placeholder={t("jobs.addJobModal.companyInfoPlaceholder", { defaultValue: "A short blurb about the company shown on the posting…" })}
               style={{ resize: "vertical" }}
             />
           </div>
 
           <div className="form-group">
             <label className="form-label" htmlFor="job-application-instructions">
-              How to Apply
+              {t("jobs.addJobModal.applicationInstructionsLabel", { defaultValue: "How to Apply" })}
             </label>
             <textarea
               id="job-application-instructions"
@@ -318,7 +320,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               rows={2}
               value={formData.applicationInstructions}
               onChange={handleChange}
-              placeholder="Application link, email, or instructions…"
+              placeholder={t("jobs.addJobModal.applicationInstructionsPlaceholder", { defaultValue: "Application link, email, or instructions…" })}
               style={{ resize: "vertical" }}
             />
           </div>
@@ -328,10 +330,10 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
               variant="secondary"
               onClick={onClose}
             >
-              Cancel
+              {t("common.actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button variant="primary" type="submit">
-              {isEdit ? "Save Changes" : "Post Job"}
+              {isEdit ? t("jobs.addJobModal.saveChanges", { defaultValue: "Save Changes" }) : t("jobs.addJobModal.postJob", { defaultValue: "Post Job" })}
             </Button>
           </div>
         </form>

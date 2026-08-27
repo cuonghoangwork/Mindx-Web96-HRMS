@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import FormField from "../components/FormField";
 import { useAuth } from "../context/AuthContext";
@@ -9,22 +10,22 @@ import AuthThemeToggle from "../components/AuthThemeToggle";
 /* ─────────────────────────────────
    Validation rules
 ───────────────────────────────── */
-function validateField(name, value, form) {
+function validateField(name, value, form, t) {
   switch (name) {
     case "name":
-      return !value.trim() ? "Full name is required" : value.trim().length < 2 ? "Name is too short" : "";
+      return !value.trim() ? t("auth.register.errors.nameRequired", { defaultValue: "Full name is required" }) : value.trim().length < 2 ? t("auth.register.errors.nameTooShort", { defaultValue: "Name is too short" }) : "";
     case "email":
-      return !value.trim() ? "Email is required" : !/\S+@\S+\.\S+/.test(value) ? "Enter a valid email address" : "";
+      return !value.trim() ? t("auth.register.errors.emailRequired", { defaultValue: "Email is required" }) : !/\S+@\S+\.\S+/.test(value) ? t("auth.register.errors.emailInvalid", { defaultValue: "Enter a valid email address" }) : "";
     case "password":
-      return !value ? "Password is required" : value.length < 8 ? "Use at least 8 characters" : "";
+      return !value ? t("auth.register.errors.passwordRequired", { defaultValue: "Password is required" }) : value.length < 8 ? t("auth.register.errors.passwordTooShort", { defaultValue: "Use at least 8 characters" }) : "";
     case "confirmPassword":
-      return !value ? "Please confirm your password" : value !== form.password ? "Passwords don't match" : "";
+      return !value ? t("auth.register.errors.confirmRequired", { defaultValue: "Please confirm your password" }) : value !== form.password ? t("auth.register.errors.passwordsMismatch", { defaultValue: "Passwords don't match" }) : "";
     default:
       return "";
   }
 }
 
-function passwordStrength(pw) {
+function passwordStrength(pw, t) {
   if (!pw) return { label: "", pct: 0, color: "var(--bg-surface-sub)" };
   let score = 0;
   if (pw.length >= 8) score++;
@@ -33,16 +34,17 @@ function passwordStrength(pw) {
   if (/\d/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
 
-  if (score <= 1) return { label: "Weak", pct: 25, color: "var(--clr-danger-400)" };
-  if (score <= 2) return { label: "Fair", pct: 50, color: "var(--clr-warning-400)" };
-  if (score <= 3) return { label: "Good", pct: 75, color: "var(--clr-info-400)" };
-  return { label: "Strong", pct: 100, color: "var(--clr-success-500)" };
+  if (score <= 1) return { label: t("auth.register.strength.weak", { defaultValue: "Weak" }), pct: 25, color: "var(--clr-danger-400)" };
+  if (score <= 2) return { label: t("auth.register.strength.fair", { defaultValue: "Fair" }), pct: 50, color: "var(--clr-warning-400)" };
+  if (score <= 3) return { label: t("auth.register.strength.good", { defaultValue: "Good" }), pct: 75, color: "var(--clr-info-400)" };
+  return { label: t("auth.register.strength.strong", { defaultValue: "Strong" }), pct: 100, color: "var(--clr-success-500)" };
 }
 
 /* ═══════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════ */
 function Register() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { register } = useAuth();
 
@@ -55,17 +57,17 @@ function Register() {
   const [agreedTouched, setAgreedTouched] = useState(false);
   const [serverError, setServerError] = useState("");
 
-  const strength = passwordStrength(form.password);
+  const strength = passwordStrength(form.password, t);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [name]: value };
       if (touched[name]) {
-        setErrors((prevErr) => ({ ...prevErr, [name]: validateField(name, value, next) }));
+        setErrors((prevErr) => ({ ...prevErr, [name]: validateField(name, value, next, t) }));
       }
       if (name === "password" && touched.confirmPassword) {
-        setErrors((prevErr) => ({ ...prevErr, confirmPassword: validateField("confirmPassword", next.confirmPassword, next) }));
+        setErrors((prevErr) => ({ ...prevErr, confirmPassword: validateField("confirmPassword", next.confirmPassword, next, t) }));
       }
       return next;
     });
@@ -74,7 +76,7 @@ function Register() {
   const handleBlur = (e) => {
     const { name, value } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
-    setErrors((prev) => ({ ...prev, [name]: validateField(name, value, form) }));
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value, form, t) }));
   };
 
   const handleSubmit = async (e) => {
@@ -88,7 +90,7 @@ function Register() {
 
     const newErrors = {};
     fields.forEach((f) => {
-      const err = validateField(f, form[f], form);
+      const err = validateField(f, form[f], form, t);
       if (err) newErrors[f] = err;
     });
     setErrors(newErrors);
@@ -101,7 +103,7 @@ function Register() {
     setIsLoading(false);
 
     if (!result.success) {
-      setServerError(result.error || "Registration failed. Please try again.");
+      setServerError(result.error || t("auth.register.genericError", { defaultValue: "Registration failed. Please try again." }));
       return;
     }
 
@@ -124,9 +126,9 @@ function Register() {
 
         <div className="login-card" style={{ maxWidth: "440px" }}>
         <div className="login-header">
-          <h1>Create Account</h1>
+          <h1>{t("auth.register.heading", { defaultValue: "Create Account" })}</h1>
         </div>
-        <p className="login-subtitle">Set up your HRMS Employee account</p>
+        <p className="login-subtitle">{t("auth.register.subtitle", { defaultValue: "Set up your HRMS Employee account" })}</p>
 
         {serverError && (
           <div className="form-error" style={{ marginBottom: "20px" }}>
@@ -136,36 +138,36 @@ function Register() {
 
         <form onSubmit={handleSubmit}>
           <FormField
-            label="Full Name" htmlFor="reg-name" required
+            label={t("auth.register.fullNameLabel", { defaultValue: "Full Name" })} htmlFor="reg-name" required
             error={errors.name} touched={touched.name}
             success={!errors.name && !!form.name}
           >
             <input
               id="reg-name" name="name" type="text"
               value={form.name} onChange={handleChange} onBlur={handleBlur}
-              placeholder="Jane Doe" autoComplete="name"
+              placeholder={t("auth.register.fullNamePlaceholder", { defaultValue: "Jane Doe" })} autoComplete="name"
               style={inputStyle("name")}
             />
           </FormField>
 
           <FormField
-            label="Email Address" htmlFor="reg-email" required
+            label={t("auth.common.emailAddressLabel", { defaultValue: "Email Address" })} htmlFor="reg-email" required
             error={errors.email} touched={touched.email}
             success={!errors.email && !!form.email}
           >
             <input
               id="reg-email" name="email" type="email"
               value={form.email} onChange={handleChange} onBlur={handleBlur}
-              placeholder="jane.doe@company.com" autoComplete="email"
+              placeholder={t("auth.register.emailPlaceholder", { defaultValue: "jane.doe@company.com" })} autoComplete="email"
               style={inputStyle("email")}
             />
           </FormField>
 
           <FormField
-            label="Password" htmlFor="reg-password" required
+            label={t("auth.common.passwordLabel", { defaultValue: "Password" })} htmlFor="reg-password" required
             error={errors.password} touched={touched.password}
             success={!errors.password && !!form.password}
-            hint="At least 8 characters"
+            hint={t("auth.common.atLeast8CharsHint", { defaultValue: "At least 8 characters" })}
           >
             <div style={{ position: "relative" }}>
               <input
@@ -178,7 +180,7 @@ function Register() {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? t("auth.register.hidePasswordAria", { defaultValue: "Hide password" }) : t("auth.register.showPasswordAria", { defaultValue: "Show password" })}
                 style={{
                   position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
                   background: "none", border: "none", cursor: "pointer",
@@ -204,7 +206,7 @@ function Register() {
           {form.password && (
             <div style={{ marginTop: "-10px", marginBottom: "var(--sp-5)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>Password strength</span>
+                <span style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{t("auth.register.strengthLabel", { defaultValue: "Password strength" })}</span>
                 <span style={{ fontSize: "var(--fs-2xs)", color: strength.color, fontWeight: "var(--fw-medium)" }}>{strength.label}</span>
               </div>
               <div style={{ height: "4px", background: "var(--bg-surface-sub)", borderRadius: "var(--radius-full)" }}>
@@ -218,7 +220,7 @@ function Register() {
           )}
 
           <FormField
-            label="Confirm Password" htmlFor="reg-confirm-password" required
+            label={t("auth.register.confirmPasswordLabel", { defaultValue: "Confirm Password" })} htmlFor="reg-confirm-password" required
             error={errors.confirmPassword} touched={touched.confirmPassword}
             success={!errors.confirmPassword && !!form.confirmPassword}
           >
@@ -252,10 +254,10 @@ function Register() {
             </span>
             <div>
               <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
-                Employee Account
+                {t("auth.register.roleInfoTitle", { defaultValue: "Employee Account" })}
               </div>
               <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                All new accounts start as Employee. An Admin can promote you to HR/Manager.
+                {t("auth.register.roleInfoDescription", { defaultValue: "All new accounts start as Employee. An Admin can promote you to HR/Manager." })}
               </div>
             </div>
           </div>
@@ -273,8 +275,8 @@ function Register() {
                 style={{ marginTop: "2px", width: "16px", height: "16px", flexShrink: 0, cursor: "pointer" }}
               />
               <span>
-                I agree to the <span style={{ color: "var(--txt-primary-brand)" }}>Terms of Service</span> and{" "}
-                <span style={{ color: "var(--txt-primary-brand)" }}>Privacy Policy</span>
+                {t("auth.register.termsPrefix", { defaultValue: "I agree to the " })}<span style={{ color: "var(--txt-primary-brand)" }}>{t("auth.register.termsOfService", { defaultValue: "Terms of Service" })}</span>{t("auth.register.termsAnd", { defaultValue: " and " })}{" "}
+                <span style={{ color: "var(--txt-primary-brand)" }}>{t("auth.register.privacyPolicy", { defaultValue: "Privacy Policy" })}</span>
               </span>
             </label>
             {!agreed && agreedTouched && (
@@ -282,7 +284,7 @@ function Register() {
                 fontSize: "var(--fs-xs)", color: "var(--txt-danger)",
                 display: "flex", alignItems: "center", gap: "4px", marginTop: "6px", marginLeft: "24px",
               }}>
-                Please accept the terms to continue
+                {t("auth.register.termsRequiredError", { defaultValue: "Please accept the terms to continue" })}
               </span>
             )}
           </div>
@@ -293,13 +295,13 @@ function Register() {
             style={{ width: "100%" }}
             disabled={isLoading}
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? t("auth.register.submittingButton", { defaultValue: "Creating Account..." }) : t("auth.register.heading", { defaultValue: "Create Account" })}
           </Button>
         </form>
 
         <p style={{ textAlign: "center", marginTop: "24px", fontSize: "14px" }}>
-          Already have an account?{" "}
-          <Link to="/login" className="link-primary">Sign in</Link>
+          {t("auth.register.alreadyHaveAccount", { defaultValue: "Already have an account?" })}{" "}
+          <Link to="/login" className="link-primary">{t("auth.common.signIn", { defaultValue: "Sign in" })}</Link>
         </p>
         </div>
       </div>

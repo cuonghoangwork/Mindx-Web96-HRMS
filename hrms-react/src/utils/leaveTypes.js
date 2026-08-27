@@ -20,4 +20,7 @@ export const LEAVE_TYPE_ALLOWANCES = {
   bereavement: 5,
 };
 
-export const leaveTypeLabel = (type) => LEAVE_TYPE_LABELS[type] ?? type;
+export const leaveTypeLabel = (type, t) => {
+  const fallback = LEAVE_TYPE_LABELS[type] ?? type;
+  return t ? t(`common.leaveType.${type}`, { defaultValue: fallback }) : fallback;
+};

@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { idsMatch } from "../utils/id";
+import { translateApiError } from "../utils/apiError";
 import { useAuth } from "./AuthContext";
 import {
   EmployeesAPI,
@@ -37,6 +39,7 @@ function upsertAttendanceRecord(prev, record) {
 }
 
 export function StoreProvider({ children }) {
+  const { t } = useTranslation();
   const { isAuthenticated, mustChangePassword } = useAuth();
 
   const [employees, setEmployees] = useState([]);
@@ -103,11 +106,11 @@ export function StoreProvider({ children }) {
       setAttendance(att.items || []);
       setNotifications(notif.items || []);
     } catch (err) {
-      setStoreError(err.message || "Failed to load data from the backend.");
+      setStoreError(translateApiError(err, t) || "Failed to load data from the backend.");
     } finally {
       setLoadingStore(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isAuthenticated && !mustChangePassword) {
@@ -357,36 +360,36 @@ export function StoreProvider({ children }) {
     try {
       await NotificationsAPI.markRead(id);
     } catch (err) {
-      showToast("error", err.message || "Failed to mark notification as read.");
+      showToast("error", translateApiError(err, t) || "Failed to mark notification as read.");
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const markAllNotificationsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     try {
       await NotificationsAPI.markAllRead();
     } catch (err) {
-      showToast("error", err.message || "Failed to mark all notifications as read.");
+      showToast("error", translateApiError(err, t) || "Failed to mark all notifications as read.");
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const removeNotification = useCallback(async (id) => {
     setNotifications((prev) => prev.filter((n) => !idsMatch(n.id, id)));
     try {
       await NotificationsAPI.remove(id);
     } catch (err) {
-      showToast("error", err.message || "Failed to dismiss notification.");
+      showToast("error", translateApiError(err, t) || "Failed to dismiss notification.");
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const clearReadNotifications = useCallback(async () => {
     setNotifications((prev) => prev.filter((n) => !n.read));
     try {
       await NotificationsAPI.clearRead();
     } catch (err) {
-      showToast("error", err.message || "Failed to clear read notifications.");
+      showToast("error", translateApiError(err, t) || "Failed to clear read notifications.");
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   // HR/Admin: compose and send a custom notice. Doesn't optimistically add to local
   // state for targeted sends (the recipient isn't necessarily "me"), but does for

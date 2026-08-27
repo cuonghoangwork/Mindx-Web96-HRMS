@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 
@@ -14,6 +15,7 @@ import { useStore } from "../context/StoreContext";
  * the list page rather than faking a deep link that doesn't exist.
  */
 function GlobalSearch() {
+  const { t } = useTranslation();
   const { employees, candidates, jobs, getJobById } = useStore();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -29,7 +31,7 @@ function GlobalSearch() {
       .slice(0, 4)
       .map((e) => ({
         key: `e${e.id}`,
-        kind: "Employee",
+        kind: t("globalSearch.kind.employee", { defaultValue: "Employee" }),
         label: e.name,
         sub: [e.designation, e.department].filter(Boolean).join(" · "),
         onSelect: () => navigate(`/employees/${e.id}`),
@@ -40,9 +42,9 @@ function GlobalSearch() {
       .slice(0, 4)
       .map((c) => ({
         key: `c${c.id}`,
-        kind: "Candidate",
+        kind: t("globalSearch.kind.candidate", { defaultValue: "Candidate" }),
         label: c.name,
-        sub: getJobById(c.jobId)?.title || "Candidate",
+        sub: getJobById(c.jobId)?.title || t("globalSearch.kind.candidate", { defaultValue: "Candidate" }),
         onSelect: () => navigate("/candidates"),
       }));
 
@@ -51,14 +53,14 @@ function GlobalSearch() {
       .slice(0, 4)
       .map((j) => ({
         key: `j${j.id}`,
-        kind: "Job",
+        kind: t("globalSearch.kind.job", { defaultValue: "Job" }),
         label: j.title,
-        sub: [j.department, j.status].filter(Boolean).join(" · "),
+        sub: [j.department, j.status ? t(`common.jobStatus.${j.status}`, { defaultValue: j.status }) : null].filter(Boolean).join(" · "),
         onSelect: () => navigate("/jobs"),
       }));
 
     return [...employeeResults, ...candidateResults, ...jobResults].slice(0, 8);
-  }, [query, employees, candidates, jobs, getJobById, navigate]);
+  }, [query, employees, candidates, jobs, getJobById, navigate, t]);
 
   const showDropdown = open && query.trim().length > 0;
 
@@ -67,7 +69,7 @@ function GlobalSearch() {
       <input
         type="text"
         className="global-search-input"
-        placeholder="Search employees, candidates, jobs..."
+        placeholder={t("globalSearch.placeholder", { defaultValue: "Search employees, candidates, jobs..." })}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => setOpen(true)}
@@ -79,7 +81,7 @@ function GlobalSearch() {
       {showDropdown && (
         <div className="global-search-dropdown">
           {results.length === 0 ? (
-            <div className="global-search-empty">No matches</div>
+            <div className="global-search-empty">{t("globalSearch.noMatches", { defaultValue: "No matches" })}</div>
           ) : (
             results.map((r) => (
               <div

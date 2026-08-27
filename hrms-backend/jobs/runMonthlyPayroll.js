@@ -60,6 +60,9 @@ export async function runMonthlyPayroll({ asOf = new Date() } = {}) {
     await notifyHR({
       title: "Monthly payroll run skipped",
       message: `No payroll period exists for ${label}. Create it before payroll can be run for that month.`,
+      titleKey: "monthlyPayrollRunSkipped",
+      messageKey: "monthlyPayrollRunSkippedNoPeriod",
+      params: { monthLabel: label },
       category: "payroll",
       link: "/payroll",
       linkLabel: "Open payroll",
@@ -91,6 +94,9 @@ export async function runMonthlyPayroll({ asOf = new Date() } = {}) {
     await notifyHR({
       title: "Monthly payroll run skipped",
       message: `The ${label} payroll period has no payslips, so it was not paid.`,
+      titleKey: "monthlyPayrollRunSkipped",
+      messageKey: "monthlyPayrollRunSkippedNoPayslips",
+      params: { monthLabel: label },
       category: "payroll",
       link: "/payroll",
       linkLabel: "Open payroll",
@@ -141,6 +147,9 @@ export async function runMonthlyPayroll({ asOf = new Date() } = {}) {
     category: "payroll",
     title: "Payroll paid",
     message: `${periodLabel(period)} payroll has been paid.`,
+    titleKey: "payrollPaid",
+    messageKey: "payrollPaid",
+    params: { periodLabel: periodLabel(period) },
     link: null,
     isCustom: false,
   });

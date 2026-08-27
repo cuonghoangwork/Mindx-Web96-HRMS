@@ -41,6 +41,7 @@ import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
 import { getManagerDepartmentId, resolveEmployeeForUser } from "./managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "./permissions.js";
+import { AppError } from "./appError.js";
 
 export const REVIEW_STATUSES = ["pending", "approved", "rejected"];
 
@@ -90,10 +91,10 @@ export async function resolveRequestingEmployee(req) {
  * `Model` — the shared "block a second submission until the first is
  * reviewed" rule every request-type's create() enforces.
  */
-export async function assertNoPendingRequest(Model, employeeId, message) {
+export async function assertNoPendingRequest(Model, employeeId, message, code, params) {
   const existing = await Model.findOne({ employee: employeeId, status: "pending" });
   if (existing) {
-    const err = new Error(message);
+    const err = new AppError(message, code, params);
     err.status = 409;
     throw err;
   }
@@ -184,7 +185,7 @@ export function createReviewRequestController({
 
         res.json({ success: true, items: items.map(toClient) });
       } catch (error) {
-        res.status(error.status || 500).json({ success: false, message: error.message });
+        res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
       }
     },
 
@@ -196,19 +197,19 @@ export function createReviewRequestController({
       try {
         const { decision, reviewNote } = req.body;
         if (!["approved", "rejected"].includes(decision)) {
-          return res.status(400).json({ success: false, message: "decision must be 'approved' or 'rejected'." });
+          return res.status(400).json({ success: false, message: "decision must be 'approved' or 'rejected'.", code: "INVALID_REVIEW_DECISION" });
         }
 
         const request = await applyPopulate(Model.findById(req.params.id));
         if (!request) {
-          return res.status(404).json({ success: false, message: "Request not found." });
+          return res.status(404).json({ success: false, message: "Request not found.", code: "REVIEW_REQUEST_NOT_FOUND" });
         }
         if (request.status !== "pending") {
-          return res.status(409).json({ success: false, message: "This request has already been reviewed." });
+          return res.status(409).json({ success: false, message: "This request has already been reviewed.", code: "REVIEW_REQUEST_ALREADY_REVIEWED" });
         }
 
         if (req.user.role === "MANAGER" && capability && !(await hasCapability("MANAGER", capability))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
         }
 
         if (req.user.role === "MANAGER") {
@@ -219,6 +220,7 @@ export function createReviewRequestController({
             return res.status(403).json({
               success: false,
               message: "You can only review requests for employees in your own department.",
+              code: "MANAGER_REVIEW_OUT_OF_DEPARTMENT",
             });
           }
         }
@@ -281,13 +283,16 @@ export function createReviewRequestController({
               link: copy.link ?? resolvedLink ?? null,
               linkLabel: copy.linkLabel ?? employeeLinkLabel ?? null,
               read: false,
+              titleKey: copy.titleKey ?? null,
+              messageKey: copy.messageKey ?? null,
+              params: copy.params ?? null,
             });
           }
         }
 
         res.json({ success: true, data: toClient(request) });
       } catch (error) {
-        res.status(error.status || 400).json({ success: false, message: error.message });
+        res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
       }
     },
   };

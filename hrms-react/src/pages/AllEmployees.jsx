@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { PromotionRequestsAPI, ProfileEditRequestsAPI } from "../api";
 import { formatDate } from "../utils/format";
+import { translateApiError } from "../utils/apiError";
 import FilterModal from "../components/FilterModal";
 import SearchBar from "../components/SearchBar";
 import Avatar from "../components/Avatar";
@@ -14,36 +16,37 @@ import ProposePromotionModal from "../components/ProposePromotionModal";
 const EMPLOYEES_PER_PAGE = 10;
 
 const SORTABLE_COLUMNS = [
-  { key: "name",        label: "Employee" },
-  { key: "employeeId",  label: "ID" },
-  { key: "department",  label: "Department" },
-  { key: "designation", label: "Designation" },
-  { key: "type",        label: "Type" },
-  { key: "status",      label: "Status" },
+  { key: "name",        labelKey: "common.columns.employee",   defaultLabel: "Employee" },
+  { key: "employeeId",  labelKey: "common.columns.id",         defaultLabel: "ID" },
+  { key: "department",  labelKey: "common.fieldLabels.department", defaultLabel: "Department" },
+  { key: "designation", labelKey: "common.columns.designation", defaultLabel: "Designation" },
+  { key: "type",        labelKey: "common.columns.type",       defaultLabel: "Type" },
+  { key: "status",      labelKey: "common.columns.status",     defaultLabel: "Status" },
 ];
 
 /* ─────────────────────────────────────────
    Employee Detail Side Panel
 ───────────────────────────────────────── */
 function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }) {
+  const { t } = useTranslation();
   if (!employee) return null;
 
   const fields = [
-    { label: "Employee ID", value: employee.employeeId },
-    { label: "Department",  value: employee.department },
-    { label: "Designation", value: employee.designation },
-    { label: "Type",        value: employee.type, render: () => <TypeBadge type={employee.type} /> },
-    { label: "Age",         value: employee.age || "—" },
-    { label: "Gender",      value: employee.sex || "—" },
-    { label: "Email",       value: employee.email || "—" },
-    { label: "Phone",       value: employee.phone || "—" },
-    { label: "Address",     value: employee.address || "—" },
+    { label: t("common.fieldLabels.employeeId", { defaultValue: "Employee ID" }), value: employee.employeeId },
+    { label: t("common.fieldLabels.department", { defaultValue: "Department" }),  value: employee.department },
+    { label: t("common.fieldLabels.designation", { defaultValue: "Designation" }), value: employee.designation },
+    { label: t("common.columns.type", { defaultValue: "Type" }),        value: employee.type, render: () => <TypeBadge type={employee.type} /> },
+    { label: t("common.fieldLabels.age", { defaultValue: "Age" }),         value: employee.age || "—" },
+    { label: t("common.fieldLabels.sex", { defaultValue: "Sex" }),      value: employee.sex ? t(`common.gender.${employee.sex}`, { defaultValue: employee.sex }) : "—" },
+    { label: t("common.fieldLabels.email", { defaultValue: "Email" }),       value: employee.email || "—" },
+    { label: t("common.fieldLabels.phone", { defaultValue: "Phone" }),       value: employee.phone || "—" },
+    { label: t("common.fieldLabels.address", { defaultValue: "Address" }),     value: employee.address || "—" },
     // Salary — hidden from a plain EMPLOYEE viewing a colleague's card now
     // that Directory is open to every role (see App.jsx); MANAGER/HR/ADMIN
     // keep seeing it, matching this app's existing company-wide salary
     // visibility for those tiers (Payroll, "My Department" roster, etc.).
     ...(canSeeSalary
-      ? [{ label: "Salary", value: employee.salary ? `$${employee.salary.toLocaleString("en-US")}/yr` : "—" }]
+      ? [{ label: t("common.fieldLabels.salary", { defaultValue: "Salary" }), value: employee.salary ? `$${employee.salary.toLocaleString("en-US")}/yr` : "—" }]
       : []),
   ];
 
@@ -86,7 +89,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
           flexShrink: 0,
         }}>
           <span style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-            Employee Details
+            {t("employees.allEmployees.sidePanel.title", { defaultValue: "Employee Details" })}
           </span>
           <button
             type="button" onClick={onClose}
@@ -96,7 +99,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
               cursor: "pointer", fontSize: "18px", color: "var(--txt-secondary)",
               display: "grid", placeItems: "center",
             }}
-            aria-label="Close panel"
+            aria-label={t("employees.allEmployees.sidePanel.closeAria", { defaultValue: "Close panel" })}
           >×</button>
         </div>
 
@@ -141,7 +144,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
           {/* Quick status change */}
           <div style={{ marginTop: "var(--sp-5)" }}>
             <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "var(--sp-3)" }}>
-              Change Status
+              {t("employees.allEmployees.sidePanel.changeStatus", { defaultValue: "Change Status" })}
             </div>
             <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
               {["Active", "On Leave", "Terminated"].map((s) => (
@@ -158,7 +161,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
                     cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
                   }}
                 >
-                  {s}
+                  {t(`common.employeeStatus.${s}`, { defaultValue: s })}
                 </button>
               ))}
             </div>
@@ -178,13 +181,13 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
             style={{ flex: 1, justifyContent: "center" }}
             onClick={onClose}
           >
-            View Full Profile
+            {t("employees.allEmployees.sidePanel.viewFullProfile", { defaultValue: "View Full Profile" })}
           </Link>
           <Button
             variant="danger"
             onClick={() => onDelete(employee.id)}
           >
-            Delete
+            {t("common.actions.delete", { defaultValue: "Delete" })}
           </Button>
         </div>
       </div>
@@ -196,6 +199,7 @@ function SidePanel({ employee, onClose, onDelete, onStatusChange, canSeeSalary }
    Bulk Action Bar
 ───────────────────────────────────────── */
 function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear, canDelete }) {
+  const { t } = useTranslation();
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: "var(--sp-3)",
@@ -207,18 +211,18 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear, can
       flexWrap: "wrap",
     }}>
       <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary-brand)", marginRight: "var(--sp-2)" }}>
-        {count} selected
+        {t("employees.allEmployees.bulkBar.selected", { defaultValue: "{{count}} selected", count })}
       </span>
 
       <Button variant="secondary" size="sm" onClick={onExport}>
-        ↓ Export CSV
+        ↓ {t("employees.allEmployees.toolbar.exportCsv", { defaultValue: "Export CSV" })}
       </Button>
 
       <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>Set status:</span>
+        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("employees.allEmployees.bulkBar.setStatus", { defaultValue: "Set status:" })}</span>
         {["Active", "On Leave", "Terminated"].map((s) => (
           <Button variant="secondary" size="sm" key={s} onClick={() => onStatusChange(s)}>
-            {s}
+            {t(`common.employeeStatus.${s}`, { defaultValue: s })}
           </Button>
         ))}
       </div>
@@ -226,7 +230,7 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear, can
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
         {canDelete && (
           <Button variant="danger" size="sm" onClick={onDelete}>
-            Delete selected
+            {t("employees.allEmployees.bulkBar.deleteSelected", { defaultValue: "Delete selected" })}
           </Button>
         )}
 
@@ -237,7 +241,7 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear, can
             color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1,
             padding: "2px 4px",
           }}
-          aria-label="Clear selection"
+          aria-label={t("employees.allEmployees.bulkBar.clearSelectionAria", { defaultValue: "Clear selection" })}
         >×</button>
       </div>
     </div>
@@ -254,11 +258,12 @@ function BulkActionBar({ count, onExport, onDelete, onStatusChange, onClear, can
 const usdFmt = (n) => (n == null ? null : `$${Number(n).toLocaleString("en-US")}/yr`);
 
 function PendingPromotionsPanel({ requests, onReview }) {
+  const { t } = useTranslation();
   if (requests.length === 0) return null;
   return (
     <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-4)" }}>
-        <h3 className="section-title" style={{ margin: 0 }}>Pending promotions</h3>
+        <h3 className="section-title" style={{ margin: 0 }}>{t("employees.allEmployees.pendingPromotions.title", { defaultValue: "Pending promotions" })}</h3>
         <span className="badge badge-primary">{requests.length}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
@@ -277,14 +282,14 @@ function PendingPromotionsPanel({ requests, onReview }) {
                 {req.proposed?.salary != null && ` · ${usdFmt(req.proposed.salary)}`}
               </div>
               <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "4px" }}>
-                {req.effectiveDate && `Effective ${formatDate(req.effectiveDate)}`}
+                {req.effectiveDate && t("employees.allEmployees.pendingPromotions.effective", { defaultValue: "Effective {{date}}", date: formatDate(req.effectiveDate) })}
                 {req.effectiveDate && req.reason ? " · " : ""}
                 {req.reason}
               </div>
             </div>
             <div style={{ display: "flex", gap: "var(--sp-2)", flexShrink: 0 }}>
-              <Button variant="primary" size="sm" onClick={() => onReview(req.id, "approved")}>Approve</Button>
-              <Button variant="danger" size="sm" onClick={() => onReview(req.id, "rejected")}>Reject</Button>
+              <Button variant="primary" size="sm" onClick={() => onReview(req.id, "approved")}>{t("common.actions.approve", { defaultValue: "Approve" })}</Button>
+              <Button variant="danger" size="sm" onClick={() => onReview(req.id, "rejected")}>{t("common.actions.reject", { defaultValue: "Reject" })}</Button>
             </div>
           </div>
         ))}
@@ -325,6 +330,7 @@ function RequestFieldRow({ label, from, to }) {
 }
 
 function EditRequestsPanel({ onChanged }) {
+  const { t } = useTranslation();
   const [requests, setRequests]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState("");
@@ -334,16 +340,18 @@ function EditRequestsPanel({ onChanged }) {
   const [actionLoading, setActionL]   = useState(null);
   const [toast, setToast]             = useState("");
 
+  const statusLabel = (s) => t(`employees.allEmployees.editRequests.tabs.${s}`, { defaultValue: s });
+
   const loadRequests = useCallback(async () => {
     setLoading(true); setError("");
     try {
       const res = await ProfileEditRequestsAPI.list({ status: filterStatus });
       setRequests(res.items ?? []);
     } catch (err) {
-      setError(err.message || "Failed to load requests.");
+      setError(translateApiError(err, t) || t("employees.allEmployees.editRequests.loadFailed", { defaultValue: "Failed to load requests." }));
     }
     setLoading(false);
-  }, [filterStatus]);
+  }, [filterStatus, t]);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
@@ -357,13 +365,13 @@ function EditRequestsPanel({ onChanged }) {
     setActionL(decision);
     try {
       await ProfileEditRequestsAPI.review(requestId, decision, note);
-      setToast(decision === "approved" ? "Profile update approved and applied." : "Request rejected.");
+      setToast(decision === "approved" ? t("employees.allEmployees.editRequests.toastApproved", { defaultValue: "Profile update approved and applied." }) : t("employees.allEmployees.editRequests.toastRejected", { defaultValue: "Request rejected." }));
       setReviewingId(null);
       setNote("");
       loadRequests();
       onChanged?.();
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(t("employees.allEmployees.editRequests.toastErrorPrefix", { defaultValue: "Error: {{message}}", message: translateApiError(err, t) }));
     }
     setActionL(null);
   };
@@ -388,13 +396,13 @@ function EditRequestsPanel({ onChanged }) {
                 textTransform: "capitalize",
               }}
             >
-              {s}
+              {statusLabel(s)}
             </button>
           ))}
         </div>
-        <Button variant="secondary" size="sm" onClick={loadRequests}>Refresh</Button>
+        <Button variant="secondary" size="sm" onClick={loadRequests}>{t("employees.allEmployees.editRequests.refresh", { defaultValue: "Refresh" })}</Button>
         <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginLeft: "auto" }}>
-          {requests.length} request{requests.length === 1 ? "" : "s"}
+          {t("employees.allEmployees.editRequests.requestCount", { count: requests.length, defaultValue_one: "{{count}} request", defaultValue_other: "{{count}} requests" })}
         </span>
       </div>
 
@@ -419,15 +427,15 @@ function EditRequestsPanel({ onChanged }) {
 
       {loading ? (
         <div style={{ padding: "var(--sp-5)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>
-          Loading requests…
+          {t("employees.allEmployees.editRequests.loading", { defaultValue: "Loading requests…" })}
         </div>
       ) : requests.length === 0 ? (
         <div className="empty-state">
           <h3 className="empty-state-title">
-            {filterStatus === "all" ? "No requests" : `No ${filterStatus} requests`}
+            {filterStatus === "all" ? t("employees.allEmployees.editRequests.noRequestsAll", { defaultValue: "No requests" }) : t("employees.allEmployees.editRequests.noRequestsFiltered", { defaultValue: "No {{status}} requests", status: statusLabel(filterStatus) })}
           </h3>
           <p className="empty-state-description">
-            Profile edit requests submitted by employees will show up here for review.
+            {t("employees.allEmployees.editRequests.emptyDescription", { defaultValue: "Profile edit requests submitted by employees will show up here for review." })}
           </p>
         </div>
       ) : (
@@ -460,20 +468,20 @@ function EditRequestsPanel({ onChanged }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
-                      {req.employeeName ?? "Unknown employee"}
+                      {req.employeeName ?? t("employees.allEmployees.editRequests.unknownEmployee", { defaultValue: "Unknown employee" })}
                     </div>
                     <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
                       {Object.keys(req.changes || {}).join(", ")} · {formatDate(req.createdAt)}
                     </div>
                   </div>
-                  <Badge variant={REQUEST_STATUS_VARIANT[req.status] ?? "neutral"} pill dot>{req.status}</Badge>
+                  <Badge variant={REQUEST_STATUS_VARIANT[req.status] ?? "neutral"} pill dot>{statusLabel(req.status)}</Badge>
                   {req.status === "pending" && (
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => { setReviewingId(isOpen ? null : req.id); setNote(""); }}
                     >
-                      {isOpen ? "Close" : "Review"}
+                      {isOpen ? t("common.actions.close", { defaultValue: "Close" }) : t("employees.allEmployees.editRequests.review", { defaultValue: "Review" })}
                     </Button>
                   )}
                 </div>
@@ -483,7 +491,7 @@ function EditRequestsPanel({ onChanged }) {
                   <div style={{ padding: "var(--sp-5)", borderTop: "1px solid var(--bdr-subtle)" }}>
                     <div style={{ marginBottom: "var(--sp-4)" }}>
                       <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--txt-secondary)", marginBottom: "var(--sp-2)" }}>
-                        Requested changes
+                        {t("employees.allEmployees.editRequests.requestedChanges", { defaultValue: "Requested changes" })}
                       </div>
                       {Object.entries(req.changes || {}).map(([field, { from, to }]) => (
                         <RequestFieldRow key={field} label={field} from={from} to={to} />
@@ -492,14 +500,14 @@ function EditRequestsPanel({ onChanged }) {
 
                     <div className="form-group" style={{ marginBottom: "var(--sp-4)" }}>
                       <label className="form-label" htmlFor={`edit-req-note-${req.id}`}>
-                        Review note <span style={{ fontWeight: "var(--fw-regular)", color: "var(--txt-secondary)" }}>(optional)</span>
+                        {t("employees.allEmployees.editRequests.reviewNoteLabel", { defaultValue: "Review note" })} <span style={{ fontWeight: "var(--fw-regular)", color: "var(--txt-secondary)" }}>{t("employees.allEmployees.editRequests.optional", { defaultValue: "(optional)" })}</span>
                       </label>
                       <textarea
                         id={`edit-req-note-${req.id}`}
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         rows={2}
-                        placeholder="Add a note for the employee…"
+                        placeholder={t("employees.allEmployees.editRequests.reviewNotePlaceholder", { defaultValue: "Add a note for the employee…" })}
                         style={{ resize: "vertical" }}
                       />
                     </div>
@@ -510,14 +518,14 @@ function EditRequestsPanel({ onChanged }) {
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, "approved")}
                       >
-                        {actionLoading === "approved" ? "Approving…" : "Approve & apply"}
+                        {actionLoading === "approved" ? t("employees.allEmployees.editRequests.approving", { defaultValue: "Approving…" }) : t("employees.allEmployees.editRequests.approveApply", { defaultValue: "Approve & apply" })}
                       </Button>
                       <Button
                         variant="danger"
                         disabled={actionLoading !== null}
                         onClick={() => handleReview(req.id, "rejected")}
                       >
-                        {actionLoading === "rejected" ? "Rejecting…" : "Reject"}
+                        {actionLoading === "rejected" ? t("employees.allEmployees.editRequests.rejecting", { defaultValue: "Rejecting…" }) : t("common.actions.reject", { defaultValue: "Reject" })}
                       </Button>
                     </div>
                   </div>
@@ -530,7 +538,7 @@ function EditRequestsPanel({ onChanged }) {
                     borderTop: "1px solid var(--bdr-subtle)",
                     fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", fontStyle: "italic",
                   }}>
-                    HR note: {req.reviewNote}
+                    {t("employees.allEmployees.editRequests.hrNotePrefix", { defaultValue: "HR note:" })} {req.reviewNote}
                   </div>
                 )}
               </div>
@@ -546,6 +554,7 @@ function EditRequestsPanel({ onChanged }) {
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 function AllEmployees() {
+  const { t } = useTranslation();
   const { isAdmin, isHRTier, isManagerTier, isManager } = useAuth();
   // Plain MANAGER (not HR/Admin) gets this page as a read-only company-wide
   // "Directory" (see employeeController.getAll — read is unscoped for
@@ -682,7 +691,7 @@ function AllEmployees() {
 
   /* ── Bulk actions ── */
   const handleBulkDelete = () => {
-    if (!confirm(`Delete ${selectedIds.size} employee(s)?`)) return;
+    if (!confirm(t("common.confirmDeleteEmployees", { defaultValue: "Delete {{count}} employee(s)?", count: selectedIds.size }))) return;
     selectedIds.forEach((id) => removeEmployee(id));
     clearSelection();
   };
@@ -723,7 +732,8 @@ function AllEmployees() {
 
   /* ── Single row actions ── */
   const handleDelete = (id) => {
-    if (!confirm("Delete this employee?")) return;
+    const emp = employees.find((e) => e.id === id);
+    if (!confirm(t("common.confirmDeleteEmployee", { defaultValue: "Delete {{name}}? This cannot be undone.", name: emp?.name }))) return;
     removeEmployee(id);
     if (panelEmployee?.id === id) setPanelEmployee(null);
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
@@ -752,7 +762,7 @@ function AllEmployees() {
       {/* ── Roster / Edit requests toggle ── */}
       {isManagerTier && (
         <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)", marginBottom: "var(--sp-5)", width: "fit-content" }}>
-          {[["roster", "Roster"], ["editRequests", `Edit requests (${pendingEditCount})`]].map(([v, label]) => (
+          {[["roster", t("employees.allEmployees.rosterTab", { defaultValue: "Roster" })], ["editRequests", t("employees.allEmployees.editRequestsTab", { defaultValue: "Edit requests ({{count}})", count: pendingEditCount })]].map(([v, label]) => (
             <button key={v} type="button" onClick={() => setActiveTab(v)} style={{
               padding: "5px 14px", borderRadius: "0", border: "none",
               background: activeTab === v ? "var(--bg-surface)" : "transparent",
@@ -782,28 +792,28 @@ function AllEmployees() {
             onClick={() => openModal("filter")}
             className="toolbar-filter-btn"
           >
-            Filter
+            {t("employees.allEmployees.toolbar.filter", { defaultValue: "Filter" })}
             {hasActiveFilters && <span className="toolbar-filter-dot" />}
           </Button>
           <SearchBar
             value={filters.search}
             onSearch={handleSearch}
-            placeholder="Search by name, employee ID, department..."
+            placeholder={t("employees.allEmployees.toolbar.searchPlaceholder", { defaultValue: "Search by name, employee ID, department..." })}
           />
           <Button
             variant="secondary"
             onClick={handleReset}
             disabled={!hasActiveSearchOrFilters}
           >
-            Reset
+            {t("employees.allEmployees.toolbar.reset", { defaultValue: "Reset" })}
           </Button>
           {isHRTier && (
             <Link to="/employees/add" className="btn btn-primary" style={{ marginLeft: "auto" }}>
-              + Add Employee
+              + {t("sideMenu.addEmployee", { defaultValue: "Add Employee" })}
             </Link>
           )}
           <Button variant="secondary" onClick={handleExportAll} style={isHRTier ? undefined : { marginLeft: "auto" }}>
-            Export CSV
+            {t("employees.allEmployees.toolbar.exportCsv", { defaultValue: "Export CSV" })}
           </Button>
         </div>
 
@@ -834,17 +844,17 @@ function AllEmployees() {
                       checked={allPageSelected}
                       onChange={togglePage}
                       style={{ cursor: "pointer", width: "15px", height: "15px" }}
-                      aria-label="Select all on this page"
+                      aria-label={t("employees.allEmployees.table.selectAllAria", { defaultValue: "Select all on this page" })}
                     />
                   </th>
                 )}
                 {SORTABLE_COLUMNS.map((col) => (
                   <SortableHeader
-                    key={col.key} label={col.label} field={col.key}
+                    key={col.key} label={t(col.labelKey, { defaultValue: col.defaultLabel })} field={col.key}
                     sortField={sortField} sortOrder={sortOrder} onSort={handleSort}
                   />
                 ))}
-                <th>Action</th>
+                <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
               </tr>
             </thead>
             <tbody>
@@ -865,7 +875,7 @@ function AllEmployees() {
                           checked={isSelected}
                           onChange={() => {}}
                           style={{ cursor: "pointer", width: "15px", height: "15px" }}
-                          aria-label={`Select ${employee.name}`}
+                          aria-label={t("employees.allEmployees.table.selectRowAria", { defaultValue: "Select {{name}}", name: employee.name })}
                         />
                       </td>
                     )}
@@ -895,7 +905,7 @@ function AllEmployees() {
                         variant="link"
                         onClick={(e) => openPanel(employee, e)}
                       >
-                        Details
+                        {t("employees.allEmployees.table.details", { defaultValue: "Details" })}
                       </Button>
                       {/* Promote is scoped to the reviewer's own department
                           server-side, so it's hidden here for plain MANAGER
@@ -907,17 +917,17 @@ function AllEmployees() {
                           variant="link"
                           onClick={() => setPromotingEmployee(employee)}
                         >
-                          Promote
+                          {t("employees.allEmployees.table.promote", { defaultValue: "Promote" })}
                         </Button>
                       )}
                       {isAdmin && (
                         <Button
                           variant="link"
                           className="btn-link-muted"
-                          aria-label="Delete employee"
+                          aria-label={t("employees.allEmployees.table.deleteAria", { defaultValue: "Delete employee" })}
                           onClick={() => handleDelete(employee.id)}
                         >
-                          Delete
+                          {t("common.actions.delete", { defaultValue: "Delete" })}
                         </Button>
                       )}
                     </td>
@@ -937,19 +947,19 @@ function AllEmployees() {
                 <path d="m21 21-4.3-4.3" />
               </svg>
             </div>
-            <h3 className="empty-state-title">No employees found</h3>
+            <h3 className="empty-state-title">{t("employees.allEmployees.emptyState.title", { defaultValue: "No employees found" })}</h3>
             <p className="empty-state-description">
               {hasActiveSearchOrFilters
-                ? "Try adjusting your search or filters."
-                : "Get started by adding your first employee."}
+                ? t("employees.allEmployees.emptyState.tryAdjusting", { defaultValue: "Try adjusting your search or filters." })
+                : t("employees.allEmployees.emptyState.getStarted", { defaultValue: "Get started by adding your first employee." })}
             </p>
             {hasActiveSearchOrFilters && (
               <Button variant="secondary" onClick={handleReset}>
-                Clear filters
+                {t("employees.allEmployees.emptyState.clearFilters", { defaultValue: "Clear filters" })}
               </Button>
             )}
             {!hasActiveSearchOrFilters && isHRTier && (
-              <Link to="/employees/add" className="btn btn-primary">+ Add Employee</Link>
+              <Link to="/employees/add" className="btn btn-primary">+ {t("sideMenu.addEmployee", { defaultValue: "Add Employee" })}</Link>
             )}
           </div>
         )}
@@ -958,15 +968,15 @@ function AllEmployees() {
         {totalPages > 1 && (
           <div className="pagination">
             <div className="pagination-info">
-              Showing {startIndex + 1}–{Math.min(startIndex + EMPLOYEES_PER_PAGE, sortedEmployees.length)} of {sortedEmployees.length} employees
+              {t("employees.allEmployees.pagination.showing", { defaultValue: "Showing {{start}}–{{end}} of {{total}} employees", start: startIndex + 1, end: Math.min(startIndex + EMPLOYEES_PER_PAGE, sortedEmployees.length), total: sortedEmployees.length })}
               {sortedEmployees.length !== employees.length && (
                 <span style={{ color: "var(--txt-secondary)", marginLeft: "8px" }}>
-                  (filtered from {employees.length})
+                  {t("employees.allEmployees.pagination.filteredFrom", { defaultValue: "(filtered from {{total}})", total: employees.length })}
                 </span>
               )}
               {someSelected && (
                 <span style={{ color: "var(--txt-primary-brand)", marginLeft: "8px", fontWeight: "var(--fw-medium)" }}>
-                  · {selectedIds.size} selected
+                  {t("employees.allEmployees.pagination.selectedSuffix", { defaultValue: "· {{count}} selected", count: selectedIds.size })}
                 </span>
               )}
             </div>
@@ -1014,9 +1024,10 @@ function AllEmployees() {
 
 /* ─── Sortable column header ─── */
 function SortableHeader({ label, field, sortField, sortOrder, onSort }) {
+  const { t } = useTranslation();
   const isActive = sortField === field;
   return (
-    <th className="sortable-header" onClick={() => onSort(field)} title={`Sort by ${label}`}>
+    <th className="sortable-header" onClick={() => onSort(field)} title={t("employees.allEmployees.sortBy", { defaultValue: "Sort by {{label}}", label })}>
       {label}
       {isActive && (
         <span className="sort-indicator" aria-hidden="true">{sortOrder === "asc" ? " ▲" : " ▼"}</span>

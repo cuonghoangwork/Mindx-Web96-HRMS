@@ -65,6 +65,9 @@ export async function annualSalaryRaise({ asOf = new Date() } = {}) {
       category: "employee",
       link: "/employees",
       linkLabel: "Review promotion queue",
+      titleKey: "annualRaiseAwaiting",
+      messageKey: "annualRaiseAwaiting",
+      params: { employeeName: employee.name, years, percent: Math.round(ANNUAL_RAISE_RATE * 100) },
     });
   }
 

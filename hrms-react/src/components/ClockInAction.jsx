@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { idsMatch } from "../utils/id";
+import { translateApiError } from "../utils/apiError";
 
 /**
  * ClockInAction — topbar "Clock in" quick action, matching the mockup's
@@ -14,6 +16,7 @@ import { idsMatch } from "../utils/id";
  * user, never picks an employee on their behalf.
  */
 function ClockInAction() {
+  const { t } = useTranslation();
   const { employees, attendance, getAppNow, clockIn } = useStore();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -28,8 +31,8 @@ function ClockInAction() {
   // with an explanatory title instead of hiding it entirely.
   if (!myEmployee) {
     return (
-      <button type="button" className="clock-in-btn" disabled title="No employee profile is linked to your account">
-        Clock in
+      <button type="button" className="clock-in-btn" disabled title={t("clockIn.noProfileTitle", { defaultValue: "No employee profile is linked to your account" })}>
+        {t("clockIn.buttonDefault", { defaultValue: "Clock in" })}
       </button>
     );
   }
@@ -49,7 +52,7 @@ function ClockInAction() {
     try {
       await clockIn(myEmployee.id, todayStr, currentTimeHHMM);
     } catch (err) {
-      setError(err.message || "Failed to clock in");
+      setError(translateApiError(err, t) || t("clockIn.failedGeneric", { defaultValue: "Failed to clock in" }));
     } finally {
       setLoading(false);
     }
@@ -61,9 +64,9 @@ function ClockInAction() {
       className="clock-in-btn"
       onClick={handleClick}
       disabled={hasCheckedIn || loading}
-      title={error || (hasCheckedIn ? `Clocked in at ${todayRecord.checkIn}` : "Clock in for today")}
+      title={error || (hasCheckedIn ? t("clockIn.clockedInAtTitle", { defaultValue: "Clocked in at {{time}}", time: todayRecord.checkIn }) : t("clockIn.clockInTodayTitle", { defaultValue: "Clock in for today" }))}
     >
-      {hasCheckedIn ? `Clocked in ${todayRecord.checkIn}` : loading ? "Clocking in…" : "Clock in"}
+      {hasCheckedIn ? t("clockIn.clockedIn", { defaultValue: "Clocked in {{time}}", time: todayRecord.checkIn }) : loading ? t("clockIn.inProgress", { defaultValue: "Clocking in…" }) : t("clockIn.buttonDefault", { defaultValue: "Clock in" })}
     </button>
   );
 }

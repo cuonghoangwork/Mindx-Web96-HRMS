@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate, formatTime } from "../utils/format";
@@ -38,6 +39,7 @@ function formatDisplayTime(date, language) {
 }
 
 function HeaderDateTime() {
+  const { t } = useTranslation();
   const { getAppNow, setAppDateTime, resetAppDateTime, isClockAdjusted } =
     useStore();
   const { language } = useLanguage();
@@ -81,12 +83,12 @@ function HeaderDateTime() {
         className="header-datetime-display"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="Adjust date and time"
+        aria-label={t("headerDateTime.adjustAriaLabel", { defaultValue: "Adjust date and time" })}
       >
         <span className="header-datetime-date">{formatDisplayDate(now, language)}</span>
         <span className="header-datetime-time">{formatDisplayTime(now, language)}</span>
         {isClockAdjusted && (
-          <span className="header-datetime-badge">Adjusted</span>
+          <span className="header-datetime-badge">{t("headerDateTime.adjustedBadge", { defaultValue: "Adjusted" })}</span>
         )}
       </button>
 
@@ -95,13 +97,13 @@ function HeaderDateTime() {
           <button
             type="button"
             className="header-datetime-backdrop"
-            aria-label="Close date and time panel"
+            aria-label={t("headerDateTime.closePanelAriaLabel", { defaultValue: "Close date and time panel" })}
             onClick={() => setOpen(false)}
           />
           <form className="header-datetime-panel" onSubmit={handleApply}>
-            <p className="header-datetime-panel-title">Set date &amp; time</p>
+            <p className="header-datetime-panel-title">{t("headerDateTime.panelTitle", { defaultValue: "Set date & time" })}</p>
             <div className="form-group">
-              <label htmlFor="header-date">Date</label>
+              <label htmlFor="header-date">{t("headerDateTime.dateLabel", { defaultValue: "Date" })}</label>
               <input
                 id="header-date"
                 type="date"
@@ -111,7 +113,7 @@ function HeaderDateTime() {
               />
             </div>
             <div className="form-group">
-              <label htmlFor="header-time">Time</label>
+              <label htmlFor="header-time">{t("headerDateTime.timeLabel", { defaultValue: "Time" })}</label>
               <input
                 id="header-time"
                 type="time"
@@ -125,10 +127,10 @@ function HeaderDateTime() {
                 variant="secondary"
                 onClick={handleReset}
               >
-                Reset to now
+                {t("headerDateTime.resetButton", { defaultValue: "Reset to now" })}
               </Button>
               <Button variant="primary" type="submit">
-                Apply
+                {t("headerDateTime.applyButton", { defaultValue: "Apply" })}
               </Button>
             </div>
           </form>

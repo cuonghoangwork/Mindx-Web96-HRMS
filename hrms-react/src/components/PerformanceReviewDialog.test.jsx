@@ -337,7 +337,7 @@ describe("PerformanceReviewDialog", () => {
     expect(await screen.findByText("A neutral summary.")).toBeInTheDocument();
     expect(screen.getByText("Clear communicator")).toBeInTheDocument();
     expect(screen.getByText("Delegate more")).toBeInTheDocument();
-    expect(PerformanceReviewsAPI.askAI).toHaveBeenCalledWith("2026-h1", "e1");
+    expect(PerformanceReviewsAPI.askAI).toHaveBeenCalledWith("2026-h1", "e1", "en");
   });
 
   it("shows a static unavailable message, never the raw server error, when the AI call fails", async () => {

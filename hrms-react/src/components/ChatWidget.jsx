@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { AiAPI } from "../api";
+import { useLanguage } from "../context/LanguageContext";
 import Button from "./Button";
 
 // Solo Gaps Milestone 2 — scoped product-help chat widget. Mounted once in
@@ -36,6 +37,7 @@ function CloseIcon({ size = 14 }) {
 
 function ChatWidget() {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -56,7 +58,7 @@ function ChatWidget() {
     setInput("");
     setSending(true);
     try {
-      const res = await AiAPI.chat(message, history);
+      const res = await AiAPI.chat(message, history, language);
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
     } catch {
       // Never surface the raw server error — it can leak backend config

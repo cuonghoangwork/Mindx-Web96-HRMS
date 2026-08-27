@@ -9,6 +9,7 @@ import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
 import { logAction } from "../utils/auditLog.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
+import { AppError } from "../utils/appError.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
@@ -90,14 +91,45 @@ const { list, review: factoryReview } = createReviewRequestController({
       return {
         title: "Promotion request rejected",
         message: `Your promotion request was not approved.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+        titleKey: "promotionRejected",
+        messageKey: request.reviewNote ? "promotionRejectedWithNote" : "promotionRejected",
+        params: request.reviewNote ? { note: request.reviewNote } : undefined,
       };
     }
     const parts = [];
     if (request.proposedPositionLevel) parts.push(`new level: ${request.proposedPositionLevel}`);
     if (request.proposedDesignation) parts.push(`new title: ${request.proposedDesignation}`);
+    const hasLevel = Boolean(request.proposedPositionLevel);
+    const hasDesignation = Boolean(request.proposedDesignation);
+    let approvedKeys = {};
+    if (hasLevel && hasDesignation) {
+      approvedKeys = {
+        titleKey: "promotionApproved",
+        messageKey: "promotionApprovedBoth",
+        params: { newLevel: request.proposedPositionLevel, newDesignation: request.proposedDesignation },
+      };
+    } else if (hasLevel) {
+      approvedKeys = {
+        titleKey: "promotionApproved",
+        messageKey: "promotionApprovedLevelOnly",
+        params: { newLevel: request.proposedPositionLevel },
+      };
+    } else if (hasDesignation) {
+      approvedKeys = {
+        titleKey: "promotionApproved",
+        messageKey: "promotionApprovedDesignationOnly",
+        params: { newDesignation: request.proposedDesignation },
+      };
+    } else {
+      approvedKeys = {
+        titleKey: "promotionApproved",
+        messageKey: "promotionApprovedOther",
+      };
+    }
     return {
       title: "Promotion approved",
       message: `Your promotion has been approved${parts.length ? ` — ${parts.join(", ")}` : ""}. Your HR record has been updated.`,
+      ...approvedKeys,
     };
   },
   employeeLink: (request) => `/employees/${request.employee._id ?? request.employee}`,
@@ -113,19 +145,21 @@ const promotionRequestController = {
         return res.status(400).json({
           success: false,
           message: `positionLevel must be one of: ${POSITION_LEVELS.join(", ")}.`,
+          code: "INVALID_POSITION_LEVEL",
+          params: { levels: POSITION_LEVELS.join(", ") },
         });
       }
 
       const employee = await EmployeeModel.findById(employeeId).populate("department", "name");
       if (!employee) {
-        return res.status(404).json({ success: false, message: "Employee not found." });
+        return res.status(404).json({ success: false, message: "Employee not found.", code: "EMPLOYEE_NOT_FOUND" });
       }
 
       // MANAGER can only propose promotions for employees in their own
       // department, and can't use a promotion to move someone to another one.
       if (req.user.role === "MANAGER") {
         if (!(await hasCapability("MANAGER", "proposePromotions"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE });
+          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
         }
         const deptId = await getManagerDepartmentId(req);
         const empDeptId = employee.department?._id ?? employee.department;
@@ -133,12 +167,14 @@ const promotionRequestController = {
           return res.status(403).json({
             success: false,
             message: "You can only propose promotions for employees in your own department.",
+            code: "PROMOTION_OUTSIDE_MANAGER_DEPARTMENT",
           });
         }
         if (department && String(department) !== String(employee.department?.name ?? "")) {
           return res.status(403).json({
             success: false,
             message: "You cannot propose moving an employee to a different department.",
+            code: "CANNOT_PROPOSE_DEPARTMENT_CHANGE",
           });
         }
       }
@@ -147,6 +183,8 @@ const promotionRequestController = {
         PromotionRequestModel,
         employee._id,
         `${employee.name} already has a pending promotion proposal. It must be reviewed before another is submitted.`,
+        "PENDING_PROMOTION_REQUEST_EXISTS",
+        { name: employee.name },
       );
 
       const currentDepartmentName = employee.department?.name ?? null;
@@ -192,6 +230,7 @@ const promotionRequestController = {
           success: false,
           message:
             "The proposal matches the employee's current designation, department and salary — nothing to change.",
+          code: "PROMOTION_PROPOSAL_NO_CHANGES",
         });
       }
 
@@ -209,6 +248,9 @@ const promotionRequestController = {
             link: "/employees",
             linkLabel: "Review promotion queue",
             read: false,
+            titleKey: "promotionProposalAwaitingReview",
+            messageKey: "promotionProposalAwaitingReview",
+            params: { employeeName: employee.name, employeeId: employee.employeeId },
           }),
         ),
       );
@@ -223,7 +265,12 @@ const promotionRequestController = {
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({
+        success: false,
+        message: error.message,
+        code: error instanceof AppError ? error.code : undefined,
+        params: error instanceof AppError ? error.params : undefined,
+      });
     }
   },
 
@@ -233,7 +280,7 @@ const promotionRequestController = {
     try {
       const request = await PromotionRequestModel.findById(req.params.id);
       if (!request) {
-        return res.status(404).json({ success: false, message: "Promotion request not found." });
+        return res.status(404).json({ success: false, message: "Promotion request not found.", code: "PROMOTION_REQUEST_NOT_FOUND" });
       }
 
       if (String(request.requestedBy) === String(req.user.id)) {
@@ -241,13 +288,14 @@ const promotionRequestController = {
           success: false,
           message:
             "You cannot review a promotion proposal you created yourself. Ask another Administrator to review it.",
+          code: "CANNOT_REVIEW_OWN_PROMOTION",
         });
       }
 
       if (request.status !== "pending") {
         return res
           .status(409)
-          .json({ success: false, message: "This request has already been reviewed." });
+          .json({ success: false, message: "This request has already been reviewed.", code: "PROMOTION_REQUEST_ALREADY_REVIEWED" });
       }
 
       if (req.body?.decision === "approved") {
@@ -255,7 +303,7 @@ const promotionRequestController = {
         if (!employee) {
           return res
             .status(409)
-            .json({ success: false, message: "The employee for this proposal no longer exists." });
+            .json({ success: false, message: "The employee for this proposal no longer exists.", code: "PROMOTION_EMPLOYEE_NOT_FOUND" });
         }
         if (request.proposedDepartment) {
           const dept = await DepartmentModel.findById(request.proposedDepartment);
@@ -263,6 +311,8 @@ const promotionRequestController = {
             return res.status(409).json({
               success: false,
               message: `Department "${request.proposedDepartmentName}" no longer exists. Recreate it or reject this proposal.`,
+              code: "PROMOTION_DEPARTMENT_NOT_FOUND",
+              params: { department: request.proposedDepartmentName },
             });
           }
         }
@@ -289,7 +339,12 @@ const promotionRequestController = {
       }
     } catch (error) {
       if (!res.headersSent) {
-        res.status(400).json({ success: false, message: error.message });
+        res.status(400).json({
+          success: false,
+          message: error.message,
+          code: error instanceof AppError ? error.code : undefined,
+          params: error instanceof AppError ? error.params : undefined,
+        });
       }
     }
   },

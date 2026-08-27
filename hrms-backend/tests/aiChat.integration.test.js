@@ -99,6 +99,29 @@ describe("POST /ai/chat", () => {
     for (let i = 4; i < 10; i += 1) expect(prompt).toContain(`msg${i}`);
   });
 
+  it("asks Gemini to respond in Vietnamese when the client's language is 'vi'", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    askGemini.mockResolvedValue("Vào trang Ngày lễ để xin nghỉ phép.");
+
+    await request
+      .post(chatUrl)
+      .set(auth(org.tokens.dev))
+      .send({ message: "How do I request leave?", language: "vi" });
+
+    const prompt = askGemini.mock.calls[0][0];
+    expect(prompt).toContain("Respond in Vietnamese.");
+  });
+
+  it("defaults to English when no language is sent", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    askGemini.mockResolvedValue("Head to the Holidays page to request leave.");
+
+    await request.post(chatUrl).set(auth(org.tokens.dev)).send({ message: "How do I request leave?" });
+
+    const prompt = askGemini.mock.calls[0][0];
+    expect(prompt).toContain("Respond in English.");
+  });
+
   it("returns a clean error response when the AI call fails, not a crash", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const err = new Error("AI chat isn't configured yet (GEMINI_API_KEY is unset).");

@@ -25,7 +25,7 @@ const auditLogController = {
 
       res.json({ success: true, items });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -70,7 +70,7 @@ const auditLogController = {
 
       res.json({ success: true, items: enriched });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

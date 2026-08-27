@@ -10,6 +10,7 @@
  */
 
 import { COMPETENCIES, COMPETENCY_LABELS } from "../model/PerformanceReview.js";
+import { languageNameFor } from "./language.js";
 
 function competencyLines(competencies) {
   return COMPETENCIES.map((key) => {
@@ -31,9 +32,10 @@ function peerFeedbackLines(peerFeedback) {
   return peerFeedback.map((p) => `${p.name} (${p.relation || "—"}): ${p.comments}`).join("\n");
 }
 
-export function buildInsightPrompt({ employee, cycle, review }) {
+export function buildInsightPrompt({ employee, cycle, review, language }) {
   const employeeName = employee?.name ?? "an employee";
   const cycleLabel = cycle?.label ?? cycle?.key ?? "this cycle";
+  const languageName = languageNameFor(language);
 
   return (
     `You are an HR assistant reviewing performance review data for ${employeeName}, cycle ${cycleLabel}.\n\n` +
@@ -47,7 +49,7 @@ export function buildInsightPrompt({ employee, cycle, review }) {
     `"summary" is a neutral 2-3 sentence overview of the review. "strengths" is 1-3 short phrases naming what ` +
     `stood out positively. "growthAreas" is 1-2 short, specific, actionable suggestions. If the review content is ` +
     `too sparse to say anything meaningful, note that plainly in "summary" instead of inventing detail. Keep the ` +
-    `total response under 120 words.`
+    `total response under 120 words. Write the "summary", "strengths", and "growthAreas" text in ${languageName}.`
   );
 }
 

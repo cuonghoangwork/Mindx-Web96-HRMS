@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { translateNotification } from "../utils/notifications";
 import AddNotificationModal from "../components/AddNotificationModal";
 import Button from "../components/Button";
 
@@ -114,6 +116,7 @@ function Notifications() {
     getAppNow,
   } = useStore();
   const { isHRTier } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   const now = getAppNow();
@@ -266,6 +269,7 @@ function Notifications() {
               const cfg = CATEGORY_CONFIG[notification.category] ?? CATEGORY_CONFIG.system;
               const isExpanded = expandedId === notification.id;
               const isOpenable = Boolean(notification.link) || Boolean(notification.message);
+              const { title, message } = translateNotification(notification, t, language);
               return (
                 <div
                   key={notification.id}
@@ -315,7 +319,7 @@ function Notifications() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
                         <h3 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
-                          {notification.title}
+                          {title}
                         </h3>
                         {!notification.read && (
                           <span
@@ -341,7 +345,7 @@ function Notifications() {
                           overflow: !isExpanded && !notification.link ? "hidden" : undefined,
                         }}
                       >
-                        {notification.message}
+                        {message}
                       </p>
                       <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-disabled)", marginTop: "var(--sp-2)", display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                         <span>{t(cfg.labelKey)} • {timeAgo(notification.timestamp, now, t)}</span>

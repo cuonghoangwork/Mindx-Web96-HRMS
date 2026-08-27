@@ -92,4 +92,19 @@ describe("buildInsightPrompt", () => {
     expect(prompt).toContain("Self rating: — — (none)");
     expect(prompt).toContain("Manager rating: — — (none)");
   });
+
+  it("defaults to English when language is omitted", () => {
+    const prompt = buildInsightPrompt({ employee: { name: "Dev One" }, cycle: { label: "H2 2026" }, review: REVIEW });
+    expect(prompt).toContain('Write the "summary", "strengths", and "growthAreas" text in English.');
+  });
+
+  it("asks for Vietnamese text when language is 'vi'", () => {
+    const prompt = buildInsightPrompt({
+      employee: { name: "Dev One" },
+      cycle: { label: "H2 2026" },
+      review: REVIEW,
+      language: "vi",
+    });
+    expect(prompt).toContain('Write the "summary", "strengths", and "growthAreas" text in Vietnamese.');
+  });
 });

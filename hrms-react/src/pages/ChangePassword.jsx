@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/Button";
@@ -6,6 +7,7 @@ import AuthBrandPanel from "../components/AuthBrandPanel";
 import AuthThemeToggle from "../components/AuthThemeToggle";
 
 function ChangePassword() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { changePassword, mustChangePassword, user, logout } = useAuth();
 
@@ -16,10 +18,10 @@ function ChangePassword() {
   const [isSaving, setIsSaving] = useState(false);
 
   const validate = () => {
-    if (!currentPassword) return "Enter your current password.";
-    if (newPassword.length < 8) return "New password must be at least 8 characters.";
-    if (newPassword === currentPassword) return "New password must be different from the current one.";
-    if (newPassword !== confirmPassword) return "The two new passwords do not match.";
+    if (!currentPassword) return t("auth.changePassword.errors.currentRequired", { defaultValue: "Enter your current password." });
+    if (newPassword.length < 8) return t("auth.changePassword.errors.tooShort", { defaultValue: "New password must be at least 8 characters." });
+    if (newPassword === currentPassword) return t("auth.changePassword.errors.sameAsCurrent", { defaultValue: "New password must be different from the current one." });
+    if (newPassword !== confirmPassword) return t("auth.changePassword.errors.mismatch", { defaultValue: "The two new passwords do not match." });
     return "";
   };
 
@@ -52,12 +54,12 @@ function ChangePassword() {
 
         <div className="login-card">
         <div className="login-header">
-          <h1>{mustChangePassword ? "Set your password" : "Change password"}</h1>
+          <h1>{mustChangePassword ? t("auth.changePassword.setPasswordHeading", { defaultValue: "Set your password" }) : t("auth.changePassword.changePasswordHeading", { defaultValue: "Change password" })}</h1>
         </div>
         <p className="login-subtitle">
           {mustChangePassword
-            ? "Your account uses a temporary password. Choose a new one to continue."
-            : "Choose a new password for your account."}
+            ? t("auth.changePassword.mustChangeSubtitle", { defaultValue: "Your account uses a temporary password. Choose a new one to continue." })
+            : t("auth.changePassword.subtitle", { defaultValue: "Choose a new password for your account." })}
         </p>
 
         {user?.email && (
@@ -72,7 +74,7 @@ function ChangePassword() {
               color: "var(--txt-secondary)",
             }}
           >
-            Signed in as <strong style={{ color: "var(--txt-primary)" }}>{user.email}</strong>
+            {t("auth.changePassword.signedInAsPrefix", { defaultValue: "Signed in as" })} <strong style={{ color: "var(--txt-primary)" }}>{user.email}</strong>
           </div>
         )}
 
@@ -84,7 +86,7 @@ function ChangePassword() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="currentPassword">Current password</label>
+            <label htmlFor="currentPassword">{t("auth.changePassword.currentPasswordLabel", { defaultValue: "Current password" })}</label>
             <input
               type="password"
               id="currentPassword"
@@ -97,13 +99,13 @@ function ChangePassword() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="newPassword">New password</label>
+            <label htmlFor="newPassword">{t("auth.changePassword.newPasswordLabel", { defaultValue: "New password" })}</label>
             <input
               type="password"
               id="newPassword"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder={t("auth.common.atLeast8CharsHint", { defaultValue: "At least 8 characters" })}
               required
               minLength={8}
               autoComplete="new-password"
@@ -111,13 +113,13 @@ function ChangePassword() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm new password</label>
+            <label htmlFor="confirmPassword">{t("auth.changePassword.confirmNewPasswordLabel", { defaultValue: "Confirm new password" })}</label>
             <input
               type="password"
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat the new password"
+              placeholder={t("auth.changePassword.confirmPlaceholder", { defaultValue: "Repeat the new password" })}
               required
               minLength={8}
               autoComplete="new-password"
@@ -130,7 +132,7 @@ function ChangePassword() {
             style={{ width: "100%" }}
             disabled={isSaving}
           >
-            {isSaving ? "Saving..." : "Update password"}
+            {isSaving ? t("auth.changePassword.savingButton", { defaultValue: "Saving..." }) : t("auth.changePassword.submitButton", { defaultValue: "Update password" })}
           </Button>
         </form>
 
@@ -147,7 +149,7 @@ function ChangePassword() {
               font: "inherit",
             }}
           >
-            Sign out
+            {t("auth.changePassword.signOutLink", { defaultValue: "Sign out" })}
           </button>
         </p>
         </div>

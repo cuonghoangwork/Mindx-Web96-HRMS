@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
 import SideMenu from "./SideMenu";
 import Header from "./Header";
@@ -7,6 +8,7 @@ import Button from "./Button";
 import ChatWidget from "./ChatWidget";
 
 function Layout() {
+  const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { loadingStore, storeError, refreshAll, toast, dismissToast } = useStore();
 
@@ -24,7 +26,7 @@ function Layout() {
         <button
           type="button"
           className="sidebar-backdrop"
-          aria-label="Close menu"
+          aria-label={t("layout.closeMenuAriaLabel", { defaultValue: "Close menu" })}
           onClick={closeSidebar}
         />
       )}
@@ -44,13 +46,13 @@ function Layout() {
                 marginBottom: "var(--sp-5)",
               }}
             >
-              <span>Couldn&apos;t load data: {storeError}</span>
+              <span>{t("layout.loadError", { error: storeError, defaultValue: "Couldn't load data: {{error}}" })}</span>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={refreshAll}
               >
-                Retry
+                {t("settings.retry", { defaultValue: "Retry" })}
               </Button>
             </div>
           ) : loadingStore ? (
@@ -96,7 +98,7 @@ function Layout() {
           <button
             type="button"
             onClick={dismissToast}
-            aria-label="Dismiss"
+            aria-label={t("notifications.item.dismiss", { defaultValue: "Dismiss" })}
             style={{
               marginLeft: "var(--sp-3)",
               background: "none",

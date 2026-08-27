@@ -13,6 +13,7 @@ export const ROLE_LABELS = {
   EMPLOYEE: "Employee",
 };
 
-export function getRoleLabel(role) {
-  return ROLE_LABELS[role] ?? role ?? "Employee";
+export function getRoleLabel(role, t) {
+  const fallback = ROLE_LABELS[role] ?? role ?? "Employee";
+  return t ? t(`common.roles.${role}`, { defaultValue: fallback }) : fallback;
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { NotificationsAPI } from "../api";
+import { translateApiError } from "../utils/apiError";
 import Button from "./Button";
 
 const TITLE_MAX = 120;
@@ -13,6 +15,7 @@ const MESSAGE_MAX = 2000;
  *   onSend  — async (payload) => void, called with the composed notification payload
  */
 function AddNotificationModal({ onClose, onSend }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [link, setLink] = useState("");
@@ -29,9 +32,9 @@ function AddNotificationModal({ onClose, onSend }) {
     setLoadingEmployees(true);
     NotificationsAPI.recipients()
       .then((res) => setEmployees(res.items || []))
-      .catch((err) => setError(err.message || "Failed to load employees."))
+      .catch((err) => setError(translateApiError(err, t) || t("notifications.addModal.errors.loadEmployeesFailed", { defaultValue: "Failed to load employees." })))
       .finally(() => setLoadingEmployees(false));
-  }, [recipientMode, employees.length]);
+  }, [recipientMode, employees.length, t]);
 
   const toggleRecipient = (id) => {
     setRecipientIds((prev) =>
@@ -58,19 +61,19 @@ function AddNotificationModal({ onClose, onSend }) {
     const trimmedMessage = message.trim();
 
     if (!trimmedTitle) {
-      setError("A title is required.");
+      setError(t("notifications.addModal.errors.titleRequired", { defaultValue: "A title is required." }));
       return;
     }
     if (trimmedTitle.length > TITLE_MAX) {
-      setError(`Title must be ${TITLE_MAX} characters or fewer.`);
+      setError(t("notifications.addModal.errors.titleTooLong", { max: TITLE_MAX, defaultValue: "Title must be {{max}} characters or fewer." }));
       return;
     }
     if (trimmedMessage.length > MESSAGE_MAX) {
-      setError(`Message must be ${MESSAGE_MAX} characters or fewer.`);
+      setError(t("notifications.addModal.errors.messageTooLong", { max: MESSAGE_MAX, defaultValue: "Message must be {{max}} characters or fewer." }));
       return;
     }
     if (recipientMode === "individual" && recipientIds.length === 0) {
-      setError("Select at least one recipient.");
+      setError(t("notifications.addModal.errors.selectRecipient", { defaultValue: "Select at least one recipient." }));
       return;
     }
 
@@ -97,7 +100,7 @@ function AddNotificationModal({ onClose, onSend }) {
       await onSend(payload);
       onClose();
     } catch (err) {
-      setError(err.message || "Failed to send notice.");
+      setError(translateApiError(err, t) || t("notifications.addModal.errors.sendFailed", { defaultValue: "Failed to send notice." }));
     } finally {
       setSubmitting(false);
     }
@@ -106,12 +109,19 @@ function AddNotificationModal({ onClose, onSend }) {
   const titleOverLimit = title.length > TITLE_MAX;
   const messageOverLimit = message.length > MESSAGE_MAX;
 
+  const recipientOptions = [
+    { value: "all", label: t("notifications.addModal.recipientOptions.all", { defaultValue: "Everyone" }) },
+    { value: "employees", label: t("notifications.addModal.recipientOptions.employees", { defaultValue: "All Employees (excludes HR/Admin)" }) },
+    { value: "hr", label: t("notifications.addModal.recipientOptions.hr", { defaultValue: "HR & Admin only" }) },
+    { value: "individual", label: t("notifications.addModal.recipientOptions.individual", { defaultValue: "Specific employee(s)" }) },
+  ];
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "560px" }}>
         <div className="modal-header">
-          <h2>Send Notice</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+          <h2>{t("notifications.addModal.title", { defaultValue: "Send Notice" })}</h2>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t("common.actions.close", { defaultValue: "Close" })}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
@@ -121,14 +131,14 @@ function AddNotificationModal({ onClose, onSend }) {
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label" htmlFor="notice-title">
-              Title<span className="required">*</span>
+              {t("notifications.addModal.titleLabel", { defaultValue: "Title" })}<span className="required">*</span>
             </label>
             <input
               type="text"
               id="notice-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Office closed Friday"
+              placeholder={t("notifications.addModal.titlePlaceholder", { defaultValue: "e.g. Office closed Friday" })}
               maxLength={TITLE_MAX + 20}
               required
               className={titleOverLimit ? "error" : ""}
@@ -147,14 +157,14 @@ function AddNotificationModal({ onClose, onSend }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="notice-message">
-              Message
+              {t("notifications.addModal.messageLabel", { defaultValue: "Message" })}
             </label>
             <textarea
               id="notice-message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
-              placeholder="Details for the recipient(s)..."
+              placeholder={t("notifications.addModal.messagePlaceholder", { defaultValue: "Details for the recipient(s)..." })}
               style={{ resize: "vertical" }}
               className={messageOverLimit ? "error" : ""}
             />
@@ -172,29 +182,24 @@ function AddNotificationModal({ onClose, onSend }) {
 
           <div className="form-group">
             <label className="form-label" htmlFor="notice-link">
-              Link <span style={{ fontWeight: "var(--fw-regular)", color: "var(--txt-secondary)" }}>(optional)</span>
+              {t("notifications.addModal.linkLabel", { defaultValue: "Link" })} <span style={{ fontWeight: "var(--fw-regular)", color: "var(--txt-secondary)" }}>{t("settings.optional", { defaultValue: "(optional)" })}</span>
             </label>
             <input
               type="text"
               id="notice-link"
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="e.g. /holidays"
+              placeholder={t("notifications.addModal.linkPlaceholder", { defaultValue: "e.g. /holidays" })}
             />
             <span className="form-hint">
-              An in-app path the notice will open when clicked, e.g. /holidays or /employees/123
+              {t("notifications.addModal.linkHint", { defaultValue: "An in-app path the notice will open when clicked, e.g. /holidays or /employees/123" })}
             </span>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Recipients</label>
+            <label className="form-label">{t("notifications.addModal.recipientsLabel", { defaultValue: "Recipients" })}</label>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
-              {[
-                { value: "all", label: "Everyone" },
-                { value: "employees", label: "All Employees (excludes HR/Admin)" },
-                { value: "hr", label: "HR & Admin only" },
-                { value: "individual", label: "Specific employee(s)" },
-              ].map((opt) => (
+              {recipientOptions.map((opt) => (
                 <label
                   key={opt.value}
                   style={{
@@ -222,7 +227,7 @@ function AddNotificationModal({ onClose, onSend }) {
           {recipientMode === "individual" && (
             <div className="form-group">
               {loadingEmployees ? (
-                <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>Loading employees…</p>
+                <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("notifications.addModal.loadingEmployees", { defaultValue: "Loading employees…" })}</p>
               ) : (
                 <>
                   {employees.length > 5 && (
@@ -230,7 +235,7 @@ function AddNotificationModal({ onClose, onSend }) {
                       type="text"
                       value={recipientSearch}
                       onChange={(e) => setRecipientSearch(e.target.value)}
-                      placeholder="Search by name, ID, or email..."
+                      placeholder={t("notifications.addModal.recipientSearchPlaceholder", { defaultValue: "Search by name, ID, or email..." })}
                       style={{ marginBottom: "var(--sp-2)" }}
                     />
                   )}
@@ -245,7 +250,9 @@ function AddNotificationModal({ onClose, onSend }) {
                   >
                     {filteredEmployees.length === 0 && (
                       <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", padding: "var(--sp-2)" }}>
-                        {employees.length === 0 ? "No employees found." : "No matches for your search."}
+                        {employees.length === 0
+                          ? t("notifications.addModal.noEmployeesFound", { defaultValue: "No employees found." })
+                          : t("notifications.addModal.noSearchMatches", { defaultValue: "No matches for your search." })}
                       </p>
                     )}
                     {filteredEmployees.map((emp) => (
@@ -269,7 +276,7 @@ function AddNotificationModal({ onClose, onSend }) {
                         <span>{emp.name}</span>
                         <span style={{ color: "var(--txt-secondary)", fontSize: "var(--fs-xs)" }}>
                           {emp.employeeId}
-                          {!emp.hasAccount && " · no account"}
+                          {!emp.hasAccount && t("notifications.addModal.noAccountSuffix", { defaultValue: " · no account" })}
                         </span>
                       </label>
                     ))}
@@ -277,21 +284,21 @@ function AddNotificationModal({ onClose, onSend }) {
                 </>
               )}
               {recipientIds.length > 0 && (
-                <span className="form-hint">{recipientIds.length} selected</span>
+                <span className="form-hint">{t("notifications.addModal.selectedCount", { count: recipientIds.length, defaultValue_one: "{{count}} selected", defaultValue_other: "{{count}} selected" })}</span>
               )}
             </div>
           )}
 
           <div className="modal-actions">
             <Button variant="secondary" onClick={onClose}>
-              Cancel
+              {t("common.actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               variant="primary"
               type="submit"
               disabled={submitting || titleOverLimit || messageOverLimit}
             >
-              {submitting ? "Sending…" : "Send Notice"}
+              {submitting ? t("notifications.addModal.sendingEllipsis", { defaultValue: "Sending…" }) : t("notifications.addModal.title", { defaultValue: "Send Notice" })}
             </Button>
           </div>
         </form>

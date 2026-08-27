@@ -5,6 +5,7 @@ import EmployeeModel from "../model/Employee.js";
 import { signTokens } from "../utils/tokens.js";
 import { notifyHR } from "./notificationController.js";
 import { publicRegistrationEnabled, accountEmailDomain } from "../middleware/registrationGate.js";
+import { AppError } from "../utils/appError.js";
 
 const SALT_ROUNDS = 10;
 
@@ -44,13 +45,13 @@ const authController = {
   register: async (req, res) => {
     try {
       const { email, password, name } = req.body;
-      if (!email) throw new Error("email is required!");
-      if (!password) throw new Error("password is required!");
-      if (!name) throw new Error("name is required!");
-      if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+      if (!email) throw new AppError("email is required!", "AUTH_EMAIL_REQUIRED");
+      if (!password) throw new AppError("password is required!", "PASSWORD_REQUIRED");
+      if (!name) throw new AppError("name is required!", "AUTH_NAME_REQUIRED");
+      if (password.length < 8) throw new AppError("Password must be at least 8 characters.", "PASSWORD_TOO_SHORT");
 
       const existing = await UserModel.findOne({ email: email.toLowerCase() });
-      if (existing) throw new Error("An account with this email already exists.");
+      if (existing) throw new AppError("An account with this email already exists.", "ACCOUNT_EMAIL_EXISTS");
 
       const salt = bcrypt.genSaltSync(SALT_ROUNDS);
       const hash = bcrypt.hashSync(password, salt);
@@ -77,6 +78,9 @@ const authController = {
         category: "employee",
         link: "/settings",
         linkLabel: "Manage user roles",
+        titleKey: "accountRegistered",
+        messageKey: "accountRegistered",
+        params: { userName: newUser.name, userEmail: newUser.email },
       });
 
       res.status(201).json({
@@ -85,23 +89,23 @@ const authController = {
         message: "Account created successfully.",
       });
     } catch (error) {
-      res.status(400).json({ success: false, data: null, message: error.message });
+      res.status(400).json({ success: false, data: null, message: error.message, code: error.code, params: error.params });
     }
   },
 
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
-      if (!email || !password) throw new Error("email and password are required.");
+      if (!email || !password) throw new AppError("email and password are required.", "EMAIL_AND_PASSWORD_REQUIRED");
 
       const user = await UserModel.findOne({ email: email.toLowerCase() });
       if (!user) {
-        return res.status(400).json({ success: false, message: "Email or password is incorrect." });
+        return res.status(400).json({ success: false, message: "Email or password is incorrect.", code: "INVALID_CREDENTIALS" });
       }
 
       const isMatch = bcrypt.compareSync(password, user.password);
       if (!isMatch) {
-        return res.status(400).json({ success: false, message: "Email or password is incorrect." });
+        return res.status(400).json({ success: false, message: "Email or password is incorrect.", code: "INVALID_CREDENTIALS" });
       }
 
       const mustChangePassword = Boolean(user.mustChangePassword);
@@ -133,7 +137,7 @@ const authController = {
         },
       });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -141,22 +145,22 @@ const authController = {
     try {
       const { refresh_token } = req.body;
       if (!refresh_token) {
-        return res.status(401).json({ success: false, message: "No refresh token provided." });
+        return res.status(401).json({ success: false, message: "No refresh token provided.", code: "NO_REFRESH_TOKEN" });
       }
 
       let decoded;
       try {
         decoded = jwt.verify(refresh_token, process.env.RT_SECRETKEY);
       } catch {
-        return res.status(401).json({ success: false, message: "Refresh token is invalid or expired." });
+        return res.status(401).json({ success: false, message: "Refresh token is invalid or expired.", code: "REFRESH_TOKEN_INVALID" });
       }
       if (decoded.tokenType !== "RT") {
-        return res.status(401).json({ success: false, message: "Invalid token type." });
+        return res.status(401).json({ success: false, message: "Invalid token type.", code: "INVALID_TOKEN_TYPE" });
       }
 
       const user = await UserModel.findById(decoded.id);
       if (!user || user.refreshToken !== refresh_token) {
-        return res.status(401).json({ success: false, message: "Refresh token is no longer valid." });
+        return res.status(401).json({ success: false, message: "Refresh token is no longer valid.", code: "REFRESH_TOKEN_REVOKED" });
       }
 
       const { access_token, refresh_token: new_refresh_token } = signTokens({
@@ -171,7 +175,7 @@ const authController = {
 
       res.json({ success: true, data: { access_token, refresh_token: new_refresh_token } });
     } catch (error) {
-      res.status(401).json({ success: false, message: error.message });
+      res.status(401).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -180,14 +184,14 @@ const authController = {
       await UserModel.findByIdAndUpdate(req.user.id, { refreshToken: null });
       res.json({ success: true, message: "Logged out." });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   me: async (req, res) => {
     try {
       const user = await UserModel.findById(req.user.id).select("-password -refreshToken");
-      if (!user) throw new Error("User not found.");
+      if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
       const employeeId = await resolveEmployeeId(user);
       res.json({
         success: true,
@@ -201,29 +205,29 @@ const authController = {
         },
       });
     } catch (error) {
-      res.status(404).json({ success: false, message: error.message });
+      res.status(404).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   changePassword: async (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
-      if (!currentPassword) throw new Error("currentPassword is required.");
-      if (!newPassword) throw new Error("newPassword is required.");
+      if (!currentPassword) throw new AppError("currentPassword is required.", "CURRENT_PASSWORD_REQUIRED");
+      if (!newPassword) throw new AppError("newPassword is required.", "NEW_PASSWORD_REQUIRED");
       if (newPassword.length < 8) {
-        throw new Error("New password must be at least 8 characters.");
+        throw new AppError("New password must be at least 8 characters.", "NEW_PASSWORD_TOO_SHORT");
       }
       if (newPassword === currentPassword) {
-        throw new Error("New password must be different from the current password.");
+        throw new AppError("New password must be different from the current password.", "NEW_PASSWORD_SAME_AS_CURRENT");
       }
 
       const user = await UserModel.findById(req.user.id);
-      if (!user) throw new Error("User not found.");
+      if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
 
       if (!bcrypt.compareSync(currentPassword, user.password)) {
         return res
           .status(400)
-          .json({ success: false, message: "Current password is incorrect." });
+          .json({ success: false, message: "Current password is incorrect.", code: "CURRENT_PASSWORD_INCORRECT" });
       }
 
       const salt = bcrypt.genSaltSync(SALT_ROUNDS);
@@ -258,7 +262,7 @@ const authController = {
         },
       });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -279,7 +283,7 @@ const authController = {
         })),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -291,16 +295,18 @@ const authController = {
         return res.status(400).json({
           success: false,
           message: "role must be one of EMPLOYEE, MANAGER, HR or ADMIN.",
+          code: "INVALID_ROLE",
         });
       }
 
       const target = await UserModel.findById(req.params.id);
-      if (!target) throw new Error("User not found.");
+      if (!target) throw new AppError("User not found.", "USER_NOT_FOUND");
 
       if (String(target._id) === String(req.user.id)) {
         return res.status(403).json({
           success: false,
           message: "You cannot change your own role.",
+          code: "CANNOT_CHANGE_OWN_ROLE",
         });
       }
 
@@ -328,7 +334,7 @@ const authController = {
         data: { id: target._id, email: target.email, name: target.name, role: target.role },
       });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

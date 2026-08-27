@@ -14,7 +14,7 @@ const permissionController = {
       const items = await RolePermissionModel.find({ role: "MANAGER" }).sort({ capability: 1 });
       res.json({ success: true, items: items.map(toClient) });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -24,16 +24,26 @@ const permissionController = {
     try {
       const { role, capability } = req.params;
       if (role !== "MANAGER") {
-        return res.status(400).json({ success: false, message: "Only MANAGER capabilities can be toggled." });
+        return res.status(400).json({
+          success: false,
+          message: "Only MANAGER capabilities can be toggled.",
+          code: "ONLY_MANAGER_CAPABILITIES_TOGGLEABLE",
+        });
       }
       if (!MANAGER_CAPABILITIES.includes(capability)) {
         return res.status(400).json({
           success: false,
           message: `capability must be one of: ${MANAGER_CAPABILITIES.join(", ")}.`,
+          code: "CAPABILITY_INVALID",
+          params: { capabilities: MANAGER_CAPABILITIES.join(", ") },
         });
       }
       if (typeof req.body.enabled !== "boolean") {
-        return res.status(400).json({ success: false, message: "enabled must be true or false." });
+        return res.status(400).json({
+          success: false,
+          message: "enabled must be true or false.",
+          code: "ENABLED_MUST_BE_BOOLEAN",
+        });
       }
 
       const doc = await RolePermissionModel.findOneAndUpdate(
@@ -44,7 +54,7 @@ const permissionController = {
 
       res.json({ success: true, data: toClient(doc) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

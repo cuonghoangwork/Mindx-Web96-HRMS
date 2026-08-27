@@ -149,7 +149,7 @@ const payrollController = {
         items: periods.map((p) => periodToClient(p, totals.get(String(p._id)))),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -167,6 +167,8 @@ const payrollController = {
         return res.status(409).json({
           success: false,
           message: `A payroll period for ${year}-${String(month).padStart(2, "0")} already exists.`,
+          code: "PAYROLL_PERIOD_ALREADY_EXISTS",
+          params: { year, month: String(month).padStart(2, "0") },
         });
       }
 
@@ -186,6 +188,7 @@ const payrollController = {
         return res.status(400).json({
           success: false,
           message: "No payable employees exist for this period. Add employees first.",
+          code: "NO_PAYABLE_EMPLOYEES",
         });
       }
 
@@ -202,6 +205,9 @@ const payrollController = {
       notifyHR({
         title: "Payroll drafts generated",
         message: `${generated} draft payslip${generated === 1 ? "" : "s"} generated for ${periodLabel(created)}.`,
+        titleKey: "payrollDraftsGenerated",
+        messageKey: "payrollDraftsGenerated",
+        params: { count: generated, periodLabel: periodLabel(created) },
         category: "payroll",
         link: "/payroll",
         linkLabel: "Open payroll",
@@ -220,9 +226,9 @@ const payrollController = {
       if (error?.code === 11000) {
         return res
           .status(409)
-          .json({ success: false, message: "A payroll period for that month already exists." });
+          .json({ success: false, message: "A payroll period for that month already exists.", code: "PAYROLL_PERIOD_DUPLICATE_KEY" });
       }
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -230,12 +236,13 @@ const payrollController = {
     try {
       const period = await PayrollPeriodModel.findById(req.params.id);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
       if (period.status !== "draft") {
         return res.status(409).json({
           success: false,
           message: "Only a draft period can be regenerated.",
+          code: "ONLY_DRAFT_PERIOD_REGENERATABLE",
         });
       }
 
@@ -258,7 +265,7 @@ const payrollController = {
         warning: "Manual bonus, allowance and deduction edits for this period were discarded.",
       });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -266,7 +273,7 @@ const payrollController = {
     try {
       const period = await PayrollPeriodModel.findById(req.params.id);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
 
       const condition = { period: period._id };
@@ -285,7 +292,7 @@ const payrollController = {
         items: payslips.map((p) => payslipToClient(p, period)),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -293,16 +300,17 @@ const payrollController = {
     try {
       const payslip = await PayslipModel.findById(req.params.id);
       if (!payslip) {
-        return res.status(404).json({ success: false, message: "Payslip not found." });
+        return res.status(404).json({ success: false, message: "Payslip not found.", code: "PAYSLIP_NOT_FOUND" });
       }
       const period = await PayrollPeriodModel.findById(payslip.period);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
       if (period.status !== "draft") {
         return res.status(409).json({
           success: false,
           message: "Payslips can only be edited while the pay period is a draft.",
+          code: "PAYSLIP_LOCKED",
         });
       }
 
@@ -325,6 +333,7 @@ const payrollController = {
         return res.status(400).json({
           success: false,
           message: "Deduction cannot exceed base salary plus bonus plus allowance.",
+          code: "DEDUCTION_EXCEEDS_LIMIT",
         });
       }
 
@@ -359,7 +368,7 @@ const payrollController = {
 
       res.json({ success: true, data: payslipToClient(payslip, period) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -367,16 +376,17 @@ const payrollController = {
     try {
       const payslip = await PayslipModel.findById(req.params.id);
       if (!payslip) {
-        return res.status(404).json({ success: false, message: "Payslip not found." });
+        return res.status(404).json({ success: false, message: "Payslip not found.", code: "PAYSLIP_NOT_FOUND" });
       }
       const period = await PayrollPeriodModel.findById(payslip.period);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
       if (period.status !== "draft") {
         return res.status(409).json({
           success: false,
           message: "Payslips can only be edited while the pay period is a draft.",
+          code: "PAYSLIP_LOCKED",
         });
       }
 
@@ -410,7 +420,7 @@ const payrollController = {
 
       res.json({ success: true, data: payslipToClient(payslip, period) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -421,35 +431,39 @@ const payrollController = {
         return res.status(400).json({
           success: false,
           message: `status must be one of ${PAYROLL_PERIOD_STATUSES.join(", ")}.`,
+          code: "PAYROLL_STATUS_INVALID",
+          params: { statuses: PAYROLL_PERIOD_STATUSES.join(", ") },
         });
       }
 
       const period = await PayrollPeriodModel.findById(req.params.id);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
 
       const from = period.status;
       if (from === status) {
         return res
           .status(409)
-          .json({ success: false, message: `This period is already ${status}.` });
+          .json({ success: false, message: `This period is already ${status}.`, code: "PERIOD_ALREADY_IN_STATUS", params: { status } });
       }
       if (from === "paid") {
         return res.status(409).json({
           success: false,
           message: "A paid period is closed and cannot change status.",
+          code: "PAID_PERIOD_LOCKED",
         });
       }
       if (from === "draft" && status === "paid") {
         return res
           .status(409)
-          .json({ success: false, message: "Approve the period before marking it paid." });
+          .json({ success: false, message: "Approve the period before marking it paid.", code: "PERIOD_NOT_APPROVED" });
       }
       if (from === "approved" && status === "draft" && req.user.role !== "ADMIN") {
         return res.status(403).json({
           success: false,
           message: "Only an Administrator can reopen an approved period.",
+          code: "ADMIN_ONLY_REOPEN_PERIOD",
         });
       }
 
@@ -458,7 +472,7 @@ const payrollController = {
         if (!count) {
           return res
             .status(400)
-            .json({ success: false, message: "Cannot approve a period with no payslips." });
+            .json({ success: false, message: "Cannot approve a period with no payslips.", code: "CANNOT_APPROVE_EMPTY_PERIOD" });
         }
         period.approvedBy = req.user.id;
         period.approvedAt = new Date();
@@ -491,6 +505,9 @@ const payrollController = {
           category: "payroll",
           title: "Payroll paid",
           message: `${periodLabel(period)} payroll has been paid.`,
+          titleKey: "payrollPaid",
+          messageKey: "payrollPaid",
+          params: { periodLabel: periodLabel(period) },
           isCustom: false,
         });
       }
@@ -498,7 +515,7 @@ const payrollController = {
       const totals = await totalsByPeriod([period._id]);
       res.json({ success: true, data: periodToClient(period, totals.get(String(period._id))) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -506,12 +523,12 @@ const payrollController = {
     try {
       const period = await PayrollPeriodModel.findById(req.params.id);
       if (!period) {
-        return res.status(404).json({ success: false, message: "Payroll period not found." });
+        return res.status(404).json({ success: false, message: "Payroll period not found.", code: "PAYROLL_PERIOD_NOT_FOUND" });
       }
       if (period.status !== "draft") {
         return res
           .status(409)
-          .json({ success: false, message: "Only a draft period can be deleted." });
+          .json({ success: false, message: "Only a draft period can be deleted.", code: "ONLY_DRAFT_PERIOD_DELETABLE" });
       }
 
       await PayslipModel.deleteMany({ period: period._id });
@@ -526,7 +543,7 @@ const payrollController = {
 
       res.json({ success: true, message: "Payroll period deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -547,7 +564,7 @@ const payrollController = {
       const result = await generateMonthlyPayrollDraft({ asOf });
       res.json({ success: true, data: result });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -556,7 +573,7 @@ const payrollController = {
       const result = await runMonthlyPayroll({});
       res.json({ success: true, data: result });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -584,7 +601,7 @@ const payrollController = {
         items: visible.map((p) => payslipToClient(p, p.period)),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -599,7 +616,7 @@ const payrollController = {
       const year = Number(req.params.year);
       const month = Number(req.params.month);
       if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
-        return res.status(400).json({ success: false, message: "Invalid year/month." });
+        return res.status(400).json({ success: false, message: "Invalid year/month.", code: "INVALID_YEAR_MONTH" });
       }
 
       const snapshot = await getOrCreateMonthlyFxRate({ year, month });
@@ -614,7 +631,7 @@ const payrollController = {
         },
       });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

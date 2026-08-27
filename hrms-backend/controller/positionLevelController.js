@@ -20,7 +20,7 @@ const positionLevelController = {
       const items = await PositionLevelModel.find().sort({ order: 1 });
       res.json({ success: true, items: items.map(toClient) });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -34,11 +34,17 @@ const positionLevelController = {
         return res.status(400).json({
           success: false,
           message: `level must be one of: ${POSITION_LEVELS.join(", ")}.`,
+          code: "POSITION_LEVEL_INVALID",
+          params: { levels: POSITION_LEVELS.join(", ") },
         });
       }
       const { baseSalary, note } = req.body;
       if (baseSalary === undefined || isNaN(Number(baseSalary)) || Number(baseSalary) < 0) {
-        return res.status(400).json({ success: false, message: "baseSalary must be a non-negative number." });
+        return res.status(400).json({
+          success: false,
+          message: "baseSalary must be a non-negative number.",
+          code: "BASE_SALARY_INVALID",
+        });
       }
 
       const doc = await PositionLevelModel.findOneAndUpdate(
@@ -50,12 +56,14 @@ const positionLevelController = {
         return res.status(404).json({
           success: false,
           message: `PositionLevel "${level}" hasn't been seeded yet.`,
+          code: "POSITION_LEVEL_NOT_SEEDED",
+          params: { level },
         });
       }
 
       res.json({ success: true, data: toClient(doc) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

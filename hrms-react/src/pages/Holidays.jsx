@@ -1,10 +1,12 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate as formatDateLocalized } from "../utils/format";
 import { LeaveRequestsAPI } from "../api";
 import { leaveTypeLabel } from "../utils/leaveTypes";
+import { translateApiError } from "../utils/apiError";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import AddHolidayModal from "../components/AddHolidayModal";
@@ -44,9 +46,10 @@ const LEAVE_TYPE_VARIANT = { annual: "info", sick: "primary", parental: "success
    which also treats this as an HR review queue rather than a create form).
 ═══════════════════════════════════════════ */
 function LeaveRequestsPanel({ requests, loading, error, onReview, reviewingId }) {
+  const { t } = useTranslation();
   const { language } = useLanguage();
   if (loading) {
-    return <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>Loading leave requests…</div>;
+    return <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>{t("holidays.leaveRequests.loading", { defaultValue: "Loading leave requests…" })}</div>;
   }
   if (error) {
     return <div style={{ padding: "var(--sp-4)", color: "var(--txt-danger)", fontSize: "var(--fs-sm)" }}>{error}</div>;
@@ -54,8 +57,8 @@ function LeaveRequestsPanel({ requests, loading, error, onReview, reviewingId })
   if (requests.length === 0) {
     return (
       <div className="empty-state">
-        <div className="empty-state-title">No leave requests</div>
-        <div className="empty-state-description">New requests will appear here for review.</div>
+        <div className="empty-state-title">{t("holidays.leaveRequests.empty.title", { defaultValue: "No leave requests" })}</div>
+        <div className="empty-state-description">{t("holidays.leaveRequests.empty.description", { defaultValue: "New requests will appear here for review." })}</div>
       </div>
     );
   }
@@ -64,29 +67,29 @@ function LeaveRequestsPanel({ requests, loading, error, onReview, reviewingId })
       <table className="data-table">
         <thead>
           <tr>
-            <th>Employee</th>
-            <th>Type</th>
-            <th>Dates</th>
-            <th>Days</th>
-            <th>Reason</th>
-            <th>Status</th>
-            <th>Action</th>
+            <th>{t("common.columns.employee", { defaultValue: "Employee" })}</th>
+            <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+            <th>{t("holidays.leaveRequests.table.dates", { defaultValue: "Dates" })}</th>
+            <th>{t("holidays.leaveRequests.table.days", { defaultValue: "Days" })}</th>
+            <th>{t("holidays.leaveRequests.table.reason", { defaultValue: "Reason" })}</th>
+            <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
+            <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
           </tr>
         </thead>
         <tbody>
           {requests.map((r) => (
             <tr key={r.id}>
               <td style={{ fontWeight: "var(--fw-medium)" }}>{r.employeeName ?? "—"}</td>
-              <td><Badge variant={LEAVE_TYPE_VARIANT[r.type] ?? "neutral"} size="sm">{leaveTypeLabel(r.type)}</Badge></td>
+              <td><Badge variant={LEAVE_TYPE_VARIANT[r.type] ?? "neutral"} size="sm">{leaveTypeLabel(r.type, t)}</Badge></td>
               <td style={{ color: "var(--txt-secondary)" }}>{formatRange(r.startDate, r.endDate, language)}</td>
               <td style={{ color: "var(--txt-secondary)" }}>{r.days}</td>
               <td style={{ color: "var(--txt-secondary)" }}>{r.reason || "—"}</td>
-              <td><Badge variant={LEAVE_STATUS_VARIANT[r.status] ?? "neutral"} size="sm">{r.status}</Badge></td>
+              <td><Badge variant={LEAVE_STATUS_VARIANT[r.status] ?? "neutral"} size="sm">{t(`settings.statusFilter.${r.status}`, { defaultValue: r.status })}</Badge></td>
               <td>
                 {r.status === "pending" && (
                   <div style={{ display: "flex", gap: "var(--sp-2)" }}>
-                    <Button variant="primary" size="xs" loading={reviewingId === `${r.id}-approved`} onClick={() => onReview(r.id, "approved")}>Approve</Button>
-                    <Button variant="danger" size="xs" loading={reviewingId === `${r.id}-rejected`} onClick={() => onReview(r.id, "rejected")}>Reject</Button>
+                    <Button variant="primary" size="xs" loading={reviewingId === `${r.id}-approved`} onClick={() => onReview(r.id, "approved")}>{t("common.actions.approve", { defaultValue: "Approve" })}</Button>
+                    <Button variant="danger" size="xs" loading={reviewingId === `${r.id}-rejected`} onClick={() => onReview(r.id, "rejected")}>{t("common.actions.reject", { defaultValue: "Reject" })}</Button>
                   </div>
                 )}
               </td>
@@ -112,6 +115,7 @@ function balanceFor(row, type) {
    mockup's "Click a row for the full ledger" pattern.
 ═══════════════════════════════════════════ */
 function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState(null);
 
   const filtered = useMemo(() => {
@@ -125,14 +129,14 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
     <div className="content-card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
         <div>
-          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Leave balances</h3>
+          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.balances.heading", { defaultValue: "Leave balances" })}</h3>
           <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-            Click a row for the full ledger
+            {t("holidays.balances.hint", { defaultValue: "Click a row for the full ledger" })}
           </div>
         </div>
         <input
           type="text" value={search} onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search employees…"
+          placeholder={t("common.placeholders.searchEmployees", { defaultValue: "Search employees…" })}
           style={{
             fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", padding: "9px var(--sp-4)",
             background: "var(--bg-surface)", color: "var(--txt-primary)",
@@ -142,23 +146,23 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
       </div>
 
       {loading ? (
-        <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>Loading leave balances…</div>
+        <div style={{ padding: "var(--sp-6)", textAlign: "center", color: "var(--txt-secondary)", fontSize: "var(--fs-sm)" }}>{t("holidays.balances.loading", { defaultValue: "Loading leave balances…" })}</div>
       ) : error ? (
         <div style={{ padding: "var(--sp-4)", color: "var(--txt-danger)", fontSize: "var(--fs-sm)" }}>{error}</div>
       ) : filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-title">No employees match</div>
-          <div className="empty-state-description">Try a different search.</div>
+          <div className="empty-state-title">{t("holidays.balances.empty.title", { defaultValue: "No employees match" })}</div>
+          <div className="empty-state-description">{t("holidays.balances.empty.description", { defaultValue: "Try a different search." })}</div>
         </div>
       ) : (
         <div className="table-wrap">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Department</th>
-                <th>PTO remaining</th>
-                <th>Sick remaining</th>
+                <th>{t("common.columns.employee", { defaultValue: "Employee" })}</th>
+                <th>{t("common.fieldLabels.department", { defaultValue: "Department" })}</th>
+                <th>{t("holidays.balances.table.pto", { defaultValue: "PTO remaining" })}</th>
+                <th>{t("holidays.balances.table.sick", { defaultValue: "Sick remaining" })}</th>
               </tr>
             </thead>
             <tbody>
@@ -195,13 +199,17 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
                             {r.balances.map((b) => (
                               <div key={b.type}>
                                 <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                                  {b.label}
+                                  {leaveTypeLabel(b.type, t)}
                                 </div>
                                 <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", marginTop: "2px" }}>
-                                  {b.remaining ?? "—"} left
+                                  {t("holidays.balances.left", { remaining: b.remaining ?? "—", defaultValue: "{{remaining}} left" })}
                                 </div>
                                 <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>
-                                  {b.used} used of {b.accrued ?? "Unlimited"}
+                                  {t("holidays.balances.usedOf", {
+                                    used: b.used,
+                                    accrued: b.accrued ?? t("holidays.balances.unlimited", { defaultValue: "Unlimited" }),
+                                    defaultValue: "{{used}} used of {{accrued}}",
+                                  })}
                                 </div>
                               </div>
                             ))}
@@ -221,6 +229,7 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
 }
 
 function Holidays() {
+  const { t } = useTranslation();
   const { language } = useLanguage();
   const { getAppNow, holidays, addHoliday, updateHoliday, removeHoliday } = useStore();
   // /holidays is requireManager-gated (App.jsx). Two different scopes live
@@ -266,10 +275,10 @@ function Holidays() {
       const res = await LeaveRequestsAPI.list();
       setLeaveRequests(res.items ?? []);
     } catch (err) {
-      setLeaveError(err.message || "Failed to load leave requests.");
+      setLeaveError(translateApiError(err, t) || t("holidays.leaveRequests.loadFailed", { defaultValue: "Failed to load leave requests." }));
     }
     setLoadingLeave(false);
-  }, [canManageLeave]);
+  }, [canManageLeave, t]);
 
   useEffect(() => { loadLeaveRequests(); }, [loadLeaveRequests]);
 
@@ -281,10 +290,10 @@ function Holidays() {
       const res = await LeaveRequestsAPI.balances();
       setBalanceRows((res.data?.items ?? []).map((item) => ({ ...item, id: item.employeeId })));
     } catch (err) {
-      setBalanceError(err.message || "Failed to load leave balances.");
+      setBalanceError(translateApiError(err, t) || t("holidays.balances.loadFailed", { defaultValue: "Failed to load leave balances." }));
     }
     setLoadingBalances(false);
-  }, [canManageLeave]);
+  }, [canManageLeave, t]);
 
   useEffect(() => { loadBalances(); }, [loadBalances]);
 
@@ -295,7 +304,7 @@ function Holidays() {
       await loadLeaveRequests();
       await loadBalances();
     } catch (err) {
-      setActionError(err.message || "Failed to review leave request.");
+      setActionError(translateApiError(err, t) || t("holidays.leaveRequests.reviewFailed", { defaultValue: "Failed to review leave request." }));
     }
     setReviewingId(null);
   };
@@ -335,10 +344,10 @@ function Holidays() {
   }, [leaveRequests, today]);
 
   const statCells = [
-    { label: "Next holiday", value: holidayStats.next ? holidayStats.next.name : "—", trend: holidayStats.next ? formatDate(holidayStats.next.date, language) : "No upcoming holidays", big: true },
-    { label: "Pending requests", value: String(leaveStats.pendingCount), trend: "Awaiting review" },
-    { label: "On leave today", value: String(leaveStats.onLeaveToday), trend: "Employees" },
-    { label: "Approved this month", value: `${leaveStats.approvedThisMonthDays} days`, trend: formatDateLocalized(today, language, { month: "long" }) },
+    { label: t("holidays.stats.nextHoliday", { defaultValue: "Next holiday" }), value: holidayStats.next ? holidayStats.next.name : "—", trend: holidayStats.next ? formatDate(holidayStats.next.date, language) : t("holidays.stats.noUpcoming", { defaultValue: "No upcoming holidays" }), big: true },
+    { label: t("holidays.stats.pendingRequests", { defaultValue: "Pending requests" }), value: String(leaveStats.pendingCount), trend: t("holidays.stats.awaitingReview", { defaultValue: "Awaiting review" }) },
+    { label: t("holidays.stats.onLeaveToday", { defaultValue: "On leave today" }), value: String(leaveStats.onLeaveToday), trend: t("holidays.stats.employees", { defaultValue: "Employees" }) },
+    { label: t("holidays.stats.approvedThisMonth", { defaultValue: "Approved this month" }), value: `${leaveStats.approvedThisMonthDays} days`, trend: formatDateLocalized(today, language, { month: "long" }) },
   ];
 
   const handleSaveHoliday = async (holiday) => {
@@ -351,7 +360,7 @@ function Holidays() {
       }
       setEditingHoliday(null);
     } catch (err) {
-      setActionError(err.message || "Failed to save holiday.");
+      setActionError(translateApiError(err, t) || t("holidays.saveFailed", { defaultValue: "Failed to save holiday." }));
     }
   };
 
@@ -360,7 +369,7 @@ function Holidays() {
     try {
       await removeHoliday(id);
     } catch (err) {
-      setActionError(err.message || "Failed to delete holiday.");
+      setActionError(translateApiError(err, t) || t("holidays.deleteFailed", { defaultValue: "Failed to delete holiday." }));
     }
   };
 
@@ -378,7 +387,7 @@ function Holidays() {
     try {
       await updateHoliday(id, { date: draftDate });
     } catch (err) {
-      setActionError(err.message || "Failed to update date.");
+      setActionError(translateApiError(err, t) || t("holidays.updateDateFailed", { defaultValue: "Failed to update date." }));
     }
     setEditingDateId(null);
   };
@@ -410,14 +419,14 @@ function Holidays() {
       <div className="content-card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
           <div>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Company holidays</h3>
+            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.companyHolidays.heading", { defaultValue: "Company holidays" })}</h3>
             <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-              {sortedHolidays.length} scheduled
+              {t("holidays.companyHolidays.scheduledCount", { count: sortedHolidays.length, defaultValue: "{{count}} scheduled" })}
             </div>
           </div>
           {canManageHolidays && (
             <Button variant="primary" size="sm" onClick={() => { setEditingHoliday(null); setModalOpen(true); }}>
-              + Add Holiday
+              {t("holidays.companyHolidays.addButton", { defaultValue: "+ Add Holiday" })}
             </Button>
           )}
         </div>
@@ -431,12 +440,12 @@ function Holidays() {
                 <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
               </svg>
             </div>
-            <div className="empty-state-title">No holidays yet</div>
+            <div className="empty-state-title">{t("holidays.companyHolidays.empty.title", { defaultValue: "No holidays yet" })}</div>
             <div className="empty-state-description">
-              {canManageHolidays ? "Add a holiday to start building the calendar." : "None scheduled yet."}
+              {canManageHolidays ? t("holidays.companyHolidays.empty.descriptionCanManage", { defaultValue: "Add a holiday to start building the calendar." }) : t("holidays.companyHolidays.empty.descriptionReadOnly", { defaultValue: "None scheduled yet." })}
             </div>
             {canManageHolidays && (
-              <Button variant="primary" onClick={() => setModalOpen(true)}>+ Add Holiday</Button>
+              <Button variant="primary" onClick={() => setModalOpen(true)}>{t("holidays.companyHolidays.addButton", { defaultValue: "+ Add Holiday" })}</Button>
             )}
           </div>
         ) : (
@@ -444,11 +453,11 @@ function Holidays() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Holiday Name</th>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{t("holidays.companyHolidays.table.name", { defaultValue: "Holiday Name" })}</th>
+                  <th>{t("holidays.companyHolidays.table.date", { defaultValue: "Date" })}</th>
+                  <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                  <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
+                  <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -469,12 +478,12 @@ function Holidays() {
                                 background: "var(--bg-surface)", color: "var(--txt-primary)",
                               }}
                             />
-                            <Button variant="primary" style={{ padding: "4px 10px" }} onClick={() => confirmEditDate(holiday.id)} aria-label="Confirm date">
+                            <Button variant="primary" style={{ padding: "4px 10px" }} onClick={() => confirmEditDate(holiday.id)} aria-label={t("holidays.companyHolidays.confirmDateAria", { defaultValue: "Confirm date" })}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="20 6 9 17 4 12" />
                               </svg>
                             </Button>
-                            <Button variant="secondary" style={{ padding: "4px 10px" }} onClick={cancelEditDate} aria-label="Cancel">
+                            <Button variant="secondary" style={{ padding: "4px 10px" }} onClick={cancelEditDate} aria-label={t("holidays.companyHolidays.cancelDateAria", { defaultValue: "Cancel" })}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <path d="M18 6L6 18M6 6l12 12" />
                               </svg>
@@ -484,7 +493,7 @@ function Holidays() {
                           <button
                             type="button" onClick={() => startEditDate(holiday)}
                             style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--txt-primary)", cursor: "pointer", textAlign: "left" }}
-                            title="Click to edit date"
+                            title={t("holidays.companyHolidays.editDateTitle", { defaultValue: "Click to edit date" })}
                           >
                             {formatDate(holiday.date, language)}
                           </button>
@@ -492,15 +501,15 @@ function Holidays() {
                           formatDate(holiday.date, language)
                         )}
                       </td>
-                      <td><Badge variant={HOLIDAY_TYPE_VARIANT[holiday.type] ?? "neutral"}>{holiday.type}</Badge></td>
+                      <td><Badge variant={HOLIDAY_TYPE_VARIANT[holiday.type] ?? "neutral"}>{t(`common.holidayType.${holiday.type}`, { defaultValue: holiday.type })}</Badge></td>
                       <td>
-                        {isPast ? <Badge variant="neutral" size="sm">Past</Badge> : <Badge variant="success" size="sm" dot>Upcoming</Badge>}
+                        {isPast ? <Badge variant="neutral" size="sm">{t("holidays.companyHolidays.status.past", { defaultValue: "Past" })}</Badge> : <Badge variant="success" size="sm" dot>{t("holidays.companyHolidays.status.upcoming", { defaultValue: "Upcoming" })}</Badge>}
                       </td>
                       <td>
                         {canManageHolidays && (
                           <div style={{ display: "flex", gap: "var(--sp-1)" }}>
-                            <Button variant="link" onClick={() => { setEditingHoliday(holiday); setModalOpen(true); }}>Edit</Button>
-                            <Button variant="link" className="btn-link-muted" onClick={() => handleDelete(holiday.id)}>Delete</Button>
+                            <Button variant="link" onClick={() => { setEditingHoliday(holiday); setModalOpen(true); }}>{t("common.actions.edit", { defaultValue: "Edit" })}</Button>
+                            <Button variant="link" className="btn-link-muted" onClick={() => handleDelete(holiday.id)}>{t("common.actions.delete", { defaultValue: "Delete" })}</Button>
                           </div>
                         )}
                       </td>
@@ -519,8 +528,8 @@ function Holidays() {
       {canManageLeave && (
         <div className="content-card">
           <div style={{ marginBottom: "var(--sp-5)" }}>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>Leave requests</h3>
-            <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>Pending requests need your review</div>
+            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.leaveRequests.heading", { defaultValue: "Leave requests" })}</h3>
+            <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>{t("holidays.leaveRequests.subtitle", { defaultValue: "Pending requests need your review" })}</div>
           </div>
           <LeaveRequestsPanel
             requests={sortedLeaveRequests}

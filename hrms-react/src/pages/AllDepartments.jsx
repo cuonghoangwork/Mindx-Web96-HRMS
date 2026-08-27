@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
@@ -28,6 +29,7 @@ function formatBudget(amount) {
 }
 
 function AllDepartments() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { language } = useLanguage();
   // employeeController.remove is ADMIN-only (employeeRouter.js) — this page
@@ -84,7 +86,7 @@ function AllDepartments() {
   };
 
   const handleDeleteEmployee = (emp) => {
-    if (!confirm(`Delete ${emp.name}? This cannot be undone.`)) return;
+    if (!confirm(t("common.confirmDeleteEmployee", { defaultValue: "Delete {{name}}? This cannot be undone.", name: emp.name }))) return;
     removeEmployee(emp.id);
   };
 
@@ -99,12 +101,12 @@ function AllDepartments() {
               <path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" />
             </svg>
           </div>
-          <h3 className="empty-state-title">No departments yet</h3>
+          <h3 className="empty-state-title">{t("employees.allDepartments.emptyTitle", { defaultValue: "No departments yet" })}</h3>
           <p className="empty-state-description">
-            Create your first department to get started with organizing your workforce.
+            {t("employees.allDepartments.emptyDesc", { defaultValue: "Create your first department to get started with organizing your workforce." })}
           </p>
           <Button variant="primary" onClick={() => setShowAddModal(true)}>
-            + Add Department
+            + {t("employees.addDepartmentModal.title", { defaultValue: "Add Department" })}
           </Button>
         </div>
         {showAddModal && <AddDepartmentModal onClose={() => setShowAddModal(false)} />}
@@ -116,34 +118,34 @@ function AllDepartments() {
     <div>
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", fontWeight: "var(--fw-semibold)" }}>
-          {departments.length} departments · {totalHeadcount} people
+          {t("employees.allDepartments.summaryLine", { defaultValue: "{{count}} departments · {{total}} people", count: departments.length, total: totalHeadcount })}
         </div>
         <Button variant="primary" style={{ marginLeft: "auto" }} onClick={() => setShowAddModal(true)}>
-          + Add Department
+          + {t("employees.addDepartmentModal.title", { defaultValue: "Add Department" })}
         </Button>
       </div>
 
       {/* ── Stat strip ── */}
       <div className="stat-strip" style={{ marginBottom: "var(--sp-6)" }}>
         <button type="button" className="stat-cell" style={{ cursor: "default" }}>
-          <div className="stat-cell-label">Departments</div>
+          <div className="stat-cell-label">{t("employees.allDepartments.stats.departments", { defaultValue: "Departments" })}</div>
           <div className="stat-cell-value sm">{departments.length}</div>
-          <div className="stat-cell-trend">across the org</div>
+          <div className="stat-cell-trend">{t("employees.allDepartments.stats.acrossOrg", { defaultValue: "across the org" })}</div>
         </button>
         <button type="button" className="stat-cell" style={{ cursor: "default" }}>
-          <div className="stat-cell-label">Total Headcount</div>
+          <div className="stat-cell-label">{t("employees.allDepartments.stats.totalHeadcount", { defaultValue: "Total Headcount" })}</div>
           <div className="stat-cell-value sm">{totalHeadcount}</div>
-          <div className="stat-cell-trend">active roster</div>
+          <div className="stat-cell-trend">{t("employees.allDepartments.stats.activeRoster", { defaultValue: "active roster" })}</div>
         </button>
         <button type="button" className="stat-cell" style={{ cursor: "default" }}>
-          <div className="stat-cell-label">Avg Team Size</div>
+          <div className="stat-cell-label">{t("employees.allDepartments.stats.avgTeamSize", { defaultValue: "Avg Team Size" })}</div>
           <div className="stat-cell-value sm">{avgTeamSize}</div>
-          <div className="stat-cell-trend">people per team</div>
+          <div className="stat-cell-trend">{t("employees.allDepartments.stats.peoplePerTeam", { defaultValue: "people per team" })}</div>
         </button>
         <button type="button" className="stat-cell" style={{ cursor: "default" }}>
-          <div className="stat-cell-label">Largest Team</div>
+          <div className="stat-cell-label">{t("employees.allDepartments.stats.largestTeam", { defaultValue: "Largest Team" })}</div>
           <div className="stat-cell-value sm" style={{ fontSize: "22px" }}>{largest?.name || "—"}</div>
-          <div className="stat-cell-trend">{largest?.headcount || 0} people</div>
+          <div className="stat-cell-trend">{t("employees.allDepartments.stats.peopleSuffix", { defaultValue: "{{count}} people", count: largest?.headcount || 0 })}</div>
         </button>
       </div>
 
@@ -155,7 +157,7 @@ function AllDepartments() {
             new Set(getEmployeesByDepartment(dept.name).map((e) => e.designation).filter(Boolean)),
           );
           const topRoles = roles.length
-            ? roles.slice(0, 2).join(", ") + (roles.length > 2 ? ` +${roles.length - 2} more` : "")
+            ? roles.slice(0, 2).join(", ") + (roles.length > 2 ? t("employees.allDepartments.card.moreRolesSuffix", { defaultValue: " +{{count}} more", count: roles.length - 2 }) : "")
             : "—";
 
           return (
@@ -187,7 +189,7 @@ function AllDepartments() {
                     {deptInitials(dept.name)}
                   </div>
                   <div style={{ fontSize: "9.5px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--txt-disabled)" }}>
-                    Department
+                    {t("employees.allDepartments.card.departmentLabel", { defaultValue: "Department" })}
                   </div>
                 </div>
                 {isActive && (
@@ -195,7 +197,7 @@ function AllDepartments() {
                     fontSize: "9px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em",
                     padding: "2px 7px", background: "var(--bg-primary)", color: "var(--txt-on-brand)",
                   }}>
-                    Viewing
+                    {t("employees.allDepartments.card.viewingBadge", { defaultValue: "Viewing" })}
                   </span>
                 )}
               </div>
@@ -206,7 +208,7 @@ function AllDepartments() {
                 <span style={{ fontWeight: 800, fontSize: "24px", color: "var(--txt-primary-brand)", lineHeight: 1 }}>
                   {dept.headcount}
                 </span>
-                <span style={{ fontSize: "11px", color: "var(--txt-secondary)", fontWeight: "var(--fw-semibold)" }}>people</span>
+                <span style={{ fontSize: "11px", color: "var(--txt-secondary)", fontWeight: "var(--fw-semibold)" }}>{t("employees.allDepartments.card.peopleWord", { defaultValue: "people" })}</span>
               </div>
 
               <div style={{ height: "5px", background: "var(--bg-surface-alt)" }}>
@@ -226,11 +228,11 @@ function AllDepartments() {
                 color: dept.manager ? "var(--txt-secondary)" : "var(--txt-disabled)",
                 fontStyle: dept.manager ? "normal" : "italic",
               }}>
-                {dept.manager ? `Manager: ${dept.manager}` : "No manager assigned"}
+                {dept.manager ? t("employees.allDepartments.card.managerPrefix", { defaultValue: "Manager: {{name}}", name: dept.manager }) : t("employees.allDepartments.card.noManagerAssigned", { defaultValue: "No manager assigned" })}
               </div>
 
               <div style={{ fontSize: "11px", fontWeight: "var(--fw-bold)", color: "var(--txt-primary-brand)", marginTop: "1px" }}>
-                View roster →
+                {t("employees.allDepartments.card.viewRoster", { defaultValue: "View roster →" })}
               </div>
             </div>
           );
@@ -243,12 +245,12 @@ function AllDepartments() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)", flexWrap: "wrap", gap: "var(--sp-3)" }}>
             <div>
               <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)" }}>
-                Roster
+                {t("employees.department.roster", { defaultValue: "Roster" })}
               </div>
               <h3 className="section-title" style={{ margin: 0 }}>{selectedDept.name}</h3>
             </div>
             <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-              {roster.length} people
+              {t("employees.allDepartments.card.peopleSuffix", { defaultValue: "{{count}} people", count: roster.length })}
             </div>
           </div>
 
@@ -257,7 +259,7 @@ function AllDepartments() {
             padding: "16px 0", borderBottom: "2px solid var(--bdr-default)", marginBottom: "var(--sp-4)",
           }}>
             <span style={{ fontSize: "12px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)" }}>
-              Department Manager
+              {t("employees.department.departmentManager", { defaultValue: "Department Manager" })}
             </span>
             <select
               value={managerOptions.find((e) => e.name === selectedDept.manager)?.id ?? ""}
@@ -268,7 +270,7 @@ function AllDepartments() {
                 fontFamily: "var(--font-family)", fontSize: "13.5px", fontWeight: "var(--fw-semibold)",
               }}
             >
-              <option value="">Not assigned</option>
+              <option value="">{t("employees.department.notAssigned", { defaultValue: "Not assigned" })}</option>
               {managerOptions.map((e) => (
                 <option key={e.id} value={e.id}>{e.name}</option>
               ))}
@@ -278,7 +280,7 @@ function AllDepartments() {
                 mockup's department page. Rather than dropping the feature,
                 it's kept here as an inline-editable value next to Manager. */}
             <span style={{ fontSize: "12px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)", marginLeft: "var(--sp-4)" }}>
-              Budget
+              {t("employees.department.budget", { defaultValue: "Budget" })}
             </span>
             {editingBudget ? (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -289,8 +291,8 @@ function AllDepartments() {
                   autoFocus
                   style={{ width: "110px", padding: "6px 8px", border: "1px solid var(--bdr-default)", fontSize: "13.5px" }}
                 />
-                <Button variant="primary" size="sm" onClick={saveBudget}>Save</Button>
-                <Button variant="secondary" size="sm" onClick={() => setEditingBudget(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={saveBudget}>{t("common.actions.save", { defaultValue: "Save" })}</Button>
+                <Button variant="secondary" size="sm" onClick={() => setEditingBudget(false)}>{t("common.actions.cancel", { defaultValue: "Cancel" })}</Button>
               </div>
             ) : (
               <Button variant="link" onClick={startEditBudget}>
@@ -301,21 +303,21 @@ function AllDepartments() {
 
           {roster.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-state-title">No employees in this department yet</div>
-              <div className="empty-state-description">Add an employee and set their department to {selectedDept.name}.</div>
+              <div className="empty-state-title">{t("employees.department.noEmployeesTitle", { defaultValue: "No employees in this department yet" })}</div>
+              <div className="empty-state-description">{t("employees.department.noEmployeesDesc", { defaultValue: "Add an employee and set their department to {{name}}.", name: selectedDept.name })}</div>
             </div>
           ) : (
             <div className="table-wrap">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Employee</th>
-                    <th>Designation</th>
-                    <th>Email</th>
-                    <th>Joined</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>{t("common.columns.employee", { defaultValue: "Employee" })}</th>
+                    <th>{t("common.columns.designation", { defaultValue: "Designation" })}</th>
+                    <th>{t("common.columns.email", { defaultValue: "Email" })}</th>
+                    <th>{t("common.columns.joined", { defaultValue: "Joined" })}</th>
+                    <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                    <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
+                    <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -330,7 +332,7 @@ function AllDepartments() {
                           <Avatar name={emp.name} src={emp.avatar} size="sm" />
                           <div>
                             <div className="employee-row-name">
-                              {emp.name}{selectedDept.manager === emp.name ? " · Manager" : ""}
+                              {emp.name}{selectedDept.manager === emp.name ? t("employees.department.managerSuffix", { defaultValue: " · Manager" }) : ""}
                             </div>
                             <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{emp.employeeId}</div>
                           </div>
@@ -342,9 +344,9 @@ function AllDepartments() {
                       <td><TypeBadge type={emp.type} /></td>
                       <td><StatusBadge status={emp.status} /></td>
                       <td onClick={(e) => e.stopPropagation()}>
-                        <Button variant="link" onClick={() => navigate(`/employees/${emp.id}`)}>View</Button>
+                        <Button variant="link" onClick={() => navigate(`/employees/${emp.id}`)}>{t("common.actions.view", { defaultValue: "View" })}</Button>
                         {isAdmin && (
-                          <Button variant="link" className="btn-link-muted" onClick={() => handleDeleteEmployee(emp)}>Delete</Button>
+                          <Button variant="link" className="btn-link-muted" onClick={() => handleDeleteEmployee(emp)}>{t("common.actions.delete", { defaultValue: "Delete" })}</Button>
                         )}
                       </td>
                     </tr>

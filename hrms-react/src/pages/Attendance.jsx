@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { EmployeesAPI, NoShowReviewsAPI } from "../api";
 import { formatDate } from "../utils/format";
+import { translateApiError } from "../utils/apiError";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
@@ -177,7 +178,7 @@ function NoShowQueueTab() {
       const res = await NoShowReviewsAPI.list({ status: filterStatus });
       setRequests(res.items ?? []);
     } catch (err) {
-      setError(err.message || t("settings.noShowReview.loadFailed"));
+      setError(translateApiError(err, t) || t("settings.noShowReview.loadFailed"));
     }
     setLoading(false);
   }, [filterStatus, t]);
@@ -199,7 +200,7 @@ function NoShowQueueTab() {
       setNote("");
       loadRequests();
     } catch (err) {
-      setToast(`Error: ${err.message}`);
+      setToast(`Error: ${translateApiError(err, t)}`);
     }
     setActionLoading(null);
   };
@@ -348,9 +349,9 @@ function NoShowQueueTab() {
 ═══════════════════════════════════════════ */
 function Attendance() {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const days = t("common.days", { returnObjects: true });
   const months = t("common.months", { returnObjects: true });
-  const monthsShort = months.map((m) => m.slice(0, 3));
   const { attendance, employees, getAppNow, clockIn, clockOut } = useStore();
   const { isManager, isHRTier, isManagerTier } = useAuth();
   const navigate = useNavigate();
@@ -452,7 +453,7 @@ function Attendance() {
 
   const dSel = new Date(selectedDay + "T00:00:00");
   const dayLabel = granularity === "monthly"
-    ? `${monthsShort[dSel.getMonth()]} ${dSel.getDate()}${selectedDay === todayStr ? ` (${t("attendance.today", { defaultValue: "Today" })})` : ""}`
+    ? `${formatDate(dSel, language, { month: "short", day: "numeric" })}${selectedDay === todayStr ? ` (${t("attendance.today", { defaultValue: "Today" })})` : ""}`
     : `${days[dSel.getDay()]}${selectedDay === todayStr ? ` (${t("attendance.today", { defaultValue: "Today" })})` : ""}`;
 
   /* ── Stat strip (scoped to the selected day) ── */
@@ -460,7 +461,7 @@ function Attendance() {
     {
       label: t("attendance.stats.checkedIn", { defaultValue: "Checked In" }),
       value: selectedData ? `${selectedData.present + selectedData.late}/${selectedData.total}` : "0/0",
-      trend: selectedData ? `${Math.round(((selectedData.present + selectedData.late) / selectedData.total) * 100)}% attendance` : "—",
+      trend: selectedData ? t("attendance.stats.attendanceRateTrend", { pct: Math.round(((selectedData.present + selectedData.late) / selectedData.total) * 100), defaultValue: "{{pct}}% attendance" }) : "—",
     },
     {
       label: t("attendance.stats.present", { defaultValue: "Present" }),
@@ -475,7 +476,7 @@ function Attendance() {
     {
       label: t("attendance.stats.absentLeave", { defaultValue: "Absent / Leave" }),
       value: String((selectedData?.absent ?? 0) + (selectedData?.leave ?? 0)),
-      trend: `${selectedData?.leave ?? 0} on leave`,
+      trend: t("attendance.stats.onLeaveTrend", { count: selectedData?.leave ?? 0, defaultValue: "{{count}} on leave" }),
     },
   ];
 
@@ -527,12 +528,12 @@ function Attendance() {
   const avgMonthRate = cellsSoFar.length ? Math.round(cellsSoFar.reduce((s, c) => s + c.rate, 0) / cellsSoFar.length) : 0;
   const bestCell = cellsSoFar.reduce((a, b) => (!a || b.rate > a.rate ? b : a), null);
   const worstCell = cellsSoFar.reduce((a, b) => (!a || b.rate < a.rate ? b : a), null);
-  const fmtCal = (iso) => { const d = new Date(iso + "T00:00:00"); return `${monthsShort[d.getMonth()]} ${d.getDate()}`; };
+  const fmtCal = (iso) => formatDate(new Date(iso + "T00:00:00"), language, { month: "short", day: "numeric" });
   const reportStatCells = [
-    { label: "Month to date", value: `${avgMonthRate}%`, trend: "Avg. attendance" },
-    { label: "Best day", value: bestCell ? `${bestCell.rate}%` : "—", trend: bestCell ? fmtCal(bestCell.date) : "" },
-    { label: "Toughest day", value: worstCell ? `${worstCell.rate}%` : "—", trend: worstCell ? fmtCal(worstCell.date) : "" },
-    { label: "Days logged", value: String(cellsSoFar.length), trend: months[viewMonth] },
+    { label: t("attendance.report.monthToDate", { defaultValue: "Month to date" }), value: `${avgMonthRate}%`, trend: t("attendance.report.avgAttendance", { defaultValue: "Avg. attendance" }) },
+    { label: t("attendance.report.bestDay", { defaultValue: "Best day" }), value: bestCell ? `${bestCell.rate}%` : "—", trend: bestCell ? fmtCal(bestCell.date) : "" },
+    { label: t("attendance.report.toughestDay", { defaultValue: "Toughest day" }), value: worstCell ? `${worstCell.rate}%` : "—", trend: worstCell ? fmtCal(worstCell.date) : "" },
+    { label: t("attendance.report.daysLogged", { defaultValue: "Days logged" }), value: String(cellsSoFar.length), trend: months[viewMonth] },
   ];
   const missedThisWeek = useMemo(() => {
     return scopedEmployees.map((e) => {
@@ -578,12 +579,17 @@ function Attendance() {
         <>
           {isManager && (
             <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", margin: 0 }}>
-              Showing your team{myEmployee?.department ? ` (${myEmployee.department})` : ""} — {scopedEmployees.length} employee{scopedEmployees.length === 1 ? "" : "s"}
+              {t("attendance.scope.team", {
+                deptSuffix: myEmployee?.department ? ` (${myEmployee.department})` : "",
+                count: scopedEmployees.length,
+                defaultValue_one: "Showing your team{{deptSuffix}} — {{count}} employee",
+                defaultValue_other: "Showing your team{{deptSuffix}} — {{count}} employees",
+              })}
             </p>
           )}
           {!isManagerTier && (
             <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", margin: 0 }}>
-              Showing your own attendance
+              {t("attendance.scope.own", { defaultValue: "Showing your own attendance" })}
             </p>
           )}
 
@@ -603,10 +609,10 @@ function Attendance() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-4)", flexWrap: "wrap" }}>
               <div>
                 <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
-                  {granularity === "monthly" ? "Monthly attendance" : "Weekly attendance"}
+                  {granularity === "monthly" ? t("attendance.granularity.monthlyHeading", { defaultValue: "Monthly attendance" }) : t("attendance.granularity.weeklyHeading", { defaultValue: "Weekly attendance" })}
                 </h3>
                 <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
-                  {granularity === "monthly" ? `${months[viewMonth]} ${viewYear} · ` : ""}Click a day to view its roster
+                  {granularity === "monthly" ? `${months[viewMonth]} ${viewYear} · ` : ""}{t("attendance.granularity.clickToViewRoster", { defaultValue: "Click a day to view its roster" })}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
@@ -622,13 +628,13 @@ function Attendance() {
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
                     <Button variant="secondary" size="sm" onClick={prevWeek}>‹</Button>
                     <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", minWidth: "150px", textAlign: "center" }}>
-                      {monthsShort[weekDates[0].getMonth()]} {weekDates[0].getDate()} – {weekDates[6].getMonth() !== weekDates[0].getMonth() ? `${monthsShort[weekDates[6].getMonth()]} ` : ""}{weekDates[6].getDate()}
+                      {formatDate(weekDates[0], language, { month: "short", day: "numeric" })} – {weekDates[6].getMonth() !== weekDates[0].getMonth() ? `${formatDate(weekDates[6], language, { month: "short" })} ` : ""}{weekDates[6].getDate()}
                     </span>
                     <Button variant="secondary" size="sm" onClick={nextWeek}>›</Button>
                   </div>
                 )}
                 <div style={{ display: "flex", border: "1px solid var(--bdr-default)" }}>
-                  {[["weekly", "Weekly"], ["monthly", "Monthly"]].map(([v, label]) => (
+                  {[["weekly", t("attendance.granularity.weekly", { defaultValue: "Weekly" })], ["monthly", t("attendance.granularity.monthly", { defaultValue: "Monthly" })]].map(([v, label]) => (
                     <button key={v} type="button" onClick={() => setGranularity(v)} style={{
                       padding: "6px 14px", border: "none", cursor: "pointer",
                       background: granularity === v ? "var(--txt-primary)" : "transparent",
@@ -637,7 +643,7 @@ function Attendance() {
                     }}>{label}</button>
                   ))}
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>Report</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowReport(true)}>{t("attendance.granularity.reportButton", { defaultValue: "Report" })}</Button>
               </div>
             </div>
 
@@ -656,12 +662,12 @@ function Attendance() {
           <div className="content-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Roster</div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{dayLabel} roster</h3>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("attendance.roster.eyebrow", { defaultValue: "Roster" })}</div>
+                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.roster.heading", { day: dayLabel, defaultValue: "{{day}} roster" })}</h3>
               </div>
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("common2.searchEmployeesPlaceholder", { defaultValue: "Search employees…" })}
+                placeholder={t("common.placeholders.searchEmployees", { defaultValue: "Search employees…" })}
                 style={{
                   fontFamily: "var(--font-family)", fontSize: "var(--fs-sm)", padding: "9px var(--sp-4)",
                   background: "var(--bg-surface)", color: "var(--txt-primary)",
@@ -672,8 +678,8 @@ function Attendance() {
 
             {rosterRows.length === 0 ? (
               <div className="empty-state">
-                <h3 className="empty-state-title">No employees match</h3>
-                <p className="empty-state-description">Try a different search, or pick another day.</p>
+                <h3 className="empty-state-title">{t("attendance.roster.empty.title", { defaultValue: "No employees match" })}</h3>
+                <p className="empty-state-description">{t("attendance.roster.empty.description", { defaultValue: "Try a different search, or pick another day." })}</p>
               </div>
             ) : (
               <div className="table-wrap">
@@ -681,11 +687,11 @@ function Attendance() {
                   <thead>
                     <tr>
                       <th>{t("attendance.table.headers.employee")}</th>
-                      <th>Department</th>
+                      <th>{t("common.fieldLabels.department", { defaultValue: "Department" })}</th>
                       <th>{t("attendance.table.headers.checkIn")}</th>
                       <th>{t("attendance.table.headers.checkOut")}</th>
                       <th>{t("attendance.table.headers.status")}</th>
-                      <th>Action</th>
+                      <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -711,7 +717,7 @@ function Attendance() {
                               loading={actionLoadingKey === `${r.employeeId}-in`}
                               onClick={() => handleInlineCheckIn(r.employeeId)}
                               style={{ marginRight: "var(--sp-2)" }}
-                            >Check-in</Button>
+                            >{t("attendance.roster.checkInButton", { defaultValue: "Check-in" })}</Button>
                           )}
                           {r.canCheckOut && (
                             <Button
@@ -719,9 +725,9 @@ function Attendance() {
                               loading={actionLoadingKey === `${r.employeeId}-out`}
                               onClick={() => handleInlineCheckOut(r.employeeId)}
                               style={{ marginRight: "var(--sp-2)" }}
-                            >Check-out</Button>
+                            >{t("attendance.roster.checkOutButton", { defaultValue: "Check-out" })}</Button>
                           )}
-                          <Button variant="link" size="xs" onClick={() => navigate(`/employees/${r.employeeId}`)}>View</Button>
+                          <Button variant="link" size="xs" onClick={() => navigate(`/employees/${r.employeeId}`)}>{t("common.actions.view", { defaultValue: "View" })}</Button>
                         </td>
                       </tr>
                     ))}
@@ -749,7 +755,7 @@ function Attendance() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-5)" }}>
-              <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{months[viewMonth]} {viewYear} attendance summary</h3>
+              <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.report.heading", { month: months[viewMonth], year: viewYear, defaultValue: "{{month}} {{year}} attendance summary" })}</h3>
               <button onClick={() => setShowReport(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1 }}>×</button>
             </div>
 
@@ -763,9 +769,9 @@ function Attendance() {
               ))}
             </div>
 
-            <h4 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-3)" }}>Most missed this week</h4>
+            <h4 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-3)" }}>{t("attendance.report.mostMissed", { defaultValue: "Most missed this week" })}</h4>
             {missedThisWeek.length === 0 ? (
-              <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>No absences or late check-ins recorded this week.</p>
+              <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("attendance.report.noneRecorded", { defaultValue: "No absences or late check-ins recorded this week." })}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
                 {missedThisWeek.map((r) => (
@@ -775,8 +781,8 @@ function Attendance() {
                       <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{r.department}</div>
                     </div>
                     <div style={{ display: "flex", gap: "var(--sp-2)" }}>
-                      {r.absent > 0 && <Badge variant="danger" size="sm">{r.absent} absent</Badge>}
-                      {r.late > 0 && <Badge variant="warning" size="sm">{r.late} late</Badge>}
+                      {r.absent > 0 && <Badge variant="danger" size="sm">{t("attendance.report.absentBadge", { count: r.absent, defaultValue: "{{count}} absent" })}</Badge>}
+                      {r.late > 0 && <Badge variant="warning" size="sm">{t("attendance.report.lateBadge", { count: r.late, defaultValue: "{{count}} late" })}</Badge>}
                     </div>
                   </div>
                 ))}

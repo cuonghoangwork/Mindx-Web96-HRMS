@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router-dom";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
@@ -33,6 +34,7 @@ function formatBudget(amount) {
  * itself doesn't otherwise restrict what MANAGER can see below).
  */
 function ViewDepartment() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { language } = useLanguage();
@@ -52,9 +54,9 @@ function ViewDepartment() {
   if (!department) {
     return (
       <div className="content-card">
-        <h2>Department Not Found</h2>
+        <h2>{t("employees.viewDepartment.notFoundTitle", { defaultValue: "Department Not Found" })}</h2>
         <Button variant="primary" style={{ marginTop: "var(--sp-5)" }} onClick={() => navigate(-1)}>
-          ← Back
+          ← {t("common.actions.back", { defaultValue: "Back" })}
         </Button>
       </div>
     );
@@ -78,7 +80,7 @@ function ViewDepartment() {
   };
 
   const handleDeleteEmployee = (emp) => {
-    if (!confirm(`Delete ${emp.name}? This cannot be undone.`)) return;
+    if (!confirm(t("common.confirmDeleteEmployee", { defaultValue: "Delete {{name}}? This cannot be undone.", name: emp.name }))) return;
     removeEmployee(emp.id);
   };
 
@@ -94,19 +96,19 @@ function ViewDepartment() {
           </svg>
         }
       >
-        Back
+        {t("common.actions.back", { defaultValue: "Back" })}
       </Button>
 
       <div className="content-card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)", flexWrap: "wrap", gap: "var(--sp-3)" }}>
           <div>
             <div style={{ fontSize: "var(--fs-xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)" }}>
-              Roster
+              {t("employees.department.roster", { defaultValue: "Roster" })}
             </div>
             <h3 className="section-title" style={{ margin: 0 }}>{department.name}</h3>
           </div>
           <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-            {roster.length} {roster.length === 1 ? "person" : "people"}
+            {t("employees.department.peopleCount", { count: roster.length, defaultValue_one: "{{count}} person", defaultValue_other: "{{count}} people" })}
           </div>
         </div>
 
@@ -115,7 +117,7 @@ function ViewDepartment() {
           padding: "16px 0", borderBottom: "2px solid var(--bdr-default)", marginBottom: "var(--sp-4)",
         }}>
           <span style={{ fontSize: "12px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)" }}>
-            Department Manager
+            {t("employees.department.departmentManager", { defaultValue: "Department Manager" })}
           </span>
           {isHRTier ? (
             <select
@@ -127,14 +129,14 @@ function ViewDepartment() {
                 fontFamily: "var(--font-family)", fontSize: "13.5px", fontWeight: "var(--fw-semibold)",
               }}
             >
-              <option value="">Not assigned</option>
+              <option value="">{t("employees.department.notAssigned", { defaultValue: "Not assigned" })}</option>
               {managerOptions.map((e) => (
                 <option key={e.id} value={e.id}>{e.name}</option>
               ))}
             </select>
           ) : (
             <span style={{ fontSize: "13.5px", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
-              {department.manager || "Not assigned"}
+              {department.manager || t("employees.department.notAssigned", { defaultValue: "Not assigned" })}
             </span>
           )}
 
@@ -143,7 +145,7 @@ function ViewDepartment() {
           {isHRTier && (
             <>
               <span style={{ fontSize: "12px", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--txt-disabled)", marginLeft: "var(--sp-4)" }}>
-                Budget
+                {t("employees.department.budget", { defaultValue: "Budget" })}
               </span>
               {editingBudget ? (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -154,8 +156,8 @@ function ViewDepartment() {
                     autoFocus
                     style={{ width: "110px", padding: "6px 8px", border: "1px solid var(--bdr-default)", fontSize: "13.5px" }}
                   />
-                  <Button variant="primary" size="sm" onClick={saveBudget}>Save</Button>
-                  <Button variant="secondary" size="sm" onClick={() => setEditingBudget(false)}>Cancel</Button>
+                  <Button variant="primary" size="sm" onClick={saveBudget}>{t("common.actions.save", { defaultValue: "Save" })}</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setEditingBudget(false)}>{t("common.actions.cancel", { defaultValue: "Cancel" })}</Button>
                 </div>
               ) : (
                 <Button variant="link" onClick={startEditBudget}>
@@ -168,21 +170,21 @@ function ViewDepartment() {
 
         {roster.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-state-title">No employees in this department yet</div>
-            <div className="empty-state-description">Add an employee and set their department to {department.name}.</div>
+            <div className="empty-state-title">{t("employees.department.noEmployeesTitle", { defaultValue: "No employees in this department yet" })}</div>
+            <div className="empty-state-description">{t("employees.department.noEmployeesDesc", { defaultValue: "Add an employee and set their department to {{name}}.", name: department.name })}</div>
           </div>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Employee</th>
-                  <th>Designation</th>
-                  <th>Email</th>
-                  <th>Joined</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th>{t("common.columns.employee", { defaultValue: "Employee" })}</th>
+                  <th>{t("common.columns.designation", { defaultValue: "Designation" })}</th>
+                  <th>{t("common.columns.email", { defaultValue: "Email" })}</th>
+                  <th>{t("common.columns.joined", { defaultValue: "Joined" })}</th>
+                  <th>{t("common.columns.type", { defaultValue: "Type" })}</th>
+                  <th>{t("common.columns.status", { defaultValue: "Status" })}</th>
+                  <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,7 +199,7 @@ function ViewDepartment() {
                         <Avatar name={emp.name} src={emp.avatar} size="sm" />
                         <div>
                           <div className="employee-row-name">
-                            {emp.name}{department.manager === emp.name ? " · Manager" : ""}
+                            {emp.name}{department.manager === emp.name ? t("employees.department.managerSuffix", { defaultValue: " · Manager" }) : ""}
                           </div>
                           <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)" }}>{emp.employeeId}</div>
                         </div>
@@ -209,12 +211,12 @@ function ViewDepartment() {
                     <td><TypeBadge type={emp.type} /></td>
                     <td><StatusBadge status={emp.status} /></td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <Button variant="link" onClick={() => navigate(`/employees/${emp.id}`)}>View</Button>
+                      <Button variant="link" onClick={() => navigate(`/employees/${emp.id}`)}>{t("common.actions.view", { defaultValue: "View" })}</Button>
                       {isManagerTier && (
-                        <Button variant="link" onClick={() => setPromotingEmployee(emp)}>Promote</Button>
+                        <Button variant="link" onClick={() => setPromotingEmployee(emp)}>{t("employees.allEmployees.table.promote", { defaultValue: "Promote" })}</Button>
                       )}
                       {isAdmin && (
-                        <Button variant="link" className="btn-link-muted" onClick={() => handleDeleteEmployee(emp)}>Delete</Button>
+                        <Button variant="link" className="btn-link-muted" onClick={() => handleDeleteEmployee(emp)}>{t("common.actions.delete", { defaultValue: "Delete" })}</Button>
                       )}
                     </td>
                   </tr>

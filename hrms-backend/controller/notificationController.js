@@ -1,6 +1,7 @@
 import NotificationModel from "../model/Notification.js";
 import EmployeeModel from "../model/Employee.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
+import { AppError } from "../utils/appError.js";
 
 // HR-tier: sees the "hr" broadcast audience company-wide; everyone else
 // (including the department-scoped MANAGER role) sees "employees" instead.
@@ -36,7 +37,7 @@ const notificationController = {
 
       res.json({ success: true, items: items.map(notificationToClient), unreadCount });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -48,7 +49,7 @@ const notificationController = {
   create: async (req, res) => {
     try {
       const { category = "announcement", title, recipientId, recipientIds } = req.body;
-      if (!title) throw new Error("title is required.");
+      if (!title) throw new AppError("title is required.", "TITLE_REQUIRED");
 
       const data = notificationFromClient({ ...req.body, category });
       data.sender = { id: req.user.id, name: req.user.name };
@@ -84,7 +85,7 @@ const notificationController = {
       const notification = await NotificationModel.create(data);
       res.status(201).json({ success: true, data: notificationToClient(notification) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -95,10 +96,10 @@ const notificationController = {
         { read: true },
         { new: true },
       );
-      if (!notification) throw new Error("Notification not found.");
+      if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
       res.json({ success: true, data: notificationToClient(notification) });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -114,7 +115,7 @@ const notificationController = {
       );
       res.json({ success: true, message: "All notifications marked as read." });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -130,17 +131,17 @@ const notificationController = {
       });
       res.json({ success: true, message: "Read notifications cleared." });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
   remove: async (req, res) => {
     try {
       const notification = await NotificationModel.findByIdAndDelete(req.params.id);
-      if (!notification) throw new Error("Notification not found.");
+      if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
       res.json({ success: true, message: "Notification deleted." });
     } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -160,7 +161,7 @@ const notificationController = {
         })),
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };
@@ -170,7 +171,16 @@ const notificationController = {
  * users of a system event (e.g. employee or account created/deleted).
  * Never throws — failures are logged only, matching utils/auditLog.js's contract.
  */
-export async function notifyHR({ title, message, category = "employee", link, linkLabel }) {
+export async function notifyHR({
+  title,
+  message,
+  category = "employee",
+  link,
+  linkLabel,
+  titleKey,
+  messageKey,
+  params,
+}) {
   try {
     await NotificationModel.create({
       user: null,
@@ -181,6 +191,9 @@ export async function notifyHR({ title, message, category = "employee", link, li
       link: link ?? null,
       linkLabel: linkLabel ?? null,
       isCustom: false,
+      titleKey: titleKey ?? null,
+      messageKey: messageKey ?? null,
+      params: params ?? null,
     });
   } catch (err) {
     console.error("[notifyHR] Failed to create notification:", err.message);

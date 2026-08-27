@@ -23,6 +23,12 @@ export function localeFor(language) {
   return LOCALE_MAP[language] ?? LOCALE_MAP.en;
 }
 
+// A bare "YYYY-MM-DD" string is parsed as UTC midnight per the ISO spec, then
+// toLocaleDateString() below renders in the viewer's local zone — anyone west
+// of UTC would see it roll back to the previous day. Appending a local-time
+// marker makes the same string parse as local midnight instead.
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * formatDate — medium-style localized date ("Aug 11, 2026" / "11 thg 8, 2026").
  * @param {Date|string|number} value
@@ -31,7 +37,9 @@ export function localeFor(language) {
  */
 export function formatDate(value, language, options) {
   if (!value) return "—";
-  const d = value instanceof Date ? value : new Date(value);
+  const d = value instanceof Date
+    ? value
+    : new Date(typeof value === "string" && DATE_ONLY_RE.test(value) ? `${value}T00:00:00` : value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString(localeFor(language), options ?? {
     year: "numeric", month: "short", day: "numeric",

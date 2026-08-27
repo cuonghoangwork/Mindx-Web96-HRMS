@@ -17,11 +17,11 @@ const aiController = {
   chat: async (req, res) => {
     try {
       const history = Array.isArray(req.body.history) ? req.body.history.slice(-MAX_HISTORY_TURNS) : [];
-      const prompt = buildChatPrompt({ history, message: req.body.message });
+      const prompt = buildChatPrompt({ history, message: req.body.message, language: req.body.language });
       const reply = await askGemini(prompt);
       res.json({ success: true, reply });
     } catch (error) {
-      res.status(error.status || 502).json({ success: false, message: error.message });
+      res.status(error.status || 502).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

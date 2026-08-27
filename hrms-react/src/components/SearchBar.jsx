@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
-function SearchBar({ value, onSearch, placeholder = "Search..." }) {
+function SearchBar({ value, onSearch, placeholder }) {
+  const { t } = useTranslation()
   const [localValue, setLocalValue] = useState(value)
 
   useEffect(() => {
@@ -22,7 +24,7 @@ function SearchBar({ value, onSearch, placeholder = "Search..." }) {
       <input
         type="text"
         className="search-input"
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('searchBar.defaultPlaceholder', { defaultValue: 'Search...' })}
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         style={{
@@ -40,7 +42,7 @@ function SearchBar({ value, onSearch, placeholder = "Search..." }) {
         <button
           type="button"
           onClick={handleClear}
-          aria-label="Clear search"
+          aria-label={t('searchBar.clearSearchAriaLabel', { defaultValue: 'Clear search' })}
           style={{
             position: 'absolute',
             right: '40px',
@@ -61,7 +63,7 @@ function SearchBar({ value, onSearch, placeholder = "Search..." }) {
       )}
       <button
         type="submit"
-        aria-label="Search"
+        aria-label={t('searchBar.searchAriaLabel', { defaultValue: 'Search' })}
         style={{
           position: 'absolute',
           right: '8px',

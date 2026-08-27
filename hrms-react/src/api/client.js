@@ -73,9 +73,11 @@ export async function apiFetch(
       body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     });
   } catch (networkErr) {
-    throw new Error(
+    const err = new Error(
       `Could not reach the backend at ${API_BASE}. Is hrms-backend running? (${networkErr.message})`,
     );
+    err.code = "NETWORK_UNREACHABLE";
+    throw err;
   }
 
   if (res.status === 401 && auth && retry) {
@@ -88,7 +90,9 @@ export async function apiFetch(
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
         window.location.href = "/login";
       }
-      throw new Error("Session expired. Please sign in again.");
+      const err = new Error("Session expired. Please sign in again.");
+      err.code = "SESSION_EXPIRED";
+      throw err;
     }
   }
 
@@ -102,7 +106,10 @@ export async function apiFetch(
     ) {
       window.location.href = "/change-password";
     }
-    throw new Error(data.message || `Request failed (${res.status})`);
+    const err = new Error(data.message || `Request failed (${res.status})`);
+    err.code = data.code;
+    err.params = data.params;
+    throw err;
   }
   return data;
 }

@@ -25,6 +25,8 @@
  *   <AvatarGroup avatars={employees.slice(0,4)} max={3} />
  */
 
+import { useTranslation } from "react-i18next";
+
 /* ─── Color palette (auto-picked by name hash) ───
    v3 "Navy Signal Blue" — flat 5-color rotation lifted directly from
    the redesign mockup's avatar-chip palette (no gradients, matches the
@@ -83,6 +85,7 @@ function Avatar({
   style,
   onClick,
 }) {
+  const { t } = useTranslation();
   const cfg = SIZE[size] ?? SIZE.md;
   const bg  = color ?? PALETTE[hashName(name)][0];
   const br  = shape === "circle" ? "50%" : "var(--radius-md)";
@@ -142,7 +145,7 @@ function Avatar({
       style={base}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      aria-label={name || "Avatar"}
+      aria-label={name || t("avatar.fallbackLabel", { defaultValue: "Avatar" })}
       onClick={onClick}
       onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(e) : undefined}
     >
@@ -179,6 +182,7 @@ function Avatar({
 
 /* ─── AvatarGroup ─── */
 export function AvatarGroup({ avatars = [], max = 4, size = "sm", gap = -8 }) {
+  const { t } = useTranslation();
   const visible = avatars.slice(0, max);
   const overflow = avatars.length - max;
   const cfg = SIZE[size] ?? SIZE.sm;
@@ -228,7 +232,7 @@ export function AvatarGroup({ avatars = [], max = 4, size = "sm", gap = -8 }) {
             fontWeight: 600,
             color: "var(--txt-secondary, #71707e)",
           }}
-          aria-label={`+${overflow} more`}
+          aria-label={t("avatar.moreAriaLabel", { count: overflow, defaultValue_one: "+{{count}} more", defaultValue_other: "+{{count}} more" })}
         >
           +{overflow}
         </span>

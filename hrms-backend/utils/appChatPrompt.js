@@ -10,6 +10,8 @@
  * performanceInsightPrompt.js's buildInsightPrompt.
  */
 
+import { languageNameFor } from "./language.js";
+
 const SYSTEM_PROMPT = `You are the HRMS product-help assistant. You help users understand how to use this HR Management System web app. You do NOT have access to any live company data — no employee records, attendance, payroll figures, or reviews — and must never claim to see any. If asked about specific data, tell the user which page to check instead of guessing.
 
 Pages available to every signed-in user: Dashboard (summary widgets), Attendance (clock in/out, personal log), Performance Reviews (self/manager review, competencies, goals, peer feedback, appeals), Notifications, Settings, and their own Employee profile (Attendance/Leave/Salary/Documents/Activity tabs).
@@ -29,10 +31,11 @@ function historyLines(history) {
     .join("\n");
 }
 
-export function buildChatPrompt({ history, message }) {
+export function buildChatPrompt({ history, message, language }) {
   const priorTurns = historyLines(history);
+  const languageLine = `Respond in ${languageNameFor(language)}.`;
   return (
-    `${SYSTEM_PROMPT}\n\n` +
+    `${SYSTEM_PROMPT} ${languageLine}\n\n` +
     (priorTurns ? `Conversation so far:\n${priorTurns}\n\n` : "") +
     `User: ${message}`
   );

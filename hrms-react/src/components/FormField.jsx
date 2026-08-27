@@ -43,6 +43,7 @@
  */
 
 import { useId, cloneElement, isValidElement } from "react";
+import { useTranslation } from "react-i18next";
 
 /* ─── Icons ─── */
 function WarnIcon() {
@@ -79,6 +80,7 @@ function FormField({
   style,
   children,
 }) {
+  const { t } = useTranslation();
   const autoId  = useId();
   const fieldId = htmlFor ?? autoId;
 
@@ -210,7 +212,7 @@ function FormField({
           }}
         >
           <CheckIcon />
-          Valid
+          {t("formField.valid", { defaultValue: "Valid" })}
         </span>
       )}
     </div>

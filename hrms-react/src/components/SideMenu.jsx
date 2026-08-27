@@ -1,9 +1,11 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { getRoleLabel } from "../utils/roles";
 
 function SideMenu({ isOpen = false, onNavigate }) {
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const { isAdmin, isHR, isHRTier, isManager, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -42,47 +44,47 @@ function SideMenu({ isOpen = false, onNavigate }) {
   // index numbers are assigned by position after filtering (below), not
   // hardcoded, since EMPLOYEE drops the Hiring group entirely.
   const rawGroups = [
-    { key: "overview", title: "Overview", items: [
-      { path: "/dashboard", title: "Dashboard", icon: dashboardIcon },
+    { key: "overview", title: t("sideMenu.overview", { defaultValue: "Overview" }), items: [
+      { path: "/dashboard", title: t("sideMenu.dashboard", { defaultValue: "Dashboard" }), icon: dashboardIcon },
     ]},
-    { key: "people", title: isPlainManager || isPlainEmployee ? "My Info" : "People", items: [
+    { key: "people", title: isPlainManager || isPlainEmployee ? t("sideMenu.myInfo", { defaultValue: "My Info" }) : t("sideMenu.people", { defaultValue: "People" }), items: [
       // "My Profile" — every role's own record (ViewEmployee.jsx's
       // /employees/:id route is open to any authenticated user, not just
       // MANAGER). user.employeeId comes straight off the JWT-derived
       // /auth/me response, no extra fetch needed; every seeded role
       // (including ADMIN) now has a linked Employee record, see seed.js.
       ...(user?.employeeId
-        ? [{ path: `/employees/${user.employeeId}`, title: "My Profile", icon: employeesIcon }]
+        ? [{ path: `/employees/${user.employeeId}`, title: t("sideMenu.myProfile", { defaultValue: "My Profile" }), icon: employeesIcon }]
         : []),
       // Directory read is company-wide for every role (see
       // employeeController.getAll) — only the label changes for MANAGER/
       // EMPLOYEE, matching the design's "Directory" wording; the page
       // itself already hides management actions (bulk select, Promote,
       // Add Employee) for a plain viewer.
-      { path: "/employees", title: isPlainManager || isPlainEmployee ? "Directory" : "All Employees", icon: employeesIcon },
+      { path: "/employees", title: isPlainManager || isPlainEmployee ? t("sideMenu.directory", { defaultValue: "Directory" }) : t("sideMenu.allEmployees", { defaultValue: "All Employees" }), icon: employeesIcon },
       // Add Employee: HR/Admin only (App.jsx gates employees/add requireHR)
       // — previously only reachable via the "+ Add Employee" button on the
       // All Employees page; the design lists it as its own People-group
       // nav item, so it gets a direct sidebar shortcut too.
-      ...(isHRTier ? [{ path: "/employees/add", title: "Add Employee", icon: addEmployeeIcon }] : []),
+      ...(isHRTier ? [{ path: "/employees/add", title: t("sideMenu.addEmployee", { defaultValue: "Add Employee" }), icon: addEmployeeIcon }] : []),
       // MANAGER/EMPLOYEE get a "My Department" shortcut instead of the
       // full company Departments list — matches the demo's role model
       // (neither has a general Departments browser, only their own via
       // MyDepartmentRedirect.jsx), and App.jsx gates /departments requireHR.
       isPlainManager || isPlainEmployee
-        ? { path: "/departments/me", title: "My Department", icon: departmentsIcon }
-        : { path: "/departments", title: "All Departments", icon: departmentsIcon },
+        ? { path: "/departments/me", title: t("sideMenu.myDepartment", { defaultValue: "My Department" }), icon: departmentsIcon }
+        : { path: "/departments", title: t("sideMenu.allDepartments", { defaultValue: "All Departments" }), icon: departmentsIcon },
       // Org Chart: HR/Admin only (matches the demo — no such nav item for
       // MANAGER/EMPLOYEE), so it's omitted from their nav below instead of
       // just relying on the Access Denied fallback.
-      ...(isPlainManager || isPlainEmployee ? [] : [{ path: "/org-chart", title: "Org Chart", icon: orgChartIcon }]),
+      ...(isPlainManager || isPlainEmployee ? [] : [{ path: "/org-chart", title: t("sideMenu.orgChart", { defaultValue: "Org Chart" }), icon: orgChartIcon }]),
     ]},
-    { key: "timepay", title: "Time & Pay", items: [
-      { path: "/attendance", title: "Attendance", icon: attendanceIcon },
+    { key: "timepay", title: t("sideMenu.timePay", { defaultValue: "Time & Pay" }), items: [
+      { path: "/attendance", title: t("sideMenu.attendance", { defaultValue: "Attendance" }), icon: attendanceIcon },
       // Every role has at least their own review (ADMIN/HR/MANAGER also
       // review reports) — always present, no isPlainManager/isPlainEmployee
       // branching needed, matching /attendance above.
-      { path: "/performance", title: "Performance Reviews", icon: performanceIcon },
+      { path: "/performance", title: t("sideMenu.performanceReviews", { defaultValue: "Performance Reviews" }), icon: performanceIcon },
       ...(isPlainEmployee && user?.employeeId
         // EMPLOYEE: "Payroll"/"Leave" deep-link into My Profile's own tabs
         // (see ViewEmployee.jsx's ?tab= handling) rather than the
@@ -90,14 +92,14 @@ function SideMenu({ isOpen = false, onNavigate }) {
         // /leave page — same underlying self-service data, just reachable
         // directly from the sidebar like the design shows.
         ? [
-            { path: `/employees/${user.employeeId}?tab=salary`, title: "Payroll", icon: payrollIcon },
-            { path: `/employees/${user.employeeId}?tab=leave`,  title: "Leave",   icon: holidaysIcon },
+            { path: `/employees/${user.employeeId}?tab=salary`, title: t("sideMenu.payroll", { defaultValue: "Payroll" }), icon: payrollIcon },
+            { path: `/employees/${user.employeeId}?tab=leave`,  title: t("sideMenu.leave", { defaultValue: "Leave" }),   icon: holidaysIcon },
           ]
         // MANAGER/HR/Admin: both requireManager (App.jsx) — all three pass
         // that gate, so they keep the full admin pages.
         : isPlainEmployee ? [] : [
-            { path: "/payroll",  title: "Payroll",  icon: payrollIcon },
-            { path: "/holidays", title: "Holidays", icon: holidaysIcon },
+            { path: "/payroll",  title: t("sideMenu.payroll", { defaultValue: "Payroll" }),  icon: payrollIcon },
+            { path: "/holidays", title: t("sideMenu.holidays", { defaultValue: "Holidays" }), icon: holidaysIcon },
           ]),
     ]},
     // Hiring: requireHR (App.jsx), so MANAGER hits Access Denied here too
@@ -105,13 +107,13 @@ function SideMenu({ isOpen = false, onNavigate }) {
     // live app's current Manager sidebar (out of scope to revisit here).
     // Only EMPLOYEE, which never had a Hiring group in the design, drops
     // it from its own nav.
-    ...(isPlainEmployee ? [] : [{ key: "hiring", title: "Hiring", items: [
-      { path: "/candidates", title: "Candidates", icon: candidatesIcon },
-      { path: "/jobs",       title: "Job Openings", icon: jobsIcon },
+    ...(isPlainEmployee ? [] : [{ key: "hiring", title: t("sideMenu.hiring", { defaultValue: "Hiring" }), items: [
+      { path: "/candidates", title: t("sideMenu.candidates", { defaultValue: "Candidates" }), icon: candidatesIcon },
+      { path: "/jobs",       title: t("sideMenu.jobOpenings", { defaultValue: "Job Openings" }), icon: jobsIcon },
     ]}]),
-    { key: "system", title: isPlainEmployee ? "Account" : "System", items: [
-      { path: "/notifications", title: "Notifications", icon: notifIcon },
-      { path: "/settings",      title: "Settings",      icon: settingsIcon },
+    { key: "system", title: isPlainEmployee ? t("sideMenu.account", { defaultValue: "Account" }) : t("sideMenu.system", { defaultValue: "System" }), items: [
+      { path: "/notifications", title: t("sideMenu.notifications", { defaultValue: "Notifications" }), icon: notifIcon },
+      { path: "/settings",      title: t("sideMenu.settings", { defaultValue: "Settings" }),      icon: settingsIcon },
     ]},
   ];
   const navGroups = rawGroups.map((group, i) => ({ ...group, index: String(i + 1).padStart(2, "0") }));
@@ -128,7 +130,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
           cursor: "pointer", background: "none",
           textAlign: "left", fontFamily: "inherit",
         }}
-        title="Go to Dashboard"
+        title={t("sideMenu.goToDashboard", { defaultValue: "Go to Dashboard" })}
       >
         <div className="logo-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
@@ -196,7 +198,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
               <path d="M9 12l2 2 4-4" />
             </svg>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-primary-brand)", fontWeight: "var(--fw-medium)" }}>
-              Administrator
+              {t("common.roles.ADMIN", { defaultValue: "Administrator" })}
             </span>
           </div>
         )}
@@ -217,7 +219,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
               <path d="M9 15l2 2 4-4" />
             </svg>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", fontWeight: "var(--fw-medium)" }}>
-              HR
+              {t("common.roles.HR", { defaultValue: "HR" })}
             </span>
           </div>
         )}
@@ -238,7 +240,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
               <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-info)", fontWeight: "var(--fw-medium)" }}>
-              Manager
+              {t("common.roles.MANAGER", { defaultValue: "Manager" })}
             </span>
           </div>
         )}
@@ -258,19 +260,19 @@ function SideMenu({ isOpen = false, onNavigate }) {
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
             </svg>
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
-              Employee access
+              {t("sideMenu.employeeAccessBadge", { defaultValue: "Employee access" })}
             </span>
           </div>
         )}
 
-        <div className="theme-switch" role="tablist" aria-label="Theme switcher">
+        <div className="theme-switch" role="tablist" aria-label={t("sideMenu.themeSwitcherLabel", { defaultValue: "Theme switcher" })}>
           <button
             className={`theme-option ${theme === "light" ? "active" : ""}`}
             onClick={() => theme !== "light" && toggleTheme()}
             type="button"
           >
             <span>☀</span>
-            <span>Light</span>
+            <span>{t("sideMenu.themeLight", { defaultValue: "Light" })}</span>
           </button>
           <button
             className={`theme-option ${theme === "dark" ? "active" : ""}`}
@@ -278,7 +280,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
             type="button"
           >
             <span>◐</span>
-            <span>Dark</span>
+            <span>{t("sideMenu.themeDark", { defaultValue: "Dark" })}</span>
           </button>
         </div>
 
@@ -289,19 +291,19 @@ function SideMenu({ isOpen = false, onNavigate }) {
           type="button"
           className="user-chip"
           onClick={() => navigate("/settings")}
-          title="Go to Settings"
+          title={t("sideMenu.goToSettings", { defaultValue: "Go to Settings" })}
         >
           <span className="user-chip-avatar" aria-hidden="true">
             {user?.avatar || "AU"}
           </span>
           <span className="user-chip-text">
             <span className="user-chip-name">{user?.name || "Admin User"}</span>
-            <span className="user-chip-role">{getRoleLabel(user?.role) || "Administrator"}</span>
+            <span className="user-chip-role">{getRoleLabel(user?.role, t) || t("common.roles.ADMIN", { defaultValue: "Administrator" })}</span>
           </span>
         </button>
 
         <button type="button" className="sign-out-link" onClick={logout}>
-          Sign Out
+          {t("sideMenu.signOut", { defaultValue: "Sign Out" })}
         </button>
       </div>
     </aside>

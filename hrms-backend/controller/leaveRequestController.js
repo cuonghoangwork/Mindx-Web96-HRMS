@@ -6,6 +6,7 @@ import EmployeeModel from "../model/Employee.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { getRemainingDays, getAllBalances, countWorkingDays } from "../utils/leaveBalance.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { AppError } from "../utils/appError.js";
 
 function dateOnly(d) {
   return d ? new Date(d).toISOString().slice(0, 10) : null;
@@ -70,6 +71,13 @@ const { list, review } = createReviewRequestController({
     message: decision === "approved"
       ? `Your ${request.type} leave from ${dateOnly(request.startDate)} to ${dateOnly(request.endDate)} has been approved.`
       : `Your leave request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+    titleKey: decision === "approved" ? "leaveApproved" : "leaveRejected",
+    messageKey: decision === "approved"
+      ? "leaveApproved"
+      : (request.reviewNote ? "leaveRejectedWithNote" : "leaveRejected"),
+    params: decision === "approved"
+      ? { leaveType: request.type, startDate: request.startDate, endDate: request.endDate }
+      : (request.reviewNote ? { note: request.reviewNote } : undefined),
   }),
   employeeLink: "/dashboard",
   employeeLinkLabel: "View leave balance",
@@ -94,24 +102,24 @@ const leaveRequestController = {
     try {
       const employee = await resolveRequestingEmployee(req);
       if (!employee) {
-        return res.status(404).json({ success: false, message: "No employee profile is linked to your account. Ask HR to link your profile." });
+        return res.status(404).json({ success: false, message: "No employee profile is linked to your account. Ask HR to link your profile.", code: "EMPLOYEE_PROFILE_NOT_LINKED" });
       }
 
       const { startDate, endDate, reason, type } = req.body;
-      if (!startDate) throw new Error("startDate is required.");
-      if (!endDate) throw new Error("endDate is required.");
+      if (!startDate) throw new AppError("startDate is required.", "START_DATE_REQUIRED");
+      if (!endDate) throw new AppError("endDate is required.", "END_DATE_REQUIRED");
       if (!LEAVE_TYPES.includes(type)) {
-        throw new Error(`type must be one of: ${LEAVE_TYPES.join(", ")}.`);
+        throw new AppError(`type must be one of: ${LEAVE_TYPES.join(", ")}.`, "INVALID_LEAVE_TYPE", { types: LEAVE_TYPES.join(", ") });
       }
 
       const start = new Date(startDate);
       const end = new Date(endDate);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-        throw new Error("startDate/endDate must be valid dates.");
+        throw new AppError("startDate/endDate must be valid dates.", "INVALID_LEAVE_DATES");
       }
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
-      if (end < start) throw new Error("endDate cannot be before startDate.");
+      if (end < start) throw new AppError("endDate cannot be before startDate.", "END_DATE_BEFORE_START_DATE");
 
       const now = new Date();
       const today = new Date(now);
@@ -120,12 +128,13 @@ const leaveRequestController = {
         return res.status(400).json({
           success: false,
           message: "Same-day leave must be requested before 9:00 AM. Please choose a future date.",
+          code: "SAME_DAY_LEAVE_CUTOFF",
         });
       }
 
       const days = countWorkingDays(start, end);
       if (days <= 0) {
-        throw new Error("The selected range contains no working days.");
+        throw new AppError("The selected range contains no working days.", "NO_WORKING_DAYS_IN_RANGE");
       }
 
       // Block if there's already a pending request for this employee — same
@@ -135,13 +144,16 @@ const leaveRequestController = {
         LeaveRequestModel,
         employee._id,
         "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+        "PENDING_LEAVE_REQUEST_EXISTS",
       );
 
       if (type !== "unpaid") {
         const remaining = await getRemainingDays(employee._id, start.getFullYear(), type);
         if (days > remaining) {
-          throw new Error(
+          throw new AppError(
             `Not enough ${LEAVE_TYPE_LABELS[type]} balance: ${remaining} day${remaining === 1 ? "" : "s"} remaining, ${days} requested. Choose fewer days or apply as Unpaid.`,
+            "INSUFFICIENT_LEAVE_BALANCE",
+            { type, remaining, days },
           );
         }
       }
@@ -173,6 +185,7 @@ const leaveRequestController = {
         return res.status(409).json({
           success: false,
           message: "You already have a pending leave request. Wait for it to be reviewed before submitting another.",
+          code: "PENDING_LEAVE_REQUEST_EXISTS",
         });
       }
 
@@ -201,8 +214,10 @@ const leaveRequestController = {
           if (String(r._id) === String(request._id)) {
             if (cumulative > allowance) {
               await LeaveRequestModel.deleteOne({ _id: request._id });
-              throw new Error(
+              throw new AppError(
                 `Not enough ${LEAVE_TYPE_LABELS[type]} balance: a concurrent request already used it. Choose fewer days or apply as Unpaid.`,
+                "INSUFFICIENT_LEAVE_BALANCE_CONCURRENT",
+                { type },
               );
             }
             break;
@@ -223,12 +238,15 @@ const leaveRequestController = {
           link: "/holidays",
           linkLabel: "Review request",
           read: false,
+          titleKey: "leaveRequestSubmitted",
+          messageKey: "leaveRequestSubmitted",
+          params: { employeeName: employee.name, days, leaveType: type, startDate: start, endDate: end },
         })
       ));
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message });
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -275,6 +293,7 @@ const leaveRequestController = {
           return res.status(403).json({
             success: false,
             message: "You can only view leave balances for your own department.",
+            code: "LEAVE_BALANCE_ACCESS_DENIED",
           });
         }
       }
@@ -294,7 +313,7 @@ const leaveRequestController = {
         },
       });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 
@@ -325,7 +344,7 @@ const leaveRequestController = {
       })));
       res.json({ success: true, data: { year, items } });
     } catch (error) {
-      res.status(error.status || 500).json({ success: false, message: error.message });
+      res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

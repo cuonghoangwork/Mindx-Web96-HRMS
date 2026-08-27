@@ -20,6 +20,14 @@ const notificationSchema = new mongoose.Schema(
     },
     title: { type: String, required: true },
     message: { type: String },
+    // Optional translation keys for system-generated notifications — when set,
+    // the frontend renders notifications.generated.<titleKey>.title /
+    // <messageKey>.message (interpolated with `params`) instead of the literal
+    // title/message above. title/message are still always populated as the
+    // English fallback for old data and for anything reading them directly.
+    titleKey: { type: String, default: null },
+    messageKey: { type: String, default: null },
+    params: { type: mongoose.Schema.Types.Mixed, default: null },
     read: { type: Boolean, default: false },
     // In-app navigation target for click-to-open notices, e.g. "/employees/64f..."
     link: { type: String, default: null },

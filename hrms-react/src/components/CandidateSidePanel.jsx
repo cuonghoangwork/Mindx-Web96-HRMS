@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import Avatar from "./Avatar";
 import { CandidateStageBadge } from "./Badge";
 import Button from "./Button";
+import { translateApiError } from "../utils/apiError";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 // Task 5.3 — same 10MB cap as employee contract uploads (ViewEmployee.jsx's
@@ -180,7 +181,7 @@ function ResumeField({ candidate, onUploadCv }) {
     try {
       await onUploadCv?.(candidate.id, file);
     } catch (err) {
-      setError(err.message || t("candidates.panel.cvUploadError"));
+      setError(translateApiError(err, t) || t("candidates.panel.cvUploadError", { defaultValue: "Failed to upload CV." }));
     } finally {
       setUploading(false);
     }
