@@ -22,8 +22,10 @@ import HolidayModel from "./model/Holiday.js";
 import AttendanceModel from "./model/Attendance.js";
 import NotificationModel from "./model/Notification.js";
 import PositionLevelModel, { POSITION_LEVELS } from "./model/PositionLevel.js";
+import LeaveRequestModel from "./model/LeaveRequest.js";
 import { closeAttendanceDay } from "./jobs/closeAttendanceDay.js";
 import { utcMidnight, hoursBetween } from "./utils/workday.js";
+import { countWorkingDays } from "./utils/leaveBalance.js";
 
 const SALT_ROUNDS = 10;
 
@@ -718,6 +720,212 @@ async function seedAttendanceHistory(employees) {
   await seedTodayInProgress(employees, now);
 }
 
+/* ── Leave requests (Sample Data plan, Phase 3) ──────────────────────────
+ * A spread of historical (already-reviewed) requests, one ongoing approved
+ * parental-leave block per currently-on-leave employee (explains the
+ * attendance streak Phase 2 already seeded for them), and a handful of
+ * fresh pending requests so the approval queue isn't empty on first login.
+ *
+ * Approved requests replicate leaveRequestController.js's onApprove hook
+ * exactly (upsert matching Attendance "on-leave" records for each weekday
+ * in range) — reusing that effect means Attendance and Leave Requests
+ * agree with each other for every employee seeded here, closing the gap
+ * Phase 2 left for its randomly-seeded on-leave days.
+ */
+
+function nextWeekdayOnOrAfter(date) {
+  let d = new Date(date);
+  while (isWeekendUtc(d)) d = addUtcDays(d, 1);
+  return d;
+}
+
+function endDateForWorkingDays(startDate, workingDays) {
+  let cur = new Date(startDate);
+  let count = 0;
+  let last = new Date(startDate);
+  while (count < workingDays) {
+    if (!isWeekendUtc(cur)) {
+      count += 1;
+      last = new Date(cur);
+    }
+    if (count < workingDays) cur = addUtcDays(cur, 1);
+  }
+  return last;
+}
+
+// Mirrors leaveRequestController.js's onApprove hook exactly (same upsert,
+// same weekday-only loop) so approved requests seeded here actually show
+// up as "on-leave" on the Attendance page too, not just on Leave Requests.
+async function syncApprovedLeaveToAttendance(employeeId, startDate, endDate) {
+  let cur = new Date(startDate);
+  const last = new Date(endDate);
+  while (cur <= last) {
+    if (!isWeekendUtc(cur)) {
+      const date = new Date(cur);
+      await AttendanceModel.findOneAndUpdate(
+        { employee: employeeId, date },
+        { status: "on-leave", checkIn: null, checkOut: null },
+        { upsert: true, setDefaultsOnInsert: true },
+      );
+    }
+    cur = addUtcDays(cur, 1);
+  }
+}
+
+// Fixed literal dates — idempotent on re-run by construction (same
+// employee/type/startDate every time).
+const HISTORICAL_LEAVE_REQUESTS = [
+  { employeeId: "EMP002", type: "annual",      startKey: "2025-11-10", workingDays: 3, status: "approved", reason: "Family trip to visit parents" },
+  { employeeId: "EMP003", type: "sick",        startKey: "2026-03-02", workingDays: 2, status: "approved", reason: "Recovering from flu" },
+  { employeeId: "EMP004", type: "unpaid",      startKey: "2025-12-15", workingDays: 2, status: "approved", reason: "Personal errands" },
+  { employeeId: "EMP006", type: "annual",      startKey: "2026-01-20", workingDays: 2, status: "approved", reason: "Long weekend trip" },
+  { employeeId: "EMP006", type: "sick",        startKey: "2026-05-11", workingDays: 1, status: "approved", reason: "Down with a cold" },
+  { employeeId: "EMP009", type: "annual",      startKey: "2025-10-13", workingDays: 4, status: "approved", reason: "Family vacation" },
+  { employeeId: "EMP010", type: "sick",        startKey: "2026-02-09", workingDays: 2, status: "approved", reason: "Medical appointment recovery" },
+  { employeeId: "EMP010", type: "annual",      startKey: "2026-06-08", workingDays: 3, status: "approved", reason: "Summer trip" },
+  { employeeId: "EMP012", type: "bereavement", startKey: "2025-09-22", workingDays: 2, status: "approved", reason: "Family bereavement" },
+  { employeeId: "EMP013", type: "sick",        startKey: "2026-04-06", workingDays: 1, status: "approved", reason: "Feeling unwell" },
+  { employeeId: "EMP014", type: "annual",      startKey: "2026-03-16", workingDays: 3, status: "approved", reason: "Personal travel" },
+  { employeeId: "EMP014", type: "unpaid",      startKey: "2026-07-06", workingDays: 2, status: "rejected", reason: "Personal time off request", reviewNote: "Critical sprint deadline during this window — please choose alternate dates." },
+  { employeeId: "EMP015", type: "annual",      startKey: "2025-12-01", workingDays: 2, status: "approved", reason: "Personal time off" },
+  { employeeId: "EMP016", type: "sick",        startKey: "2026-01-27", workingDays: 3, status: "approved", reason: "Recovering from illness" },
+  { employeeId: "EMP018", type: "annual",      startKey: "2026-05-18", workingDays: 2, status: "rejected", reason: "Family trip", reviewNote: "Campaign launch week — please resubmit for after May 25." },
+  { employeeId: "EMP022", type: "annual",      startKey: "2025-11-24", workingDays: 3, status: "approved", reason: "Family gathering" },
+  { employeeId: "EMP024", type: "sick",        startKey: "2026-02-23", workingDays: 1, status: "approved", reason: "Medical checkup" },
+  { employeeId: "EMP025", type: "unpaid",      startKey: "2026-04-20", workingDays: 2, status: "approved", reason: "Personal matters" },
+  { employeeId: "EMP025", type: "annual",      startKey: "2026-07-13", workingDays: 3, status: "approved", reason: "Family trip" },
+  { employeeId: "EMP027", type: "annual",      startKey: "2025-10-27", workingDays: 2, status: "approved", reason: "Weekend getaway extension" },
+  { employeeId: "EMP029", type: "sick",        startKey: "2026-03-23", workingDays: 2, status: "rejected", reason: "Feeling unwell", reviewNote: "Please provide a doctor's note for sick leave over 1 day, per policy — resubmit with documentation." },
+  { employeeId: "EMP030", type: "annual",      startKey: "2026-06-22", workingDays: 4, status: "approved", reason: "Family vacation" },
+  { employeeId: "EMP033", type: "annual",      startKey: "2026-03-09", workingDays: 2, status: "approved", reason: "Personal time off" }, // terminated later — safely before TERMINATED_CUTOFF_KEY
+];
+
+// The three currently on-leave employees (Employee.status "on-leave",
+// Phase 2's ON_LEAVE_STREAK_EMPLOYEE_IDS) get one big ongoing *parental*
+// leave request each instead of several short ones — parental's 90-day
+// allowance comfortably covers the ~33 business days their Phase 2
+// attendance streak already spans (12 bulk-tail days + the full 20-day
+// recent slice + today), and a single long block is a more realistic
+// reason for that shape of absence than several short annual/sick
+// requests stacked back to back would be.
+const ONGOING_PARENTAL_LEAVE_EMPLOYEE_IDS = ["EMP008", "EMP019", "EMP032"];
+
+// Relative to "now" at run time — recomputed fresh on every run, so these
+// stay "a few days ago" / "a couple weeks out" regardless of when this
+// script actually runs.
+const PENDING_LEAVE_REQUESTS = [
+  { employeeId: "EMP001", type: "annual", appliedDaysAgo: 2, startDaysFromNow: 10, workingDays: 3, reason: "Family trip" },
+  { employeeId: "EMP005", type: "annual", appliedDaysAgo: 1, startDaysFromNow: 14, workingDays: 2, reason: "Long weekend" },
+  { employeeId: "EMP011", type: "sick",   appliedDaysAgo: 1, startDaysFromNow: 1,  workingDays: 2, reason: "Feeling unwell, need a couple days to recover" },
+  { employeeId: "EMP017", type: "annual", appliedDaysAgo: 3, startDaysFromNow: 21, workingDays: 4, reason: "Personal travel" },
+  { employeeId: "EMP021", type: "unpaid", appliedDaysAgo: 4, startDaysFromNow: 5,  workingDays: 2, reason: "Personal matters" },
+  { employeeId: "EMP023", type: "annual", appliedDaysAgo: 2, startDaysFromNow: 10, workingDays: 2, reason: "Family visit" },
+  { employeeId: "EMP026", type: "sick",   appliedDaysAgo: 1, startDaysFromNow: 1,  workingDays: 1, reason: "Doctor's appointment" },
+  { employeeId: "EMP031", type: "annual", appliedDaysAgo: 5, startDaysFromNow: 18, workingDays: 3, reason: "Trip with family" },
+  { employeeId: "EMP034", type: "annual", appliedDaysAgo: 2, startDaysFromNow: 9,  workingDays: 2, reason: "Personal time off" },
+  { employeeId: "EMP007", type: "unpaid", appliedDaysAgo: 3, startDaysFromNow: 6,  workingDays: 2, reason: "Personal errands" },
+];
+
+async function seedLeaveRequests(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  const now = new Date();
+  const todayUtc = utcMidnight(toDateKeyUtc(now));
+
+  let created = 0;
+  let skipped = 0;
+
+  // dedupeQuery is caller-supplied rather than always {employee, startDate,
+  // type}: the pending/parental blocks compute startDate relative to "now"
+  // at run time, so a literal-date dedupe key would never match across two
+  // runs on different days and would insert a duplicate on every re-run.
+  // Deduping on {employee, type, status} instead for those keeps the
+  // script safe to re-run regardless of when it's next invoked.
+  async function upsertRequest({ employeeId, type, startDate, endDate, status, reason, reviewNote, appliedAt, dedupeQuery }) {
+    const emp = byId.get(employeeId);
+    if (!emp) { skipped += 1; return; }
+    if (emp.createdAt && startDate < emp.createdAt) { skipped += 1; return; }
+    if (employeeId === "EMP033" && toDateKeyUtc(startDate) >= TERMINATED_CUTOFF_KEY) { skipped += 1; return; }
+
+    const exists = await LeaveRequestModel.findOne({ employee: emp._id, ...dedupeQuery });
+    if (exists) return;
+
+    const days = countWorkingDays(startDate, endDate);
+    const doc = {
+      employee: emp._id,
+      requestedBy: emp.userId ?? null,
+      startDate,
+      endDate,
+      days,
+      type,
+      reason: reason ?? "",
+      appliedAt,
+      status,
+    };
+    if (status !== "pending") {
+      doc.reviewedBy = hrUser?._id ?? null;
+      doc.reviewedAt = addUtcDays(appliedAt, 2);
+      doc.reviewNote = reviewNote ?? "";
+    }
+
+    await LeaveRequestModel.create(doc);
+    created += 1;
+
+    if (status === "approved") {
+      await syncApprovedLeaveToAttendance(emp._id, startDate, endDate);
+    }
+  }
+
+  for (const spec of HISTORICAL_LEAVE_REQUESTS) {
+    const startDate = nextWeekdayOnOrAfter(utcMidnight(spec.startKey));
+    const endDate = endDateForWorkingDays(startDate, spec.workingDays);
+    await upsertRequest({
+      employeeId: spec.employeeId,
+      type: spec.type,
+      startDate,
+      endDate,
+      status: spec.status,
+      reason: spec.reason,
+      reviewNote: spec.reviewNote,
+      appliedAt: addUtcDays(startDate, -5),
+      dedupeQuery: { startDate, type: spec.type },
+    });
+  }
+
+  const parentalStart = nextWeekdayOnOrAfter(addUtcDays(todayUtc, -40));
+  const parentalEnd = addUtcDays(todayUtc, 10);
+  for (const employeeId of ONGOING_PARENTAL_LEAVE_EMPLOYEE_IDS) {
+    await upsertRequest({
+      employeeId,
+      type: "parental",
+      startDate: parentalStart,
+      endDate: parentalEnd,
+      status: "approved",
+      reason: "Parental leave for a new child",
+      appliedAt: addUtcDays(parentalStart, -10),
+      dedupeQuery: { type: "parental", status: "approved" },
+    });
+  }
+
+  for (const spec of PENDING_LEAVE_REQUESTS) {
+    const appliedAt = addUtcDays(todayUtc, -spec.appliedDaysAgo);
+    const startDate = nextWeekdayOnOrAfter(addUtcDays(todayUtc, spec.startDaysFromNow));
+    const endDate = endDateForWorkingDays(startDate, spec.workingDays);
+    await upsertRequest({
+      employeeId: spec.employeeId,
+      type: spec.type,
+      startDate,
+      endDate,
+      status: "pending",
+      reason: spec.reason,
+      appliedAt,
+      dedupeQuery: { status: "pending" },
+    });
+  }
+
+  console.log(`✓ Seeded ${created} leave requests` + (skipped ? ` (skipped ${skipped})` : ""));
+}
+
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
 async function seedPositionLevels() {
   // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
@@ -815,6 +1023,7 @@ async function main() {
   await seedCandidates(jobs);
   await seedHolidays();
   await seedAttendanceHistory(employees);
+  await seedLeaveRequests(employees);
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
