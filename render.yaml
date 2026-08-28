@@ -16,8 +16,10 @@ services:
     rootDir: hrms-backend
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /api/v1/audit-log/recent
+    healthCheckPath: /api/v1/health
     envVars:
+      - key: NODE_VERSION
+        value: "24"
       - key: NODE_ENV
         value: production
       - key: AT_EXPIRES_IN
@@ -68,6 +70,8 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
+      - key: NODE_VERSION
+        value: "24"
       - key: VITE_API_URL
         value: https://hrms-backend.onrender.com/api/v1   # update to match your actual backend URL
     routes:

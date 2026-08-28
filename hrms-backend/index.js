@@ -17,6 +17,14 @@ const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json());
 
+// Public health check for hosting platforms (e.g. Render) that poll this
+// path with no Authorization header. Every other /api/v1 route requires a
+// valid JWT (see middleware/auth.js), so this one is deliberately mounted
+// ahead of rootRouter and outside verifyToken.
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({ success: true, status: "ok" });
+});
+
 app.use("/api/v1", rootRouter);
 
 app.use((req, res) => {
