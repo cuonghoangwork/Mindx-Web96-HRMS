@@ -15,10 +15,10 @@ export default defineConfig({
     css: false,
     // Matches hrms-backend/vitest.config.js — this sandbox's worker-pool
     // threading is unreliable (same root cause as the backend's documented
-    // isolate/maxWorkers findings), so pin to a single fork.
+    // isolate/maxWorkers findings), so pin to a single fork. Vitest 4 removed
+    // poolOptions.forks.singleFork in favor of maxWorkers (isolate stays on —
+    // it's a separate setting that would break cross-test module isolation).
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    maxWorkers: 1,
   },
 })
