@@ -30,6 +30,7 @@ import { generateMonthlyPayrollDraft } from "./jobs/generateMonthlyPayrollDraft.
 import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
 import { checkPromotionEligibility } from "./jobs/checkPromotionEligibility.js";
 import PromotionRequestModel from "./model/PromotionRequest.js";
+import { buildPayslipRows, insertPayslips } from "./utils/payrollGeneration.js";
 import ProfileEditRequestModel from "./model/ProfileEditRequest.js";
 import PerformanceCycleModel from "./model/PerformanceCycle.js";
 import PerformanceReviewModel from "./model/PerformanceReview.js";
@@ -1126,6 +1127,46 @@ async function seedPromotionRequests(employees) {
   console.log("✓ Seeded 2 manually-proposed promotion requests (1 approved, 1 rejected)");
 }
 
+/* ── Post-promotion payroll refresh (cross-phase audit fix) ───────────────
+ * Phase 4 (payroll) runs before Phase 5 (promotions) in main(), so the
+ * current calendar month's draft period was already built from
+ * pre-promotion salaries — most visibly, EMP029's approved bump to
+ * Manager/$130,000 happens *after* her August draft was generated from
+ * her old Senior/$93,000 figures. The real system has this exact same
+ * limitation (a draft doesn't auto-refresh when a salary changes after
+ * the fact) — payrollController.js's regenerate endpoint is HR's real
+ * fix for it: delete the draft's payslips and rebuild them from current
+ * employee data. Replicating that here, unconditionally, picks up any
+ * promotion-driven salary change against whichever period is still in
+ * draft — not narrowly hardcoded to one employee.
+ */
+async function refreshCurrentDraftPayrollAfterPromotions() {
+  const now = new Date();
+  const period = await PayrollPeriodModel.findOne({
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    status: "draft",
+  });
+  if (!period) return;
+
+  await PayslipModel.deleteMany({ period: period._id });
+  const rows = await buildPayslipRows(period);
+  const generated = await insertPayslips(rows);
+  await logAction(
+    {},
+    {
+      action: "updated",
+      resource: "payroll",
+      resourceId: period._id,
+      label: `Payroll ${period.year}-${String(period.month).padStart(2, "0")} regenerated (post-promotion refresh)`,
+    },
+  );
+  console.log(
+    `✓ Refreshed ${period.year}-${String(period.month).padStart(2, "0")} draft payroll ` +
+      `to reflect post-promotion salaries (${generated} payslips)`,
+  );
+}
+
 /* ── Profile edit requests (Sample Data plan, Phase 6) ────────────────────
  * One pending, one approved, one rejected, for the Admin "Edit requests"
  * tab. The approved one replicates profileEditRequestController.js's
@@ -1309,9 +1350,24 @@ async function seedPerformanceReviews(employees) {
   const engManagerUser = await UserModel.findOne({ email: "manager@hrms.com" });
 
   async function managerReviewerForDept(emp) {
-    if (!emp.department) return hrUser?._id ?? null;
-    const dept = await DepartmentModel.findById(emp.department, "name");
-    return dept?.name === "Engineering" ? (engManagerUser?._id ?? hrUser?._id) : (hrUser?._id ?? null);
+    let candidateId = hrUser?._id ?? null;
+    if (emp.department) {
+      const dept = await DepartmentModel.findById(emp.department, "name");
+      if (dept?.name === "Engineering") candidateId = engManagerUser?._id ?? hrUser?._id ?? null;
+    }
+    // Self-review isn't possible in the real system — assertCanRateAsManager
+    // blocks isSelf unconditionally, even for ADMIN (performanceScope.js).
+    // That matters here specifically for MGR001 (HR, so the "HR reviews
+    // orphan departments" rule would otherwise assign them to review
+    // themselves) and MGR002 (Engineering's own department manager, same
+    // problem via the "Engineering manager reviews Engineering" rule).
+    // Admin is the only person who can legitimately review either of them,
+    // since isAdmin is an unconditional branch independent of department/
+    // orphan status — the same reason it's the fallback here.
+    if (candidateId && emp.userId && String(candidateId) === String(emp.userId)) {
+      return adminUser?._id ?? null;
+    }
+    return candidateId;
   }
 
   const cycles = await ensureStandardCycles();
@@ -1384,6 +1440,24 @@ async function seedPerformanceReviews(employees) {
     closedCount += 1;
   }
   console.log(`✓ Seeded ${closedCount} completed reviews for ${closedCycle.key} (closed)`);
+
+  // Correction pass, not just forward-looking logic: if this ran before
+  // the managerReviewerForDept fix above existed, MGR001/MGR002's review
+  // is already sitting in the database self-reviewed — the exists-check
+  // at the top of the loop would otherwise skip them forever on re-run
+  // since a record already exists. Retarget to Admin if still self-set;
+  // a no-op once corrected.
+  for (const employeeId of ["MGR001", "MGR002"]) {
+    const emp = byId.get(employeeId);
+    if (!emp?.userId) continue;
+    const review = await PerformanceReviewModel.findOne({ cycleKey: closedCycle.key, employee: emp._id });
+    if (!review?.managerReviewedBy) continue;
+    if (String(review.managerReviewedBy) === String(emp.userId)) {
+      review.managerReviewedBy = adminUser?._id ?? null;
+      await review.save();
+      console.log(`✓ Corrected self-reviewed manager rating for ${employeeId} (now reviewed by Admin)`);
+    }
+  }
 
   // Open cycle: a deliberate mid-cycle mix, not full coverage — most of the
   // roster genuinely hasn't started yet, which is realistic and needs no
@@ -1805,6 +1879,7 @@ async function main() {
   await seedLeaveRequests(employees);
   await seedPayrollHistory();
   await seedPromotionRequests(employees);
+  await refreshCurrentDraftPayrollAfterPromotions();
   await seedProfileEditRequests(employees);
   await seedPerformanceReviews(employees);
   await seedNotifications();
