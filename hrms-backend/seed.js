@@ -443,6 +443,18 @@ async function seedCandidates(jobs) {
     { name: "Tom Brown",    jobTitle: "DevOps Engineer",          stage: "offer",     rating: 4.8, email: "tom.brown@example.com",        phone: "+84 92 345 6789", notes: "Offer extended."            },
     { name: "Emily Davis",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.8, email: "emily.davis@example.com",      phone: "+84 93 456 7890", notes: ""                           },
     { name: "James Nguyen", jobTitle: "Marketing Intern",         stage: "hired",     rating: 4.2, email: "james.nguyen@example.com",     phone: "+84 94 567 8901", notes: "Starts soon."              },
+    // ── Sample Data plan, Phase 8 — more candidates per open pipeline so
+    // the Jobs/Candidates pages show a real funnel instead of one name per role.
+    { name: "Daniel Park",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.5, email: "daniel.park@example.com",      phone: "+84 90 111 2233", notes: ""                                     },
+    { name: "Priya Sharma", jobTitle: "Senior Software Engineer", stage: "screening", rating: 4.1, email: "priya.sharma@example.com",     phone: "+84 91 222 3344", notes: "Solid systems design background."   },
+    { name: "Kevin Tran",   jobTitle: "Senior Software Engineer", stage: "rejected",  rating: 2.5, email: "kevin.tran@example.com",       phone: "+84 92 333 4455", notes: "Didn't pass the technical screen."   },
+    { name: "Isabella Cruz",jobTitle: "UI/UX Designer",           stage: "applied",   rating: 3.6, email: "isabella.cruz@example.com",    phone: "+84 93 444 5566", notes: ""                                     },
+    { name: "Minh Nguyen",  jobTitle: "UI/UX Designer",           stage: "interview", rating: 4.3, email: "minh.nguyen.cand@example.com", phone: "+84 94 555 6677", notes: "Strong case study walkthrough."      },
+    { name: "Oliver Bennett",jobTitle: "UI/UX Designer",          stage: "rejected",  rating: 2.8, email: "oliver.bennett@example.com",   phone: "+84 95 666 7788", notes: "Portfolio didn't fit our product style." },
+    { name: "Rachel Adams", jobTitle: "DevOps Engineer",          stage: "applied",   rating: 3.4, email: "rachel.adams@example.com",     phone: "+84 96 777 8899", notes: ""                                     },
+    { name: "Duc Pham",     jobTitle: "DevOps Engineer",          stage: "screening", rating: 3.9, email: "duc.pham@example.com",         phone: "+84 97 888 9900", notes: "Good Kubernetes experience."         },
+    { name: "Sophie Turner",jobTitle: "Marketing Intern",         stage: "applied",   rating: 3.2, email: "sophie.turner@example.com",    phone: "+84 98 999 0011", notes: ""                                     },
+    { name: "Anh Le",       jobTitle: "Marketing Intern",         stage: "rejected",  rating: 2.6, email: "anh.le.cand@example.com",      phone: "+84 99 000 1122", notes: "Went with a candidate with more relevant coursework." },
   ];
   for (const def of defs) {
     const job = byTitle[def.jobTitle];
@@ -1557,6 +1569,220 @@ async function seedNotifications() {
   }
 }
 
+/* ── Targeted notifications (Sample Data plan, Phase 8) ───────────────────
+ * Writing directly to Mongoose in Phases 3/5/6/7 skipped the real
+ * controllers' own NotificationModel.create() side effects entirely (no
+ * HTTP request ever happened, so those never fired) — this backfills a
+ * representative sample of them, matching the exact copy/titleKey shape
+ * each real controller already uses (leaveRequestController.js,
+ * promotionRequestController.js, profileEditRequestController.js,
+ * performanceController.js). Dates are read back from the records
+ * themselves rather than re-typed, so they can't drift out of sync with
+ * what was actually seeded. Older (already-acted-on) ones are marked
+ * read; the two freshest performance/leave items are left unread.
+ */
+async function seedTargetedNotifications(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+
+  let created = 0;
+
+  async function notifyEmployeeUser(employeeId, payload) {
+    const emp = byId.get(employeeId);
+    if (!emp?.userId) return;
+    const exists = await NotificationModel.findOne({ user: emp.userId, title: payload.title, message: payload.message });
+    if (exists) return;
+    await NotificationModel.create({ user: emp.userId, ...payload });
+    created += 1;
+  }
+
+  async function notifyHrUser(payload) {
+    if (!hrUser) return;
+    const exists = await NotificationModel.findOne({ user: hrUser._id, title: payload.title, message: payload.message });
+    if (exists) return;
+    await NotificationModel.create({ user: hrUser._id, ...payload });
+    created += 1;
+  }
+
+  // Leave request outcomes — mirrors leaveRequestController.js's notifyEmployee.
+  const leaveOutcomeEmployees = [
+    { employeeId: "EMP014", type: "unpaid" },
+    { employeeId: "EMP018", type: "annual" },
+    { employeeId: "EMP029", type: "sick" },
+    { employeeId: "EMP009", type: "annual" },
+    { employeeId: "EMP015", type: "annual" },
+  ];
+  for (const { employeeId, type } of leaveOutcomeEmployees) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const request = await LeaveRequestModel.findOne({ employee: emp._id, type, status: { $ne: "pending" } });
+    if (!request) continue;
+
+    const dateKey = (d) => toDateKeyUtc(new Date(d));
+    if (request.status === "approved") {
+      await notifyEmployeeUser(employeeId, {
+        category: "leave",
+        title: "Leave request approved",
+        message: `Your ${request.type} leave from ${dateKey(request.startDate)} to ${dateKey(request.endDate)} has been approved.`,
+        titleKey: "leaveApproved",
+        messageKey: "leaveApproved",
+        params: { leaveType: request.type, startDate: request.startDate, endDate: request.endDate },
+        link: "/dashboard",
+        linkLabel: "View leave balance",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    } else {
+      await notifyEmployeeUser(employeeId, {
+        category: "leave",
+        title: "Leave request rejected",
+        message: `Your leave request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+        titleKey: "leaveRejected",
+        messageKey: request.reviewNote ? "leaveRejectedWithNote" : "leaveRejected",
+        params: request.reviewNote ? { note: request.reviewNote } : undefined,
+        link: "/dashboard",
+        linkLabel: "View leave balance",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    }
+  }
+
+  // Profile edit outcomes — mirrors profileEditRequestController.js's notifyEmployee.
+  for (const employeeId of ["EMP021", "EMP006"]) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const request = await ProfileEditRequestModel.findOne({ employee: emp._id, status: { $ne: "pending" } });
+    if (!request) continue;
+
+    if (request.status === "approved") {
+      await notifyEmployeeUser(employeeId, {
+        category: "employee",
+        title: "Profile update approved",
+        message: "Your profile edit request has been approved and your information has been updated.",
+        titleKey: "profileUpdateApproved",
+        messageKey: "profileUpdateApproved",
+        link: `/employees/${emp._id}`,
+        linkLabel: "View profile",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    } else {
+      await notifyEmployeeUser(employeeId, {
+        category: "employee",
+        title: "Profile update rejected",
+        message: `Your profile edit request was rejected.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+        titleKey: "profileUpdateRejected",
+        messageKey: request.reviewNote ? "profileUpdateRejectedWithNote" : "profileUpdateRejected",
+        params: request.reviewNote ? { note: request.reviewNote } : undefined,
+        link: `/employees/${emp._id}`,
+        linkLabel: "View profile",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    }
+  }
+
+  // Promotion outcomes — mirrors promotionRequestController.js's notifyEmployee.
+  for (const employeeId of ["EMP029", "EMP018"]) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const request = await PromotionRequestModel.findOne({ employee: emp._id, systemGenerated: false, status: { $ne: "pending" } });
+    if (!request) continue;
+
+    if (request.status === "approved") {
+      await notifyEmployeeUser(employeeId, {
+        category: "employee",
+        title: "Promotion approved",
+        message: `Your promotion has been approved — new level: ${request.proposedPositionLevel}. Your HR record has been updated.`,
+        titleKey: "promotionApproved",
+        messageKey: "promotionApprovedLevelOnly",
+        params: { newLevel: request.proposedPositionLevel },
+        link: `/employees/${emp._id}`,
+        linkLabel: "View profile",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    } else {
+      await notifyEmployeeUser(employeeId, {
+        category: "employee",
+        title: "Promotion request rejected",
+        message: `Your promotion request was not approved.${request.reviewNote ? ` Note: ${request.reviewNote}` : ""}`,
+        titleKey: "promotionRejected",
+        messageKey: request.reviewNote ? "promotionRejectedWithNote" : "promotionRejected",
+        params: request.reviewNote ? { note: request.reviewNote } : undefined,
+        link: `/employees/${emp._id}`,
+        linkLabel: "View profile",
+        read: true,
+        createdAt: request.reviewedAt,
+      });
+    }
+  }
+
+  // Performance appeal — resolved (to the employee) and filed (to HR) —
+  // mirrors performanceController.js's resolveAppeal/fileAppeal notifications.
+  const emp025 = byId.get("EMP025");
+  if (emp025) {
+    const review = await PerformanceReviewModel.findOne({ employee: emp025._id, "appeal.status": "Resolved" });
+    if (review?.appeal) {
+      await notifyEmployeeUser("EMP025", {
+        category: "performance",
+        title: "Performance appeal resolved",
+        message: `Your appeal was ${review.appeal.resolution.toLowerCase()}.`,
+        titleKey: "appealResolved",
+        messageKey: "appealResolved",
+        params: { resolution: review.appeal.resolution.toLowerCase() },
+        link: "/performance",
+        linkLabel: "Open review",
+        read: true,
+        createdAt: review.appeal.resolvedDate,
+      });
+    }
+  }
+
+  const emp009 = byId.get("EMP009");
+  if (emp009) {
+    const review = await PerformanceReviewModel.findOne({ employee: emp009._id, "appeal.status": "Pending" });
+    if (review?.appeal) {
+      await notifyHrUser({
+        category: "performance",
+        title: "Performance appeal filed",
+        message: `${emp009.name} appealed their manager rating.`,
+        titleKey: "appealFiled",
+        messageKey: "appealFiled",
+        params: { employeeName: emp009.name },
+        link: "/performance",
+        linkLabel: "Open review",
+        read: false,
+        createdAt: review.appeal.filedDate,
+      });
+    }
+  }
+
+  // HR-facing: one still-pending leave request awaiting review — mirrors
+  // leaveRequestController.js's create()-time HR notification.
+  const emp001 = byId.get("EMP001");
+  if (emp001) {
+    const pendingLeave = await LeaveRequestModel.findOne({ employee: emp001._id, status: "pending" });
+    if (pendingLeave) {
+      await notifyHrUser({
+        category: "leave",
+        title: "New leave request",
+        message: `${emp001.name} requested ${pendingLeave.days} ${pendingLeave.type} leave day${pendingLeave.days === 1 ? "" : "s"}.`,
+        titleKey: "leaveRequestSubmitted",
+        messageKey: "leaveRequestSubmitted",
+        params: { employeeName: emp001.name, days: pendingLeave.days, leaveType: pendingLeave.type },
+        link: "/holidays",
+        linkLabel: "Review request",
+        read: false,
+        createdAt: pendingLeave.appliedAt,
+      });
+    }
+  }
+
+  console.log(`✓ Seeded ${created} targeted notifications`);
+}
+
 /* ── Main ── */
 async function main() {
   await connectDB();
@@ -1582,6 +1808,7 @@ async function main() {
   await seedProfileEditRequests(employees);
   await seedPerformanceReviews(employees);
   await seedNotifications();
+  await seedTargetedNotifications(employees);
 
   console.log("\n✅ Seed complete.");
   console.log("   Admin    → admin@hrms.com    / admin123");
