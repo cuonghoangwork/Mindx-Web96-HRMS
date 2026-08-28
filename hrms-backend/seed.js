@@ -28,6 +28,8 @@ import PayslipModel from "./model/Payslip.js";
 import { closeAttendanceDay } from "./jobs/closeAttendanceDay.js";
 import { generateMonthlyPayrollDraft } from "./jobs/generateMonthlyPayrollDraft.js";
 import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
+import { checkPromotionEligibility } from "./jobs/checkPromotionEligibility.js";
+import PromotionRequestModel from "./model/PromotionRequest.js";
 import { utcMidnight, hoursBetween } from "./utils/workday.js";
 import { countWorkingDays } from "./utils/leaveBalance.js";
 import { logAction } from "./utils/auditLog.js";
@@ -1016,6 +1018,98 @@ async function seedPayrollHistory() {
   }
 }
 
+/* ── Promotion eligibility (Sample Data plan, Phase 5) ────────────────────
+ * Calls the real checkPromotionEligibility job once — Phase 1 already
+ * planted two employees (EMP010, EMP013) with levelStartDate safely past
+ * their tenure threshold specifically so this job has genuine candidates
+ * to flag, rather than fabricating PromotionRequest documents directly.
+ * Every other active employee was deliberately kept under threshold, so
+ * only those two should come out of this.
+ *
+ * Two more are added by hand afterward — one approved, one rejected — for
+ * full status coverage. HR-initiated promotions don't require the tenure
+ * threshold the auto-check enforces, so these represent the "manager
+ * proposes early based on performance" path instead, not a second flavor
+ * of the same auto-flagging logic.
+ */
+async function seedPromotionRequests(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+
+  const eligibilityResult = await checkPromotionEligibility({ asOf: new Date() });
+  console.log("✓ Ran checkPromotionEligibility:", JSON.stringify(eligibilityResult));
+
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  const adminUser = await UserModel.findOne({ email: "admin@hrms.com" });
+
+  async function upsertManualProposal({ employeeId, proposedPositionLevel, proposedAnnualSalary, reason, status, reviewNote }) {
+    const emp = byId.get(employeeId);
+    if (!emp) return;
+
+    const exists = await PromotionRequestModel.findOne({
+      employee: emp._id,
+      systemGenerated: false,
+      proposedPositionLevel,
+    });
+    if (exists) return;
+
+    const dept = emp.department ? await DepartmentModel.findById(emp.department) : null;
+    const appliedAt = addUtcDays(utcMidnight(toDateKeyUtc(new Date())), -14);
+
+    const doc = {
+      employee: emp._id,
+      requestedBy: hrUser?._id ?? null,
+      systemGenerated: false,
+      status,
+      currentDesignation: emp.designation ?? null,
+      currentDepartmentName: dept?.name ?? null,
+      currentAnnualSalary: emp.annualSalary ?? 0,
+      currentPositionLevel: emp.positionLevel ?? null,
+      proposedPositionLevel,
+      proposedAnnualSalary,
+      reason,
+      appliedAt,
+    };
+    if (status !== "pending") {
+      doc.reviewedBy = adminUser?._id ?? null;
+      doc.reviewedAt = addUtcDays(appliedAt, 4);
+      doc.reviewNote = reviewNote ?? "";
+    }
+
+    await PromotionRequestModel.create(doc);
+
+    if (status === "approved") {
+      // Mirrors promotionRequestController.js's onApprove hook: apply the
+      // proposed level/salary to the employee and restart their tenure
+      // clock, exactly as approving this through the real UI would.
+      await EmployeeModel.findByIdAndUpdate(emp._id, {
+        positionLevel: proposedPositionLevel,
+        annualSalary: proposedAnnualSalary,
+        levelStartDate: new Date(),
+      });
+    }
+  }
+
+  await upsertManualProposal({
+    employeeId: "EMP029",
+    proposedPositionLevel: "Manager",
+    proposedAnnualSalary: 130000,
+    reason: "Strong performance this year and consistent ownership of the Sales team's largest accounts — proposing an early promotion to Manager.",
+    status: "approved",
+    reviewNote: "Agreed — well-earned. Approved ahead of the usual tenure schedule.",
+  });
+
+  await upsertManualProposal({
+    employeeId: "EMP018",
+    proposedPositionLevel: "Senior",
+    proposedAnnualSalary: 90000,
+    reason: "Requesting consideration for Senior given recent campaign ownership.",
+    status: "rejected",
+    reviewNote: "Not quite yet — revisit in 6 months once the current campaign cycle wraps and results are in.",
+  });
+
+  console.log("✓ Seeded 2 manually-proposed promotion requests (1 approved, 1 rejected)");
+}
+
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
 async function seedPositionLevels() {
   // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
@@ -1115,6 +1209,7 @@ async function main() {
   await seedAttendanceHistory(employees);
   await seedLeaveRequests(employees);
   await seedPayrollHistory();
+  await seedPromotionRequests(employees);
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
