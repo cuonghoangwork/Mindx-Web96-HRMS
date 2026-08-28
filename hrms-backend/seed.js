@@ -31,6 +31,9 @@ import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
 import { checkPromotionEligibility } from "./jobs/checkPromotionEligibility.js";
 import PromotionRequestModel from "./model/PromotionRequest.js";
 import ProfileEditRequestModel from "./model/ProfileEditRequest.js";
+import PerformanceCycleModel from "./model/PerformanceCycle.js";
+import PerformanceReviewModel from "./model/PerformanceReview.js";
+import { ensureStandardCycles } from "./utils/performanceCycles.js";
 import { utcMidnight, hoursBetween } from "./utils/workday.js";
 import { countWorkingDays } from "./utils/leaveBalance.js";
 import { logAction } from "./utils/auditLog.js";
@@ -1192,6 +1195,290 @@ async function seedProfileEditRequests(employees) {
   console.log(`✓ Seeded ${created} profile edit requests`);
 }
 
+/* ── Performance reviews + appeals (Sample Data plan, Phase 7) ────────────
+ * Cycles come from the real ensureStandardCycles() (utils/performanceCycles.js)
+ * — it self-manages a rolling window of half-year cycles (2 closed, 1 open)
+ * dated off "now", the same way listCycles/loadCycleOrThrow already trigger
+ * it in production. No cycle dates are hand-typed here.
+ *
+ * Reviews are written as one $set per employee rather than replaying the
+ * real submitSelf/submitManager/setCompetency/addGoal call sequence one
+ * HTTP call at a time — slower for no benefit here, since the schema has
+ * no cross-field validation that sequence would exercise differently.
+ * managerReviewedBy follows the same authorization rule the real
+ * performanceScope.js enforces: only Engineering has an actual
+ * role:"MANAGER" user (MGR002), so every other department is "orphan" and
+ * HR is who'd really be allowed to submit those manager reviews.
+ */
+
+const PERFORMANCE_TIER = {
+  EMP009: "star", EMP015: "star", EMP022: "star", EMP030: "star",
+  EMP017: "developing", EMP026: "developing",
+};
+
+const GOAL_POOL = [
+  "Complete a relevant certification this cycle",
+  "Mentor a junior team member",
+  "Improve documentation for core workflows",
+  "Take ownership of a process improvement initiative",
+  "Strengthen cross-team collaboration",
+  "Present at the next team sync or all-hands",
+  "Improve consistency in meeting deadlines",
+  "Deepen expertise in a core tool or domain area",
+  "Support onboarding for new team members",
+  "Contribute more to quarterly planning discussions",
+  "Take on a stretch project outside the usual scope",
+  "Improve response time on assigned tasks",
+];
+
+const COMPETENCY_COMMENTS = {
+  low: ["An area to focus on this cycle.", "Room to grow here.", "Needs more consistency."],
+  mid: ["Solid and reliable.", "Meets expectations consistently.", "Steady performance here."],
+  high: ["A real strength.", "Consistently strong in this area.", "Stands out here."],
+};
+
+function randomInt(min, max) {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+function pickOne(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function clampRating(n) {
+  return Math.max(1, Math.min(5, Math.round(n)));
+}
+function competencyComment(rating) {
+  const tier = rating <= 2 ? "low" : rating === 3 ? "mid" : "high";
+  return pickOne(COMPETENCY_COMMENTS[tier]);
+}
+function tierSelfBase(employeeId) {
+  const tier = PERFORMANCE_TIER[employeeId] ?? "solid";
+  if (tier === "star") return 5;
+  if (tier === "developing") return 2;
+  return randomInt(3, 4);
+}
+function buildCompetencies(selfBase, managerBase) {
+  const out = {};
+  for (const key of ["communication", "execution", "ownership", "collaboration", "leadership", "problemSolving"]) {
+    const self = clampRating(selfBase + randomInt(-1, 1));
+    const manager = clampRating(managerBase + randomInt(-1, 1));
+    out[key] = { self, selfComment: competencyComment(self), manager, managerComment: competencyComment(manager) };
+  }
+  return out;
+}
+function buildGoals(count, createdBy) {
+  const pool = [...GOAL_POOL];
+  const goals = [];
+  for (let i = 0; i < count && pool.length; i += 1) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const [text] = pool.splice(idx, 1);
+    goals.push({ text, progress: pickOne([20, 30, 40, 50, 60, 70, 80, 90, 100]), createdBy });
+  }
+  return goals;
+}
+
+// EMP008/019/032 (on-leave), EMP033 (terminated), EMP028 (chronic no-show,
+// consistent with their disengaged pattern elsewhere), EMP020 (hired too
+// recently to have been part of the closed cycle) are deliberately excluded.
+const CLOSED_CYCLE_ROSTER = [
+  "ADM001", "MGR001", "MGR002",
+  "EMP001", "EMP002", "EMP003", "EMP004", "EMP005", "EMP006", "EMP007",
+  "EMP009", "EMP010", "EMP011", "EMP012", "EMP013", "EMP014", "EMP015", "EMP016", "EMP017", "EMP018",
+  "EMP021", "EMP022", "EMP023", "EMP024", "EMP025", "EMP026", "EMP027",
+  "EMP029", "EMP030", "EMP031", "EMP034",
+];
+
+const PEER_FEEDBACK_ROSTER = new Set(["EMP009", "EMP015", "EMP022", "EMP030", "EMP002", "EMP023"]);
+const RESOLVED_APPEAL_EMPLOYEE_ID = "EMP025";
+
+async function seedPerformanceReviews(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  const adminUser = await UserModel.findOne({ email: "admin@hrms.com" });
+  const engManagerUser = await UserModel.findOne({ email: "manager@hrms.com" });
+
+  async function managerReviewerForDept(emp) {
+    if (!emp.department) return hrUser?._id ?? null;
+    const dept = await DepartmentModel.findById(emp.department, "name");
+    return dept?.name === "Engineering" ? (engManagerUser?._id ?? hrUser?._id) : (hrUser?._id ?? null);
+  }
+
+  const cycles = await ensureStandardCycles();
+  const closedCycle = cycles[cycles.length - 2];
+  const openCycle = cycles[cycles.length - 1];
+  console.log(
+    "✓ Ensured standard cycles:",
+    cycles.map((c) => `${c.key} (${c.defaultStatus})`).join(", "),
+  );
+
+  const now = new Date();
+  const cycleAgeDays = Math.max(1, Math.floor((now - new Date(openCycle.start)) / 86400000));
+  const safeDaysAgo = (n) => addUtcDays(utcMidnight(toDateKeyUtc(now)), -Math.min(n, cycleAgeDays - 1 || 1));
+
+  let closedCount = 0;
+  for (const employeeId of CLOSED_CYCLE_ROSTER) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+
+    const exists = await PerformanceReviewModel.findOne({ cycleKey: closedCycle.key, employee: emp._id });
+    if (exists) continue;
+
+    const selfBase = tierSelfBase(employeeId);
+    const managerBase = clampRating(selfBase + randomInt(-1, 1));
+    const managerReviewedBy = await managerReviewerForDept(emp);
+
+    const selfSubmittedDate = new Date(new Date(closedCycle.end).getTime() - 20 * 86400000);
+    const managerSubmittedDate = new Date(new Date(closedCycle.end).getTime() - 10 * 86400000);
+
+    const doc = {
+      cycleKey: closedCycle.key,
+      employee: emp._id,
+      selfRating: selfBase,
+      selfComments: "Reflecting on this cycle, I focused on delivering consistently and supporting the team where I could.",
+      selfSubmittedDate,
+      managerRating: managerBase,
+      managerComments: "Good cycle overall — see competency notes for specific areas of strength and focus.",
+      managerSubmittedDate,
+      managerReviewedBy,
+      competencies: buildCompetencies(selfBase, managerBase),
+      goals: buildGoals(randomInt(1, 3), emp.userId ?? null),
+      peerFeedback: PEER_FEEDBACK_ROSTER.has(employeeId)
+        ? [{ name: "A teammate", relation: "Peer", comments: "Reliable and easy to work with — always follows through.", addedBy: hrUser?._id ?? null, addedAt: managerSubmittedDate }]
+        : [],
+      appeal: null,
+    };
+
+    if (employeeId === RESOLVED_APPEAL_EMPLOYEE_ID) {
+      const adjustedRating = clampRating(managerBase + 1);
+      doc.managerRating = adjustedRating; // reflects the post-resolution value, same as the real resolveAppeal effect
+      doc.appeal = {
+        reasonCategory: "rating_low",
+        detail: "I believe this cycle's rating doesn't reflect the scope of work I took on, particularly the finance close automation project.",
+        status: "Resolved",
+        filedDate: new Date(managerSubmittedDate.getTime() + 3 * 86400000),
+        filedBy: emp.userId ?? null,
+        resolution: "Adjusted",
+        resolvedRating: adjustedRating,
+        resolverNote: "Agreed the automation work wasn't fully reflected — adjusted up by one point.",
+        resolvedBy: adminUser?._id ?? null,
+        resolvedDate: new Date(managerSubmittedDate.getTime() + 9 * 86400000),
+      };
+    }
+
+    await PerformanceReviewModel.findOneAndUpdate(
+      { cycleKey: closedCycle.key, employee: emp._id },
+      { $set: doc },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    closedCount += 1;
+  }
+  console.log(`✓ Seeded ${closedCount} completed reviews for ${closedCycle.key} (closed)`);
+
+  // Open cycle: a deliberate mid-cycle mix, not full coverage — most of the
+  // roster genuinely hasn't started yet, which is realistic and needs no
+  // seeding (no review doc at all = "Not started").
+  const selfOnly = ["EMP002", "EMP011", "EMP024", "EMP031"];
+  const managerOnly = ["EMP016"];
+  const completed = ["EMP015", "EMP022", "EMP030"];
+  const completedWithPendingAppeal = "EMP009";
+
+  let openCount = 0;
+  for (const employeeId of selfOnly) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const exists = await PerformanceReviewModel.findOne({ cycleKey: openCycle.key, employee: emp._id });
+    if (exists) continue;
+    const selfBase = tierSelfBase(employeeId);
+    await PerformanceReviewModel.findOneAndUpdate(
+      { cycleKey: openCycle.key, employee: emp._id },
+      {
+        $set: {
+          cycleKey: openCycle.key,
+          employee: emp._id,
+          selfRating: selfBase,
+          selfComments: "Submitting my self-review for this cycle — looking forward to the discussion.",
+          selfSubmittedDate: safeDaysAgo(randomInt(3, 10)),
+          competencies: buildCompetencies(selfBase, selfBase),
+        },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    openCount += 1;
+  }
+
+  for (const employeeId of managerOnly) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const exists = await PerformanceReviewModel.findOne({ cycleKey: openCycle.key, employee: emp._id });
+    if (exists) continue;
+    const managerBase = tierSelfBase(employeeId);
+    const managerReviewedBy = await managerReviewerForDept(emp);
+    await PerformanceReviewModel.findOneAndUpdate(
+      { cycleKey: openCycle.key, employee: emp._id },
+      {
+        $set: {
+          cycleKey: openCycle.key,
+          employee: emp._id,
+          managerRating: managerBase,
+          managerComments: "Getting an early read in before the self-review is in — will revisit once it's submitted.",
+          managerSubmittedDate: safeDaysAgo(randomInt(3, 10)),
+          managerReviewedBy,
+          competencies: buildCompetencies(managerBase, managerBase),
+        },
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    openCount += 1;
+  }
+
+  for (const employeeId of [...completed, completedWithPendingAppeal]) {
+    const emp = byId.get(employeeId);
+    if (!emp) continue;
+    const exists = await PerformanceReviewModel.findOne({ cycleKey: openCycle.key, employee: emp._id });
+    if (exists) continue;
+
+    const selfBase = tierSelfBase(employeeId);
+    const managerBase = clampRating(selfBase + randomInt(-1, 1));
+    const managerReviewedBy = await managerReviewerForDept(emp);
+    const isPendingAppealCase = employeeId === completedWithPendingAppeal;
+
+    const selfSubmittedDate = safeDaysAgo(isPendingAppealCase ? 8 : randomInt(18, 25));
+    const managerSubmittedDate = safeDaysAgo(isPendingAppealCase ? 5 : randomInt(10, 17));
+
+    const doc = {
+      cycleKey: openCycle.key,
+      employee: emp._id,
+      selfRating: selfBase,
+      selfComments: "Submitting my self-review for this cycle.",
+      selfSubmittedDate,
+      managerRating: managerBase,
+      managerComments: "Review complete — see competency notes below.",
+      managerSubmittedDate,
+      managerReviewedBy,
+      competencies: buildCompetencies(selfBase, managerBase),
+      goals: buildGoals(randomInt(1, 2), emp.userId ?? null),
+    };
+
+    if (isPendingAppealCase) {
+      doc.appeal = {
+        reasonCategory: "inaccurate",
+        detail: "A couple of the shipped features from this cycle aren't reflected in the competency notes — would like this reviewed.",
+        status: "Pending",
+        filedDate: safeDaysAgo(2),
+        filedBy: emp.userId ?? null,
+      };
+    }
+
+    await PerformanceReviewModel.findOneAndUpdate(
+      { cycleKey: openCycle.key, employee: emp._id },
+      { $set: doc },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+    openCount += 1;
+  }
+
+  console.log(`✓ Seeded ${openCount} in-progress reviews for ${openCycle.key} (open)`);
+}
+
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
 async function seedPositionLevels() {
   // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
@@ -1293,6 +1580,7 @@ async function main() {
   await seedPayrollHistory();
   await seedPromotionRequests(employees);
   await seedProfileEditRequests(employees);
+  await seedPerformanceReviews(employees);
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
