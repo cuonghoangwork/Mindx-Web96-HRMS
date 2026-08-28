@@ -23,9 +23,14 @@ import AttendanceModel from "./model/Attendance.js";
 import NotificationModel from "./model/Notification.js";
 import PositionLevelModel, { POSITION_LEVELS } from "./model/PositionLevel.js";
 import LeaveRequestModel from "./model/LeaveRequest.js";
+import PayrollPeriodModel from "./model/PayrollPeriod.js";
+import PayslipModel from "./model/Payslip.js";
 import { closeAttendanceDay } from "./jobs/closeAttendanceDay.js";
+import { generateMonthlyPayrollDraft } from "./jobs/generateMonthlyPayrollDraft.js";
+import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
 import { utcMidnight, hoursBetween } from "./utils/workday.js";
 import { countWorkingDays } from "./utils/leaveBalance.js";
+import { logAction } from "./utils/auditLog.js";
 
 const SALT_ROUNDS = 10;
 
@@ -926,6 +931,91 @@ async function seedLeaveRequests(employees) {
   console.log(`✓ Seeded ${created} leave requests` + (skipped ? ` (skipped ${skipped})` : ""));
 }
 
+/* ── Payroll history (Sample Data plan, Phase 4) ─────────────────────────
+ * Walks the real payroll jobs forward across the trailing 12 months so
+ * periods land in believable, varied states instead of an empty Payroll
+ * page. Every number here — FX rate, BHXH/BHYT/BHTN, deductions — comes
+ * from the actual payroll engine (utils/payrollEngine.js via
+ * utils/payrollGeneration.js), not hand-typed figures, since Phase 2/3
+ * already seeded real attendance and leave data for these jobs to read.
+ *
+ * generateMonthlyPayrollDraft({asOf}) drafts the month asOf falls in.
+ * runMonthlyPayroll({asOf}) always targets *asOf's previous month* (it
+ * mirrors the real 10th-of-month cron, which pays out last month's
+ * period) and — important — always drives a period straight through to
+ * "paid" in one call; it has no "stop at approved" mode. So the one
+ * period we want left at "approved" (not yet paid) is moved there with a
+ * direct, minimal field update instead, mirroring exactly what
+ * payrollController.js's setPeriodStatus does for that same transition
+ * (set status/approvedBy/approvedAt, log it) — that handler is
+ * Express-only (needs a real req/res), so replicating its few lines
+ * directly here is simpler and more transparent than mocking one.
+ *
+ * Newest month → left as "draft" (freshly generated, awaiting HR review —
+ * matches a real deploy, where the draft job runs at the start of the
+ * month and the pay run doesn't happen until the 10th of the next one).
+ * Second-newest → "approved" only. Everything older → fully "paid".
+ */
+async function seedPayrollHistory() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1–12
+
+  // Trailing 12 months ending at the current one, oldest first. Built via
+  // Date's own month-overflow normalization (new Date(y, -4, 1) rolls back
+  // into the previous year correctly) rather than hand-rolled carry logic.
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(currentYear, currentMonth - 1 - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+  }
+
+  const adminUser = await UserModel.findOne({ email: "admin@hrms.com" });
+  const label = (y, m) => `${y}-${String(m).padStart(2, "0")}`;
+
+  for (let idx = 0; idx < months.length; idx++) {
+    const { year, month } = months[idx];
+    const isCurrentMonth = idx === months.length - 1;
+    const isPreviousMonth = idx === months.length - 2;
+
+    const draftResult = await generateMonthlyPayrollDraft({ asOf: new Date(year, month - 1, 1) });
+    console.log(`✓ Drafted ${label(year, month)}:`, JSON.stringify(draftResult));
+
+    if (isCurrentMonth) continue; // leave as draft
+
+    if (isPreviousMonth) {
+      const period = await PayrollPeriodModel.findOne({ year, month });
+      if (period && period.status === "draft") {
+        const payslipCount = await PayslipModel.countDocuments({ period: period._id });
+        if (payslipCount > 0) {
+          period.status = "approved";
+          period.approvedBy = adminUser?._id ?? null;
+          period.approvedAt = new Date();
+          await period.save();
+          await logAction(
+            {},
+            {
+              action: "status_changed",
+              resource: "payroll",
+              resourceId: period._id,
+              label: `Payroll ${label(year, month)} — draft to approved`,
+            },
+          );
+          console.log(`✓ Approved ${label(year, month)} (${payslipCount} payslips) — held here, not yet paid`);
+        }
+      }
+      continue;
+    }
+
+    // asOf = the 1st of the *following* month, since runMonthlyPayroll
+    // always targets "asOf's previous month". (year, month) here is
+    // already 1-indexed, so new Date(year, month, 1) — no "-1" — lands
+    // exactly on next month's 1st in JS's 0-indexed Date constructor.
+    const payRunResult = await runMonthlyPayroll({ asOf: new Date(year, month, 1) });
+    console.log(`✓ Paid ${label(year, month)}:`, JSON.stringify(payRunResult));
+  }
+}
+
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
 async function seedPositionLevels() {
   // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
@@ -1024,6 +1114,7 @@ async function main() {
   await seedHolidays();
   await seedAttendanceHistory(employees);
   await seedLeaveRequests(employees);
+  await seedPayrollHistory();
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
