@@ -22,6 +22,8 @@ import HolidayModel from "./model/Holiday.js";
 import AttendanceModel from "./model/Attendance.js";
 import NotificationModel from "./model/Notification.js";
 import PositionLevelModel, { POSITION_LEVELS } from "./model/PositionLevel.js";
+import { closeAttendanceDay } from "./jobs/closeAttendanceDay.js";
+import { utcMidnight, hoursBetween } from "./utils/workday.js";
 
 const SALT_ROUNDS = 10;
 
@@ -462,28 +464,258 @@ async function seedHolidays() {
   }
 }
 
-/* ── Attendance ── */
-async function seedAttendance(employees) {
-  const date = new Date("2026-01-15");
-  const statuses = [
-    { checkIn: "09:00", checkOut: "18:00", status: "present"  },
-    { checkIn: "09:15", checkOut: "18:30", status: "present"  },
-    { checkIn: null,    checkOut: null,    status: "on-leave"  },
-    { checkIn: "08:45", checkOut: "17:30", status: "present"  },
-    { checkIn: "09:30", checkOut: null,    status: "present"  },
-    { checkIn: "09:45", checkOut: "18:00", status: "present"  },
-    { checkIn: "08:30", checkOut: "17:00", status: "present"  },
-    { checkIn: null,    checkOut: null,    status: "on-leave"  },
-  ];
-  for (let i = 0; i < employees.length; i++) {
-    const emp = employees[i];
-    const def = statuses[i % statuses.length];
-    const exists = await AttendanceModel.findOne({ employee: emp._id, date });
-    if (!exists) {
-      await AttendanceModel.create({ employee: emp._id, date, ...def });
-    }
+/* ── Attendance history (Sample Data plan, Phase 2) ──────────────────────
+ * Replaces the old single stale day with a real trailing-12-month window,
+ * built two different ways depending on how recent the day is:
+ *
+ *   - Older business days: inserted directly with a plausible
+ *     present/late/on-leave/no-show mix. Running the real end-of-day
+ *     closer for ~230 individual days would be a lot of slow, sequential
+ *     writes for no extra realism this far back — nobody is going to open
+ *     a payroll deduction from 9 months ago and check whether it was
+ *     computed by the live job or backfilled.
+ *   - The most recent RECENT_SLICE_BUSINESS_DAYS: seeded as check-ins only
+ *     (open, no checkOut — exactly what a real day looks like mid-close),
+ *     then actually closed via the real closeAttendanceDay() job
+ *     (jobs/closeAttendanceDay.js) so late-flagging, no-show detection,
+ *     and the auto NoShowReview flag are real business logic, not
+ *     hand-faked. One deliberately-new hire (EMP028) is left uncovered
+ *     often enough to cross the real 5-no-show threshold.
+ *   - "Today" is left as in-progress check-ins with no checkOut and is
+ *     never closed — ENABLE_SCHEDULER=false on Render's free tier means
+ *     nothing auto-closes it in production either, so this matches what a
+ *     freshly-deployed instance would actually look like.
+ *
+ * All dates are handled in UTC calendar terms throughout (matching
+ * utils/workday.js's utcMidnight/utcDateKey convention that the real job
+ * already stores dates in) so bulk-inserted and job-closed records are
+ * byte-consistent with each other.
+ */
+
+const RECENT_SLICE_BUSINESS_DAYS = 20; // ~4 weeks, closed via the real job
+const ON_LEAVE_STREAK_EMPLOYEE_IDS = new Set(["EMP008", "EMP019", "EMP032"]); // currently Employee.status "on-leave"
+const ON_LEAVE_STREAK_BIZ_DAYS = 12; // how far back their leave streak runs
+const TERMINATED_CUTOFF_KEY = "2026-07-01"; // EMP033 (terminated) has no attendance from here on
+const CHRONIC_NO_SHOW_EMPLOYEE_ID = "EMP028"; // very new hire — deliberately crosses the real no-show threshold
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+function toDateKeyUtc(d) {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+function isWeekendUtc(d) {
+  const day = d.getUTCDay();
+  return day === 0 || day === 6;
+}
+function addUtcDays(d, days) {
+  const copy = new Date(d);
+  copy.setUTCDate(copy.getUTCDate() + days);
+  return copy;
+}
+function randomHHMM(minMinutes, maxMinutes) {
+  const total = Math.floor(minMinutes + Math.random() * (maxMinutes - minMinutes));
+  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+}
+const checkInOnTime = () => randomHHMM(8 * 60 + 40, 9 * 60 + 12); // 08:40–09:12, under WORKDAY_LATE_AFTER's 09:15 default
+const checkInLate = () => randomHHMM(9 * 60 + 20, 9 * 60 + 55); // 09:20–09:55, past it
+const checkOutNormal = () => randomHHMM(17 * 60 + 25, 18 * 60 + 20); // 17:25–18:20
+
+// Same "insert, tolerate duplicate-key errors" pattern jobs/closeAttendanceDay.js's
+// markNoShow() already uses — makes bulk seeding idempotent on re-run without a
+// slow per-record existence check first.
+async function insertAttendanceTolerantly(docs) {
+  if (!docs.length) return 0;
+  try {
+    const res = await AttendanceModel.insertMany(docs, { ordered: false });
+    return res.length;
+  } catch (err) {
+    const isDuplicateOnly =
+      err?.code === 11000 ||
+      (Array.isArray(err?.writeErrors) &&
+        err.writeErrors.length > 0 &&
+        err.writeErrors.every((w) => (w?.err?.code ?? w?.code) === 11000));
+    if (!isDuplicateOnly) throw err;
+    return err.result?.insertedCount ?? err.insertedDocs?.length ?? 0;
   }
-  console.log("✓ Seeded attendance for", employees.length, "employees on 2026-01-15");
+}
+
+// Mirrors seedHolidays()'s 2026 dates that fall in this window, so bulk
+// attendance and the Holiday collection agree with each other.
+const SEEDED_2026_HOLIDAYS = new Set([
+  "2026-01-01",
+  "2026-02-17",
+  "2026-04-26",
+  "2026-04-30",
+  "2026-05-01",
+  "2026-06-15",
+]);
+
+function collectBusinessDayKeys(startUtc, endUtcInclusive) {
+  const keys = [];
+  for (let d = new Date(startUtc); d <= endUtcInclusive; d = addUtcDays(d, 1)) {
+    if (isWeekendUtc(d)) continue;
+    if (SEEDED_2026_HOLIDAYS.has(toDateKeyUtc(d))) continue;
+    keys.push(toDateKeyUtc(d));
+  }
+  return keys;
+}
+
+async function seedBulkAttendance(employees, bulkDateKeys) {
+  const onLeaveStreakStart = bulkDateKeys.length - ON_LEAVE_STREAK_BIZ_DAYS;
+  const docs = [];
+
+  bulkDateKeys.forEach((dateKey, idx) => {
+    const date = utcMidnight(dateKey);
+    const isOnLeaveStreakDay = idx >= onLeaveStreakStart;
+
+    for (const emp of employees) {
+      if (emp.createdAt && date < emp.createdAt) continue; // not hired yet
+      if (emp.employeeId === "EMP033" && dateKey >= TERMINATED_CUTOFF_KEY) continue; // left the company
+      if (emp.employeeId === CHRONIC_NO_SHOW_EMPLOYEE_ID) continue; // their whole history lives in the recent slice
+
+      if (ON_LEAVE_STREAK_EMPLOYEE_IDS.has(emp.employeeId) && isOnLeaveStreakDay) {
+        docs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "on-leave" });
+        continue;
+      }
+
+      // no-show is deliberately rare here (unlike the recent-slice phase
+      // below): bulk days never run the real closeAttendanceDay job, so an
+      // employee who racked up 5+ of these by chance alone would never
+      // trigger a real NoShowReview flag — a silent inconsistency if
+      // anyone dug into their attendance history. Kept low enough
+      // (~1 expected per employee over the whole bulk window) that only
+      // the deliberate EMP028 case (handled via the real job, below)
+      // realistically crosses the threshold.
+      const roll = Math.random();
+      if (roll < 0.03) {
+        docs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "on-leave" });
+      } else if (roll < 0.035) {
+        docs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "no-show" });
+      } else if (roll < 0.115) {
+        const checkIn = checkInLate();
+        const checkOut = checkOutNormal();
+        docs.push({
+          employee: emp._id,
+          date,
+          checkIn,
+          checkOut,
+          hours: hoursBetween(checkIn, checkOut),
+          status: "late",
+          lateHalfDayType: Math.random() < 0.85 ? "annual" : "unpaid",
+        });
+      } else {
+        const checkIn = checkInOnTime();
+        const checkOut = checkOutNormal();
+        docs.push({
+          employee: emp._id,
+          date,
+          checkIn,
+          checkOut,
+          hours: hoursBetween(checkIn, checkOut),
+          status: "present",
+        });
+      }
+    }
+  });
+
+  const BATCH = 2000;
+  let inserted = 0;
+  for (let i = 0; i < docs.length; i += BATCH) {
+    inserted += await insertAttendanceTolerantly(docs.slice(i, i + BATCH));
+  }
+  console.log(
+    `✓ Bulk-seeded ${inserted} attendance records across ${bulkDateKeys.length} business days` +
+      (docs.length - inserted > 0 ? ` (${docs.length - inserted} already existed)` : ""),
+  );
+}
+
+async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
+  let chronicNoShows = 0;
+
+  for (const dateKey of recentDateKeys) {
+    const date = utcMidnight(dateKey);
+    const preSeedDocs = [];
+
+    for (const emp of employees) {
+      if (emp.createdAt && date < emp.createdAt) continue;
+      if (emp.employeeId === "EMP033" && dateKey >= TERMINATED_CUTOFF_KEY) continue;
+
+      if (ON_LEAVE_STREAK_EMPLOYEE_IDS.has(emp.employeeId)) {
+        preSeedDocs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "on-leave" });
+        continue;
+      }
+
+      if (emp.employeeId === CHRONIC_NO_SHOW_EMPLOYEE_ID && chronicNoShows < 6) {
+        chronicNoShows += 1;
+        continue; // no attendance record at all — the real markNoShow() below will catch it
+      }
+
+      if (Math.random() < 0.03) continue; // an ordinary occasional no-show, rotates across everyone else
+
+      // Left open (no checkOut) — closeAttendanceDay()'s autoCheckOut() step
+      // fills that in below, exactly as it would in production.
+      const checkIn = Math.random() < 0.10 ? checkInLate() : checkInOnTime();
+      preSeedDocs.push({ employee: emp._id, date, checkIn, checkOut: null, hours: 0, status: "present" });
+    }
+
+    await insertAttendanceTolerantly(preSeedDocs);
+
+    // The real job — late-flagging, no-show detection, and the 5-no-show
+    // NoShowReview auto-flag all run for real here, in chronological order
+    // (required: flagRepeatedNoShows checks an all-time cumulative count,
+    // so it must fire on the actual day the 5th no-show happens).
+    const result = await closeAttendanceDay({ dateKey });
+    console.log(`✓ Closed ${dateKey} via the real job:`, JSON.stringify(result));
+  }
+}
+
+async function seedTodayInProgress(employees, now) {
+  const dateKey = toDateKeyUtc(now);
+  const date = utcMidnight(dateKey);
+  const docs = [];
+
+  for (const emp of employees) {
+    if (emp.createdAt && date < emp.createdAt) continue;
+    if (emp.employeeId === "EMP033" && dateKey >= TERMINATED_CUTOFF_KEY) continue;
+    if (emp.employeeId === CHRONIC_NO_SHOW_EMPLOYEE_ID) continue; // stays consistent with their pattern
+
+    if (ON_LEAVE_STREAK_EMPLOYEE_IDS.has(emp.employeeId)) {
+      docs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "on-leave" });
+      continue;
+    }
+    if (Math.random() < 0.08) continue; // hasn't checked in yet today
+
+    const checkIn = Math.random() < 0.08 ? checkInLate() : checkInOnTime();
+    docs.push({ employee: emp._id, date, checkIn, checkOut: null, hours: 0, status: "present" });
+  }
+
+  const inserted = await insertAttendanceTolerantly(docs);
+  console.log(
+    `✓ Seeded ${inserted} in-progress check-ins for today (${dateKey}) — left open, since ` +
+      "ENABLE_SCHEDULER=false in production means nothing auto-closes today's attendance.",
+  );
+}
+
+async function seedAttendanceHistory(employees) {
+  const now = new Date();
+  const todayUtc = utcMidnight(toDateKeyUtc(now));
+  const yesterdayUtc = addUtcDays(todayUtc, -1);
+  const windowStartUtc = addUtcDays(todayUtc, -365);
+
+  const allDateKeys = collectBusinessDayKeys(windowStartUtc, yesterdayUtc);
+  const recentDateKeys = allDateKeys.slice(-RECENT_SLICE_BUSINESS_DAYS);
+  const bulkDateKeys = allDateKeys.slice(0, -RECENT_SLICE_BUSINESS_DAYS);
+
+  console.log(
+    `Attendance window: ${toDateKeyUtc(windowStartUtc)} → ${toDateKeyUtc(yesterdayUtc)} ` +
+      `(${allDateKeys.length} business days: ${bulkDateKeys.length} bulk-seeded, ` +
+      `${recentDateKeys.length} closed via the real job)`,
+  );
+
+  await seedBulkAttendance(employees, bulkDateKeys);
+  await seedRecentAttendanceViaRealJob(employees, recentDateKeys);
+  await seedTodayInProgress(employees, now);
 }
 
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
@@ -582,7 +814,7 @@ async function main() {
 
   await seedCandidates(jobs);
   await seedHolidays();
-  await seedAttendance(employees);
+  await seedAttendanceHistory(employees);
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
