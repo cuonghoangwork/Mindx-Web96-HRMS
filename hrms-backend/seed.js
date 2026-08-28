@@ -30,6 +30,7 @@ import { generateMonthlyPayrollDraft } from "./jobs/generateMonthlyPayrollDraft.
 import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
 import { checkPromotionEligibility } from "./jobs/checkPromotionEligibility.js";
 import PromotionRequestModel from "./model/PromotionRequest.js";
+import ProfileEditRequestModel from "./model/ProfileEditRequest.js";
 import { utcMidnight, hoursBetween } from "./utils/workday.js";
 import { countWorkingDays } from "./utils/leaveBalance.js";
 import { logAction } from "./utils/auditLog.js";
@@ -1110,6 +1111,87 @@ async function seedPromotionRequests(employees) {
   console.log("✓ Seeded 2 manually-proposed promotion requests (1 approved, 1 rejected)");
 }
 
+/* ── Profile edit requests (Sample Data plan, Phase 6) ────────────────────
+ * One pending, one approved, one rejected, for the Admin "Edit requests"
+ * tab. The approved one replicates profileEditRequestController.js's
+ * onApprove hook exactly (apply the diff's "to" values to the Employee
+ * record), so it actually changes the employee's data, not just its own
+ * status — and each "from" value is read off the employee's real current
+ * field at seed time, not hand-typed, so the diff is never stale.
+ */
+const PROFILE_EDIT_CLIENT_TO_DB = { name: "name", phone: "phone", address: "address", age: "age", sex: "gender" };
+
+const PROFILE_EDIT_REQUESTS = [
+  {
+    employeeId: "EMP012",
+    status: "pending",
+    daysAgo: 2,
+    changes: { address: "45 Le Van Sy, Ho Chi Minh City", phone: "+84 90 555 2231" },
+  },
+  {
+    employeeId: "EMP021",
+    status: "approved",
+    daysAgo: 20,
+    changes: { phone: "+84 91 777 4410" },
+  },
+  {
+    employeeId: "EMP006",
+    status: "rejected",
+    daysAgo: 15,
+    changes: { name: "Sarah Lee-Nguyen" },
+    reviewNote: "Please submit an updated legal ID or marriage certificate to HR before we can process a legal name change.",
+  },
+];
+
+async function seedProfileEditRequests(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  const todayUtc = utcMidnight(toDateKeyUtc(new Date()));
+
+  let created = 0;
+  for (const spec of PROFILE_EDIT_REQUESTS) {
+    const emp = byId.get(spec.employeeId);
+    if (!emp) continue;
+
+    const exists = await ProfileEditRequestModel.findOne({ employee: emp._id });
+    if (exists) continue;
+
+    const changes = {};
+    for (const [field, to] of Object.entries(spec.changes)) {
+      const dbField = PROFILE_EDIT_CLIENT_TO_DB[field] ?? field;
+      changes[field] = { from: emp[dbField] ?? null, to };
+    }
+
+    const appliedAt = addUtcDays(todayUtc, -spec.daysAgo);
+    const doc = {
+      employee: emp._id,
+      requestedBy: emp.userId ?? null,
+      changes,
+      status: spec.status,
+      createdAt: appliedAt,
+    };
+    if (spec.status !== "pending") {
+      doc.reviewedBy = hrUser?._id ?? null;
+      doc.reviewedAt = addUtcDays(appliedAt, 2);
+      doc.reviewNote = spec.reviewNote ?? "";
+    }
+
+    await ProfileEditRequestModel.create(doc);
+    created += 1;
+
+    if (spec.status === "approved") {
+      const updates = {};
+      for (const [field, { to }] of Object.entries(changes)) {
+        const dbField = PROFILE_EDIT_CLIENT_TO_DB[field] ?? field;
+        updates[dbField] = field === "age" ? Number(to) || undefined : to;
+      }
+      await EmployeeModel.findByIdAndUpdate(emp._id, updates);
+    }
+  }
+
+  console.log(`✓ Seeded ${created} profile edit requests`);
+}
+
 /* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
 async function seedPositionLevels() {
   // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
@@ -1210,6 +1292,7 @@ async function main() {
   await seedLeaveRequests(employees);
   await seedPayrollHistory();
   await seedPromotionRequests(employees);
+  await seedProfileEditRequests(employees);
   await seedNotifications();
 
   console.log("\n✅ Seed complete.");
