@@ -617,12 +617,16 @@ body {
 
 /* Matches the mockup's fieldLabelStyle exactly (source line 5331):
    small uppercase muted label, not a larger primary-colored one. Also
-   applied as a bare-tag fallback (.form-group label) since most pages
-   render a plain <label> inside .form-group without the .form-label
-   class explicitly — this way every form in the app gets it, not just
-   the ones that opted in. */
+   applied as a bare-tag fallback (.form-group > label) since most pages
+   render a plain <label> as the field's direct top-level label inside
+   .form-group without the .form-label class explicitly — this way every
+   form in the app gets it, not just the ones that opted in. Scoped to a
+   direct child (not a descendant) so it doesn't also catch per-option
+   <label>s nested inside a radio/checkbox group within the same
+   .form-group (e.g. AddNotificationModal's recipient picker), which
+   style themselves inline and aren't meant to look like field captions. */
 .form-label,
-.form-group label {
+.form-group > label {
   display: block;
   font-size: 12px;
   font-weight: var(--fw-semibold);
@@ -649,7 +653,7 @@ body {
 }
 
 .form-input,
-.form-group input,
+.form-group input:not([type="checkbox"]):not([type="radio"]),
 .form-group select,
 .form-group textarea {
   width: 100%;
@@ -672,11 +676,11 @@ body {
 }
 
 .form-input:hover,
-.form-group input:hover,
+.form-group input:not([type="checkbox"]):not([type="radio"]):hover,
 .form-group select:hover { border-color: var(--bdr-strong); }
 
 .form-input:focus,
-.form-group input:focus,
+.form-group input:not([type="checkbox"]):not([type="radio"]):focus,
 .form-group select:focus,
 .form-group textarea:focus {
   border-color: var(--bdr-brand);
