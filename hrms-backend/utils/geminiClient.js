@@ -48,31 +48,7 @@ export function extractGeminiJson(json) {
   }
 }
 
-/**
- * Sends `prompt` to Gemini and returns the response — plain text by default,
- * or a parsed JSON object when called with `{json: true}` (adds
- * responseMimeType: "application/json" to the request). Throws on any
- * failure (missing API key, network error, non-2xx, unparseable/malformed
- * body, timeout) — callers decide what to do about that.
- */
-export async function askGemini(prompt, {
-  apiKey = process.env.GEMINI_API_KEY,
-  model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-  fetchImpl = globalThis.fetch,
-  timeoutMs = GEMINI_FETCH_TIMEOUT_MS,
-  json = false,
-} = {}) {
-  if (!apiKey) {
-    const err = new Error("AI insight isn't configured yet (GEMINI_API_KEY is unset).");
-    err.status = 503;
-    throw err;
-  }
-  if (typeof fetchImpl !== "function") {
-    const err = new Error("No fetch implementation available to call the Gemini API.");
-    err.status = 502;
-    throw err;
-  }
-
+async function askGeminiOnce(prompt, { apiKey, model, fetchImpl, timeoutMs, json }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -109,6 +85,54 @@ export async function askGemini(prompt, {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Sends `prompt` to Gemini and returns the response — plain text by default,
+ * or a parsed JSON object when called with `{json: true}` (adds
+ * responseMimeType: "application/json" to the request). Throws on any
+ * failure (missing API key, network error, non-2xx, unparseable/malformed
+ * body, timeout) — callers decide what to do about that.
+ *
+ * Retries once on a transient failure (timeout, network error, non-2xx).
+ * Measured latency for this model is wildly bimodal — repeat real calls with
+ * an identical prompt clocked anywhere from ~3s to 30s+ (enough to hit
+ * GEMINI_FETCH_TIMEOUT_MS and abort) within the same minute, with no
+ * apparent correlation to prompt size. A single retry turns most of those
+ * timeouts into a successful response instead of a user-facing "AI insight
+ * unavailable" that just makes them click the button again anyway. Not
+ * retried: a missing API key (status 503) — that's a config problem, not a
+ * transient one, and retrying it only doubles the wait for a guaranteed
+ * second failure.
+ */
+export async function askGemini(prompt, {
+  apiKey = process.env.GEMINI_API_KEY,
+  model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = GEMINI_FETCH_TIMEOUT_MS,
+  json = false,
+  attempts = 2,
+} = {}) {
+  if (!apiKey) {
+    const err = new Error("AI insight isn't configured yet (GEMINI_API_KEY is unset).");
+    err.status = 503;
+    throw err;
+  }
+  if (typeof fetchImpl !== "function") {
+    const err = new Error("No fetch implementation available to call the Gemini API.");
+    err.status = 502;
+    throw err;
+  }
+
+  let lastErr;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await askGeminiOnce(prompt, { apiKey, model, fetchImpl, timeoutMs, json });
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 export default askGemini;

@@ -148,4 +148,42 @@ describe("askGemini", () => {
       askGemini("prompt", { apiKey: "test-key", fetchImpl, timeoutMs: 10 }),
     ).rejects.toThrow();
   });
+
+  describe("retry (measured latency for this model ranges ~3s-30s+ call to call)", () => {
+    it("retries once and succeeds when the first attempt fails", async () => {
+      const fetchImpl = vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, status: 500 })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ candidates: [{ content: { parts: [{ text: "Recovered." }] } }] }),
+        });
+
+      const text = await askGemini("prompt", { apiKey: "test-key", fetchImpl });
+
+      expect(text).toBe("Recovered.");
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it("gives up and throws the last error once every attempt fails", async () => {
+      const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+
+      await expect(askGemini("prompt", { apiKey: "test-key", fetchImpl })).rejects.toMatchObject({ status: 502 });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not retry a missing API key — that's a config problem, not a transient one", async () => {
+      const fetchImpl = vi.fn();
+      await expect(askGemini("prompt", { apiKey: "", fetchImpl })).rejects.toMatchObject({ status: 503 });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it("honors a custom attempts count", async () => {
+      const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      await expect(
+        askGemini("prompt", { apiKey: "test-key", fetchImpl, attempts: 3 }),
+      ).rejects.toMatchObject({ status: 502 });
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    });
+  });
 });

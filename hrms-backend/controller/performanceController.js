@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { createHash } from "crypto";
 import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
 import UserModel from "../model/User.js";
@@ -495,6 +496,18 @@ const performanceController = {
         review: reviewToClient(review ?? emptyReviewDoc(cycle.key, employee._id)),
         language: req.body.language,
       });
+
+      // Gemini's forced "thinking" adds ~15-20s of unavoidable latency per
+      // call (see geminiClient.js) — skip it entirely when this exact prompt
+      // was already answered for this review, so re-opening the dialog or a
+      // second HR user checking the same review is instant instead of
+      // paying that cost again for an identical answer.
+      const promptHash = createHash("sha256").update(prompt).digest("hex");
+      if (review?.aiInsight?.promptHash === promptHash) {
+        const { summary, strengths, growthAreas } = review.aiInsight;
+        return res.json({ success: true, summary, strengths, growthAreas });
+      }
+
       const insight = await askGemini(prompt, { json: true });
       if (
         typeof insight?.summary !== "string" ||
@@ -502,6 +515,11 @@ const performanceController = {
         !Array.isArray(insight?.growthAreas)
       ) {
         throw new AppError("Gemini response did not match the expected shape.", "AI_INSIGHT_INVALID_RESPONSE", null, 502);
+      }
+
+      if (review) {
+        review.aiInsight = { ...insight, promptHash, generatedAt: new Date() };
+        await review.save();
       }
 
       res.json({

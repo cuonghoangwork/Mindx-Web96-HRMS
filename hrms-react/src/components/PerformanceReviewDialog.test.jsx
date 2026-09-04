@@ -326,7 +326,7 @@ describe("PerformanceReviewDialog", () => {
     await screen.findByText("Self Review");
 
     fireEvent.click(screen.getByText("Summary"));
-    expect(await screen.findByText("Thinking…")).toBeInTheDocument();
+    expect(await screen.findByText("Analyzing the review — this can take up to 20 seconds…")).toBeInTheDocument();
 
     resolveAsk({
       success: true,

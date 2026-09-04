@@ -1209,7 +1209,7 @@
    "appealAdjustAndResolve": "Adjust & resolve",
    "askAi": "Summary",
    "aiInsightTitle": "Performance Summary",
-   "aiThinking": "Thinking…",
+   "aiThinking": "Analyzing the review — this can take up to 20 seconds…",
    "aiUnavailable": "AI insight is unavailable right now. Try again later.",
    "aiStrengthsLabel": "Strengths",
    "aiGrowthAreasLabel": "Growth areas"

@@ -140,4 +140,55 @@ describe("POST /performance/reviews/:cycleKey/:employeeId/ai-insight", () => {
     expect(res.body.success).toBe(false);
     expect(res.body.message).not.toContain("Only a summary");
   });
+
+  describe("caching (Gemini's forced 'thinking' makes every call ~15-20s)", () => {
+    async function makeReview(selfRating = 4) {
+      const { default: PerformanceReviewModel } = await import("../model/PerformanceReview.js");
+      return PerformanceReviewModel.create({
+        cycleKey,
+        employee: org.employees.dev._id,
+        selfRating,
+        selfComments: "Shipped the migration on time.",
+      });
+    }
+
+    it("reuses the cached insight on a second call instead of asking Gemini again", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
+      await makeReview();
+      askGemini.mockResolvedValue({
+        summary: "A neutral summary.",
+        strengths: ["Communication"],
+        growthAreas: ["Delegation"],
+      });
+
+      const first = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+      expect(first.status).toBe(200);
+      expect(askGemini).toHaveBeenCalledTimes(1);
+
+      const second = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+      expect(second.status).toBe(200);
+      expect(second.body.summary).toBe("A neutral summary.");
+      expect(second.body.strengths).toEqual(["Communication"]);
+      expect(second.body.growthAreas).toEqual(["Delegation"]);
+      // Still 1 — the second call was served from the cached aiInsight, not a new Gemini call.
+      expect(askGemini).toHaveBeenCalledTimes(1);
+    });
+
+    it("re-asks Gemini once the underlying review content changes", async (ctx) => {
+      if (!dbAvailable) return ctx.skip();
+      const review = await makeReview();
+      askGemini.mockResolvedValue({ summary: "First summary.", strengths: [], growthAreas: [] });
+
+      await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+      expect(askGemini).toHaveBeenCalledTimes(1);
+
+      review.selfComments = "Also mentored two juniors this cycle.";
+      await review.save();
+      askGemini.mockResolvedValue({ summary: "Second summary.", strengths: [], growthAreas: [] });
+
+      const res = await request.post(insightUrl(org.employees.dev)).set(auth(org.tokens.dev));
+      expect(res.body.summary).toBe("Second summary.");
+      expect(askGemini).toHaveBeenCalledTimes(2);
+    });
+  });
 });

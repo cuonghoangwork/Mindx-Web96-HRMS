@@ -100,6 +100,23 @@ const appealSchema = new mongoose.Schema(
   { _id: false },
 );
 
+/** Cached "Ask AI" result — Gemini's forced "thinking" adds ~15-20s of
+ * unavoidable latency per call (see geminiClient.js), so performanceController
+ * skips re-calling it when the exact same prompt (hashed) was already
+ * answered for this review. promptHash naturally invalidates the cache
+ * whenever the underlying review content, employee, cycle, or language
+ * changes, since any of those change the prompt string. */
+const aiInsightSchema = new mongoose.Schema(
+  {
+    summary: { type: String, required: true },
+    strengths: { type: [String], default: [] },
+    growthAreas: { type: [String], default: [] },
+    promptHash: { type: String, required: true },
+    generatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const performanceReviewSchema = new mongoose.Schema(
   {
     cycleKey: { type: String, required: true, trim: true },
@@ -118,6 +135,7 @@ const performanceReviewSchema = new mongoose.Schema(
     goals: { type: [goalSchema], default: [] },
     peerFeedback: { type: [peerFeedbackSchema], default: [] },
     appeal: { type: appealSchema, default: null },
+    aiInsight: { type: aiInsightSchema, default: null },
   },
   { timestamps: true },
 );
