@@ -403,7 +403,7 @@ body {
 
 .uppercase    { text-transform: uppercase; letter-spacing: var(--ls-wider); }
 .tracking-wide { letter-spacing: var(--ls-wide); }
-.label-caps   { font-size: var(--fs-xs); font-weight: var(--fw-medium);
+.label-caps   { font-size: var(--fs-xs); font-weight: var(--fw-semibold);
                 text-transform: uppercase; letter-spacing: var(--ls-widest);
                 color: var(--txt-secondary); }
 
@@ -759,7 +759,7 @@ body {
 
 .stat-card-label {
   font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
+  font-weight: var(--fw-semibold);
   color: var(--txt-secondary);
   text-transform: uppercase;
   letter-spacing: var(--ls-widest);
