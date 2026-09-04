@@ -392,7 +392,7 @@ function AdminDashboard() {
               {t("dashboard.attendanceTrend.viewDetails")}
             </Link>
           </div>
-          <AttendanceTrendChart attendance={attendance} totalStaff={totalEmployees} />
+          <AttendanceTrendChart attendance={attendance} employees={employees} />
           {/* Legend */}
           <div style={{ display: "flex", gap: "var(--sp-4)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
             {[

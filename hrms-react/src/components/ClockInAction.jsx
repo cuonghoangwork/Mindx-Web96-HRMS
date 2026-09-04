@@ -4,6 +4,7 @@ import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { idsMatch } from "../utils/id";
 import { translateApiError } from "../utils/apiError";
+import { isoOf } from "../utils/attendance";
 
 /**
  * ClockInAction — topbar "Clock in" quick action, matching the mockup's
@@ -38,7 +39,7 @@ function ClockInAction() {
   }
 
   const now = getAppNow();
-  const todayStr = now.toISOString().split("T")[0];
+  const todayStr = isoOf(now);
   const todayRecord = attendance.find(
     (r) => idsMatch(r.employeeId, myEmployee.id) && r.date === todayStr
   );

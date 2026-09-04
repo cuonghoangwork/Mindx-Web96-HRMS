@@ -7,7 +7,7 @@ import { useCurrency } from "../context/CurrencyContext";
 import { useLanguage } from "../context/LanguageContext";
 import { formatDate } from "../utils/format";
 import { LeaveRequestsAPI, PayrollAPI, AuditLogAPI, ProfileEditRequestsAPI } from "../api";
-import { resolveStatus, buildMonthAttendance, buildDayData } from "../utils/attendance";
+import { resolveStatus, buildMonthAttendance, buildDayData, isoOf } from "../utils/attendance";
 import AttendanceCalendarGrid from "../components/AttendanceCalendarGrid";
 import PayrollBreakdownPanel from "../components/PayrollBreakdownPanel";
 import Avatar from "../components/Avatar";
@@ -659,7 +659,7 @@ function AttendanceReportCard({ employee, attendance, navigate, getAppNow, embed
               dayData={calendarDayData}
               selectedDay={selectedDay}
               onSelectDay={setSelectedDay}
-              todayStr={now.toISOString().split("T")[0]}
+              todayStr={isoOf(now)}
               dotOnly
             />
           </div>

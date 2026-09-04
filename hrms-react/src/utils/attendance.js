@@ -8,6 +8,19 @@
  */
 import { numericSeed, idsMatch } from "./id";
 
+/**
+ * Formats a Date as a local YYYY-MM-DD key. Deliberately NOT
+ * `date.toISOString().split("T")[0]` — that converts to UTC first, which
+ * silently rolls back to the previous calendar day for any local-midnight
+ * Date once the local zone is ahead of UTC (e.g. Asia/Ho_Chi_Minh, UTC+7:
+ * local midnight is 17:00 UTC the day before). Every attendance date key
+ * in the app must go through this so a given calendar day always maps to
+ * the same key regardless of time of day or how the Date was constructed.
+ */
+export function isoOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 /** Derives display status from a raw attendance record — flags "Present" as "Late" past 9am. */
 export function resolveStatus(record) {
   let s = record.status;

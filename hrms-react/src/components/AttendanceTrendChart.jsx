@@ -6,87 +6,75 @@
  *
  * Props:
  *   attendance  — array from StoreContext (required)
- *   totalStaff  — total staff count (to calculate % when date data is missing)
+ *   employees   — array from StoreContext (required) — needed (not just a
+ *                 count) so gap-filling can reuse buildMonthAttendance's
+ *                 per-employee deterministic mock, same as Attendance.jsx
+ *                 and ViewEmployee.jsx, instead of a third, different guess.
  *   height      — SVG height, default 160
  *   showLegend  — show legend, default true
  *   showTooltip — show hover tooltip, default true
  *
  * Usage:
  *   import AttendanceTrendChart from "../components/AttendanceTrendChart";
- *   <AttendanceTrendChart attendance={attendance} totalStaff={employees.length} />
+ *   <AttendanceTrendChart attendance={attendance} employees={employees} />
  */
 
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { useStore } from "../context/StoreContext";
+import { buildMonthAttendance, buildDayData, isoOf } from "../utils/attendance";
 
 function formatDateLabel(dateStr, dayLabels) {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr + "T00:00:00");
   return `${dayLabels[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
 }
 
 function formatDateShort(dateStr, dayLabels) {
-  const d = new Date(dateStr);
+  const d = new Date(dateStr + "T00:00:00");
   return dayLabels[d.getDay()];
 }
 
-/* Determine Late status from checkIn (mirrors Attendance.jsx logic) */
-function resolveStatus(record) {
-  let status = record.status;
-  if (record.checkIn && status === "Present") {
-    const [hours] = record.checkIn.split(":").map(Number);
-    if (hours >= 9) status = "Late";
+/*
+ * Build the last 7 days ending TODAY (not the latest date that happens to
+ * have an attendance record — a stray future-dated row used to anchor the
+ * whole window on the wrong day). Gaps are filled via the same
+ * buildMonthAttendance/buildDayData helpers Attendance.jsx and
+ * ViewEmployee.jsx use, so a day without real records yet (e.g. today,
+ * before closeAttendanceDay runs) shows the same numbers here as there
+ * instead of a second, differently-tuned mock.
+ */
+function buildChartData(attendance, employees, todayKey, dayLabels) {
+  const today = new Date(todayKey + "T00:00:00");
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d);
   }
-  return status;
-}
 
-/* Generate last 7 days from real data + fallback mock */
-function buildChartData(attendance, totalStaff, dayLabels) {
-  const grouped = {};
-  attendance.forEach((r) => {
-    if (!grouped[r.date]) grouped[r.date] = [];
-    grouped[r.date].push(r);
+  const monthKeys = new Set(days.map((d) => `${d.getFullYear()}-${d.getMonth()}`));
+  const dayData = {};
+  monthKeys.forEach((key) => {
+    const [y, m] = key.split("-").map(Number);
+    const prefix = `${y}-${String(m + 1).padStart(2, "0")}-`;
+    const existingForMonth = attendance.filter((r) => r.date.startsWith(prefix));
+    const monthFull = buildMonthAttendance(y, m, employees, existingForMonth);
+    Object.assign(dayData, buildDayData(monthFull, employees));
   });
 
-  const realDates = Object.keys(grouped).sort();
+  const totalStaff = employees.length || 1;
 
-  // Build 7 consecutive days — use real dates if available, otherwise mock
-  const result = [];
-  const baseDate = realDates.length > 0
-    ? new Date(realDates[realDates.length - 1])
-    : new Date("2026-01-15");
+  return days.map((d, idx) => {
+    const key = isoOf(d);
+    const agg = dayData[key];
+    const present = agg?.present ?? 0;
+    const late    = agg?.late ?? 0;
+    const leave   = agg?.leave ?? 0;
+    const absent  = agg?.absent ?? 0;
+    const total   = agg?.total || totalStaff;
+    const pct     = total > 0 ? Math.min(100, Math.round(((present + late) / total) * 100)) : 0;
 
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(baseDate);
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split("T")[0];
-    const records = grouped[key] || [];
-
-    let present = 0, late = 0, leave = 0, absent = 0;
-
-    if (records.length > 0) {
-      records.forEach((r) => {
-        const s = resolveStatus(r);
-        if (s === "Present") present++;
-        else if (s === "Late") late++;
-        else if (s === "On Leave") leave++;
-        else absent++;
-      });
-    } else {
-      // Reasonable mock data based on day of week
-      const dayOfWeek = d.getDay();
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      const base = isWeekend ? 0 : totalStaff;
-      const seed = (d.getDate() * 7 + i * 3) % 20;
-      present = isWeekend ? 0 : Math.max(0, base - Math.floor(seed / 4));
-      late    = isWeekend ? 0 : Math.floor(seed / 8);
-      leave   = isWeekend ? 0 : Math.floor(seed / 10);
-      absent  = isWeekend ? 0 : Math.max(0, base - present - late - leave);
-    }
-
-    const total = totalStaff || records.length || 1;
-    const pct   = total > 0 ? Math.min(100, Math.round(((present + late) / total) * 100)) : 0;
-
-    result.push({
+    return {
       date: key,
       label: formatDateShort(key, dayLabels),
       fullLabel: formatDateLabel(key, dayLabels),
@@ -96,11 +84,10 @@ function buildChartData(attendance, totalStaff, dayLabels) {
       absent,
       total,
       pct,
-      isToday: i === 0,
+      isToday: idx === days.length - 1,
       isWeekend: d.getDay() === 0 || d.getDay() === 6,
-    });
-  }
-  return result;
+    };
+  });
 }
 
 /* ─── Tooltip ─── */
@@ -142,18 +129,21 @@ function Tooltip({ x, y, data, svgW, t }) {
 /* ─── Main component ─── */
 export default function AttendanceTrendChart({
   attendance = [],
-  totalStaff  = 8,
+  employees  = [],
   height      = 160,
   showLegend  = true,
   showTooltip = true,
 }) {
   const { t } = useTranslation();
+  const { getAppNow } = useStore();
   const dayLabels = t("common.days", { returnObjects: true });
   const [hovered, setHovered] = useState(null);
 
+  const todayKey = isoOf(getAppNow());
+
   const data = useMemo(
-    () => buildChartData(attendance, totalStaff, dayLabels),
-    [attendance, totalStaff, dayLabels]
+    () => buildChartData(attendance, employees, todayKey, dayLabels),
+    [attendance, employees, todayKey, dayLabels]
   );
 
   /* SVG dimensions */

@@ -11,7 +11,7 @@ import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
 import { idsMatch } from "../utils/id";
-import { resolveStatus, buildMonthAttendance, buildDayData } from "../utils/attendance";
+import { resolveStatus, buildMonthAttendance, buildDayData, isoOf } from "../utils/attendance";
 
 /* ─── helpers ─── */
 const fmt = (v) => {
@@ -32,8 +32,6 @@ const STATUS_LABEL_KEY = {
   "On Leave": "attendance.status.onLeave",
 };
 const statusLabel = (t, status) => t(STATUS_LABEL_KEY[status] ?? "attendance.status.absent");
-
-const isoOf = (d) => d.toISOString().split("T")[0];
 
 /* ═══════════════════════════════════════════
    Weekly bar chart — % checked-in per day, click to select
