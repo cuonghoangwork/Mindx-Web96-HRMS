@@ -210,7 +210,7 @@ export default function AttendanceTrendChart({
             />
             <text
               x={padL - 5} y={yPos(tick) + 4}
-              fontSize="9" fill="var(--txt-disabled)" textAnchor="end"
+              fontSize="9" fill="var(--txt-secondary)" textAnchor="end"
             >{tick}%</text>
           </g>
         ))}

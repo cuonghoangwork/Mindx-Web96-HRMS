@@ -23,7 +23,7 @@
   --clr-primary-100: #dce8fe;
   --clr-primary-200: #b8d0fd;
   --clr-primary-300: #8fb3fb;
-  --clr-primary-400: #2f6fed;   /* signal blue — main brand */
+  --clr-primary-400: #1359e1;   /* signal blue — main brand */
   --clr-primary-500: #1d3f8f;
   --clr-primary-600: #16316f;
   --clr-primary-700: #112552;
@@ -48,7 +48,7 @@
   --clr-warning-200: #f5d18c;
   --clr-warning-300: #f0c674;
   --clr-warning-400: #d9a13f;
-  --clr-warning-500: #9a6a12;   /* main */
+  --clr-warning-500: #926511;   /* main */
   --clr-warning-600: #7f570f;
   --clr-warning-700: #66450c;
   --clr-warning-800: #4d3409;
@@ -133,9 +133,9 @@
      LIGHT/DARK token objects + panelStyle/thStyle/navBtnStyle usage) —
      these are meaningfully stronger/darker than a typical "subtle gray
      border" because borders ARE the elevation system here, not a hint. */
-  --bdr-subtle:  rgba(11, 31, 58, 0.14);   /* T.dividerSoft — table rows, minor separators */
-  --bdr-default: rgba(11, 31, 58, 0.4);    /* T.divider — cards/panels/inputs/buttons/table headers */
-  --bdr-strong:  rgba(11, 31, 58, 0.55);
+  --bdr-subtle:  rgba(11, 31, 58, 0.27);   /* T.dividerSoft — table rows, minor separators */
+  --bdr-default: rgba(11, 31, 58, 0.5);    /* T.divider — cards/panels/inputs/buttons/table headers */
+  --bdr-strong:  rgba(11, 31, 58, 0.65);
   --bdr-brand:   var(--clr-primary-400);
   --bdr-success: var(--clr-success-200);
   --bdr-warning: var(--clr-warning-200);
@@ -422,7 +422,7 @@ body {
   font-weight: var(--fw-bold);
   line-height: 1;
   white-space: nowrap;
-  border: none;
+  border: 1px solid currentColor;
 }
 
 .badge-dot::before {
@@ -601,7 +601,7 @@ body {
 /* Delete/Dismiss-style actions — faint, matches deleteLinkStyle's
    textFaint exactly (deliberately NOT red — the mockup doesn't use a
    danger color for these plain-text row actions). */
-.btn-link-muted { color: var(--txt-disabled); }
+.btn-link-muted { color: var(--txt-secondary); }
 .btn-link-muted:hover { color: var(--txt-danger); }
 
 /* ============================================================
@@ -668,7 +668,7 @@ body {
 .form-input::placeholder,
 .form-group input::placeholder,
 .form-group textarea::placeholder {
-  color: var(--txt-disabled);
+  color: var(--txt-secondary);
 }
 
 .form-input:hover,
@@ -823,7 +823,7 @@ body {
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--txt-disabled);
+  color: var(--txt-secondary);
   margin-bottom: 10px;
 }
 
@@ -956,7 +956,7 @@ body {
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--txt-disabled);
+  color: var(--txt-secondary);
   padding: 0 24px 8px;
 }
 
@@ -1112,7 +1112,7 @@ body {
   font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--txt-disabled);
+  color: var(--txt-secondary);
   margin-top: 0;
 }
 
@@ -1190,7 +1190,7 @@ body {
   font-size: var(--fs-sm);
   outline: none;
 }
-.global-search-input::placeholder { color: var(--txt-disabled); }
+.global-search-input::placeholder { color: var(--txt-secondary); }
 .global-search-input:focus { border-color: var(--bdr-brand); }
 
 .global-search-dropdown {
@@ -1458,7 +1458,7 @@ body {
   transition: var(--transition-fast);
   outline: none;
 }
-.search-input::placeholder { color: var(--txt-disabled); }
+.search-input::placeholder { color: var(--txt-secondary); }
 .search-input:focus { border-color: var(--bdr-brand); box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.15); }
 
 .toolbar-filter-btn { position: relative; }
