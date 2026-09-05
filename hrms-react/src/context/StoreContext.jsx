@@ -11,7 +11,9 @@ import {
   HolidaysAPI,
   AttendanceAPI,
   NotificationsAPI,
+  OvertimeRequestsAPI,
 } from "../api";
+import { setDemoClockOffset } from "../api/client";
 
 const StoreContext = createContext(null);
 
@@ -72,6 +74,7 @@ export function StoreProvider({ children }) {
   });
 
   const [activePage, setActivePage] = useState("Dashboard");
+  const [overtimeRequests, setOvertimeRequests] = useState([]);
   const [clockOffset, setClockOffset] = useState(0);
 
   const getAppNow = useCallback(
@@ -84,12 +87,20 @@ export function StoreProvider({ children }) {
   const resetAppDateTime = useCallback(() => setClockOffset(0), []);
   const isClockAdjusted = clockOffset !== 0;
 
+  // Push the offset down to the API client so requests carry X-App-Now while
+  // the clock is moved. Server-side rules (the 13:00 overtime cutoff) run
+  // against server time, so without this the demo clock would move only what
+  // the browser renders and none of what the backend decides.
+  useEffect(() => {
+    setDemoClockOffset(clockOffset);
+  }, [clockOffset]);
+
   /* ── Initial load from the backend, once signed in ── */
   const refreshAll = useCallback(async () => {
     setLoadingStore(true);
     setStoreError(null);
     try {
-      const [emp, dept, job, cand, hol, att, notif] = await Promise.all([
+      const [emp, dept, job, cand, hol, att, notif, ot] = await Promise.all([
         EmployeesAPI.list(),
         DepartmentsAPI.list(),
         JobsAPI.list(),
@@ -97,6 +108,7 @@ export function StoreProvider({ children }) {
         HolidaysAPI.list(),
         AttendanceAPI.list(),
         NotificationsAPI.list(),
+        OvertimeRequestsAPI.list(),
       ]);
       setEmployees(emp.items || []);
       setDepartments(dept.items || []);
@@ -105,6 +117,8 @@ export function StoreProvider({ children }) {
       setHolidays(hol.items || []);
       setAttendance(att.items || []);
       setNotifications(notif.items || []);
+      // Role-scoped server-side: an employee gets only their own rows.
+      setOvertimeRequests(ot.items || []);
     } catch (err) {
       setStoreError(translateApiError(err, t) || "Failed to load data from the backend.");
     } finally {
@@ -123,6 +137,7 @@ export function StoreProvider({ children }) {
       setHolidays([]);
       setAttendance([]);
       setNotifications([]);
+      setOvertimeRequests([]);
       setStoreError(null);
       setLoadingStore(false);
     }
@@ -352,6 +367,48 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
+  /* ── Overtime actions (Attendance Overtime, M4) ── */
+
+  const refreshOvertimeRequests = useCallback(async (params = {}) => {
+    const res = await OvertimeRequestsAPI.list(params);
+    setOvertimeRequests(res.items ?? []);
+    return res.items ?? [];
+  }, []);
+
+  const applyOvertime = useCallback(async (data) => {
+    const res = await OvertimeRequestsAPI.create(data);
+    setOvertimeRequests((prev) => [res.data, ...prev]);
+    return res.data;
+  }, []);
+
+  /**
+   * Returns { created, skipped } rather than throwing on a partial failure:
+   * the endpoint validates each employee independently, and the caller needs to
+   * show exactly who was left out and why.
+   */
+  const assignOvertime = useCallback(async (data) => {
+    const res = await OvertimeRequestsAPI.assign(data);
+    if (res.created?.length) setOvertimeRequests((prev) => [...res.created, ...prev]);
+    return { created: res.created ?? [], skipped: res.skipped ?? [] };
+  }, []);
+
+  const reviewOvertime = useCallback(async (id, decision, reviewNote) => {
+    const res = await OvertimeRequestsAPI.review(id, decision, reviewNote);
+    setOvertimeRequests((prev) => prev.map((r) => (idsMatch(r.id, id) ? res.data : r)));
+    return res.data;
+  }, []);
+
+  /** Withdrawn requests are deleted server-side, so drop the row entirely. */
+  const cancelOvertime = useCallback(async (id) => {
+    await OvertimeRequestsAPI.cancel(id);
+    setOvertimeRequests((prev) => prev.filter((r) => !idsMatch(r.id, id)));
+  }, []);
+
+  const fetchOvertimeBalance = useCallback(async (params = {}) => {
+    const res = await OvertimeRequestsAPI.balance(params);
+    return res.data;
+  }, []);
+
   /* ── Notification actions (optimistic, backed by the API) ── */
   const markNotificationRead = useCallback(async (id) => {
     setNotifications((prev) =>
@@ -459,6 +516,13 @@ export function StoreProvider({ children }) {
     setAttendance,
     clockIn,
     clockOut,
+    overtimeRequests,
+    refreshOvertimeRequests,
+    applyOvertime,
+    assignOvertime,
+    reviewOvertime,
+    cancelOvertime,
+    fetchOvertimeBalance,
     addJob,
     updateJob,
     removeJob,

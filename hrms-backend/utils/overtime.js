@@ -58,6 +58,18 @@ export const OT_ANNUAL_CAP_HOURS = envNumber("OT_ANNUAL_CAP_HOURS", 200);
 export const OT_PIT_EXEMPT = process.env.OT_PIT_EXEMPT !== "false";
 
 /**
+ * Minutes to hours, rounded to two decimals.
+ *
+ * Overtime is stored in whole minutes everywhere (OvertimeRequest.plannedMinutes,
+ * Attendance.otMinutes) because caps accumulate across many rows and fractional
+ * hours drift. Hours are a presentation concern, so the conversion lives here —
+ * in the one overtime module that imports nothing — rather than in
+ * utils/overtimeBalance.js, which pulls in a Mongoose model and so cannot be
+ * imported by the deliberately dependency-free utils/mappers.js.
+ */
+export const minutesToHours = (minutes) => Math.round((minutes / 60) * 100) / 100;
+
+/**
  * Daily ceiling for a day type. On a rest day or holiday there is no normal
  * shift, so the whole worked span is overtime and the cap is the 12h total-work
  * limit rather than the 4h overtime limit.

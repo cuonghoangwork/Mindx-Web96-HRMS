@@ -58,6 +58,27 @@ export const EmployeesAPI = {
     apiFetch(`/employees/${id}/documents/${docId}`, { method: "DELETE" }),
 };
 
+/**
+ * Attendance Overtime. Mirrors hrms-backend/router/overtimeRequestRouter.js.
+ *
+ * `assign` resolves even when some employees were skipped — the endpoint
+ * reports per-employee outcomes in { created, skipped } rather than failing the
+ * whole batch, so one person being over their monthly cap does not discard
+ * everyone else's assignment. Callers must read `skipped`.
+ */
+export const OvertimeRequestsAPI = {
+  list: (params = {}) => apiFetch(`/overtime-requests${qs(params)}`),
+  create: (data) => apiFetch("/overtime-requests", { method: "POST", body: data }),
+  assign: (data) => apiFetch("/overtime-requests/assign", { method: "POST", body: data }),
+  review: (id, decision, reviewNote) =>
+    apiFetch(`/overtime-requests/${id}/review`, {
+      method: "PATCH",
+      body: { decision, reviewNote },
+    }),
+  cancel: (id) => apiFetch(`/overtime-requests/${id}`, { method: "DELETE" }),
+  balance: (params = {}) => apiFetch(`/overtime-requests/balance${qs(params)}`),
+};
+
 export const DepartmentsAPI = {
   list: () => apiFetch("/departments"),
   create: (data) => apiFetch("/departments", { method: "POST", body: data }),

@@ -8,6 +8,28 @@ export const API_BASE =
 const ACCESS_KEY = "hrms-access-token";
 const REFRESH_KEY = "hrms-refresh-token";
 
+/**
+ * Demo clock bridge.
+ *
+ * StoreContext owns the offset as React state (HeaderDateTime lets you move
+ * it), but apiFetch is a plain module function with no access to React. Rather
+ * than thread a clock through every call site, the store pushes the offset here
+ * whenever it changes and apiFetch reads it.
+ *
+ * The header is only sent when BOTH gates are open: the build has
+ * VITE_DEMO_MODE enabled, and the clock has actually been moved. Normal traffic
+ * carries no header at all, and a production build carries none regardless —
+ * the server ignores it too unless DEMO_MODE is on there (utils/appNow.js).
+ * This is a bypass for every date rule in the system, not just the overtime
+ * cutoff it was added for, so it is deliberately hard to leave on by accident.
+ */
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
+let demoClockOffsetMs = 0;
+
+export function setDemoClockOffset(offsetMs) {
+  demoClockOffsetMs = Number(offsetMs) || 0;
+}
+
 export function getTokens() {
   return {
     access: localStorage.getItem(ACCESS_KEY),
@@ -64,6 +86,9 @@ export async function apiFetch(
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const headers = isFormData ? {} : { "Content-Type": "application/json" };
   if (auth && access) headers.Authorization = `Bearer ${access}`;
+  if (DEMO_MODE && demoClockOffsetMs !== 0) {
+    headers["X-App-Now"] = new Date(Date.now() + demoClockOffsetMs).toISOString();
+  }
 
   let res;
   try {

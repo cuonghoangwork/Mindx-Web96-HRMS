@@ -17,7 +17,12 @@
  * writing to the DB. ObjectId <-> name lookups (department, manager) that need a DB
  * query live in utils/refResolvers.js and are applied by the controller in addition
  * to these pure functions.
+ *
+ * The one import below is deliberate and deliberately narrow: utils/overtime.js
+ * is config plus arithmetic with no imports of its own, so it does not
+ * compromise this file's DB-free contract.
  */
+import { minutesToHours } from "./overtime.js";
 
 /* ───────────────────────── enum maps (client label -> db value) ───────────────────────── */
 
@@ -334,6 +339,21 @@ export function attendanceToClient(doc) {
     status: toClient(ATTENDANCE_STATUS_REV, o.status),
     // Task 4.2 — "paid" | "unpaid" | null. Only ever set when status is "Late".
     lateHalfDayType: o.lateHalfDayType ?? null,
+
+    // Attendance Overtime (M3). All derived by utils/overtimeRecompute.js.
+    // Exposed as hours as well as minutes: minutes are the stored source of
+    // truth (they accumulate against the caps without float drift), hours are
+    // what every surface actually renders.
+    rawCheckOut: o.rawCheckOut ?? null,
+    otMinutes: o.otMinutes ?? 0,
+    otHours: minutesToHours(o.otMinutes ?? 0),
+    otNightMinutes: o.otNightMinutes ?? 0,
+    otNightHours: minutesToHours(o.otNightMinutes ?? 0),
+    otUnapprovedMinutes: o.otUnapprovedMinutes ?? 0,
+    otUnapprovedHours: minutesToHours(o.otUnapprovedMinutes ?? 0),
+    otDayType: o.otDayType ?? null,
+    otEvidence: o.otEvidence ?? null,
+    otRequestId: o.otRequest ? String(o.otRequest._id ?? o.otRequest) : null,
   };
 }
 
@@ -345,6 +365,12 @@ export function attendanceFromClient(body = {}) {
   carry(body, "checkOut", out, "checkOut");
   carry(body, "status", out, "status", (v) => toDb(ATTENDANCE_STATUS, v));
   carry(body, "lateHalfDayType", out, "lateHalfDayType");
+  // Attendance Overtime (M3): rawCheckOut is deliberately NOT carried from the
+  // client. It records a genuine employee clock-out, written only by
+  // attendanceController.checkOut - letting an HR edit set it would destroy the
+  // very distinction otEvidence exists to make. The ot* fields are likewise
+  // absent: they are derived by utils/overtimeRecompute.js from the clock times
+  // this mapper does carry, never accepted from a request body.
   return out;
 }
 

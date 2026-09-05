@@ -4,7 +4,7 @@ import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { idsMatch } from "../utils/id";
 import { translateApiError } from "../utils/apiError";
-import { isoOf } from "../utils/attendance";
+import { hhmmOf, isoOf } from "../utils/attendance";
 
 /**
  * ClockInAction — topbar "Clock in" quick action, matching the mockup's
@@ -49,7 +49,9 @@ function ClockInAction() {
     if (hasCheckedIn || loading) return;
     setLoading(true);
     setError("");
-    const currentTimeHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    // hhmmOf, not getHours(): the server records this against company-timezone
+    // rules, so a browser in another zone must not send its own wall clock.
+    const currentTimeHHMM = hhmmOf(now);
     try {
       await clockIn(myEmployee.id, todayStr, currentTimeHHMM);
     } catch (err) {

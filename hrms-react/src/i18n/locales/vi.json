@@ -244,6 +244,7 @@
    "OT_INVALID_DATE": "Ngày làm thêm giờ không hợp lệ.",
    "OT_ON_LEAVE_DAY": "Nhân viên đã có đơn nghỉ phép được duyệt cho ngày này.",
    "OT_REQUEST_NOT_FOUND": "Không tìm thấy yêu cầu làm thêm giờ.",
+   "OT_STARTS_BEFORE_WINDOW": "Làm thêm giờ trong ngày làm việc không thể bắt đầu trước {{start}}.",
    "OT_UNKNOWN_DAY_TYPE": "Loại ngày làm thêm giờ không hợp lệ.",
    "PAID_PERIOD_LOCKED": "Kỳ lương đã thanh toán đã đóng và không thể thay đổi trạng thái.",
    "PASSWORD_CHANGE_REQUIRED": "Bạn phải đổi mật khẩu trước khi tiếp tục.",
@@ -522,7 +523,8 @@
   },
   "tabs": {
    "roster": "Danh sách trực",
-   "noShowQueue": "Hàng chờ vắng không phép"
+   "noShowQueue": "Hàng chờ vắng không phép",
+    "overtime": "Làm thêm giờ"
   },
   "scope": {
    "team_one": "Đang hiển thị đội của bạn{{deptSuffix}} — {{count}} nhân viên",
@@ -2273,5 +2275,87 @@
  "layout": {
   "closeMenuAriaLabel": "Đóng menu",
   "loadError": "Không thể tải dữ liệu: {{error}}"
+ },
+ "overtime": {
+  "modal": {
+   "title": "Đăng ký làm thêm giờ",
+   "date": "Ngày làm thêm",
+   "start": "Giờ bắt đầu",
+   "end": "Giờ kết thúc",
+   "endOfDay": "Đến hết ngày (24:00)",
+   "reason": "Lý do",
+   "reasonPlaceholder": "ví dụ: triển khai bản phát hành, chuyển đổi dữ liệu",
+   "submit": "Gửi yêu cầu",
+   "submitting": "Đang gửi…",
+   "errors": {
+    "invalidSpan": "Giờ kết thúc phải sau giờ bắt đầu và ca làm thêm không được kéo dài qua nửa đêm.",
+    "submitFailed": "Không thể gửi yêu cầu làm thêm giờ."
+   }
+  },
+  "meter": {
+   "title": "Hạn mức làm thêm giờ của bạn",
+   "month": "Tháng này",
+   "year": "Năm nay",
+   "usedOfCap": "{{used}} giờ / {{cap}} giờ",
+   "remaining": "Còn lại {{hours}} giờ",
+   "loading": "Đang tải hạn mức…",
+   "thisRequest": "Yêu cầu này thêm {{hours}} giờ — tổng {{projected}} giờ trong tháng.",
+   "wouldExceed": "Yêu cầu này thêm {{hours}} giờ, vượt quá giới hạn {{cap}} giờ mỗi tháng."
+  },
+  "mine": {
+   "title": "Làm thêm giờ của tôi",
+   "description": "Đăng ký làm thêm giờ. Đơn đóng lúc 13:00 của ngày làm thêm.",
+   "apply": "+ Đăng ký làm thêm giờ",
+   "empty": "Bạn chưa có yêu cầu làm thêm giờ nào.",
+   "noProfile": "Tài khoản của bạn chưa được liên kết với hồ sơ nhân viên. Vui lòng liên hệ HR.",
+   "cancel": "Thu hồi",
+   "cancelled": "Đã thu hồi yêu cầu làm thêm giờ.",
+   "submitted": "Đã gửi yêu cầu làm thêm giờ."
+  },
+  "table": {
+   "date": "Ngày",
+   "span": "Khung giờ",
+   "hours": "Tổng",
+   "hoursValue": "{{hours}} giờ",
+   "dayType": "Loại ngày",
+   "status": "Trạng thái"
+  },
+  "dayType": {
+   "normal": "Ngày làm việc",
+   "restDay": "Ngày nghỉ hằng tuần",
+   "holiday": "Ngày lễ"
+  },
+  "status": {
+   "pending": "Chờ duyệt",
+   "approved": "Đã duyệt",
+   "rejected": "Bị từ chối"
+  },
+  "evidence": {
+   "clocked": "Có chấm công",
+   "clockedTitle": "Được xác nhận bằng lần chấm công ra thực tế.",
+   "planned": "Theo kế hoạch",
+   "plannedTitle": "Không có chấm công ra — số giờ này dựa trên kế hoạch đã duyệt.",
+   "manual": "Nhập tay",
+   "manualTitle": "Bản ghi chấm công đã được chỉnh sửa thủ công."
+  },
+  "queue": {
+   "title": "Hàng đợi duyệt làm thêm giờ",
+   "description": "Duyệt hoặc từ chối yêu cầu làm thêm giờ. Mỗi dòng hiển thị tổng số giờ đã dùng so với giới hạn pháp luật.",
+   "count": "{{count}} yêu cầu",
+   "loading": "Đang tải yêu cầu…",
+   "empty": "Không có yêu cầu làm thêm giờ nào cần duyệt.",
+   "rowLine": "{{date}} · {{span}} · {{hours}} giờ · {{dayType}}",
+   "totals": "Tháng {{monthUsed}}/{{monthCap}} giờ · Năm {{yearUsed}}/{{yearCap}} giờ",
+   "assigned": "Được phân công",
+   "reasonLabel": "Lý do",
+   "notePlaceholder": "Ghi chú cho nhân viên (không bắt buộc)…",
+   "approve": "Duyệt",
+   "reject": "Từ chối",
+   "approved": "Đã duyệt làm thêm giờ.",
+   "rejected": "Đã từ chối làm thêm giờ."
+  },
+  "errors": {
+   "loadFailed": "Không thể tải danh sách yêu cầu làm thêm giờ."
+  }
  }
 }

@@ -119,7 +119,12 @@ export function startScheduler() {
     return null;
   }
 
-  const expression = process.env.CRON_CLOSE_ATTENDANCE || "0 22 * * *";
+  // 23:00, not 22:00. Attendance Overtime moved the auto clock-out boundary to
+  // 22:00 (18:00 + the 4h daily cap), so a 22:00 close job would fire while an
+  // overtime shift was still being written. The job takes dateKey as a
+  // parameter and dateKeyInTz() at 23:00 still resolves to the same calendar
+  // day in SCHEDULER_TZ, so nothing else shifts.
+  const expression = process.env.CRON_CLOSE_ATTENDANCE || "0 23 * * *";
   if (!cron.validate(expression)) {
     console.error(`[scheduler] invalid cron expression: ${expression} - scheduler not started`);
     return null;

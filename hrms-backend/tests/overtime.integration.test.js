@@ -239,8 +239,10 @@ describe("POST /overtime-requests — apply (§7.4 validation order)", () => {
     if (!dbAvailable) return ctx.skip();
     const res = await apply(org.tokens.dev, {
       date: TOMORROW,
-      plannedStart: "17:00",
-      plannedEnd: "22:00", // 5h
+      // 18:00-23:00, not 17:00-22:00: a pre-18:00 start now trips the
+      // working-day boundary rule first, which would mask the cap under test.
+      plannedStart: "18:00",
+      plannedEnd: "23:00", // 5h
     });
     expect(res.status).toBe(409);
     expect(res.body.code).toBe("OT_EXCEEDS_DAILY_CAP");
@@ -596,5 +598,185 @@ describe("DELETE /overtime-requests/:id — withdraw", () => {
       .delete(`${URL}/${req0.id}`).set(auth(org.tokens.dev)).set("X-App-Now", NOW_PAST_CUTOFF);
     expect(res.status).toBe(409);
     expect(res.body.code).toBe("OT_CANCEL_PAST_CUTOFF");
+  });
+});
+/* ══════════════════════════════════════════════════
+   M3 — approval writes hours onto the attendance record
+
+   The case worth protecting is the LATE approval. With nothing approved at
+   23:00 the close job shuts the day at 18:00 and overwrites checkOut, so by
+   the time HR approves the next morning, checkOut no longer shows when the
+   employee actually left. rawCheckOut does — and whether it is set is exactly
+   what separates "credit the hours they clocked" from "credit what was
+   planned, and flag it".
+══════════════════════════════════════════════════ */
+describe("PATCH /:id/review — attendance side effect (M3)", () => {
+  async function makeAttendance(employee, dateKey, overrides = {}) {
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+    return AttendanceModel.create({
+      employee: employee._id,
+      date: utcMidnight(dateKey),
+      checkIn: "09:00",
+      status: "present",
+      ...overrides,
+    });
+  }
+
+  const reload = async (id) => {
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    return AttendanceModel.findById(id);
+  };
+
+  async function applyAndApprove(attendanceOverrides) {
+    const record = await makeAttendance(org.employees.dev, TOMORROW, attendanceOverrides);
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+    const res = await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "approved" });
+    expect(res.status).toBe(200);
+    return { record, created };
+  }
+
+  it("credits real clocked hours when the close job already overwrote checkOut", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Exactly what the job leaves behind when nothing was approved in time:
+    // checkOut forced to 18:00, but rawCheckOut still remembering 21:30.
+    const { record, created } = await applyAndApprove({ checkOut: "18:00", rawCheckOut: "21:30" });
+
+    const after = await reload(record._id);
+    expect(after.otMinutes).toBe(210); // 3.5h actually worked, not the planned 4h
+    expect(after.otEvidence).toBe("clocked");
+    expect(after.otDayType).toBe("normal");
+    expect(String(after.otRequest)).toBe(created.id);
+    expect(after.otUnapprovedMinutes).toBe(0);
+  });
+
+  it("falls back to the planned span when there is no clock evidence", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Never clocked out; the job closed the day at the 18:00 default.
+    const { record } = await applyAndApprove({ checkOut: "18:00", rawCheckOut: null });
+
+    const after = await reload(record._id);
+    // Nothing past 18:00 is evidenced, so nothing is credited yet - the close
+    // job will extend checkOut to the planned end on its next run.
+    expect(after.otMinutes).toBe(0);
+    expect(after.otEvidence).toBeNull();
+  });
+
+  it("moves unapproved minutes into paid ones on approval", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { record } = await applyAndApprove({ checkOut: "21:00", rawCheckOut: "21:00" });
+
+    const after = await reload(record._id);
+    expect(after.otMinutes).toBe(180);
+    expect(after.otUnapprovedMinutes).toBe(0);
+    expect(after.otEvidence).toBe("clocked");
+  });
+
+  it("never pays beyond the approved window", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { record } = await applyAndApprove({ checkOut: "23:30", rawCheckOut: "23:30" });
+
+    const after = await reload(record._id);
+    expect(after.otMinutes).toBe(240); // the approved 18:00-22:00
+    expect(after.otUnapprovedMinutes).toBe(90); // 22:00-23:30, recorded not paid
+  });
+
+  it("is a no-op when no attendance record exists for that day yet", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+
+    // Approving ahead of the day must not fail just because nobody has clocked in.
+    const res = await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "approved" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe("approved");
+  });
+
+  it("rejecting leaves the attendance record untouched", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const record = await makeAttendance(org.employees.dev, TOMORROW, {
+      checkOut: "21:00", rawCheckOut: "21:00",
+    });
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+
+    await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "rejected" });
+
+    const after = await reload(record._id);
+    expect(after.otMinutes).toBe(0);
+    expect(after.otRequest).toBeNull();
+  });
+});
+
+describe("POST /attendance/check-out — rawCheckOut (M3)", () => {
+  it("records the employee's own clock-out as evidence", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+
+    await AttendanceModel.create({
+      employee: org.employees.dev._id,
+      date: utcMidnight(TODAY),
+      checkIn: "09:00",
+      status: "present",
+    });
+
+    const res = await request
+      .post("/api/v1/attendance/check-out")
+      .set(auth(org.tokens.dev))
+      .send({ employeeId: String(org.employees.dev._id), date: TODAY, checkOut: "21:30" });
+
+    expect(res.status).toBe(200);
+
+    const after = await AttendanceModel.findOne({
+      employee: org.employees.dev._id, date: utcMidnight(TODAY),
+    });
+    // rawCheckOut is what survives the close job overwriting checkOut.
+    expect(after.rawCheckOut).toBe("21:30");
+    expect(after.checkOut).toBe("21:30");
+    // Nothing approved, so it is recorded as unapproved overtime.
+    expect(after.otUnapprovedMinutes).toBe(210);
+    expect(after.otMinutes).toBe(0);
+  });
+});
+
+describe("POST /overtime-requests - working-day start boundary", () => {
+  it("rejects a working-day request that starts before 18:00", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // 17:00-20:00 is 3h and clears the 4h daily cap, but only 18:00-20:00
+    // would ever be paid - the recompute clamps to the overtime boundary.
+    // Accepting a request the engine will silently shorten is the bug.
+    const res = await apply(org.tokens.dev, {
+      date: TOMORROW, plannedStart: "17:00", plannedEnd: "20:00",
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("OT_STARTS_BEFORE_WINDOW");
+    expect(res.body.params.start).toBe("18:00");
+  });
+
+  it("accepts a working-day request starting exactly at 18:00", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const res = await apply(org.tokens.dev, {
+      date: TOMORROW, plannedStart: "18:00", plannedEnd: "20:00",
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("does not apply the rule to a rest day, where the whole span is overtime", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const res = await apply(org.tokens.dev, {
+      date: SATURDAYS[0], plannedStart: "09:00", plannedEnd: "17:00",
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.dayType).toBe("restDay");
   });
 });

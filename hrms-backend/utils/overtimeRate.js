@@ -92,13 +92,43 @@ export function splitDayNight(startHHMM, endHHMM) {
   if (end <= start) {
     throw new AppError("Overtime cannot cross midnight.", "OT_CROSSES_MIDNIGHT", undefined, 400);
   }
+  return splitDayNightMinutes(start, end);
+}
 
+/**
+ * splitDayNight's arithmetic, on minutes-since-midnight instead of "HH:MM".
+ *
+ * Deliberately does NOT throw on an empty or inverted span - it returns zeroes.
+ * The string form above validates a span someone *requested*, where an inverted
+ * span is a user error worth rejecting loudly. This form is used by
+ * utils/overtimeRecompute.js to intersect an approved window with the hours
+ * actually clocked, where an empty intersection is an ordinary outcome ("they
+ * went home before their overtime window started"), not a fault.
+ */
+export function splitDayNightMinutes(start, end) {
+  if (!(end > start)) return { dayMinutes: 0, nightMinutes: 0 };
   const nightMinutes = Math.max(
     0,
     Math.min(end, DAY_END_MINUTES) - Math.max(start, NIGHT_START_MINUTES),
   );
-  const dayMinutes = end - start - nightMinutes;
-  return { dayMinutes, nightMinutes };
+  return { dayMinutes: end - start - nightMinutes, nightMinutes };
+}
+
+/**
+ * minutesBetween / hoursBetween from utils/workday.js, but accepting the
+ * end-of-day sentinel as the end value.
+ *
+ * The close job writes an approved request's plannedEnd straight onto
+ * Attendance.checkOut, and on a rest day that can legitimately be "24:00" -
+ * which workday.js's parseHHMM rejects. Without these the nightly close would
+ * throw on exactly the rest-day overtime records the feature exists to handle.
+ */
+export function minutesBetweenEnd(startHHMM, endHHMM) {
+  return Math.max(0, parseHHMMEnd(endHHMM) - parseHHMM(startHHMM));
+}
+
+export function hoursBetweenEnd(startHHMM, endHHMM) {
+  return minutesBetweenEnd(startHHMM, endHHMM) / 60;
 }
 
 /**

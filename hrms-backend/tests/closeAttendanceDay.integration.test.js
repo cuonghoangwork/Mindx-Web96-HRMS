@@ -210,3 +210,224 @@ describe("closeAttendanceDay — no-show status (task 4.6)", () => {
     expect(result.markedNoShow).toBe(0);
   });
 });
+/* ══════════════════════════════════════════════════
+   Attendance Overtime (M3)
+
+   The close job is where overtime stops being a request and becomes hours on
+   a record. Two things it must get right, and both are silent when wrong:
+   an approved employee has to be closed at their planned end rather than at
+   18:00 (or the job erases the overtime it exists to record), and time worked
+   with nothing approved has to be measured from the right boundary — 18:00 on
+   a working day, but check-in on a rest day, where there is no normal shift.
+══════════════════════════════════════════════════ */
+
+// 2026-02-07 is a Saturday; TEST_DATE_KEY above is the Monday of that week.
+const SATURDAY_KEY = "2026-02-07";
+
+async function makeAttendance(employee, dateKey, overrides = {}) {
+  const { default: AttendanceModel } = await import("../model/Attendance.js");
+  const { utcMidnight } = await import("../utils/workday.js");
+  return AttendanceModel.create({
+    employee: employee._id,
+    date: utcMidnight(dateKey),
+    checkIn: "09:00",
+    checkOut: null,
+    status: "present",
+    ...overrides,
+  });
+}
+
+async function makeApprovedOvertime(employee, dateKey, plannedStart, plannedEnd, overrides = {}) {
+  const { default: OvertimeRequestModel } = await import("../model/OvertimeRequest.js");
+  const { utcMidnight, parseHHMM } = await import("../utils/workday.js");
+  const { parseHHMMEnd } = await import("../utils/overtimeRate.js");
+  return OvertimeRequestModel.create({
+    employee: employee._id,
+    date: utcMidnight(dateKey),
+    plannedStart,
+    plannedEnd,
+    plannedMinutes: parseHHMMEnd(plannedEnd) - parseHHMM(plannedStart),
+    dayType: overrides.dayType ?? "normal",
+    status: "approved",
+    origin: "self",
+    ...overrides,
+  });
+}
+
+const reload = async (id) => {
+  const { default: AttendanceModel } = await import("../model/Attendance.js");
+  return AttendanceModel.findById(id);
+};
+
+describe("closeAttendanceDay — overtime (M3)", () => {
+  it("closes an approved employee at their planned end, not at 18:00", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, TEST_DATE_KEY);
+    await makeApprovedOvertime(employee, TEST_DATE_KEY, "18:00", "22:00");
+
+    await closeAttendanceDay({ dateKey: TEST_DATE_KEY });
+
+    const after = await reload(record._id);
+    expect(after.checkOut).toBe("22:00");
+    expect(after.hours).toBe(13);
+    expect(after.otMinutes).toBe(240);
+    expect(after.otDayType).toBe("normal");
+    // No genuine clock-out happened, so the credit rests on the plan.
+    expect(after.rawCheckOut).toBeNull();
+    expect(after.otEvidence).toBe("planned");
+    expect(after.otUnapprovedMinutes).toBe(0);
+  });
+
+  it("still closes an unapproved employee at 18:00 with no overtime", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, TEST_DATE_KEY);
+
+    await closeAttendanceDay({ dateKey: TEST_DATE_KEY });
+
+    const after = await reload(record._id);
+    expect(after.checkOut).toBe("18:00");
+    expect(after.otMinutes).toBe(0);
+    expect(after.otUnapprovedMinutes).toBe(0);
+    expect(after.otEvidence).toBeNull();
+  });
+
+  it("does not credit overtime for a request that is still pending", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, TEST_DATE_KEY);
+    await makeApprovedOvertime(employee, TEST_DATE_KEY, "18:00", "22:00", { status: "pending" });
+
+    await closeAttendanceDay({ dateKey: TEST_DATE_KEY });
+
+    const after = await reload(record._id);
+    expect(after.checkOut).toBe("18:00");
+    expect(after.otMinutes).toBe(0);
+  });
+
+  it("records a genuine late clock-out as unapproved overtime", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    // Already clocked out at 21:00 with nothing approved. autoCheckOut skips
+    // it (checkOut is set), so this exercises the recompute from clock times.
+    const record = await makeAttendance(employee, TEST_DATE_KEY, {
+      checkOut: "21:00",
+      rawCheckOut: "21:00",
+    });
+    const { applyOvertimeToRecord } = await import("../utils/overtimeRecompute.js");
+    applyOvertimeToRecord(record, null, { dayType: "normal" });
+    await record.save();
+
+    const after = await reload(record._id);
+    expect(after.otUnapprovedMinutes).toBe(180);
+    expect(after.otMinutes).toBe(0);
+  });
+
+  it("closes a rest day at a 24:00 planned end without throwing on the sentinel", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, SATURDAY_KEY, { checkIn: "12:00" });
+    await makeApprovedOvertime(employee, SATURDAY_KEY, "12:00", "24:00", { dayType: "restDay" });
+
+    // The whole point: hoursBetween() would throw on "24:00" here, because
+    // parseHHMM rejects it. hoursBetweenEnd() is what makes this survive.
+    const result = await closeAttendanceDay({ dateKey: SATURDAY_KEY });
+    expect(result.autoCheckedOut).toBe(1);
+
+    const after = await reload(record._id);
+    expect(after.checkOut).toBe("24:00");
+    expect(after.hours).toBe(12);
+    expect(after.otMinutes).toBe(720);
+    expect(after.otNightMinutes).toBe(120); // 22:00-24:00
+    expect(after.otDayType).toBe("restDay");
+  });
+
+  /**
+   * The §6 regression. Measuring unapproved overtime from 18:00 on every day
+   * reports ZERO for a Saturday worked 09:00-17:00 — silent on exactly the
+   * pattern the flag exists to surface.
+   */
+  it("counts a whole unapproved Saturday, not just the part after 18:00", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, SATURDAY_KEY, { checkIn: "09:00" });
+
+    await closeAttendanceDay({ dateKey: SATURDAY_KEY });
+
+    const after = await reload(record._id);
+    // Closed at the 18:00 default (nothing approved), and every worked minute
+    // from check-in counts, because a rest day has no normal shift.
+    expect(after.checkOut).toBe("18:00");
+    expect(after.otDayType).toBe("restDay");
+    expect(after.otUnapprovedMinutes).toBe(540); // 09:00-18:00, not 0
+    expect(after.otMinutes).toBe(0);
+  });
+
+  it("keeps auto-closing on a rest day even though late/no-show marking is skipped", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    await makeAttendance(employee, SATURDAY_KEY, { checkIn: "12:00" });
+
+    const result = await closeAttendanceDay({ dateKey: SATURDAY_KEY });
+    expect(result.skipped).toBe(true);
+    expect(result.reason).toBe("weekend");
+    // autoCheckOut runs outside the skip guard, on purpose.
+    expect(result.autoCheckedOut).toBe(1);
+  });
+
+  it("rates a public holiday as a holiday even when it falls on a Saturday", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+    const { default: HolidayModel } = await import("../model/Holiday.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+
+    await HolidayModel.create({
+      name: "Test Holiday",
+      date: utcMidnight(SATURDAY_KEY),
+      type: "public",
+    });
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, SATURDAY_KEY, { checkIn: "12:00" });
+
+    const result = await closeAttendanceDay({ dateKey: SATURDAY_KEY });
+    // The skip reason keeps its original precedence (weekend first) so
+    // late/no-show behaviour is unchanged...
+    expect(result.reason).toBe("weekend");
+
+    // ...but the pay rate does not: a holiday is 300%, and it does not stop
+    // being a holiday because it landed on a weekend.
+    const after = await reload(record._id);
+    expect(after.otDayType).toBe("holiday");
+  });
+
+  it("is idempotent — a second close does not double the overtime", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { closeAttendanceDay } = await import("../jobs/closeAttendanceDay.js");
+
+    const employee = await makeEmployee();
+    const record = await makeAttendance(employee, TEST_DATE_KEY);
+    await makeApprovedOvertime(employee, TEST_DATE_KEY, "18:00", "22:00");
+
+    await closeAttendanceDay({ dateKey: TEST_DATE_KEY });
+    await closeAttendanceDay({ dateKey: TEST_DATE_KEY });
+
+    const after = await reload(record._id);
+    expect(after.otMinutes).toBe(240); // not 480
+  });
+});

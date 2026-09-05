@@ -10,8 +10,9 @@ import { translateApiError } from "../utils/apiError";
 import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 import Button from "../components/Button";
+import OvertimeTab from "../components/OvertimeTab";
 import { idsMatch } from "../utils/id";
-import { resolveStatus, buildMonthAttendance, buildDayData, isoOf } from "../utils/attendance";
+import { resolveStatus, buildMonthAttendance, buildDayData, hhmmOf, isoOf } from "../utils/attendance";
 
 /* ─── helpers ─── */
 const fmt = (v) => {
@@ -504,18 +505,16 @@ function Attendance() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedData, search, scopedEmployees, isManagerTier, selectedDay, todayStr]);
 
+  // hhmmOf, not getHours() — see utils/attendance.js. The clock time is
+  // evaluated server-side against company-timezone rules.
   const handleInlineCheckIn = async (employeeId) => {
     setActionLoadingKey(`${employeeId}-in`);
-    const now = getAppNow();
-    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    try { await clockIn(employeeId, todayStr, t); } catch { /* surfaced via row staying unchanged */ }
+    try { await clockIn(employeeId, todayStr, hhmmOf(getAppNow())); } catch { /* surfaced via row staying unchanged */ }
     setActionLoadingKey(null);
   };
   const handleInlineCheckOut = async (employeeId) => {
     setActionLoadingKey(`${employeeId}-out`);
-    const now = getAppNow();
-    const t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    try { await clockOut(employeeId, todayStr, t); } catch { /* surfaced via row staying unchanged */ }
+    try { await clockOut(employeeId, todayStr, hhmmOf(getAppNow())); } catch { /* surfaced via row staying unchanged */ }
     setActionLoadingKey(null);
   };
 
@@ -549,16 +548,24 @@ function Attendance() {
 
   const noShowCountBadge = ""; // pending-flag count intentionally omitted here — see disclosure below the tab row
 
+  const tabs = [
+    { key: "roster", label: t("attendance.tabs.roster", { defaultValue: "Roster" }) },
+    ...(isHRTier
+      ? [{ key: "noshow", label: t("attendance.tabs.noShowQueue", { defaultValue: "No-show queue" }) }]
+      : []),
+    { key: "overtime", label: t("attendance.tabs.overtime", { defaultValue: "Overtime" }) },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
-      {/* ── Roster / No-show queue tabs (admin only) ── */}
-      {isHRTier && (
+      {/* ── Roster / No-show queue / Overtime tabs ──
+           The tab row is no longer HR-only: every employee needs the Overtime
+           tab to file their own requests. The No-show queue stays HR-tier, so
+           an employee sees two tabs and HR sees three. ── */}
+      {(isHRTier || tabs.length > 1) && (
         <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)", alignSelf: "flex-start" }}>
-          {[
-            { key: "roster", label: t("attendance.tabs.roster", { defaultValue: "Roster" }) },
-            { key: "noshow", label: t("attendance.tabs.noShowQueue", { defaultValue: "No-show queue" }) },
-          ].map(({ key, label }) => (
+          {tabs.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setActiveTab(key)} style={{
               padding: "7px 16px", borderRadius: "6px", border: "none", cursor: "pointer",
               background: activeTab === key ? "var(--bg-surface)" : "transparent",
@@ -573,6 +580,8 @@ function Attendance() {
 
       {activeTab === "noshow" ? (
         <NoShowQueueTab />
+      ) : activeTab === "overtime" ? (
+        <OvertimeTab />
       ) : (
         <>
           {isManager && (

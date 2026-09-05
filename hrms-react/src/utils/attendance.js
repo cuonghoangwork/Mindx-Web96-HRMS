@@ -21,6 +21,34 @@ export function isoOf(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * The timezone the company operates in. Must match the backend's SCHEDULER_TZ,
+ * because the server evaluates the overtime cutoff and every date-key rule in
+ * that zone.
+ */
+export const APP_TIMEZONE = import.meta.env.VITE_APP_TIMEZONE || "Asia/Ho_Chi_Minh";
+
+/**
+ * "HH:MM" wall clock in APP_TIMEZONE.
+ *
+ * Deliberately NOT `date.getHours()` — that reads the *browser's* zone. A
+ * clock-in sent from a laptop in another timezone would record the wrong
+ * time against a company-timezone rule; it is the same class of bug as the
+ * server-side `new Date().getHours()` the overtime cutoff had to avoid, just
+ * one layer up.
+ *
+ * hourCycle "h23" is explicit: hour12:false renders midnight as "24:00" in
+ * some runtimes, and the backend's parseHHMM rejects that.
+ */
+export function hhmmOf(date) {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
 /** Derives display status from a raw attendance record — flags "Present" as "Late" past 9am. */
 export function resolveStatus(record) {
   let s = record.status;

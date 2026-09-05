@@ -6,6 +6,7 @@ import { dateKeyInTz } from "../utils/workday.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
 import { AppError } from "../utils/appError.js";
+import { recomputeRecordOvertime } from "../utils/overtimeRecompute.js";
 
 const attendanceController = {
   getAll: async (req, res) => {
@@ -137,11 +138,20 @@ const attendanceController = {
       if (!record) throw new AppError("No check-in record found for this employee/date.", "NO_CHECKIN_RECORD");
 
       record.checkOut = data.checkOut || new Date().toTimeString().slice(0, 5);
+      // The ONE place rawCheckOut is written. It is what makes a late overtime
+      // approval able to credit real hours: the close job overwrites checkOut,
+      // so without this a record auto-closed at 18:00 loses all evidence that
+      // the employee actually stayed until 21:30.
+      record.rawCheckOut = record.checkOut;
       if (record.checkIn) {
         const [h1, m1] = record.checkIn.split(":").map(Number);
         const [h2, m2] = record.checkOut.split(":").map(Number);
         record.hours = Math.max(0, (h2 * 60 + m2 - (h1 * 60 + m1)) / 60);
       }
+      // Clocking out is one of the inputs overtime is derived from. With no
+      // approved request this records the span as unapproved overtime; once HR
+      // approves, the same function moves those minutes across.
+      await recomputeRecordOvertime(record);
       await record.save();
       await record.populate("employee", "name");
 
@@ -151,18 +161,26 @@ const attendanceController = {
     }
   },
 
+  /**
+   * Fetch-mutate-save rather than findByIdAndUpdate, because overtime is
+   * recomputed from the record's clock times and the recompute needs a document
+   * to mutate. Editing check-in/check-out by hand is one of the three ways
+   * overtime changes, and it has to go through the same single derivation as
+   * the other two or the numbers drift.
+   */
   update: async (req, res) => {
     try {
       const data = attendanceFromClient(req.body);
+
+      const record = await AttendanceModel.findById(req.params.id);
+      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
 
       if (req.user.role === "MANAGER") {
         if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
           return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
         }
-        const existing = await AttendanceModel.findById(req.params.id, "employee");
-        if (!existing) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
         const deptId = await getManagerDepartmentId(req);
-        const emp = await EmployeeModel.findById(existing.employee, "department");
+        const emp = await EmployeeModel.findById(record.employee, "department");
         if (!emp || String(emp.department) !== String(deptId)) {
           return res.status(403).json({
             success: false,
@@ -172,11 +190,13 @@ const attendanceController = {
         }
       }
 
-      const record = await AttendanceModel.findByIdAndUpdate(req.params.id, data, {
-        new: true,
-        runValidators: true,
-      }).populate("employee", "name");
-      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
+      Object.assign(record, data);
+      // "manual" tells the approval queue that these hours rest on a human's
+      // edit rather than on a clock-out or an approved plan.
+      await recomputeRecordOvertime(record, { evidence: "manual" });
+      await record.save();
+      await record.populate("employee", "name");
+
       res.json({ success: true, data: attendanceToClient(record) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });

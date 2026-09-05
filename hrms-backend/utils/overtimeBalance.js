@@ -14,9 +14,7 @@
  */
 
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
-import { OT_MONTHLY_CAP_HOURS, OT_ANNUAL_CAP_HOURS } from "./overtime.js";
-
-export const minutesToHours = (minutes) => Math.round((minutes / 60) * 100) / 100;
+import { OT_MONTHLY_CAP_HOURS, OT_ANNUAL_CAP_HOURS, minutesToHours } from "./overtime.js";
 
 /** UTC [start, end] bounds for a calendar month, matching Attendance.date's UTC midnights. */
 export function monthBoundsUtc(year, month) {

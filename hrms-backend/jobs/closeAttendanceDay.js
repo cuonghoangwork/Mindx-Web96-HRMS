@@ -1,8 +1,8 @@
 import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
-import HolidayModel from "../model/Holiday.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
 import NoShowReviewModel from "../model/NoShowReview.js";
+import OvertimeRequestModel from "../model/OvertimeRequest.js";
 import { logAction } from "../utils/auditLog.js";
 import { notifyHR } from "../controller/notificationController.js";
 import { getRemainingDays } from "../utils/leaveBalance.js";
@@ -10,40 +10,91 @@ import {
   WORKDAY_END,
   WORKDAY_LATE_AFTER,
   endOfUtcDay,
-  hoursBetween,
   isLater,
   isWeekend,
   localDateKey,
   utcDateKey,
   utcMidnight,
 } from "../utils/workday.js";
+import { isHolidayOn } from "../utils/holidayLookup.js";
+import { hoursBetweenEnd, resolveDayType } from "../utils/overtimeRate.js";
+import { applyOvertimeToRecord } from "../utils/overtimeRecompute.js";
 
-async function resolveSkipReason(dateKey, date) {
-  if (isWeekend(dateKey)) return "weekend";
-  const holiday = await HolidayModel.findOne({ date });
-  return holiday ? "holiday" : null;
+/**
+ * One Holiday lookup per run, answering two different questions.
+ *
+ * They resolve a Saturday-holiday in opposite directions, on purpose:
+ *
+ *   - skipReason keeps its original precedence (weekend first), so late/no-show
+ *     marking behaves exactly as it did before overtime existed.
+ *   - dayType puts holiday first, because a public holiday pays 300% and does
+ *     not stop being a holiday because it landed on a weekend.
+ *
+ * The lookup itself goes through utils/holidayLookup.js so attendance and
+ * overtime cannot drift onto different holiday-matching idioms (the codebase
+ * has an exact-Date match here and a range match in payrollGeneration; they
+ * agree only while every Holiday row sits at exactly UTC midnight).
+ */
+async function resolveDayContext(dateKey, date) {
+  const isHoliday = await isHolidayOn(date);
+  return {
+    skipReason: isWeekend(dateKey) ? "weekend" : isHoliday ? "holiday" : null,
+    dayType: resolveDayType(dateKey, { isHoliday }),
+  };
 }
 
-async function autoCheckOut(date) {
+/**
+ * Closes every still-open record for the day.
+ *
+ * An employee with an approved overtime request is closed at their planned
+ * end (up to 22:00 on a working day, up to 24:00 on a rest day) rather than
+ * at 18:00 — otherwise the close job would erase the overtime it is supposed
+ * to record.
+ *
+ * The approved requests are fetched in one query for the whole batch, not one
+ * per record: this runs over every open attendance row in the company, and the
+ * late-day handler below already documents the same N+1 concern.
+ *
+ * Note what is NOT set here: rawCheckOut. It records a *genuine* employee
+ * clock-out, so the job must leave it null — that null is exactly what tells a
+ * late approval tomorrow that these hours are planned rather than clocked.
+ */
+async function autoCheckOut(date, dayType) {
   const open = await AttendanceModel.find({
     date,
     checkIn: { $ne: null },
     checkOut: null,
     status: { $in: ["present", "late"] },
   });
+  if (!open.length) return 0;
+
+  const approved = await OvertimeRequestModel.find({
+    date,
+    status: "approved",
+    employee: { $in: open.map((r) => r.employee) },
+  });
+  const otByEmployee = new Map(approved.map((r) => [String(r.employee), r]));
 
   let closed = 0;
   for (const record of open) {
-    let hours = 0;
+    const request = otByEmployee.get(String(record.employee)) ?? null;
+    const closeAt = request ? request.plannedEnd : WORKDAY_END;
     try {
-      hours = hoursBetween(record.checkIn, WORKDAY_END);
-    } catch {
-      hours = 0;
+      record.checkOut = closeAt;
+      // hoursBetweenEnd, not hoursBetween: on a rest day an approved
+      // plannedEnd can legitimately be "24:00", which parseHHMM rejects.
+      record.hours = hoursBetweenEnd(record.checkIn, closeAt);
+      applyOvertimeToRecord(record, request, { dayType });
+      await record.save();
+      closed += 1;
+    } catch (err) {
+      // One malformed record must not abort the nightly close for everyone
+      // else. Logged loudly rather than swallowed, so it can be fixed.
+      console.error(
+        `[closeAttendanceDay] could not auto-close attendance ${record._id} ` +
+          `(employee ${record.employee}): ${err.message}`,
+      );
     }
-    record.checkOut = WORKDAY_END;
-    record.hours = hours;
-    await record.save();
-    closed += 1;
   }
   return closed;
 }
@@ -246,9 +297,12 @@ async function flagRepeatedNoShows(employeeIds) {
 
 export async function closeAttendanceDay({ dateKey } = {}) {
   const date = utcMidnight(dateKey);
-  const reason = await resolveSkipReason(dateKey, date);
+  const { skipReason: reason, dayType } = await resolveDayContext(dateKey, date);
 
-  const autoCheckedOut = await autoCheckOut(date);
+  // Deliberately outside the skip guard below: a rest day or holiday has no
+  // late/no-show marking to do, but it is exactly when rest-day overtime needs
+  // closing.
+  const autoCheckedOut = await autoCheckOut(date, dayType);
 
   let markedLate = 0;
   let markedLateUnpaid = 0;

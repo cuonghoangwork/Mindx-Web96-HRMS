@@ -246,6 +246,7 @@
    "OT_INVALID_DATE": "Overtime date must be a valid date.",
    "OT_ON_LEAVE_DAY": "This employee is on approved leave for that date.",
    "OT_REQUEST_NOT_FOUND": "Overtime request not found.",
+   "OT_STARTS_BEFORE_WINDOW": "Overtime on a working day cannot start before {{start}}.",
    "OT_UNKNOWN_DAY_TYPE": "Unknown overtime day type.",
    "PAID_PERIOD_LOCKED": "A paid period is closed and cannot change status.",
    "PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
@@ -522,7 +523,8 @@
   },
   "tabs": {
    "roster": "Roster",
-   "noShowQueue": "No-show queue"
+   "noShowQueue": "No-show queue",
+    "overtime": "Overtime"
   },
   "scope": {
    "team_one": "Showing your team{{deptSuffix}} — {{count}} employee",
@@ -2281,5 +2283,87 @@
  "layout": {
   "closeMenuAriaLabel": "Close menu",
   "loadError": "Couldn't load data: {{error}}"
+ },
+ "overtime": {
+  "modal": {
+   "title": "Apply for overtime",
+   "date": "Overtime date",
+   "start": "Start time",
+   "end": "End time",
+   "endOfDay": "Until end of day (24:00)",
+   "reason": "Reason",
+   "reasonPlaceholder": "e.g. release deploy, migration window",
+   "submit": "Submit request",
+   "submitting": "Submitting…",
+   "errors": {
+    "invalidSpan": "The end time must be later than the start time, and the span cannot cross midnight.",
+    "submitFailed": "Could not submit the overtime request."
+   }
+  },
+  "meter": {
+   "title": "Your overtime allowance",
+   "month": "This month",
+   "year": "This year",
+   "usedOfCap": "{{used}}h of {{cap}}h",
+   "remaining": "{{hours}}h remaining",
+   "loading": "Loading your allowance…",
+   "thisRequest": "This request adds {{hours}}h — {{projected}}h for the month.",
+   "wouldExceed": "This request adds {{hours}}h, which would exceed the {{cap}}h monthly cap."
+  },
+  "mine": {
+   "title": "My overtime",
+   "description": "Apply to work overtime. Requests close at 13:00 on the overtime date.",
+   "apply": "+ Apply for overtime",
+   "empty": "You have no overtime requests.",
+   "noProfile": "No employee profile is linked to your account. Ask HR to link one.",
+   "cancel": "Withdraw",
+   "cancelled": "Overtime request withdrawn.",
+   "submitted": "Overtime request submitted."
+  },
+  "table": {
+   "date": "Date",
+   "span": "Hours",
+   "hours": "Total",
+   "hoursValue": "{{hours}}h",
+   "dayType": "Day type",
+   "status": "Status"
+  },
+  "dayType": {
+   "normal": "Working day",
+   "restDay": "Rest day",
+   "holiday": "Public holiday"
+  },
+  "status": {
+   "pending": "Pending",
+   "approved": "Approved",
+   "rejected": "Rejected"
+  },
+  "evidence": {
+   "clocked": "Clocked",
+   "clockedTitle": "Backed by a real clock-out.",
+   "planned": "Planned",
+   "plannedTitle": "No clock-out on record — these hours rest on the approved plan.",
+   "manual": "Manual",
+   "manualTitle": "The attendance record was edited by hand."
+  },
+  "queue": {
+   "title": "Overtime approval queue",
+   "description": "Approve or reject overtime requests. Each row shows the employee's running totals against the statutory caps.",
+   "count": "{{count}} request(s)",
+   "loading": "Loading requests…",
+   "empty": "No overtime requests to review.",
+   "rowLine": "{{date}} · {{span}} · {{hours}}h · {{dayType}}",
+   "totals": "Month {{monthUsed}}/{{monthCap}}h · Year {{yearUsed}}/{{yearCap}}h",
+   "assigned": "Assigned",
+   "reasonLabel": "Reason",
+   "notePlaceholder": "Optional note for the employee…",
+   "approve": "Approve",
+   "reject": "Reject",
+   "approved": "Overtime approved.",
+   "rejected": "Overtime rejected."
+  },
+  "errors": {
+   "loadFailed": "Could not load overtime requests."
+  }
  }
 }

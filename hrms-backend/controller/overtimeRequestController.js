@@ -17,6 +17,8 @@
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
 import EmployeeModel from "../model/Employee.js";
+import AttendanceModel from "../model/Attendance.js";
+import { recomputeRecordOvertime } from "../utils/overtimeRecompute.js";
 import {
   createReviewRequestController,
   resolveRequestingEmployee,
@@ -25,15 +27,20 @@ import {
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { notifyHR } from "./notificationController.js";
 import { AppError } from "../utils/appError.js";
-import { dateKeyInTz, utcMidnight } from "../utils/workday.js";
+import { dateKeyInTz, parseHHMM, utcMidnight } from "../utils/workday.js";
 import { serverNow } from "../utils/appNow.js";
 import { isPastCutoff, OT_TIMEZONE } from "../utils/overtimeCutoff.js";
 import { isHolidayOn } from "../utils/holidayLookup.js";
 import { resolveDayType, splitDayNight } from "../utils/overtimeRate.js";
-import { dailyCapHoursFor, OT_MONTHLY_CAP_HOURS, OT_ANNUAL_CAP_HOURS } from "../utils/overtime.js";
+import {
+  dailyCapHoursFor,
+  minutesToHours,
+  OT_MONTHLY_CAP_HOURS,
+  OT_ANNUAL_CAP_HOURS,
+  OT_WORKDAY_START,
+} from "../utils/overtime.js";
 import {
   getOvertimeBalance,
-  minutesToHours,
   monthBoundsUtc,
   usedMinutesInWindow,
   yearBoundsUtc,
@@ -156,6 +163,21 @@ async function buildRequestPayload({
   const { dayMinutes, nightMinutes } = splitDayNight(plannedStart, plannedEnd);
   const plannedMinutes = dayMinutes + nightMinutes;
 
+  // 7b. On a working day, overtime cannot start before the normal shift ends.
+  //     Without this a request for 17:00-20:00 is accepted as 3h (it clears the
+  //     4h cap) but only ever pays 2h, because utils/overtimeRecompute.js
+  //     correctly clamps the credited span to the 18:00 boundary. The clamp is
+  //     right; accepting a request it will silently shorten is not. Rest days
+  //     and holidays have no normal shift, so the rule does not apply to them.
+  if (dayType === "normal" && parseHHMM(plannedStart) < parseHHMM(OT_WORKDAY_START)) {
+    throw new AppError(
+      `Overtime on a working day cannot start before ${OT_WORKDAY_START}.`,
+      "OT_STARTS_BEFORE_WINDOW",
+      { start: OT_WORKDAY_START },
+      400,
+    );
+  }
+
   // 8. Daily cap — 4h of overtime on a working day, 12h of total work on a
   //    rest day or public holiday (where the whole span is overtime).
   const dailyCapHours = dailyCapHoursFor(dayType);
@@ -267,16 +289,38 @@ function asDuplicateError(err, dateKey) {
 }
 
 /**
- * list/review from the shared pattern. onApprove is deliberately absent in
- * M2: approval currently only flips the status. Milestone M3 adds the
- * attendance side effect here (the single idempotent applyOvertimeToRecord),
- * which is what makes a late approval recoverable.
+ * list/review from the shared pattern; onApprove is the overtime-specific side
+ * effect (M3).
+ *
+ * Approval writes the derived hours onto that day's attendance record. It is
+ * safe to run late — the day after the close job already wrote the record — and
+ * safe to run twice, because applyOvertimeToRecord derives every field from
+ * scratch rather than incrementing.
+ *
+ * The late case is the one that matters: with nothing approved at close time
+ * the record was shut at 18:00 and `checkOut` no longer shows when the
+ * employee left. `rawCheckOut` does, so an approval tomorrow still credits
+ * the hours actually clocked and marks them `otEvidence: "clocked"`. When
+ * there is no clock evidence it falls back to the planned span and marks it
+ * `"planned"`, which is what the queue shows a warning against.
  */
 const { list, review } = createReviewRequestController({
   Model: OvertimeRequestModel,
   resourceLabel: "overtime request",
   capability: "approveOvertimeRequests",
   toClient: toClientRequest,
+  onApprove: async (request) => {
+    const employeeId = request.employee?._id ?? request.employee;
+    const record = await AttendanceModel.findOne({ employee: employeeId, date: request.date });
+    // No attendance row yet — approved ahead of the day, or the employee never
+    // clocked in. Nothing to derive; the close job applies it at day's end.
+    if (!record) return;
+
+    // Pass the request explicitly: reviewQueue sets status = "approved" on this
+    // in-memory document before calling us, and it has not been saved yet.
+    await recomputeRecordOvertime(record, { request });
+    await record.save();
+  },
   notifyEmployee: (decision, request) => ({
     title: decision === "approved" ? "Overtime approved" : "Overtime rejected",
     message:
