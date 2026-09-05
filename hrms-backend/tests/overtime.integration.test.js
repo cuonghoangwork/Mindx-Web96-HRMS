@@ -470,6 +470,48 @@ describe("POST /overtime-requests/assign", () => {
     expect(res.body.skipped[0].code).toBe("OT_DUPLICATE_FOR_DATE");
   });
 
+  it("carries error params on a skipped entry so the client can interpolate", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Push dev over the monthly cap first, so the skip reason is a code whose
+    // message interpolates {{cap}} rather than a bare sentence.
+    for (const date of SATURDAYS.slice(0, 3)) {
+      expect((await apply(org.tokens.dev, fullSaturday(date))).status).toBe(201);
+    }
+
+    const res = await assign(org.tokens.hr, {
+      ...fullSaturday(SATURDAYS[3]),
+      employeeIds: [String(org.employees.dev._id), String(org.employees.designer._id)],
+    });
+
+    expect(res.body.created).toHaveLength(1);
+    const skipped = res.body.skipped[0];
+    expect(skipped.code).toBe("OT_EXCEEDS_MONTHLY_CAP");
+    // Without params the assign panel renders the literal "{{cap}}".
+    expect(skipped.params).toBeDefined();
+    expect(skipped.params.cap).toBe(40);
+  });
+
+  it("still reports reasons when every employee is skipped", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Both already have a live request for that date.
+    await apply(org.tokens.dev, weekdayEvening());
+    await apply(org.tokens.designer, weekdayEvening());
+
+    const res = await assign(org.tokens.hr, {
+      ...weekdayEvening(),
+      employeeIds: [String(org.employees.dev._id), String(org.employees.designer._id)],
+    });
+
+    // 200, not 4xx: the request was well-formed and produced a full answer.
+    // Returning success:false here would make the client throw and discard
+    // `skipped`, losing the only explanation of what happened.
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.created).toHaveLength(0);
+    expect(res.body.skipped).toHaveLength(2);
+    expect(res.body.skipped.every((s) => s.code === "OT_DUPLICATE_FOR_DATE")).toBe(true);
+  });
+
   it("scopes a manager to their own department", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const res = await assign(org.tokens.manager, {

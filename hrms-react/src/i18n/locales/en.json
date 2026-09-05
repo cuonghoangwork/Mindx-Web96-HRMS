@@ -2362,6 +2362,23 @@
    "approved": "Overtime approved.",
    "rejected": "Overtime rejected."
   },
+  "assign": {
+   "title": "Assign overtime",
+   "description": "Schedule overtime for several people at once. Assignments skip the 13:00 cutoff and still go to the approval queue.",
+   "open": "Assign overtime",
+   "employees": "Employees",
+   "searchPlaceholder": "Search name, ID or department…",
+   "selectAll": "Select all shown",
+   "selectedCount": "{{count}} selected",
+   "noEmployees": "No employees available to assign.",
+   "noneSelected": "Select at least one employee.",
+   "submit": "Assign to {{count}} employee(s)",
+   "submitting": "Assigning…",
+   "failed": "Could not assign overtime.",
+   "resultCreated": "Overtime assigned to {{count}} employee(s).",
+   "resultSkipped": "{{count}} employee(s) were skipped:",
+   "toast": "Assigned to {{created}} employee(s), {{skipped}} skipped."
+  },
   "errors": {
    "loadFailed": "Could not load overtime requests."
   }

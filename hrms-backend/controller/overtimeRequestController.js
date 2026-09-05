@@ -480,6 +480,10 @@ const overtimeRequestController = {
           skipped.push({
             employeeId: String(employeeId),
             code: err.code ?? "OT_ASSIGN_FAILED",
+            // params travels with the code so the client can interpolate the
+            // translated message ("...the {{cap}}-hour monthly cap") rather
+            // than rendering the placeholder.
+            params: err.params,
             message: err.message,
           });
         }
@@ -498,7 +502,14 @@ const overtimeRequestController = {
         });
       }
 
-      res.status(created.length ? 201 : 400).json({ success: Boolean(created.length), created, skipped });
+      // Always a success when the batch itself was well-formed, even if every
+      // employee was skipped. The per-employee outcomes are DATA, not errors:
+      // success:false makes apiFetch throw, and the client then discards
+      // `skipped` — the only place the reasons live, and the whole point of
+      // the partial-success contract. A genuinely bad request (nothing
+      // selected, bad span, wrong role) still throws above and returns 4xx.
+      // 201 when something was created, 200 when the answer is just a report.
+      res.status(created.length ? 201 : 200).json({ success: true, created, skipped });
     } catch (error) {
       res.status(error.status || 400).json({
         success: false, message: error.message, code: error.code, params: error.params,

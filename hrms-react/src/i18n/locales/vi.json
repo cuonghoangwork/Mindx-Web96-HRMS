@@ -2354,6 +2354,23 @@
    "approved": "Đã duyệt làm thêm giờ.",
    "rejected": "Đã từ chối làm thêm giờ."
   },
+  "assign": {
+   "title": "Phân công làm thêm giờ",
+   "description": "Xếp lịch làm thêm giờ cho nhiều người cùng lúc. Phân công bỏ qua hạn 13:00 nhưng vẫn cần được duyệt.",
+   "open": "Phân công làm thêm giờ",
+   "employees": "Nhân viên",
+   "searchPlaceholder": "Tìm theo tên, mã hoặc phòng ban…",
+   "selectAll": "Chọn tất cả đang hiển thị",
+   "selectedCount": "Đã chọn {{count}}",
+   "noEmployees": "Không có nhân viên nào để phân công.",
+   "noneSelected": "Vui lòng chọn ít nhất một nhân viên.",
+   "submit": "Phân công cho {{count}} nhân viên",
+   "submitting": "Đang phân công…",
+   "failed": "Không thể phân công làm thêm giờ.",
+   "resultCreated": "Đã phân công làm thêm giờ cho {{count}} nhân viên.",
+   "resultSkipped": "{{count}} nhân viên bị bỏ qua:",
+   "toast": "Đã phân công cho {{created}} nhân viên, bỏ qua {{skipped}}."
+  },
   "errors": {
    "loadFailed": "Không thể tải danh sách yêu cầu làm thêm giờ."
   }

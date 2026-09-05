@@ -10,6 +10,7 @@ import Avatar from "./Avatar";
 import Badge from "./Badge";
 import Button from "./Button";
 import OvertimeRequestModal from "./OvertimeRequestModal";
+import AssignOvertimePanel from "./AssignOvertimePanel";
 
 /**
  * OvertimeTab — the Attendance page's third tab.
@@ -54,7 +55,7 @@ function EvidenceFlag({ evidence, t }) {
 function OvertimeTab() {
   const { t } = useTranslation();
   const { language } = useLanguage();
-  const { isManagerTier } = useAuth();
+  const { isManagerTier, isHRTier, isManager } = useAuth();
   const {
     overtimeRequests,
     refreshOvertimeRequests,
@@ -165,6 +166,17 @@ function OvertimeTab() {
     [overtimeRequests, myEmployee],
   );
 
+  // Who this user may assign overtime to. The server enforces the same rule
+  // and reports an out-of-department pick in `skipped`, so this is about not
+  // offering a choice that would only be refused — same scoping as the roster.
+  const assignableEmployees = useMemo(() => {
+    if (isHRTier) return employees;
+    if (isManager && myEmployee?.department) {
+      return employees.filter((e) => e.department === myEmployee.department);
+    }
+    return [];
+  }, [employees, isHRTier, isManager, myEmployee]);
+
   const spanOf = (r) => `${r.plannedStart}–${r.plannedEnd}`;
 
   return (
@@ -254,6 +266,19 @@ function OvertimeTab() {
           </div>
         )}
       </div>
+
+      {/* ── Assign overtime (HR / Admin / Manager) ── */}
+      {isManagerTier && (
+        <AssignOvertimePanel
+          employees={assignableEmployees}
+          onAssigned={({ created, skipped }) => {
+            if (created.length) {
+              setToast(t("overtime.assign.toast", { created: created.length, skipped: skipped.length }));
+            }
+            load();
+          }}
+        />
+      )}
 
       {/* ── Approval queue (HR / Admin / Manager) ── */}
       {isManagerTier && (
