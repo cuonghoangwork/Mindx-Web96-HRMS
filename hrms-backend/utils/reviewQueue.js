@@ -90,9 +90,23 @@ export async function resolveRequestingEmployee(req) {
  * Rejects with a 409 if the employee already has a pending request in
  * `Model` — the shared "block a second submission until the first is
  * reviewed" rule every request-type's create() enforces.
+ *
+ * `scope` is an optional extra filter merged over the base query, for
+ * request types whose "already has one" rule is narrower or wider than
+ * "one pending per employee". Overtime is the first: its rule is one *live*
+ * (pending or approved) request per employee per **date**, so it passes
+ * `{ date, status: { $in: ["pending", "approved"] } }` — the date narrows the
+ * scope, and the status key overrides the default. Extended rather than
+ * forked because leave will eventually want the same per-range treatment.
+ *
+ * Note for callers with a uniqueness constraint that must hold under
+ * concurrency: this is a pre-check for a clean error message, not a
+ * guarantee. Two concurrent submissions can both pass it before either
+ * commits. Overtime backs it with a partial unique index (see
+ * model/OvertimeRequest.js); leave re-checks after committing.
  */
-export async function assertNoPendingRequest(Model, employeeId, message, code, params) {
-  const existing = await Model.findOne({ employee: employeeId, status: "pending" });
+export async function assertNoPendingRequest(Model, employeeId, message, code, params, scope = {}) {
+  const existing = await Model.findOne({ employee: employeeId, status: "pending", ...scope });
   if (existing) {
     const err = new AppError(message, code, params);
     err.status = 409;

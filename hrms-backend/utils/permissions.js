@@ -20,6 +20,7 @@ export const MANAGER_CAPABILITIES = [
   "reviewProfileEdits",
   "manageAttendanceRecords",
   "proposePromotions",
+  "approveOvertimeRequests",
 ];
 
 export const CAPABILITY_DISABLED_MESSAGE =

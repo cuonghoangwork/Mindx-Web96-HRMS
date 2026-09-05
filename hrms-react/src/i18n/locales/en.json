@@ -228,6 +228,25 @@
    "ONLY_DRAFT_PERIOD_DELETABLE": "Only a draft period can be deleted.",
    "ONLY_DRAFT_PERIOD_REGENERATABLE": "Only a draft period can be regenerated.",
    "ONLY_MANAGER_CAPABILITIES_TOGGLEABLE": "Only MANAGER capabilities can be toggled.",
+   "OT_APPLICATION_PAST_CUTOFF": "Overtime applications close at 13:00 on the overtime date.",
+   "OT_ASSIGN_EMPLOYEE_NOT_FOUND": "Employee not found.",
+   "OT_ASSIGN_FAILED": "Overtime could not be assigned to this employee.",
+   "OT_ASSIGN_NO_EMPLOYEES": "Select at least one employee.",
+   "OT_ASSIGN_OUT_OF_DEPARTMENT": "You can only assign overtime to employees in your own department.",
+   "OT_BALANCE_ACCESS_DENIED": "You can only view overtime balances for your own department.",
+   "OT_CANCEL_NOT_OWNER": "You can only cancel your own overtime requests.",
+   "OT_CANCEL_NOT_PENDING": "Only a pending overtime request can be cancelled.",
+   "OT_CANCEL_PAST_CUTOFF": "Overtime requests can no longer be cancelled after the 13:00 cutoff.",
+   "OT_CROSSES_MIDNIGHT": "Overtime cannot cross midnight.",
+   "OT_DATE_IN_PAST": "Overtime cannot be applied for a date in the past.",
+   "OT_DUPLICATE_FOR_DATE": "There is already an overtime request for this date.",
+   "OT_EXCEEDS_ANNUAL_CAP": "This would exceed the {{cap}}-hour annual overtime cap.",
+   "OT_EXCEEDS_DAILY_CAP": "Overtime on this day is capped at {{cap}} hours.",
+   "OT_EXCEEDS_MONTHLY_CAP": "This would exceed the {{cap}}-hour monthly overtime cap.",
+   "OT_INVALID_DATE": "Overtime date must be a valid date.",
+   "OT_ON_LEAVE_DAY": "This employee is on approved leave for that date.",
+   "OT_REQUEST_NOT_FOUND": "Overtime request not found.",
+   "OT_UNKNOWN_DAY_TYPE": "Unknown overtime day type.",
    "PAID_PERIOD_LOCKED": "A paid period is closed and cannot change status.",
    "PASSWORD_CHANGE_REQUIRED": "You must change your password before continuing.",
    "PASSWORD_REQUIRED": "password is required!",
@@ -677,6 +696,25 @@
    "leaveRequestSubmitted": {
     "title": "New leave request",
     "message": "{{employeeName}} requested {{days}} {{leaveType}} leave day(s) ({{startDate}} → {{endDate}})."
+   },
+   "overtimeApproved": {
+    "title": "Overtime approved",
+    "message": "Your overtime on {{date}} ({{start}}–{{end}}) has been approved."
+   },
+   "overtimeAssigned": {
+    "title": "Overtime assigned",
+    "message": "{{count}} employee(s) were assigned overtime on {{date}} ({{start}}–{{end}})."
+   },
+   "overtimeRejected": {
+    "title": "Overtime rejected",
+    "message": "Your overtime request for {{date}} was rejected."
+   },
+   "overtimeRejectedWithNote": {
+    "message": "Your overtime request for {{date}} was rejected. Note: {{note}}"
+   },
+   "overtimeRequestSubmitted": {
+    "title": "New overtime request",
+    "message": "{{employeeName}} requested overtime on {{date}} ({{start}}–{{end}})."
    },
    "payrollDraftsGenerated": {
     "title": "Payroll drafts generated",

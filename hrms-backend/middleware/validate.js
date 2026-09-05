@@ -501,6 +501,46 @@ const performanceAppealResolve = makeValidator([
   isRequiredText("resolverNote", "Resolver note", 1000),
 ]);
 
+/* ══════════════════════════════════════════════════
+   OVERTIME REQUEST (Attendance Overtime, M2)
+══════════════════════════════════════════════════ */
+// Shape checks only — the authoritative parsing lives in utils/workday.js's
+// parseHHMM and utils/overtimeRate.js's parseHHMMEnd, which the controller
+// calls. These exist so an obviously malformed body gets a field-named 400
+// before any database work happens.
+//
+// The end time additionally accepts "24:00" (END_OF_DAY): overtime spans may
+// not cross midnight, so a rest-day shift running to the end of the day needs
+// a representable end value. A *start* of "24:00" stays invalid.
+const OT_START_TIME_RE = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+const OT_END_TIME_RE = /^(([01]?[0-9]|2[0-3]):[0-5][0-9]|24:00)$/;
+
+const otSpanChecks = [
+  required("date", "Overtime date"),
+  isDateString("date", "Overtime date"),
+  required("plannedStart", "Start time"),
+  (body) =>
+    body.plannedStart && !OT_START_TIME_RE.test(body.plannedStart)
+      ? "Start time must be in HH:MM format."
+      : null,
+  required("plannedEnd", "End time"),
+  (body) =>
+    body.plannedEnd && !OT_END_TIME_RE.test(body.plannedEnd)
+      ? 'End time must be in HH:MM format (or "24:00" for the end of the day).'
+      : null,
+  maxLength("reason", "Reason", 500),
+];
+
+const overtimeRequestCreate = makeValidator(otSpanChecks);
+
+const overtimeRequestAssign = makeValidator([
+  ...otSpanChecks,
+  (body) =>
+    Array.isArray(body.employeeIds) && body.employeeIds.length
+      ? null
+      : "Select at least one employee.",
+]);
+
 // Solo Gaps Milestone 2 — AI chat widget.
 const aiChat = makeValidator([isRequiredText("message", "Message", 2000)]);
 
@@ -514,6 +554,7 @@ export const validate = {
   auth:       { register: authRegister, login: authLogin },
   attendance: { checkIn: attendanceCheckIn, checkOut: attendanceCheckOut },
   leaveRequest: { create: leaveRequestCreate },
+  overtimeRequest: { create: overtimeRequestCreate, assign: overtimeRequestAssign },
   promotionRequest: { create: promotionRequestCreate },
   payroll: { createPeriod: payrollCreatePeriod, updatePayslip: payrollUpdatePayslip },
   performance: {

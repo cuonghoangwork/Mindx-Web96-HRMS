@@ -226,6 +226,25 @@
    "ONLY_DRAFT_PERIOD_DELETABLE": "Chỉ có thể xóa kỳ lương ở trạng thái nháp.",
    "ONLY_DRAFT_PERIOD_REGENERATABLE": "Chỉ có thể tạo lại kỳ lương ở trạng thái nháp.",
    "ONLY_MANAGER_CAPABILITIES_TOGGLEABLE": "Chỉ có thể bật/tắt quyền hạn của vai trò MANAGER.",
+   "OT_APPLICATION_PAST_CUTOFF": "Đơn đăng ký làm thêm giờ đóng lúc 13:00 của ngày làm thêm.",
+   "OT_ASSIGN_EMPLOYEE_NOT_FOUND": "Không tìm thấy nhân viên.",
+   "OT_ASSIGN_FAILED": "Không thể phân công làm thêm giờ cho nhân viên này.",
+   "OT_ASSIGN_NO_EMPLOYEES": "Vui lòng chọn ít nhất một nhân viên.",
+   "OT_ASSIGN_OUT_OF_DEPARTMENT": "Bạn chỉ có thể phân công làm thêm giờ cho nhân viên trong phòng ban của mình.",
+   "OT_BALANCE_ACCESS_DENIED": "Bạn chỉ có thể xem hạn mức làm thêm giờ của phòng ban mình.",
+   "OT_CANCEL_NOT_OWNER": "Bạn chỉ có thể hủy yêu cầu làm thêm giờ của chính mình.",
+   "OT_CANCEL_NOT_PENDING": "Chỉ có thể hủy yêu cầu làm thêm giờ đang chờ duyệt.",
+   "OT_CANCEL_PAST_CUTOFF": "Không thể hủy yêu cầu làm thêm giờ sau 13:00 của ngày làm thêm.",
+   "OT_CROSSES_MIDNIGHT": "Ca làm thêm giờ không được kéo dài qua nửa đêm.",
+   "OT_DATE_IN_PAST": "Không thể đăng ký làm thêm giờ cho ngày trong quá khứ.",
+   "OT_DUPLICATE_FOR_DATE": "Đã có yêu cầu làm thêm giờ cho ngày này.",
+   "OT_EXCEEDS_ANNUAL_CAP": "Vượt quá giới hạn {{cap}} giờ làm thêm mỗi năm.",
+   "OT_EXCEEDS_DAILY_CAP": "Số giờ làm thêm trong ngày này tối đa là {{cap}} giờ.",
+   "OT_EXCEEDS_MONTHLY_CAP": "Vượt quá giới hạn {{cap}} giờ làm thêm mỗi tháng.",
+   "OT_INVALID_DATE": "Ngày làm thêm giờ không hợp lệ.",
+   "OT_ON_LEAVE_DAY": "Nhân viên đã có đơn nghỉ phép được duyệt cho ngày này.",
+   "OT_REQUEST_NOT_FOUND": "Không tìm thấy yêu cầu làm thêm giờ.",
+   "OT_UNKNOWN_DAY_TYPE": "Loại ngày làm thêm giờ không hợp lệ.",
    "PAID_PERIOD_LOCKED": "Kỳ lương đã thanh toán đã đóng và không thể thay đổi trạng thái.",
    "PASSWORD_CHANGE_REQUIRED": "Bạn phải đổi mật khẩu trước khi tiếp tục.",
    "PASSWORD_REQUIRED": "Vui lòng nhập mật khẩu!",
@@ -675,6 +694,25 @@
    "leaveRequestSubmitted": {
     "title": "Yêu cầu nghỉ phép mới",
     "message": "{{employeeName}} đã yêu cầu {{days}} ngày nghỉ phép {{leaveType}} ({{startDate}} → {{endDate}})."
+   },
+   "overtimeApproved": {
+    "title": "Đã duyệt làm thêm giờ",
+    "message": "Ca làm thêm ngày {{date}} ({{start}}–{{end}}) của bạn đã được duyệt."
+   },
+   "overtimeAssigned": {
+    "title": "Đã phân công làm thêm giờ",
+    "message": "{{count}} nhân viên được phân công làm thêm giờ ngày {{date}} ({{start}}–{{end}})."
+   },
+   "overtimeRejected": {
+    "title": "Từ chối làm thêm giờ",
+    "message": "Yêu cầu làm thêm giờ ngày {{date}} của bạn đã bị từ chối."
+   },
+   "overtimeRejectedWithNote": {
+    "message": "Yêu cầu làm thêm giờ ngày {{date}} của bạn đã bị từ chối. Ghi chú: {{note}}"
+   },
+   "overtimeRequestSubmitted": {
+    "title": "Yêu cầu làm thêm giờ mới",
+    "message": "{{employeeName}} đã yêu cầu làm thêm giờ ngày {{date}} ({{start}}–{{end}})."
    },
    "payrollDraftsGenerated": {
     "title": "Đã tạo bản nháp bảng lương",
