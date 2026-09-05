@@ -11,6 +11,13 @@ import rootRouter from "./router/index.js";
 import { startScheduler } from "./jobs/index.js";
 import { runStartupMigrations } from "./utils/startupMigrations.js";
 import { seedRolePermissions } from "./utils/permissions.js";
+import { warnIfDemoMode } from "./utils/appNow.js";
+
+// Attendance Overtime: DEMO_MODE lets an X-App-Now header override server
+// time, which is a bypass for every date rule in the system — not just the
+// overtime cutoff it was added for. Warn before anything else so a
+// production deploy that left it on is impossible to miss in the boot log.
+warnIfDemoMode();
 
 const app = express();
 

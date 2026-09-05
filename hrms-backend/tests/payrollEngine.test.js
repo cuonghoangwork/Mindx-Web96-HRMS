@@ -211,6 +211,126 @@ describe("computePayslip insurance exemption for 14+ unpaid days", () => {
   });
 });
 
+/**
+ * Attendance Overtime, milestone M1. Overtime is added to computePayslip
+ * ahead of the rest of the feature, while the term is still always 0 in
+ * production — that is the cheapest possible moment to prove the change is
+ * inert, because every test above must pass unchanged.
+ *
+ * The load-bearing case is "the insurance base does not move". Overtime is
+ * excluded from the BHXH/BHYT/BHTN base by law, and the natural way to write
+ * this — just add overtimePay to grossPay — breaks that silently, because
+ * grossPay is the *clamp ceiling* for the base:
+ *
+ *   insuranceBase = min(base + allowance, grossPay)
+ *
+ * When a deduction pushes gross below base + allowance the clamp binds, and
+ * raising gross with overtime raises the base with it. The employee then pays
+ * more insurance *because they worked overtime*. Nothing errors; the number
+ * is just wrong.
+ */
+describe("computePayslip with overtime", () => {
+  // Deduction exceeds bonus, so grossExOt (3,000,000) sits below
+  // base + allowance (15,000,000) and the clamp is the binding constraint.
+  const CLAMPED = { baseSalary: 10_000_000, allowance: 5_000_000, deduction: 12_000_000 };
+
+  it("leaves the insurance base untouched when the clamp binds", () => {
+    const without = computePayslip(CLAMPED);
+    const with_ = computePayslip({ ...CLAMPED, overtimePay: 2_000_000 });
+
+    expect(without.insuranceBase).toBe(3_000_000);
+    expect(with_.insuranceBase).toBe(without.insuranceBase);
+    expect(with_.bhxh).toBe(without.bhxh);
+    expect(with_.bhyt).toBe(without.bhyt);
+    expect(with_.bhtn).toBe(without.bhtn);
+    expect(with_.insuranceTotal).toBe(without.insuranceTotal);
+  });
+
+  it("leaves the insurance base untouched when the clamp does not bind either", () => {
+    const base = { baseSalary: 30_000_000, allowance: 2_000_000 };
+    const without = computePayslip(base);
+    const with_ = computePayslip({ ...base, overtimePay: 8_000_000 });
+    expect(with_.insuranceBase).toBe(without.insuranceBase);
+    expect(with_.insuranceTotal).toBe(without.insuranceTotal);
+  });
+
+  it("still raises gross and net pay", () => {
+    const without = computePayslip(CLAMPED);
+    const with_ = computePayslip({ ...CLAMPED, overtimePay: 2_000_000 });
+    expect(with_.grossPay).toBe(without.grossPay + 2_000_000);
+    expect(with_.netPay).toBeGreaterThan(without.netPay);
+  });
+
+  it("is exempt from personal income tax by default (Law 109/2025/QH15)", () => {
+    const PAY = { baseSalary: 40_000_000 };
+    const without = computePayslip(PAY);
+    const with_ = computePayslip({ ...PAY, overtimePay: 10_000_000 });
+    expect(with_.overtimeTaxExempt).toBe(true);
+    expect(with_.taxableIncome).toBe(without.taxableIncome);
+    expect(with_.pit).toBe(without.pit);
+  });
+
+  it("is taxed like any other income once the exemption is switched off", () => {
+    const PAY = { baseSalary: 40_000_000 };
+    const without = computePayslip(PAY);
+    const with_ = computePayslip({ ...PAY, overtimePay: 10_000_000, overtimeTaxExempt: false });
+    expect(with_.overtimeTaxExempt).toBe(false);
+    expect(with_.taxableIncome).toBe(without.taxableIncome + 10_000_000);
+    expect(with_.pit).toBeGreaterThan(without.pit);
+  });
+
+  it("never lets the exemption drive taxable income negative", () => {
+    // Overtime larger than the whole rest of the payslip.
+    const r = computePayslip({ baseSalary: 5_000_000, overtimePay: 80_000_000 });
+    expect(r.taxableIncome).toBeGreaterThanOrEqual(0);
+    expect(r.pit).toBeGreaterThanOrEqual(0);
+  });
+
+  it("reports the overtime it was given", () => {
+    const r = computePayslip({ baseSalary: 20_000_000, overtimePay: 1_234_567 });
+    expect(r.overtimePay).toBe(1_234_567);
+  });
+
+  it("treats missing, negative and non-numeric overtime as zero", () => {
+    const PAY = { baseSalary: 20_000_000 };
+    const expected = computePayslip(PAY);
+    for (const overtimePay of [undefined, 0, -5_000_000, null, "lots"]) {
+      const r = computePayslip({ ...PAY, overtimePay });
+      expect(r.overtimePay, String(overtimePay)).toBe(0);
+      expect(r.grossPay).toBe(expected.grossPay);
+      expect(r.insuranceBase).toBe(expected.insuranceBase);
+    }
+  });
+
+  it("holds every invariant across a deterministic fuzz sweep with overtime", () => {
+    let seed = 987654321;
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < 20_000; i += 1) {
+      const baseSalary = Math.floor(rnd() * 300_000_000);
+      const bonus = Math.floor(rnd() * 100_000_000);
+      const allowance = Math.floor(rnd() * 50_000_000);
+      const deduction = Math.floor(rnd() * (baseSalary + bonus + allowance + 1));
+      const overtimePay = Math.floor(rnd() * 40_000_000);
+      const unpaidDays = Math.floor(rnd() * 25);
+      const input = { baseSalary, bonus, allowance, deduction, unpaidDays };
+
+      const r = computePayslip({ ...input, overtimePay });
+      const withoutOt = computePayslip(input);
+
+      expect(r.grossPay).toBe(r.netPay + r.insuranceTotal + r.pit);
+      expect(r.netPay).toBeGreaterThanOrEqual(0);
+      expect(r.taxableIncome).toBeGreaterThanOrEqual(0);
+      expect(r.insuranceTotal).toBe(r.bhxh + r.bhyt + r.bhtn);
+      // The whole point: overtime moves gross, never the insurance base.
+      expect(r.insuranceBase).toBe(withoutOt.insuranceBase);
+      expect(r.grossPay).toBe(withoutOt.grossPay + overtimePay);
+    }
+  });
+});
+
 describe("seedBaseSalaryVnd", () => {
   it("converts an annual USD salary to a monthly VND figure", () => {
     expect(seedBaseSalaryVnd(60_000, 25_000)).toBe(125_000_000);

@@ -1,3 +1,5 @@
+import { OT_PIT_EXEMPT } from "./overtime.js";
+
 export const BASE_SALARY_VND = 2_340_000;
 export const BHXH_BHYT_CAP_VND = BASE_SALARY_VND * 20;
 
@@ -49,15 +51,28 @@ export function computePayslip({
   allowance = 0,
   deduction = 0,
   unpaidDays = 0,
+  overtimePay = 0,
+  overtimeTaxExempt = OT_PIT_EXEMPT,
 } = {}) {
   const base = toVnd(baseSalary);
   const bon = toVnd(bonus);
   const allo = toVnd(allowance);
   const ded = toVnd(deduction);
+  const ot = toVnd(overtimePay);
 
-  const grossPay = Math.max(0, base + bon + allo - ded);
+  // Two grosses, deliberately. `grossExOt` is the pre-overtime figure and is
+  // the only one the insurance base may be clamped against — overtime is
+  // excluded from the BHXH/BHYT/BHTN base by law, and clamping against the
+  // full gross would smuggle it back in: when a deduction pushes gross below
+  // base + allowance the Math.min binds, so a larger gross would mean a
+  // larger base, and the employee would pay more insurance *because* they
+  // worked overtime. See tests/payrollEngine.test.js's "computePayslip with
+  // overtime" block, which pins exactly that.
+  const grossExOt = Math.max(0, base + bon + allo - ded);
+  const grossPay = grossExOt + ot;
+
   const insuranceExempt = Number(unpaidDays) >= INSURANCE_EXEMPT_UNPAID_DAYS;
-  const insuranceBase = insuranceExempt ? 0 : Math.min(base + allo, grossPay);
+  const insuranceBase = insuranceExempt ? 0 : Math.min(base + allo, grossExOt);
 
   const bhxhBase = Math.min(insuranceBase, BHXH_BHYT_CAP_VND);
   const bhtnBase = Math.min(insuranceBase, BHTN_CAP_VND);
@@ -67,7 +82,14 @@ export function computePayslip({
   const bhtn = Math.round(bhtnBase * BHTN_RATE);
   const insuranceTotal = bhxh + bhyt + bhtn;
 
-  const taxableIncome = Math.max(0, grossPay - insuranceTotal - PERSONAL_DEDUCTION_VND);
+  // Overtime pay is exempt from personal income tax under Law 109/2025/QH15,
+  // so it is added to gross and then subtracted back out of the tax base.
+  // Flagged rather than unconditional — see OT_PIT_EXEMPT in utils/overtime.js.
+  const exemptOt = overtimeTaxExempt ? ot : 0;
+  const taxableIncome = Math.max(
+    0,
+    grossPay - insuranceTotal - PERSONAL_DEDUCTION_VND - exemptOt,
+  );
   const pit = Math.round(calcProgressivePitVnd(taxableIncome));
 
   const netPay = grossPay - insuranceTotal - pit;
@@ -77,6 +99,8 @@ export function computePayslip({
     bonus: bon,
     allowance: allo,
     deduction: ded,
+    overtimePay: ot,
+    overtimeTaxExempt: Boolean(overtimeTaxExempt),
     grossPay,
     insuranceBase,
     insuranceExempt,
