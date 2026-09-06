@@ -9,6 +9,7 @@ import { apiFetch } from '../api/client'
 import { getRoleLabel } from '../utils/roles'
 import { translateApiError } from '../utils/apiError'
 import { permissionState, isWanted, setWanted, ensurePermission } from '../utils/desktopNotify'
+import { isPushSupported, currentSubscription, subscribeToPush, unsubscribeFromPush } from '../utils/webPush'
 import Button from "../components/Button";
 
 /* ─────────────────────────────────────────────
@@ -616,6 +617,77 @@ function Switch({ checked, onChange, disabled, label }) {
 }
 
 /* ─────────────────────────────────────────────
+   Web Push. Unlike the email toggle below, this is
+   PER-BROWSER: the subscription is minted by this
+   browser for this origin, so the row is labelled
+   "this device" and turning it on elsewhere does
+   nothing here. See utils/webPush.js.
+───────────────────────────────────────────── */
+function PushRow() {
+  const { t } = useTranslation()
+  const [state, setState] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!isPushSupported()) {
+      setState({ available: false, supported: false, subscribed: false })
+      return
+    }
+    const existing = await currentSubscription()
+    try {
+      const res = await NotificationsAPI.pushStatus(existing?.endpoint)
+      setState({ ...res.data, supported: true })
+    } catch {
+      setState({ available: false, supported: true, subscribed: false })
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const toggle = async (next) => {
+    setBusy(true)
+    try {
+      if (next) {
+        const result = await subscribeToPush(state?.publicKey)
+        if (!result.ok) return
+        await NotificationsAPI.pushSubscribe(result.subscription)
+      } else {
+        const { endpoint } = await unsubscribeFromPush()
+        // Drop the server row even when the browser had nothing to revoke,
+        // or it would keep pushing to an endpoint the user has disowned.
+        if (endpoint) await NotificationsAPI.pushUnsubscribe(endpoint)
+      }
+      await load()
+    } catch {
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!state) return null
+
+  return (
+    <SettingRow
+      label={t('settings.notificationsTab.pushLabel')}
+      hint={
+        !state.supported ? t('settings.notificationsTab.pushUnsupported')
+          : !state.available ? t('settings.notificationsTab.pushUnavailable')
+          : t('settings.notificationsTab.pushHint')
+      }
+      control={
+        <Switch
+          checked={Boolean(state.subscribed)}
+          onChange={toggle}
+          disabled={busy || !state.supported || !state.available}
+          label={t('settings.notificationsTab.pushLabel')}
+        />
+      }
+    />
+  )
+}
+
+/* ─────────────────────────────────────────────
    Email toggle. Server-side preference, unlike the
    desktop one above: an inbox is not tied to a
    device, and email is the only channel that can
@@ -856,6 +928,8 @@ function NotificationsTab() {
             />
           }
         />
+
+        <PushRow />
 
         <EmailRow />
 

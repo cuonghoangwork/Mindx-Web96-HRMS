@@ -130,6 +130,14 @@ export const NotificationsAPI = {
   preferences: () => apiFetch("/notifications/preferences"),
   updatePreferences: (body) =>
     apiFetch("/notifications/preferences", { method: "PATCH", body }),
+  // Web Push. Per-device, so status is asked about a specific endpoint. The
+  // server also returns the VAPID public key, so a frontend built against the
+  // wrong key pair can be caught without a redeploy.
+  pushStatus: (endpoint) => apiFetch(`/notifications/push${qs({ endpoint })}`),
+  pushSubscribe: (subscription) =>
+    apiFetch("/notifications/push/subscribe", { method: "POST", body: subscription }),
+  pushUnsubscribe: (endpoint) =>
+    apiFetch("/notifications/push/subscribe", { method: "DELETE", body: { endpoint } }),
   // Telegram linking. `available` reports whether the server has a bot
   // configured at all, so Settings can say "not set up" rather than showing
   // a button that always fails.

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import notificationController from "../controller/notificationController.js";
 import telegramController from "../controller/telegramController.js";
+import pushController from "../controller/pushController.js";
 import { verifyToken, authorize } from "../middleware/auth.js";
 
 const router = Router();
@@ -18,6 +19,12 @@ router.get("/stream", notificationController.stream);
 // per-device and lives in the browser.
 router.get("/preferences", verifyToken, notificationController.getPreferences);
 router.patch("/preferences", verifyToken, notificationController.updatePreferences);
+
+// Web Push (Level 3). Per-device, so every route keys off the browser's
+// own endpoint rather than the user alone.
+router.get("/push", verifyToken, pushController.status);
+router.post("/push/subscribe", verifyToken, pushController.subscribe);
+router.delete("/push/subscribe", verifyToken, pushController.unsubscribe);
 
 // Telegram (Level 4b). The webhook is deliberately outside verifyToken:
 // Telegram cannot present a JWT, so the secret in the path is the

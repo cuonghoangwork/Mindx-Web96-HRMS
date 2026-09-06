@@ -1,0 +1,18 @@
+{
+  "name": "HRMS — HR Management System",
+  "short_name": "HRMS",
+  "description": "Headcount, attendance and pay in a single flat record.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1359e1",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

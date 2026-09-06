@@ -40,6 +40,8 @@ import { emailFooter, languageFor, openInAppLabel, renderNotification } from "./
 import { sendTelegramMessage, telegramEnabled } from "./telegram.js";
 import { mailEnabled, sendMail } from "./mailer.js";
 import { renderEmail } from "./emailTemplate.js";
+import PushSubscriptionModel from "../model/PushSubscription.js";
+import { pushEnabled, sendPush } from "./webPush.js";
 
 /**
  * Telegram delivery.
@@ -85,14 +87,32 @@ async function fanOutTelegram(doc) {
 }
 
 /**
- * How many emails are in flight at once.
+ * How many sends are in flight at once, per channel.
  *
  * A broadcast to a 50-person roster must not open 50 SMTP connections: every
- * free provider (Gmail, Brevo, Resend) rate-limits, and the failure mode is
- * a burst of rejections rather than a slow send. Three at a time turns that
- * into a queue.
+ * free provider (Gmail, Brevo, Resend) rate-limits, and the failure mode is a
+ * burst of rejections rather than a slow send. Push services tolerate more,
+ * but the same reasoning applies and one shared number is easier to reason
+ * about than two.
  */
-const EMAIL_CONCURRENCY = 3;
+const SEND_CONCURRENCY = 3;
+
+/**
+ * Run `worker` over `items`, at most SEND_CONCURRENCY at a time.
+ *
+ * A shared cursor over one array is the whole limiter: N workers pull until
+ * it is empty. `worker` must not throw — a rejection here would strand the
+ * items still in the queue.
+ */
+async function runLimited(items, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(SEND_CONCURRENCY, queue.length) }, async () => {
+    while (queue.length) {
+      await worker(queue.shift());
+    }
+  });
+  await Promise.all(runners);
+}
 
 function absoluteUrl(link) {
   const base = process.env.APP_BASE_URL || process.env.CORS_ORIGIN || "";
@@ -140,20 +160,78 @@ async function fanOutEmail(doc) {
   const recipients = await emailRecipients(doc);
   if (!recipients.length) return;
 
-  // A shared cursor over one array is the whole concurrency limiter: N
-  // workers pull until it is empty. No setImmediate — fanOut is already
-  // detached from the request (see emitNotification), so deferring again
-  // would only make the send harder to observe in tests.
-  const queue = [...recipients];
-  const workers = Array.from({ length: Math.min(EMAIL_CONCURRENCY, queue.length) }, async () => {
-    while (queue.length) {
-      const user = queue.shift();
-      // sendMail never throws, so one bad address cannot strand the queue.
-      await sendOneEmail(doc, user);
+  // No setImmediate — fanOut is already detached from the request (see
+  // emitNotification), so deferring again would only make the send harder to
+  // observe in tests. sendMail never throws, so one bad address cannot
+  // strand the queue.
+  await runLimited(recipients, (user) => sendOneEmail(doc, user));
+}
+
+/**
+ * Web Push delivery.
+ *
+ * Serves BROADCASTS as well as addressed notices, unlike Telegram. The bar is
+ * genuinely different: a Telegram message arrives in a personal messenger the
+ * user linked once, whereas a push subscription is minted per-browser behind
+ * an OS permission prompt and can be revoked from that device in one tap. It
+ * also has to serve broadcasts to be useful at all — "payroll has been paid"
+ * is only ever written as one (controller/payrollController.js and
+ * jobs/runMonthlyPayroll.js both broadcast it), and the plan's table wants
+ * push for payroll.
+ *
+ * There is no `notify.push` flag on User: the existence of a subscription row
+ * IS the opt-in, and it belongs to a device rather than a person.
+ */
+async function fanOutPush(doc) {
+  if (!pushEnabled()) return;
+  if (!allowsChannel(doc.category, "push")) return;
+
+  const scope = doc.user
+    ? { _id: doc.user }
+    : { role: { $in: rolesForAudience(doc.audience ?? "all") } };
+
+  const users = await UserModel.find(scope, "language");
+  if (!users.length) return;
+
+  const subscriptions = await PushSubscriptionModel.find({
+    user: { $in: users.map((u) => u._id) },
+  });
+  if (!subscriptions.length) return;
+
+  const languageByUser = new Map(users.map((u) => [String(u._id), languageFor(u)]));
+
+  await runLimited(subscriptions, async (subscription) => {
+    const language = languageByUser.get(String(subscription.user)) ?? "en";
+    const { title, message } = renderNotification(doc, language);
+
+    // Deliberately small. Push payloads are encrypted per-recipient and
+    // services reject anything much over 4KB, so this carries identifiers and
+    // display copy only — the service worker has the id if it needs more.
+    const result = await sendPush(subscription, {
+      id: String(doc._id ?? doc.id ?? ""),
+      title,
+      body: message,
+      url: doc.link ?? null,
+      // Same collapsing key the SSE-driven desktop toast uses, so a user with
+      // the app open on one device and closed on another cannot get two
+      // notifications for one event on the same machine.
+      tag: String(doc._id ?? doc.id ?? ""),
+    });
+
+    if (result.gone) {
+      // 410/404 means the browser permanently unsubscribed. Delete rather
+      // than retry — without this the row is pushed to forever.
+      await PushSubscriptionModel.deleteOne({ _id: subscription._id });
+      console.log(`[webpush] subscription gone — removed ${subscription.endpoint.slice(0, 40)}…`);
+    } else if (result.ok) {
+      await PushSubscriptionModel.updateOne(
+        { _id: subscription._id },
+        { $set: { lastSuccessAt: new Date(), failureCount: 0 } },
+      );
+    } else if (!result.disabled) {
+      await PushSubscriptionModel.updateOne({ _id: subscription._id }, { $inc: { failureCount: 1 } });
     }
   });
-
-  await Promise.all(workers);
 }
 
 /**
@@ -173,7 +251,7 @@ async function fanOutEmail(doc) {
 // eslint-disable-next-line no-unused-vars
 async function fanOut(doc, channels) {
   publish(doc);
-  const results = await Promise.allSettled([fanOutTelegram(doc), fanOutEmail(doc)]);
+  const results = await Promise.allSettled([fanOutTelegram(doc), fanOutEmail(doc), fanOutPush(doc)]);
   for (const result of results) {
     if (result.status === "rejected") {
       console.error("[notify] channel failed:", result.reason?.message ?? result.reason);

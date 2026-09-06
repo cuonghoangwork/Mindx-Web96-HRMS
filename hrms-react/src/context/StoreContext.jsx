@@ -219,6 +219,28 @@ export function StoreProvider({ children }) {
     return () => connection.close();
   }, [isAuthenticated, mustChangePassword, refreshNotifications]);
 
+  /* ── Service worker bridge (Web Push) ── */
+
+  // public/sw.js hands a push to the page instead of showing an OS
+  // notification whenever a tab is visible — that is the double-toast fix.
+  // The push payload is deliberately tiny (id/title/body/url), not a whole
+  // notification, so refetch rather than trying to insert a partial row.
+  useEffect(() => {
+    if (!isAuthenticated || mustChangePassword) return undefined;
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return undefined;
+
+    const onMessage = (event) => {
+      const { type, url } = event.data ?? {};
+      if (type === "notification") refreshNotifications();
+      // Sent when the user clicks an OS notification and an HRMS tab already
+      // exists: focus it and route in place rather than opening another tab.
+      if (type === "navigate" && url) navigate(url);
+    };
+
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [isAuthenticated, mustChangePassword, refreshNotifications, navigate]);
+
   /* ── Employee actions ── */
   const addEmployee = useCallback(async (employee) => {
     const res = await EmployeesAPI.create(employee);
