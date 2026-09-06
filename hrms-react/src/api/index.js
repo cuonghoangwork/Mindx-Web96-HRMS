@@ -123,6 +123,8 @@ export const AttendanceAPI = {
 
 export const NotificationsAPI = {
   list: () => apiFetch("/notifications"),
+  /** Single-use, 60-second credential for the SSE feed — see api/notificationStream.js. */
+  streamTicket: () => apiFetch("/notifications/stream-ticket"),
   create: (data) => apiFetch("/notifications", { method: "POST", body: data }),
   recipients: () => apiFetch("/notifications/recipients"),
   markRead: (id) => apiFetch(`/notifications/${id}/read`, { method: "PATCH" }),

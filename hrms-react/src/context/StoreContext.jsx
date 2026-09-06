@@ -14,6 +14,7 @@ import {
   OvertimeRequestsAPI,
 } from "../api";
 import { setDemoClockOffset } from "../api/client";
+import { connectNotificationStream } from "../api/notificationStream";
 
 const StoreContext = createContext(null);
 
@@ -142,6 +143,36 @@ export function StoreProvider({ children }) {
       setLoadingStore(false);
     }
   }, [isAuthenticated, mustChangePassword, refreshAll]);
+
+  /* ── Live notifications (SSE) ── */
+
+  // Notifications only, unlike refreshAll: used to catch up after the stream
+  // has been down, where refetching the whole store would flash every list.
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const notif = await NotificationsAPI.list();
+      setNotifications(notif.items || []);
+    } catch {
+      // The stream is already retrying on its own; a failed catch-up is not
+      // worth a toast, and the next reconnect will try again.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || mustChangePassword) return undefined;
+
+    const connection = connectNotificationStream({
+      onNotification: (incoming) =>
+        setNotifications((prev) =>
+          // A reconnect refetch races the stream: the catch-up GET and a live
+          // event can both carry the same notification. Dedupe on id.
+          prev.some((n) => idsMatch(n.id, incoming.id)) ? prev : [incoming, ...prev],
+        ),
+      onReconnect: refreshNotifications,
+    });
+
+    return () => connection.close();
+  }, [isAuthenticated, mustChangePassword, refreshNotifications]);
 
   /* ── Employee actions ── */
   const addEmployee = useCallback(async (employee) => {

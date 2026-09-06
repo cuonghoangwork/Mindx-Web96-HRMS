@@ -33,19 +33,23 @@
  */
 
 import NotificationModel from "../model/Notification.js";
+import { publish } from "./sseHub.js";
 
 /**
- * Side-channel delivery. Empty in Level 0 — this is the seam, not the
- * feature. Level 1 pushes sseHub.publish here, Level 2+ the rest.
+ * Side-channel delivery.
  *
- * Publish the CLIENT shape (utils/mappers.js's notificationToClient), not the
- * raw Mongoose doc: the frontend keys off `id` and `timestamp`, which only
- * exist after mapping. Handing a transport `_id`/`createdAt` gives a silently
- * broken row rather than an error.
+ * Level 1 wired the first channel: every open SSE connection whose viewer
+ * matches the notification. sseHub.publish maps to the client shape itself
+ * and swallows per-socket write failures, so one dead connection cannot stop
+ * the others — or the request that produced the notification.
+ *
+ * `channels` is the per-call override the later levels will consult (desktop,
+ * push, email, Telegram). Nothing reads it yet; leaving the parameter in place
+ * keeps the call signature stable while those land.
  */
 // eslint-disable-next-line no-unused-vars
 async function fanOut(doc, channels) {
-  // No channels yet. Deliberately not a TODO — Level 1 fills this in.
+  publish(doc);
 }
 
 /** Optional fields are stored as explicit nulls, never undefined, so that a

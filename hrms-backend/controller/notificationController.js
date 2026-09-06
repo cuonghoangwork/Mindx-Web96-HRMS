@@ -3,6 +3,26 @@ import { emitNotification, emitNotificationEach } from "../utils/notify.js";
 import EmployeeModel from "../model/Employee.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
 import { AppError } from "../utils/appError.js";
+import {
+  signStreamTicket,
+  verifyStreamTicket,
+  STREAM_TICKET_TTL_SECONDS,
+} from "../utils/tokens.js";
+import { subscribe, consumeTicketId } from "../utils/sseHub.js";
+
+/* ── Level 1: live delivery over SSE ─────────────────────────────── */
+
+// Render's proxy closes an idle connection at ~60s and the browser then
+// reconnects, so a quiet app would otherwise produce a steady reconnect
+// churn. 25s leaves room to miss one beat and still stay under that.
+const HEARTBEAT_MS = Number(process.env.SSE_HEARTBEAT_MS) || 25_000;
+
+// A connection caches the viewer's role at handshake time — sseHub matches
+// broadcasts against it without a DB lookup. Capping the connection bounds
+// how long someone demoted from HR keeps receiving "hr" broadcasts: the
+// client reconnects straight away and re-handshakes with a fresh ticket,
+// so this is invisible in the UI.
+const MAX_CONNECTION_MS = Number(process.env.SSE_MAX_CONNECTION_MS) || 15 * 60_000;
 
 const notificationController = {
   // Returns notifications addressed to the current user PLUS broadcasts that match
@@ -134,6 +154,87 @@ const notificationController = {
     } catch (error) {
       res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
+  },
+
+  /**
+   * GET /notifications/stream-ticket — normal Bearer auth.
+   *
+   * Hands back the short-lived, single-use credential the stream endpoint
+   * wants, because EventSource cannot send an Authorization header. See
+   * utils/tokens.js for why this is not just the access token in a query
+   * string.
+   */
+  streamTicket: async (req, res) => {
+    try {
+      const ticket = signStreamTicket({ id: req.user.id, role: req.user.role });
+      res.json({ success: true, data: { ticket, expiresIn: STREAM_TICKET_TTL_SECONDS } });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message, code: error.code });
+    }
+  },
+
+  /**
+   * GET /notifications/stream?ticket=... — the live feed.
+   *
+   * Deliberately NOT behind verifyToken: the credential is the ticket in
+   * the query string, and verifyToken would reject it for having
+   * tokenType "SSE" rather than "AT".
+   */
+  stream: async (req, res) => {
+    let ticket;
+    try {
+      ticket = verifyStreamTicket(req.query.ticket ?? "");
+    } catch {
+      return res.status(401).json({
+        success: false,
+        message: "Stream ticket is missing, expired or invalid.",
+        code: "STREAM_TICKET_INVALID",
+      });
+    }
+
+    if (!consumeTicketId(ticket.jti, ticket.exp)) {
+      return res.status(401).json({
+        success: false,
+        message: "Stream ticket has already been used.",
+        code: "STREAM_TICKET_ALREADY_USED",
+      });
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      // Stops nginx-style proxies (Render included) buffering the stream
+      // into oblivion — without it nothing arrives until the buffer fills.
+      "X-Accel-Buffering": "no",
+    });
+    res.flushHeaders?.();
+    res.write(": connected\n\n");
+
+    const unsubscribe = subscribe({ res, userId: ticket.id, role: ticket.role });
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        cleanup();
+      }
+    }, HEARTBEAT_MS);
+
+    const lifetime = setTimeout(() => res.end(), MAX_CONNECTION_MS);
+
+    // Neither timer should hold the event loop open on its own.
+    heartbeat.unref?.();
+    lifetime.unref?.();
+
+    // Miss this and every dropped connection leaks a 25s interval plus a
+    // reference to a dead socket that publish() keeps writing to.
+    function cleanup() {
+      clearInterval(heartbeat);
+      clearTimeout(lifetime);
+      unsubscribe();
+    }
+    req.on("close", cleanup);
   },
 
   // GET /notifications/recipients — HR/Admin only: list of employees (id + name + email)
