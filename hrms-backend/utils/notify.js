@@ -32,12 +32,14 @@
  *    without taking away their own answer to "who".
  */
 
-import NotificationModel from "../model/Notification.js";
+import NotificationModel, { rolesForAudience } from "../model/Notification.js";
 import UserModel from "../model/User.js";
 import { publish } from "./sseHub.js";
 import { allowsChannel } from "./notifyPolicy.js";
-import { languageFor, openInAppLabel, renderNotification } from "./notifyI18n.js";
+import { emailFooter, languageFor, openInAppLabel, renderNotification } from "./notifyI18n.js";
 import { sendTelegramMessage, telegramEnabled } from "./telegram.js";
+import { mailEnabled, sendMail } from "./mailer.js";
+import { renderEmail } from "./emailTemplate.js";
 
 /**
  * Telegram delivery.
@@ -83,20 +85,100 @@ async function fanOutTelegram(doc) {
 }
 
 /**
+ * How many emails are in flight at once.
+ *
+ * A broadcast to a 50-person roster must not open 50 SMTP connections: every
+ * free provider (Gmail, Brevo, Resend) rate-limits, and the failure mode is
+ * a burst of rejections rather than a slow send. Three at a time turns that
+ * into a queue.
+ */
+const EMAIL_CONCURRENCY = 3;
+
+function absoluteUrl(link) {
+  const base = process.env.APP_BASE_URL || process.env.CORS_ORIGIN || "";
+  return link && base ? `${base.replace(/\/$/, "")}${link}` : null;
+}
+
+/**
+ * Who gets this by email.
+ *
+ * Unlike Telegram, email DOES serve broadcasts — "payroll has been paid" to
+ * the whole roster is the best email case in the system, and an inbox is the
+ * right place for it in a way a private messenger is not. That is why the
+ * `notify.email` default is false: opt-in, so a broadcast can only ever reach
+ * people who asked for one.
+ */
+async function emailRecipients(doc) {
+  const scope = doc.user
+    ? { _id: doc.user }
+    : { role: { $in: rolesForAudience(doc.audience ?? "all") } };
+
+  return UserModel.find(
+    { ...scope, "notify.email": true, email: { $ne: null } },
+    "email language",
+  );
+}
+
+async function sendOneEmail(doc, user) {
+  const language = languageFor(user);
+  const { title, message } = renderNotification(doc, language);
+  const { html, text } = renderEmail({
+    title,
+    message,
+    url: absoluteUrl(doc.link),
+    urlLabel: openInAppLabel(language),
+    footer: emailFooter(language),
+  });
+
+  await sendMail({ to: user.email, subject: title, html, text });
+}
+
+async function fanOutEmail(doc) {
+  if (!mailEnabled()) return;
+  if (!allowsChannel(doc.category, "email")) return;
+
+  const recipients = await emailRecipients(doc);
+  if (!recipients.length) return;
+
+  // A shared cursor over one array is the whole concurrency limiter: N
+  // workers pull until it is empty. No setImmediate — fanOut is already
+  // detached from the request (see emitNotification), so deferring again
+  // would only make the send harder to observe in tests.
+  const queue = [...recipients];
+  const workers = Array.from({ length: Math.min(EMAIL_CONCURRENCY, queue.length) }, async () => {
+    while (queue.length) {
+      const user = queue.shift();
+      // sendMail never throws, so one bad address cannot strand the queue.
+      await sendOneEmail(doc, user);
+    }
+  });
+
+  await Promise.all(workers);
+}
+
+/**
  * Side-channel delivery.
  *
- * Never awaited by emitNotification and never allowed to throw: a dead socket
- * or a blocked bot must not fail the leave request that produced the
- * notification.
+ * Never awaited by emitNotification and never allowed to throw: a dead socket,
+ * a blocked bot or a bounced email must not fail the leave request that
+ * produced the notification.
  *
- * `channels` is the per-call override the remaining levels will consult
- * (push, email). Nothing reads it yet; the parameter keeps the call signature
- * stable while those land.
+ * The channels run in parallel — a slow SMTP server should not delay the SSE
+ * push that the user is watching for — and settle independently, so one
+ * throwing cannot cancel the others.
+ *
+ * `channels` is the per-call override Web Push will consult. Nothing reads it
+ * yet; the parameter keeps the call signature stable until it lands.
  */
 // eslint-disable-next-line no-unused-vars
 async function fanOut(doc, channels) {
   publish(doc);
-  await fanOutTelegram(doc);
+  const results = await Promise.allSettled([fanOutTelegram(doc), fanOutEmail(doc)]);
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.error("[notify] channel failed:", result.reason?.message ?? result.reason);
+    }
+  }
 }
 
 /** Optional fields are stored as explicit nulls, never undefined, so that a

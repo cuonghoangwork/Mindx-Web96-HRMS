@@ -34,6 +34,20 @@ export function broadcastAudiencesFor(role) {
   return AUDIENCES_BY_ROLE[role] ?? AUDIENCES_BY_ROLE.EMPLOYEE;
 }
 
+/**
+ * The inverse: which roles read a given audience.
+ *
+ * Needed by out-of-app delivery, which has to turn a broadcast into an actual
+ * list of people (utils/notify.js). DERIVED from the same map rather than
+ * written out a second time — two hand-maintained tables facing opposite
+ * directions is precisely how "the email went to the wrong people" happens.
+ */
+export function rolesForAudience(audience) {
+  return Object.keys(AUDIENCES_BY_ROLE).filter((role) =>
+    AUDIENCES_BY_ROLE[role].includes(audience),
+  );
+}
+
 const notificationSchema = new mongoose.Schema(
   {
     // null = broadcast to all users, per hrms_schema_docs.md.

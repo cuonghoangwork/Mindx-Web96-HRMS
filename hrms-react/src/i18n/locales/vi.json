@@ -1060,6 +1060,8 @@
    "desktopUnsupported": "Trình duyệt này không hỗ trợ thông báo trên máy tính.",
    "gapNotice": "Tùy chọn theo từng danh mục chưa khả dụng — bạn sẽ nhận mọi thông báo trong ứng dụng phù hợp với vai trò của mình.",
    "viewAll": "Xem thông báo",
+   "emailLabel": "Email",
+   "emailHint": "Gửi thông báo nghỉ phép, đánh giá hiệu suất và lương tới địa chỉ email tài khoản của bạn.",
    "telegramLabel": "Telegram",
    "telegramHint": "Nhận quyết định về nghỉ phép và đánh giá hiệu suất qua Telegram, kể cả khi đã đóng HRMS.",
    "telegramConnected": "Đã kết nối. Tin nhắn được gửi theo ngôn ngữ tài khoản của bạn.",

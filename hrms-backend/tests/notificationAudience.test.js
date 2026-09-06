@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { broadcastAudiencesFor, NOTIFICATION_AUDIENCES } from "../model/Notification.js";
+import { broadcastAudiencesFor, rolesForAudience, NOTIFICATION_AUDIENCES } from "../model/Notification.js";
 import { startDb, stopDb, clearDb, createApp, seedUserAndLogin } from "./testHelpers.js";
 
 describe("broadcastAudiencesFor", () => {
@@ -55,6 +55,34 @@ describe("broadcastAudiencesFor", () => {
     for (const role of ["ADMIN", "HR", "MANAGER", "EMPLOYEE", undefined]) {
       expect(broadcastAudiencesFor(role)).toContain("all");
     }
+  });
+});
+
+describe("rolesForAudience", () => {
+  it("inverts the map the read path uses", () => {
+    expect(rolesForAudience("hr").sort()).toEqual(["ADMIN", "HR"]);
+    expect(rolesForAudience("employees").sort()).toEqual(["EMPLOYEE", "MANAGER"]);
+    expect(rolesForAudience("all").sort()).toEqual(["ADMIN", "EMPLOYEE", "HR", "MANAGER"]);
+  });
+
+  it("agrees with broadcastAudiencesFor in both directions", () => {
+    // Out-of-app delivery turns a broadcast into an actual list of inboxes,
+    // so these two have to be exact inverses. If they ever disagree, the bug
+    // is "the email went to people who cannot see it in the app".
+    for (const audience of NOTIFICATION_AUDIENCES) {
+      for (const role of rolesForAudience(audience)) {
+        expect(broadcastAudiencesFor(role)).toContain(audience);
+      }
+    }
+    for (const role of ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]) {
+      for (const audience of broadcastAudiencesFor(role)) {
+        expect(rolesForAudience(audience)).toContain(role);
+      }
+    }
+  });
+
+  it("returns nobody for an audience that does not exist", () => {
+    expect(rolesForAudience("nope")).toEqual([]);
   });
 });
 

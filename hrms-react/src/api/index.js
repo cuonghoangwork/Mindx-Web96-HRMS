@@ -125,6 +125,11 @@ export const NotificationsAPI = {
   list: () => apiFetch("/notifications"),
   /** Single-use, 60-second credential for the SSE feed — see api/notificationStream.js. */
   streamTicket: () => apiFetch("/notifications/stream-ticket"),
+  // Out-of-app channel preferences. Desktop is NOT here — it is per-device
+  // and lives in localStorage (see utils/desktopNotify.js).
+  preferences: () => apiFetch("/notifications/preferences"),
+  updatePreferences: (body) =>
+    apiFetch("/notifications/preferences", { method: "PATCH", body }),
   // Telegram linking. `available` reports whether the server has a bot
   // configured at all, so Settings can say "not set up" rather than showing
   // a button that always fails.

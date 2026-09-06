@@ -126,14 +126,37 @@ describe("drift from the frontend copy", () => {
   });
 
   it("covers every key the out-of-app categories can actually emit", () => {
-    // The mirror only needs the categories notifyPolicy lets out. This ties
-    // the two together: widen the policy and this points at the gap.
-    const outOfApp = ["leave", "performance"].filter((c) => channelsFor(c).includes("telegram"));
-    expect(outOfApp).toEqual(["leave", "performance"]);
+    // The mirror only needs the categories notifyPolicy lets out — but that
+    // set differs per channel. Telegram carries leave + performance; email
+    // adds payroll, so payroll copy has to be mirrored too even though
+    // Telegram will never render it.
+    const telegram = ["leave", "performance", "payroll"].filter((c) => channelsFor(c).includes("telegram"));
+    const email = ["leave", "performance", "payroll"].filter((c) => channelsFor(c).includes("email"));
+    expect(telegram).toEqual(["leave", "performance"]);
+    expect(email).toEqual(["leave", "performance", "payroll"]);
 
     const mirrored = Object.keys(backend("en").generated);
-    for (const key of ["leaveApproved", "leaveRejected", "leaveRequestSubmitted", "appealResolved"]) {
+    for (const key of [
+      "leaveApproved", "leaveRejected", "leaveRequestSubmitted", "appealResolved",
+      "payrollPaid", "payrollDraftsGenerated", "monthlyPayrollDraftReady",
+      "monthlyPayrollRunSkippedNoPeriod",
+    ]) {
       expect(mirrored).toContain(key);
     }
+  });
+
+  it("localizes the rateSource token payroll copy interpolates", () => {
+    // Another enum-token param, like leaveType — a payroll email would
+    // otherwise read "tỷ giá ... (live rate)" in half-English.
+    const { message } = renderNotification(
+      {
+        messageKey: "monthlyPayrollDraftReady",
+        message: "fallback",
+        params: { count: 3, periodLabel: "March 2027", rate: 25000, rateSource: "live" },
+      },
+      "vi",
+    );
+    expect(message).toContain("tỷ giá trực tiếp");
+    expect(message).not.toContain("live");
   });
 });

@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema(
      * it: that table decides what is allowed to leave the app at all.
      */
     notify: {
+      // Opt-in, not opt-out. Email is the only channel here that can reach a
+      // broadcast audience, so a default of `true` would mean the first
+      // company-wide payroll notice mails the entire roster before anyone
+      // chose to receive anything.
+      email: { type: Boolean, default: false },
       telegram: { type: Boolean, default: false },
       telegramChatId: { type: String, default: null },
     },

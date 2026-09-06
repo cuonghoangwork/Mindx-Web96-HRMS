@@ -46,6 +46,27 @@
     "selfReviewSubmitted": {
       "title": "Đã nộp tự đánh giá",
       "message": "{{employeeName}} đã nộp bản tự đánh giá {{cycleLabel}} của mình."
+    },
+    "payrollPaid": {
+      "title": "Đã thanh toán lương",
+      "message": "Lương kỳ {{periodLabel}} đã được thanh toán."
+    },
+    "payrollDraftsGenerated": {
+      "title": "Đã tạo bản nháp bảng lương",
+      "message": "Đã tạo {{count}} phiếu lương nháp cho {{periodLabel}}."
+    },
+    "monthlyPayrollDraftReady": {
+      "title": "Bản nháp lương tháng đã sẵn sàng",
+      "message": "Đã tự động tạo {{count}} phiếu lương nháp cho {{periodLabel}} với tỷ giá {{rate}} VND/USD ({{rateSource}}). Vui lòng kiểm tra trước khi chạy lương vào ngày 10 hàng tháng."
+    },
+    "monthlyPayrollRunSkipped": {
+      "title": "Đã bỏ qua chạy lương tháng"
+    },
+    "monthlyPayrollRunSkippedNoPeriod": {
+      "message": "Chưa có kỳ lương nào cho {{monthLabel}}. Vui lòng tạo kỳ lương trước khi có thể chạy lương cho tháng đó."
+    },
+    "monthlyPayrollRunSkippedNoPayslips": {
+      "message": "Kỳ lương {{monthLabel}} không có phiếu lương nào nên chưa được thanh toán."
     }
   },
   "labels": {
@@ -60,6 +81,11 @@
       "adjusted": "đã điều chỉnh",
       "upheld": "giữ nguyên"
     },
-    "openInApp": "Mở trong HRMS"
+    "openInApp": "Mở trong HRMS",
+    "rateSource": {
+      "live": "tỷ giá trực tiếp",
+      "fallback": "tỷ giá dự phòng"
+    },
+    "emailFooter": "Bạn nhận được email này vì thông báo qua email đang bật cho tài khoản HRMS của bạn. Tắt trong Cài đặt → Thông báo."
   }
 }

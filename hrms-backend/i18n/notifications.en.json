@@ -46,6 +46,27 @@
     "selfReviewSubmitted": {
       "title": "Self review submitted",
       "message": "{{employeeName}} submitted their {{cycleLabel}} self review."
+    },
+    "payrollPaid": {
+      "title": "Payroll paid",
+      "message": "{{periodLabel}} payroll has been paid."
+    },
+    "payrollDraftsGenerated": {
+      "title": "Payroll drafts generated",
+      "message": "{{count}} draft payslip(s) generated for {{periodLabel}}."
+    },
+    "monthlyPayrollDraftReady": {
+      "title": "Monthly payroll draft ready",
+      "message": "{{count}} draft payslip(s) auto-generated for {{periodLabel}} at {{rate}} VND/USD ({{rateSource}}). Review before the 10th-of-month payroll run."
+    },
+    "monthlyPayrollRunSkipped": {
+      "title": "Monthly payroll run skipped"
+    },
+    "monthlyPayrollRunSkippedNoPeriod": {
+      "message": "No payroll period exists for {{monthLabel}}. Create it before payroll can be run for that month."
+    },
+    "monthlyPayrollRunSkippedNoPayslips": {
+      "message": "The {{monthLabel}} payroll period has no payslips, so it was not paid."
     }
   },
   "labels": {
@@ -60,6 +81,11 @@
       "adjusted": "adjusted",
       "upheld": "upheld"
     },
-    "openInApp": "Open in HRMS"
+    "openInApp": "Open in HRMS",
+    "rateSource": {
+      "live": "live rate",
+      "fallback": "fallback rate"
+    },
+    "emailFooter": "You are receiving this because email notifications are on for your HRMS account. Turn them off in Settings → Notifications."
   }
 }

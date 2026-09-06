@@ -79,6 +79,7 @@ function localizeParams(params, bundle, language) {
     if (value != null && DATE_PARAM_RE.test(key)) out[key] = formatDate(value, language);
     else if (key === "leaveType") out[key] = bundle.labels.leaveType[value] ?? value;
     else if (key === "resolution") out[key] = bundle.labels.resolution[value] ?? value;
+    else if (key === "rateSource") out[key] = bundle.labels.rateSource[value] ?? value;
     else out[key] = value;
   }
   return out;
@@ -101,6 +102,11 @@ export function languageFor(user) {
 /** Label for the "open this in the app" button on an out-of-app message. */
 export function openInAppLabel(language = "en") {
   return (BUNDLES[language] ?? BUNDLES.en).labels.openInApp;
+}
+
+/** Why-am-I-getting-this line, required on anything that lands in an inbox. */
+export function emailFooter(language = "en") {
+  return (BUNDLES[language] ?? BUNDLES.en).labels.emailFooter;
 }
 
 /**

@@ -1066,6 +1066,8 @@
    "desktopUnsupported": "This browser doesn't support desktop notifications.",
    "gapNotice": "Per-category preferences aren't configurable yet — you'll receive all in-app notifications relevant to your role.",
    "viewAll": "View notifications",
+   "emailLabel": "Email",
+   "emailHint": "Send leave, performance and payroll notices to your account email address.",
    "telegramLabel": "Telegram",
    "telegramHint": "Get leave and performance decisions as a Telegram message, even with HRMS closed.",
    "telegramConnected": "Connected. Messages are sent in your account language.",

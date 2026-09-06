@@ -1,6 +1,7 @@
 import NotificationModel, { broadcastAudiencesFor } from "../model/Notification.js";
 import { emitNotification, emitNotificationEach } from "../utils/notify.js";
 import EmployeeModel from "../model/Employee.js";
+import UserModel from "../model/User.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
 import { AppError } from "../utils/appError.js";
 import {
@@ -9,6 +10,7 @@ import {
   STREAM_TICKET_TTL_SECONDS,
 } from "../utils/tokens.js";
 import { subscribe, consumeTicketId } from "../utils/sseHub.js";
+import { SUPPORTED_LANGUAGES } from "../utils/notifyI18n.js";
 
 /* ── Level 1: live delivery over SSE ─────────────────────────────── */
 
@@ -153,6 +155,57 @@ const notificationController = {
       res.json({ success: true, message: "Notification deleted." });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    }
+  },
+
+  /**
+   * GET /notifications/preferences — the out-of-app channel toggles.
+   *
+   * Desktop notifications are deliberately absent: the browser owns that
+   * permission, so it is stored per-device in localStorage rather than
+   * here (see hrms-react/src/utils/desktopNotify.js).
+   */
+  getPreferences: async (req, res) => {
+    try {
+      const user = await UserModel.findById(req.user.id, "language notify");
+      res.json({
+        success: true,
+        data: {
+          email: Boolean(user?.notify?.email),
+          language: user?.language ?? "en",
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message, code: error.code });
+    }
+  },
+
+  /**
+   * PATCH /notifications/preferences — { email?, language? }
+   *
+   * `language` is what anything rendered SERVER-side goes out in. The
+   * frontend keeps it in step with the UI toggle so an email and the app
+   * cannot end up in different languages; there is deliberately no second
+   * language picker in Settings.
+   */
+  updatePreferences: async (req, res) => {
+    try {
+      const update = {};
+      if (typeof req.body.email === "boolean") update["notify.email"] = req.body.email;
+      if (SUPPORTED_LANGUAGES.includes(req.body.language)) update.language = req.body.language;
+
+      if (!Object.keys(update).length) {
+        throw new AppError("No supported preference was provided.", "NO_PREFERENCES_PROVIDED");
+      }
+
+      await UserModel.updateOne({ _id: req.user.id }, { $set: update });
+      const user = await UserModel.findById(req.user.id, "language notify");
+      res.json({
+        success: true,
+        data: { email: Boolean(user?.notify?.email), language: user?.language ?? "en" },
+      });
+    } catch (error) {
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code });
     }
   },
 

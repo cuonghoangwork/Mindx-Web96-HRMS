@@ -616,6 +616,57 @@ function Switch({ checked, onChange, disabled, label }) {
 }
 
 /* ─────────────────────────────────────────────
+   Email toggle. Server-side preference, unlike the
+   desktop one above: an inbox is not tied to a
+   device, and email is the only channel that can
+   reach a broadcast audience — which is exactly
+   why it defaults to off.
+───────────────────────────────────────────── */
+function EmailRow() {
+  const { t } = useTranslation()
+  const [enabled, setEnabled] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    NotificationsAPI.preferences()
+      .then((res) => setEnabled(Boolean(res.data.email)))
+      .catch(() => setEnabled(false))
+  }, [])
+
+  const toggle = async (next) => {
+    setBusy(true)
+    // Optimistic: the switch should not lag behind the tap. Rolled back below
+    // if the write fails, so it can never show "on" while the server says off.
+    setEnabled(next)
+    try {
+      const res = await NotificationsAPI.updatePreferences({ email: next })
+      setEnabled(Boolean(res.data.email))
+    } catch {
+      setEnabled(!next)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (enabled === null) return null
+
+  return (
+    <SettingRow
+      label={t('settings.notificationsTab.emailLabel')}
+      hint={t('settings.notificationsTab.emailHint')}
+      control={
+        <Switch
+          checked={enabled}
+          onChange={toggle}
+          disabled={busy}
+          label={t('settings.notificationsTab.emailLabel')}
+        />
+      }
+    />
+  )
+}
+
+/* ─────────────────────────────────────────────
    Telegram linking. The code is minted server-side
    and redeemed by the bot when the user sends
    "/start <code>" — see hrms-backend/controller/
@@ -805,6 +856,8 @@ function NotificationsTab() {
             />
           }
         />
+
+        <EmailRow />
 
         <TelegramRow />
 

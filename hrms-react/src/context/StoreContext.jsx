@@ -150,6 +150,21 @@ export function StoreProvider({ children }) {
     }
   }, [isAuthenticated, mustChangePassword, refreshAll]);
 
+  /* ── Out-of-app language ── */
+
+  // Email and Telegram are rendered on the server, which has no way to read
+  // the UI toggle — it reads User.language instead. Mirroring the choice here
+  // is what keeps an email from arriving in a different language than the app
+  // the reader just set, and avoids a second language picker in Settings that
+  // could disagree with the first.
+  useEffect(() => {
+    if (!isAuthenticated || mustChangePassword || !language) return;
+    NotificationsAPI.updatePreferences({ language }).catch(() => {
+      // Nothing to recover: the app language is already applied locally, and
+      // this only affects copy the server renders later.
+    });
+  }, [isAuthenticated, mustChangePassword, language]);
+
   /* ── Live notifications (SSE) ── */
 
   // Notifications only, unlike refreshAll: used to catch up after the stream

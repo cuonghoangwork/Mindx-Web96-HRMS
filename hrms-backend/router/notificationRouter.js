@@ -14,6 +14,11 @@ router.get("/", verifyToken, notificationController.getAll);
 router.get("/stream-ticket", verifyToken, notificationController.streamTicket);
 router.get("/stream", notificationController.stream);
 
+// Out-of-app channel preferences (Level 4a). Desktop is not here — it is
+// per-device and lives in the browser.
+router.get("/preferences", verifyToken, notificationController.getPreferences);
+router.patch("/preferences", verifyToken, notificationController.updatePreferences);
+
 // Telegram (Level 4b). The webhook is deliberately outside verifyToken:
 // Telegram cannot present a JWT, so the secret in the path is the
 // credential (see telegramController.webhook). Declared before "/:id" so
