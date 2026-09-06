@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 import { signTokens } from "../utils/tokens.js";
-import { notifyHR } from "./notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { publicRegistrationEnabled, accountEmailDomain } from "../middleware/registrationGate.js";
 import { AppError } from "../utils/appError.js";
 

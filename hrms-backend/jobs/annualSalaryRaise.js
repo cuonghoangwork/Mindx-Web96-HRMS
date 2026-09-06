@@ -1,6 +1,6 @@
 import EmployeeModel from "../model/Employee.js";
 import PromotionRequestModel from "../model/PromotionRequest.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { monthsBetween } from "../utils/positionLadder.js";
 
 export const ANNUAL_RAISE_RATE = 0.1;

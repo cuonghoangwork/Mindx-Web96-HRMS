@@ -25,7 +25,7 @@ import {
   assertNoPendingRequest,
 } from "../utils/reviewQueue.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
-import { notifyHR } from "./notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { AppError } from "../utils/appError.js";
 import { dateKeyInTz, parseHHMM, utcMidnight } from "../utils/workday.js";
 import { serverNow } from "../utils/appNow.js";

@@ -8,7 +8,7 @@ import {
   isCloudinaryConfigured,
   destroyCloudinaryAsset,
 } from "../utils/cloudinary.js";
-import { notifyHR } from "./notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { logAction } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
 import {

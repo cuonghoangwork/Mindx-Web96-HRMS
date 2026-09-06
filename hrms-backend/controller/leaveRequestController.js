@@ -1,6 +1,6 @@
 import LeaveRequestModel, { LEAVE_TYPES, LEAVE_TYPE_LABELS, LEAVE_TYPE_ALLOWANCES } from "../model/LeaveRequest.js";
 import UserModel from "../model/User.js";
-import NotificationModel from "../model/Notification.js";
+import { emitNotificationEach } from "../utils/notify.js";
 import AttendanceModel from "../model/Attendance.js";
 import EmployeeModel from "../model/Employee.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
@@ -227,22 +227,21 @@ const leaveRequestController = {
 
       await request.populate("employee", "name email employeeId");
 
-      // Notify all HR/Admin users
-      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
-      await Promise.all(hrUsers.map((u) =>
-        NotificationModel.create({
-          user: u._id,
-          category: "leave",
-          title: "New leave request",
-          message: `${employee.name} requested ${days} ${type} leave day${days === 1 ? "" : "s"} (${dateOnly(start)} → ${dateOnly(end)}).`,
-          link: "/holidays",
-          linkLabel: "Review request",
-          read: false,
-          titleKey: "leaveRequestSubmitted",
-          messageKey: "leaveRequestSubmitted",
-          params: { employeeName: employee.name, days, leaveType: type, startDate: start, endDate: end },
-        })
-      ));
+      // Addressed one-per-reviewer rather than an "hr" broadcast: MANAGER is
+      // department-scoped and a broadcast carries no department. Who belongs in
+      // this set is this call site's decision, not the spine's — see the header
+      // of utils/notify.js.
+      const reviewers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
+      await emitNotificationEach(reviewers.map((u) => u._id), {
+        category: "leave",
+        title: "New leave request",
+        message: `${employee.name} requested ${days} ${type} leave day${days === 1 ? "" : "s"} (${dateOnly(start)} → ${dateOnly(end)}).`,
+        link: "/holidays",
+        linkLabel: "Review request",
+        titleKey: "leaveRequestSubmitted",
+        messageKey: "leaveRequestSubmitted",
+        params: { employeeName: employee.name, days, leaveType: type, startDate: start, endDate: end },
+      });
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {

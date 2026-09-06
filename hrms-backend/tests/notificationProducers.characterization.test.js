@@ -81,7 +81,7 @@ const recipientIds = (docs) => docs.map((n) => String(n.user)).sort();
 describe("notifyHR()", () => {
   it("writes one unaddressed 'hr' broadcast, not a per-user fan-out", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const { notifyHR } = await import("../controller/notificationController.js");
+    const { notifyHR } = await import("../utils/notify.js");
 
     await notifyHR({ title: "T", message: "M" });
 
@@ -102,7 +102,7 @@ describe("notifyHR()", () => {
 
   it("normalises every omitted optional field to null, never undefined", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const { notifyHR } = await import("../controller/notificationController.js");
+    const { notifyHR } = await import("../utils/notify.js");
 
     await notifyHR({ title: "T" });
 
@@ -118,7 +118,7 @@ describe("notifyHR()", () => {
 
   it("carries the i18n triple through untouched when given", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const { notifyHR } = await import("../controller/notificationController.js");
+    const { notifyHR } = await import("../utils/notify.js");
 
     await notifyHR({
       title: "New employee added",
@@ -146,7 +146,7 @@ describe("notifyHR()", () => {
 
   it("swallows a write failure instead of throwing — callers do not await it", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const { notifyHR } = await import("../controller/notificationController.js");
+    const { notifyHR } = await import("../utils/notify.js");
 
     // `title` is required by the schema, so this write cannot succeed.
     // Several call sites (authController, departmentController, the jobs)
@@ -158,7 +158,7 @@ describe("notifyHR()", () => {
 
   it("swallows an invalid category the same way", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const { notifyHR } = await import("../controller/notificationController.js");
+    const { notifyHR } = await import("../utils/notify.js");
 
     await expect(
       notifyHR({ title: "T", category: "not-a-real-category" }),

@@ -38,7 +38,7 @@
 import mongoose from "mongoose";
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
-import NotificationModel from "../model/Notification.js";
+import { emitNotification } from "./notify.js";
 import { getManagerDepartmentId, resolveEmployeeForUser } from "./managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "./permissions.js";
 import { AppError } from "./appError.js";
@@ -300,17 +300,16 @@ export function createReviewRequestController({
               : defaultNotificationCopy(decision, resourceLabel, request.reviewNote);
             const resolvedLink = typeof employeeLink === "function" ? employeeLink(request) : employeeLink;
 
-            await NotificationModel.create({
+            await emitNotification({
               user: employeeUser._id,
               category: "employee",
               title: copy.title,
               message: copy.message,
-              link: copy.link ?? resolvedLink ?? null,
-              linkLabel: copy.linkLabel ?? employeeLinkLabel ?? null,
-              read: false,
-              titleKey: copy.titleKey ?? null,
-              messageKey: copy.messageKey ?? null,
-              params: copy.params ?? null,
+              link: copy.link ?? resolvedLink,
+              linkLabel: copy.linkLabel ?? employeeLinkLabel,
+              titleKey: copy.titleKey,
+              messageKey: copy.messageKey,
+              params: copy.params,
             });
           }
         }

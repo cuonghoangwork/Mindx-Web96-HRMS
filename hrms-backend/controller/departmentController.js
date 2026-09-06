@@ -3,7 +3,7 @@ import EmployeeModel from "../model/Employee.js";
 import { departmentToClient, departmentFromClient } from "../utils/mappers.js";
 import { resolveManagerRef } from "../utils/refResolvers.js";
 import { logAction, diffChanges } from "../utils/auditLog.js";
-import { notifyHR } from "./notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { AppError } from "../utils/appError.js";
 import { actorNotifyKeys } from "../utils/notifyActor.js";

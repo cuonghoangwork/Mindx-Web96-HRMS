@@ -14,7 +14,7 @@ import EmployeeModel from "../model/Employee.js";
 import NotificationModel from "../model/Notification.js";
 import PerformanceCycleModel from "../model/PerformanceCycle.js";
 import PerformanceReviewModel from "../model/PerformanceReview.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { emitNotification, notifyHR } from "../utils/notify.js";
 import { findUserForEmployee } from "../controller/performanceController.js";
 import { daysUntil } from "../utils/performanceCycles.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
@@ -26,17 +26,16 @@ const REMINDER_WINDOW_DAYS = 7;
 async function notifyOnceForUser(userId, { title, message, titleKey, messageKey, params }) {
   const existing = await NotificationModel.findOne({ user: userId, category: "performance", title });
   if (existing) return false;
-  await NotificationModel.create({
+  await emitNotification({
     user: userId,
     category: "performance",
     title,
     message,
     link: REVIEW_LINK,
     linkLabel: REVIEW_LINK_LABEL,
-    isCustom: false,
-    titleKey: titleKey ?? null,
-    messageKey: messageKey ?? null,
-    params: params ?? null,
+    titleKey,
+    messageKey,
+    params,
   });
   return true;
 }

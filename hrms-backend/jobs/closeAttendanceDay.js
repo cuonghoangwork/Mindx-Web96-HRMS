@@ -4,7 +4,7 @@ import LeaveRequestModel from "../model/LeaveRequest.js";
 import NoShowReviewModel from "../model/NoShowReview.js";
 import OvertimeRequestModel from "../model/OvertimeRequest.js";
 import { logAction } from "../utils/auditLog.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { getRemainingDays } from "../utils/leaveBalance.js";
 import {
   WORKDAY_END,

@@ -1,6 +1,5 @@
 import PayrollPeriodModel from "../model/PayrollPeriod.js";
 import PayslipModel from "../model/Payslip.js";
-import NotificationModel from "../model/Notification.js";
 import { autoDeductionVnd, computePayslip } from "../utils/payrollEngine.js";
 import {
   buildPayslipRows,
@@ -9,7 +8,7 @@ import {
   periodLabel,
 } from "../utils/payrollGeneration.js";
 import { logAction } from "../utils/auditLog.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { emitNotification, notifyHR } from "../utils/notify.js";
 
 export function targetMonthOf(asOf) {
   const d = new Date(asOf.getFullYear(), asOf.getMonth() - 1, 1);
@@ -141,8 +140,9 @@ export async function runMonthlyPayroll({ asOf = new Date() } = {}) {
     },
   );
 
-  await NotificationModel.create({
-    user: null,
+  // audience "all" here vs "employees" on the manual path in
+  // controller/payrollController.js — see the note there.
+  await emitNotification({
     audience: "all",
     category: "payroll",
     title: "Payroll paid",
@@ -150,8 +150,6 @@ export async function runMonthlyPayroll({ asOf = new Date() } = {}) {
     titleKey: "payrollPaid",
     messageKey: "payrollPaid",
     params: { periodLabel: periodLabel(period) },
-    link: null,
-    isCustom: false,
   });
 
   return {

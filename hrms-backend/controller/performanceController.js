@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { createHash } from "crypto";
 import EmployeeModel from "../model/Employee.js";
-import NotificationModel from "../model/Notification.js";
 import UserModel from "../model/User.js";
 import PerformanceCycleModel from "../model/PerformanceCycle.js";
 import PerformanceReviewModel, {
@@ -14,7 +13,7 @@ import PerformanceReviewModel, {
   RATING_OPTIONS,
   REVIEW_STATUSES,
 } from "../model/PerformanceReview.js";
-import { notifyHR } from "./notificationController.js";
+import { emitNotification, notifyHR } from "../utils/notify.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
 import { askGemini } from "../utils/geminiClient.js";
 import { buildInsightPrompt } from "../utils/performanceInsightPrompt.js";
@@ -243,15 +242,13 @@ export async function findUserForEmployee(employee) {
 
 async function broadcastCycleOpen(cycle) {
   try {
-    await NotificationModel.create({
-      user: null,
+    await emitNotification({
       audience: "all",
       category: "performance",
       title: "Review cycle open",
       message: `${cycle.label} is now open for performance reviews.`,
       link: REVIEW_LINK,
       linkLabel: REVIEW_LINK_LABEL,
-      isCustom: false,
       titleKey: "reviewCycleOpen",
       messageKey: "reviewCycleOpen",
       params: { cycleLabel: cycle.label },
@@ -264,17 +261,16 @@ async function broadcastCycleOpen(cycle) {
 async function notifyUsers(userIds, payload) {
   await Promise.all(
     userIds.map((userId) =>
-      NotificationModel.create({
+      emitNotification({
         user: userId,
         category: "performance",
         title: payload.title,
         message: payload.message,
         link: REVIEW_LINK,
         linkLabel: REVIEW_LINK_LABEL,
-        isCustom: false,
-        titleKey: payload.titleKey ?? null,
-        messageKey: payload.messageKey ?? null,
-        params: payload.params ?? null,
+        titleKey: payload.titleKey,
+        messageKey: payload.messageKey,
+        params: payload.params,
       }).catch((err) =>
         console.error("[performance] Failed to create notification:", err.message),
       ),

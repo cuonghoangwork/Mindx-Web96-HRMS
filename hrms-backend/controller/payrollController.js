@@ -12,8 +12,7 @@ import { generateMonthlyPayrollDraft } from "../jobs/generateMonthlyPayrollDraft
 import { runMonthlyPayroll } from "../jobs/runMonthlyPayroll.js";
 import { getOrCreateMonthlyFxRate } from "../utils/exchangeRate.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
-import { notifyHR } from "./notificationController.js";
-import NotificationModel from "../model/Notification.js";
+import { emitNotification, notifyHR } from "../utils/notify.js";
 import { resolveRequestingEmployee } from "../utils/reviewQueue.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 
@@ -516,8 +515,12 @@ const payrollController = {
       });
 
       if (status === "paid") {
-        await NotificationModel.create({
-          user: null,
+        // NOTE: jobs/runMonthlyPayroll.js emits this same notice with
+        // audience "all". Whether HR/Admin see "Payroll paid" therefore depends
+        // on whether a human or the cron marked the period paid. Pinned as-is in
+        // tests/notificationProducers.characterization.test.js — reconciling the
+        // two is a behaviour decision, separate from moving the call site.
+        await emitNotification({
           audience: "employees",
           category: "payroll",
           title: "Payroll paid",
@@ -525,7 +528,6 @@ const payrollController = {
           titleKey: "payrollPaid",
           messageKey: "payrollPaid",
           params: { periodLabel: periodLabel(period) },
-          isCustom: false,
         });
       }
 

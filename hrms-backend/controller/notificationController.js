@@ -1,4 +1,5 @@
 import NotificationModel, { broadcastAudiencesFor } from "../model/Notification.js";
+import { emitNotification, emitNotificationEach } from "../utils/notify.js";
 import EmployeeModel from "../model/Employee.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
 import { AppError } from "../utils/appError.js";
@@ -61,9 +62,7 @@ const notificationController = {
           if (employee?.userId) uid = String(employee.userId);
           userIds.push(uid);
         }
-        const created = await Promise.all(
-          userIds.map((uid) => NotificationModel.create({ ...data, user: uid })),
-        );
+        const created = await emitNotificationEach(userIds, data);
         return res.status(201).json({
           success: true,
           data: notificationToClient(created[0]),
@@ -72,9 +71,11 @@ const notificationController = {
       }
 
       // Broadcast
-      data.user = null;
-      data.audience = data.audience || "all";
-      const notification = await NotificationModel.create(data);
+      const notification = await emitNotification({
+        ...data,
+        user: null,
+        audience: data.audience || "all",
+      });
       res.status(201).json({ success: true, data: notificationToClient(notification) });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
@@ -155,39 +156,5 @@ const notificationController = {
     }
   },
 };
-
-/**
- * notifyHR — fire-and-forget helper other controllers call to alert all HR/Admin
- * users of a system event (e.g. employee or account created/deleted).
- * Never throws — failures are logged only, matching utils/auditLog.js's contract.
- */
-export async function notifyHR({
-  title,
-  message,
-  category = "employee",
-  link,
-  linkLabel,
-  titleKey,
-  messageKey,
-  params,
-}) {
-  try {
-    await NotificationModel.create({
-      user: null,
-      audience: "hr",
-      category,
-      title,
-      message,
-      link: link ?? null,
-      linkLabel: linkLabel ?? null,
-      isCustom: false,
-      titleKey: titleKey ?? null,
-      messageKey: messageKey ?? null,
-      params: params ?? null,
-    });
-  } catch (err) {
-    console.error("[notifyHR] Failed to create notification:", err.message);
-  }
-}
 
 export default notificationController;

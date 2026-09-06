@@ -23,7 +23,7 @@
 import EmployeeModel from "../model/Employee.js";
 import PromotionRequestModel from "../model/PromotionRequest.js";
 import PositionLevelModel from "../model/PositionLevel.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 import { computeEligibility } from "../utils/positionLadder.js";
 
 export async function checkPromotionEligibility({ asOf = new Date() } = {}) {

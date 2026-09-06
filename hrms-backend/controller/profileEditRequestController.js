@@ -1,7 +1,7 @@
 import ProfileEditRequestModel, { EDITABLE_FIELDS } from "../model/ProfileEditRequest.js";
 import EmployeeModel from "../model/Employee.js";
 import UserModel from "../model/User.js";
-import NotificationModel from "../model/Notification.js";
+import { emitNotificationEach } from "../utils/notify.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 
 /* ── client-shape field name → DB field name (mirrors mappers.js) ── */
@@ -140,22 +140,18 @@ const profileEditRequestController = {
         status: "pending",
       });
 
-      // Notify all HR/Admin users
-      const hrUsers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
-      await Promise.all(hrUsers.map((u) =>
-        NotificationModel.create({
-          user: u._id,
-          category: "employee",
-          title: "Profile edit request",
-          message: `${employee.name} has submitted a request to update their profile.`,
-          link: "/employees?tab=editRequests",
-          linkLabel: "Review request",
-          read: false,
-          titleKey: "profileEditRequestSubmitted",
-          messageKey: "profileEditRequestSubmitted",
-          params: { employeeName: employee.name },
-        })
-      ));
+      // Same reviewer set as a leave request, and for the same reason.
+      const reviewers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
+      await emitNotificationEach(reviewers.map((u) => u._id), {
+        category: "employee",
+        title: "Profile edit request",
+        message: `${employee.name} has submitted a request to update their profile.`,
+        link: "/employees?tab=editRequests",
+        linkLabel: "Review request",
+        titleKey: "profileEditRequestSubmitted",
+        messageKey: "profileEditRequestSubmitted",
+        params: { employeeName: employee.name },
+      });
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {

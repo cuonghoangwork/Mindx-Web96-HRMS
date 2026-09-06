@@ -2,7 +2,7 @@ import PromotionRequestModel from "../model/PromotionRequest.js";
 import EmployeeModel from "../model/Employee.js";
 import DepartmentModel from "../model/Department.js";
 import UserModel from "../model/User.js";
-import NotificationModel from "../model/Notification.js";
+import { emitNotificationEach } from "../utils/notify.js";
 import { POSITION_LEVELS } from "../model/PositionLevel.js";
 import { createReviewRequestController, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { resolveDepartmentIdByName } from "../utils/refResolvers.js";
@@ -237,23 +237,20 @@ const promotionRequestController = {
       const request = await PromotionRequestModel.create(doc);
       await request.populate(POPULATE.map(([path, select]) => ({ path, select })));
 
+      // ADMIN only, deliberately narrower than the leave/profile-edit set:
+      // router/promotionRequestRouter.js lets only an ADMIN review a promotion,
+      // so telling anyone else would be a notice they cannot act on.
       const admins = await UserModel.find({ role: "ADMIN" }, "_id");
-      await Promise.all(
-        admins.map((u) =>
-          NotificationModel.create({
-            user: u._id,
-            category: "employee",
-            title: "Promotion proposal awaiting review",
-            message: `A promotion was proposed for ${employee.name} (${employee.employeeId}).`,
-            link: "/employees",
-            linkLabel: "Review promotion queue",
-            read: false,
-            titleKey: "promotionProposalAwaitingReview",
-            messageKey: "promotionProposalAwaitingReview",
-            params: { employeeName: employee.name, employeeId: employee.employeeId },
-          }),
-        ),
-      );
+      await emitNotificationEach(admins.map((u) => u._id), {
+        category: "employee",
+        title: "Promotion proposal awaiting review",
+        message: `A promotion was proposed for ${employee.name} (${employee.employeeId}).`,
+        link: "/employees",
+        linkLabel: "Review promotion queue",
+        titleKey: "promotionProposalAwaitingReview",
+        messageKey: "promotionProposalAwaitingReview",
+        params: { employeeName: employee.name, employeeId: employee.employeeId },
+      });
 
       await logAction(req, {
         action: "created",

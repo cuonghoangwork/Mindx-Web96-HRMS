@@ -25,7 +25,7 @@ import { standardWorkingDaysInMonth } from "../utils/payrollEngine.js";
 import { buildPayslipRows, insertPayslips, periodLabel } from "../utils/payrollGeneration.js";
 import { getOrCreateMonthlyFxRate } from "../utils/exchangeRate.js";
 import { logAction } from "../utils/auditLog.js";
-import { notifyHR } from "../controller/notificationController.js";
+import { notifyHR } from "../utils/notify.js";
 
 export async function generateMonthlyPayrollDraft({ asOf = new Date() } = {}) {
   const year = asOf.getFullYear();
