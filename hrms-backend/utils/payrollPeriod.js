@@ -1,4 +1,4 @@
-import { localDateKey, utcDateKey } from "./workday.js";
+import { APP_TIMEZONE, localDateKey, utcDateKey, zonedWallClockToUtc } from "./workday.js";
 
 const DAY_MS = 86_400_000;
 
@@ -15,8 +15,20 @@ export function monthQueryWindowUtc(year, month) {
   };
 }
 
-export function periodEndUtc(year, month) {
-  return new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+/**
+ * The last instant of the payroll month, as a real UTC timestamp.
+ *
+ * The month ends when it ends *for the company*, which is why this is not
+ * plain Date.UTC(). It used to be, and the difference was not cosmetic: the
+ * only caller compares an employee's `createdAt` against this to decide
+ * whether they were on the roster (utils/payrollGeneration.js). With a UTC
+ * boundary, anyone hired between 00:00 and 06:59 on the 1st of a month —
+ * still 07:00-behind "yesterday" in UTC — was handed a payslip for the month
+ * BEFORE they started. In Asia/Ho_Chi_Minh that is a seven-hour window on
+ * the first morning of every month.
+ */
+export function periodEndUtc(year, month, timeZone = APP_TIMEZONE) {
+  return zonedWallClockToUtc(Date.UTC(year, month, 0, 23, 59, 59, 999), timeZone);
 }
 
 export function attendanceDateKey(date) {

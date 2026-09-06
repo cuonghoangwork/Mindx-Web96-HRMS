@@ -205,10 +205,45 @@ describe("monthQueryWindowUtc / periodEndUtc", () => {
     expect(monthQueryWindowUtc(2024, 2).hi.toISOString()).toBe("2024-03-02T23:59:59.999Z");
   });
 
-  it("ends the period on the last millisecond of the last day", () => {
-    expect(periodEndUtc(2026, 8).toISOString()).toBe("2026-08-31T23:59:59.999Z");
-    expect(periodEndUtc(2026, 12).toISOString()).toBe("2026-12-31T23:59:59.999Z");
-    expect(periodEndUtc(2024, 2).toISOString()).toBe("2024-02-29T23:59:59.999Z");
+  it("ends the period on the last millisecond of the last day IN COMPANY TIME", () => {
+    // 16:59:59.999Z is 23:59:59.999 +07:00 — the end of 31 August in
+    // Asia/Ho_Chi_Minh, not in UTC. Fixed values, because the default zone
+    // has no DST and these must not move with the host clock.
+    expect(periodEndUtc(2026, 8).toISOString()).toBe("2026-08-31T16:59:59.999Z");
+    expect(periodEndUtc(2026, 12).toISOString()).toBe("2026-12-31T16:59:59.999Z");
+    expect(periodEndUtc(2024, 2).toISOString()).toBe("2024-02-29T16:59:59.999Z"); // leap
+  });
+
+  it("excludes the first morning of the next month, which UTC used to include", () => {
+    // The bug this replaced: an employee hired 00:00-06:59 on the 1st is
+    // still "yesterday" in UTC, so a UTC month-end let them onto the PREVIOUS
+    // month's payroll. Expressed as instants so the assertion does not depend
+    // on the host zone.
+    const end = periodEndUtc(2026, 8);
+    const hiredFirstOfSeptMidnight = new Date("2026-08-31T17:00:00.000Z"); // 1 Sep 00:00 +07
+    const hiredFirstOfSeptMorning = new Date("2026-08-31T23:59:00.000Z"); // 1 Sep 06:59 +07
+    expect(hiredFirstOfSeptMidnight > end).toBe(true);
+    expect(hiredFirstOfSeptMorning > end).toBe(true);
+  });
+
+  it("still includes the final minute of the month in company time", () => {
+    // The other side of the boundary — the fix must not shut the month early.
+    const end = periodEndUtc(2026, 8);
+    expect(new Date("2026-08-31T16:59:00.000Z") <= end).toBe(true); // 31 Aug 23:59 +07
+    expect(new Date("2026-08-31T05:00:00.000Z") <= end).toBe(true); // 31 Aug 12:00 +07
+  });
+
+  it("respects an explicit zone, including a half-hour offset", () => {
+    // SCHEDULER_TZ is configurable, so the boundary must not assume +07:00.
+    expect(periodEndUtc(2026, 8, "UTC").toISOString()).toBe("2026-08-31T23:59:59.999Z");
+    expect(periodEndUtc(2026, 8, "Asia/Kolkata").toISOString()).toBe("2026-08-31T18:29:59.999Z");
+  });
+
+  it("tracks a DST transition rather than assuming a fixed offset", () => {
+    // Sydney is UTC+11 in March and UTC+10 in August. A single hardcoded
+    // offset would get one of these wrong; sampling per instant gets both.
+    expect(periodEndUtc(2026, 3, "Australia/Sydney").toISOString()).toBe("2026-03-31T12:59:59.999Z");
+    expect(periodEndUtc(2026, 8, "Australia/Sydney").toISOString()).toBe("2026-08-31T13:59:59.999Z");
   });
 });
 

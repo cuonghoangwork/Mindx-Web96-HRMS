@@ -1,3 +1,8 @@
+// Real translations, not the raw keys: AvatarGroup's overflow badge labels
+// itself through t("avatar.moreAriaLabel"), so without this the aria-label
+// renders as the key and getByLabelText finds nothing. Same first line as
+// every other test file that renders a translated component.
+import "../i18n";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import Avatar, { AvatarGroup, getInitials } from "./Avatar";

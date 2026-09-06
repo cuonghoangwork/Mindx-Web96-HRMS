@@ -13,7 +13,7 @@
  * calendar days. Nothing in this file reads the host's local time.
  */
 
-import { dateKeyInTz, parseHHMM } from "./workday.js";
+import { APP_TIMEZONE, dateKeyInTz, parseHHMM } from "./workday.js";
 import { OT_APPLY_CUTOFF } from "./overtime.js";
 
 /**
@@ -21,7 +21,7 @@ import { OT_APPLY_CUTOFF } from "./overtime.js";
  * attendanceController.closeDay, so the cutoff, the close job and the
  * manual close endpoint all agree on what "today" means.
  */
-export const OT_TIMEZONE = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
+export const OT_TIMEZONE = APP_TIMEZONE;
 
 /**
  * The wall-clock "HH:MM" in `timeZone` at the given instant.

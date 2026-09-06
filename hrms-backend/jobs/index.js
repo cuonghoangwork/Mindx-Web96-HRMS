@@ -5,9 +5,9 @@ import { generateMonthlyPayrollDraft } from "./generateMonthlyPayrollDraft.js";
 import { runMonthlyPayroll } from "./runMonthlyPayroll.js";
 import { annualSalaryRaise } from "./annualSalaryRaise.js";
 import { sendPerformanceReminders } from "./performanceReminders.js";
-import { dateKeyInTz } from "../utils/workday.js";
+import { APP_TIMEZONE, dateKeyInTz } from "../utils/workday.js";
 
-export const SCHEDULER_TZ = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
+export const SCHEDULER_TZ = APP_TIMEZONE;
 
 let running = false;
 let promotionCheckRunning = false;
