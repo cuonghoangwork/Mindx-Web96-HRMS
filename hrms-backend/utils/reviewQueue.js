@@ -144,6 +144,12 @@ export async function assertNoPendingRequest(Model, employeeId, message, code, p
  *   send the employee.
  * @param {string} [options.employeeLinkLabel] - label for `employeeLink`,
  *   same override rule as above.
+ * @param {(items: object[]) => Promise<object[]>} [options.enrichItems] - optional
+ *   async pass over the mapped client items before they are sent. For facts
+ *   that live on another collection and would otherwise cost one query per
+ *   row: the overtime queue uses it to attach each request's attendance
+ *   evidence in a single batched lookup. Runs once per list call, never per
+ *   item — an enrich hook that queries inside a loop defeats its own purpose.
  * @param {string} [options.capability] - Solo Gaps Milestone 3: an optional
  *   RolePermission capability key (see utils/permissions.js). When set,
  *   MANAGER additionally needs this capability enabled to review — never
@@ -163,6 +169,7 @@ export function createReviewRequestController({
   employeeLink,
   employeeLinkLabel,
   capability,
+  enrichItems,
 }) {
   function applyPopulate(query) {
     for (const [path, select] of populate) query.populate(path, select);
@@ -197,7 +204,11 @@ export function createReviewRequestController({
           Model.find(condition).sort({ createdAt: -1 }),
         );
 
-        res.json({ success: true, items: items.map(toClient) });
+        const mapped = items.map(toClient);
+        res.json({
+          success: true,
+          items: typeof enrichItems === "function" ? await enrichItems(mapped) : mapped,
+        });
       } catch (error) {
         res.status(error.status || 500).json({ success: false, message: error.message, code: error.code, params: error.params });
       }

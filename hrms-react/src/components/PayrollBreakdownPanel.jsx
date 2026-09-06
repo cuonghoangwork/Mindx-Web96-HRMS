@@ -12,9 +12,41 @@ import { fmtMoney } from "../utils/payroll";
 function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
   const { t } = useTranslation();
   const exemptSuffix = slip.insuranceExempt ? t("payrollBreakdown.exemptSuffix", { defaultValue: " — exempt" }) : "";
+
+  // "150% × 4h · 200% × 10h · 270% × 2h · PIT-exempt".
+  //
+  // The segments arrive pre-computed from the server (payslipToClient), so the
+  // statutory multipliers live in exactly one place — utils/overtimeRate.js —
+  // rather than being duplicated here and drifting the first time one changes.
+  const overtimeNote = [
+    ...(slip.overtimeSegments ?? []).map((s) =>
+      t("payrollBreakdown.overtimeSegment", {
+        percent: s.percent,
+        hours: s.hours,
+        defaultValue: "{{percent}}% × {{hours}}h",
+      }),
+    ),
+    slip.overtimeTaxExempt
+      ? t("payrollBreakdown.overtimePitExempt", { defaultValue: "PIT-exempt" })
+      : t("payrollBreakdown.overtimePitTaxed", { defaultValue: "taxed" }),
+  ].join(" · ");
   const rows = [
     { label: t("payrollBreakdown.rows.baseSalary", { defaultValue: "Base salary" }), value: slip.baseSalary, sign: 1 },
     { label: t("payrollBreakdown.rows.bonus", { defaultValue: "Bonus" }), value: slip.bonus, sign: 1 },
+    // Overtime sits after Bonus, and only appears when there is some — a row
+    // reading "Overtime (0 h) · PIT-exempt" on every payslip in the company
+    // would be noise on the great majority of them.
+    ...(slip.overtimePay > 0
+      ? [{
+          label: t("payrollBreakdown.rows.overtime", {
+            hours: slip.overtimeHours,
+            defaultValue: "Overtime ({{hours}} h)",
+          }),
+          value: slip.overtimePay,
+          sign: 1,
+          note: overtimeNote,
+        }]
+      : []),
     { label: t("payrollBreakdown.rows.allowance", { defaultValue: "Allowance" }), value: slip.allowance, sign: 1 },
     { label: t("payrollBreakdown.rows.deduction", { defaultValue: "Deduction" }), value: slip.deduction, sign: -1 },
     { label: t("payrollBreakdown.rows.grossPay", { defaultValue: "Gross pay" }), value: slip.grossPay, total: true },
@@ -51,19 +83,28 @@ function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
       <div style={{ maxWidth: "520px" }}>
         {rows.map((r) => (
           <div key={r.label} style={{
-            display: "flex", justifyContent: "space-between", gap: "var(--sp-4)",
             padding: "7px 0", borderBottom: "1px solid var(--bdr-subtle)",
             fontWeight: r.total ? "var(--fw-semibold)" : "var(--fw-regular)",
           }}>
-            <span style={{ fontSize: "var(--fs-sm)", color: r.total ? "var(--txt-primary)" : "var(--txt-secondary)" }}>
-              {r.label}
-            </span>
-            <span style={{
-              fontSize: "var(--fs-sm)",
-              color: r.total ? "var(--txt-primary)" : r.sign === -1 ? "var(--txt-danger)" : "var(--txt-primary)",
-            }}>
-              {r.sign === -1 ? "− " : ""}{fmtMoney(r.value, currency, fxRate)}
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-4)" }}>
+              <span style={{ fontSize: "var(--fs-sm)", color: r.total ? "var(--txt-primary)" : "var(--txt-secondary)" }}>
+                {r.label}
+              </span>
+              <span style={{
+                fontSize: "var(--fs-sm)",
+                color: r.total ? "var(--txt-primary)" : r.sign === -1 ? "var(--txt-danger)" : "var(--txt-primary)",
+              }}>
+                {r.sign === -1 ? "− " : ""}{fmtMoney(r.value, currency, fxRate)}
+              </span>
+            </div>
+            {r.note && (
+              <div style={{
+                fontSize: "var(--fs-xs)", color: "var(--txt-secondary)",
+                marginTop: "2px", fontWeight: "var(--fw-regular)",
+              }}>
+                └ {r.note}
+              </div>
+            )}
           </div>
         ))}
       </div>

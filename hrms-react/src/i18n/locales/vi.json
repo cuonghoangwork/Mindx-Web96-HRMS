@@ -521,7 +521,12 @@
    "absentLeave": "Vắng mặt / Nghỉ phép",
    "onLeaveTrend": "{{count}} đang nghỉ phép"
   },
-  "tabs": {
+  "overtime": {
+    "badge": "Tăng ca {{hours}} giờ · {{percent}}%",
+    "badgeWithNight": "Tăng ca {{hours}} giờ · {{percent}}% + {{nightPercent}}% ca đêm",
+    "unapproved": "⚠ {{hours}} giờ chưa duyệt"
+   },
+   "tabs": {
    "roster": "Danh sách trực",
    "noShowQueue": "Hàng chờ vắng không phép",
     "overtime": "Làm thêm giờ"
@@ -1400,6 +1405,8 @@
  },
  "clockIn": {
   "buttonDefault": "Chấm công vào",
+   "overtimeUntil": "Tăng ca đến {{time}}",
+   "overtimeUntilTitle": "Được duyệt làm thêm đến {{time}}",
   "inProgress": "Đang chấm công…",
   "clockedIn": "Đã chấm công {{time}}",
   "clockedInAtTitle": "Đã chấm công lúc {{time}}",
@@ -2121,6 +2128,7 @@
   "rows": {
    "baseSalary": "Lương cơ bản",
    "bonus": "Thưởng",
+    "overtime": "Làm thêm giờ ({{hours}} giờ)",
    "allowance": "Phụ cấp",
    "deduction": "Khấu trừ",
    "grossPay": "Tổng lương",
@@ -2131,6 +2139,9 @@
    "netPay": "Lương thực nhận"
   },
   "exemptSuffix": " — miễn trừ",
+   "overtimeSegment": "{{percent}}% × {{hours}} giờ",
+   "overtimePitExempt": "miễn thuế TNCN",
+   "overtimePitTaxed": "chịu thuế",
   "disclosure": "Kỳ {{label}} · {{workDays}} ngày làm việc chuẩn · Tỷ giá khóa ở {{rate}} VND/USD{{rateSourceSuffix}} · {{leaveClause}} · {{absentClause}} · giả định 0 người phụ thuộc đăng ký.",
   "unpaidLeaveDay_one": "{{count}} ngày nghỉ không lương",
   "unpaidLeaveDay_other": "{{count}} ngày nghỉ không lương",

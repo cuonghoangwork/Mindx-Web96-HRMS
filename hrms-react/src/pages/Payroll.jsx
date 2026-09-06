@@ -611,14 +611,22 @@ function Payroll() {
 
   const exportCSV = () => {
     if (!period) return;
+    // Overtime sits immediately before Gross: it is an addend to gross pay,
+    // so grouping the three overtime columns there keeps the money columns
+    // reading in the order they actually combine. The PIT-exempt flag is
+    // included because it is the only thing that explains a taxable figure
+    // lower than gross minus insurance and the personal deduction.
     const headers = [
       "Employee", "Employee ID", "Department", "Type",
       "Base Salary (VND)", "Bonus (VND)", "Allowance (VND)", "Deduction (VND)",
+      "Overtime Hours", "Overtime Night Hours", "Overtime (VND)", "Overtime PIT-Exempt",
       "Gross (VND)", "BHXH (VND)", "BHYT (VND)", "BHTN (VND)", "PIT (VND)", "Net (VND)",
     ];
     const lines = filtered.map((p) => [
       p.employeeName, p.employeeCode, p.departmentName ?? "", p.type ?? "",
       p.baseSalary, p.bonus, p.allowance, p.deduction,
+      p.overtimeHours ?? 0, p.overtimeNightHours ?? 0, p.overtimePay ?? 0,
+      p.overtimePay > 0 ? (p.overtimeTaxExempt ? "yes" : "no") : "",
       p.grossPay, p.bhxh, p.bhyt, p.bhtn, p.pit, p.netPay,
     ].map(csvCell).join(","));
 

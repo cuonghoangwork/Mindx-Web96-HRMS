@@ -23,6 +23,11 @@
  * compromise this file's DB-free contract.
  */
 import { minutesToHours } from "./overtime.js";
+// overtimeRate.js is Mongoose-free (appError/workday/payrollEngine/overtime
+// only), so importing the rate table here does not compromise this file's
+// DB-free contract — and it keeps the statutory multipliers in one place
+// rather than duplicated into the React roster.
+import { OT_MULTIPLIERS } from "./overtimeRate.js";
 
 /* ───────────────────────── enum maps (client label -> db value) ───────────────────────── */
 
@@ -352,6 +357,9 @@ export function attendanceToClient(doc) {
     otUnapprovedMinutes: o.otUnapprovedMinutes ?? 0,
     otUnapprovedHours: minutesToHours(o.otUnapprovedMinutes ?? 0),
     otDayType: o.otDayType ?? null,
+    // Display-ready rates for the roster badge ("OT 4h · 150%").
+    otDayPercent: o.otDayType ? Math.round(OT_MULTIPLIERS[o.otDayType].day * 100) : null,
+    otNightPercent: o.otDayType ? Math.round(OT_MULTIPLIERS[o.otDayType].night * 100) : null,
     otEvidence: o.otEvidence ?? null,
     otRequestId: o.otRequest ? String(o.otRequest._id ?? o.otRequest) : null,
   };

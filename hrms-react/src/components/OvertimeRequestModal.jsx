@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import Button from "./Button";
 import { useStore } from "../context/StoreContext";
 import { translateApiError } from "../utils/apiError";
-import { isoOf } from "../utils/attendance";
+import { hhmmToMinutes, isoOf } from "../utils/attendance";
 
 /**
  * OvertimeRequestModal — apply for overtime on a given date.
@@ -49,17 +49,8 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
 
   /** Minutes in the requested span. "24:00" is a legal end, never a legal start. */
   const requestedMinutes = useMemo(() => {
-    const toMinutes = (v, allowEndOfDay) => {
-      if (allowEndOfDay && v === "24:00") return 24 * 60;
-      const m = /^(\d{1,2}):(\d{2})$/.exec(v ?? "");
-      if (!m) return null;
-      const h = Number(m[1]);
-      const min = Number(m[2]);
-      if (h > 23 || min > 59) return null;
-      return h * 60 + min;
-    };
-    const start = toMinutes(plannedStart, false);
-    const end = toMinutes(plannedEnd, true);
+    const start = hhmmToMinutes(plannedStart);
+    const end = hhmmToMinutes(plannedEnd, { allowEndOfDay: true });
     if (start === null || end === null || end <= start) return null;
     return end - start;
   }, [plannedStart, plannedEnd]);

@@ -146,11 +146,8 @@ export function overtimeHourlyRateVnd({ baseSalary, year, month } = {}) {
   return Math.round(salary / (standardWorkingDaysInMonth(year, month) * 8));
 }
 
-/**
- * Prices one overtime span. Rounds once at the end rather than per-portion,
- * so the day and night halves cannot each absorb a rounding error.
- */
-export function overtimePayVnd({ hourlyRate, dayType, startHHMM, endHHMM } = {}) {
+/** The rate table lookup, with a loud error rather than a silent zero. */
+export function multipliersFor(dayType) {
   const multipliers = OT_MULTIPLIERS[dayType];
   if (!multipliers) {
     throw new AppError(
@@ -160,16 +157,42 @@ export function overtimePayVnd({ hourlyRate, dayType, startHHMM, endHHMM } = {})
       400,
     );
   }
+  return multipliers;
+}
+
+/**
+ * Prices already-split day/night minutes.
+ *
+ * This is the form payroll needs: Attendance stores otMinutes/otNightMinutes,
+ * not the original "HH:MM" span, so re-deriving a span just to price it would
+ * mean reconstructing information the recompute already threw away.
+ *
+ * Rounds once at the end rather than per-portion, so the day and night halves
+ * cannot each absorb a rounding error.
+ */
+export function overtimePayFromMinutesVnd({ hourlyRate, dayType, dayMinutes = 0, nightMinutes = 0 } = {}) {
+  const multipliers = multipliersFor(dayType);
+  const rate = Number(hourlyRate);
+  if (!Number.isFinite(rate) || rate <= 0) return 0;
+
+  return Math.round(
+    (Math.max(0, dayMinutes) / 60) * rate * multipliers.day +
+      (Math.max(0, nightMinutes) / 60) * rate * multipliers.night,
+  );
+}
+
+/**
+ * Prices one overtime span given as "HH:MM" times. Thin wrapper over
+ * overtimePayFromMinutesVnd so there is a single pricing implementation.
+ */
+export function overtimePayVnd({ hourlyRate, dayType, startHHMM, endHHMM } = {}) {
+  // Look the day type up first: an unknown one is a programming error worth
+  // reporting even when the span is also bad.
+  multipliersFor(dayType);
 
   // Validate the span before the rate: an inverted span is an error whether
   // or not there is a salary to price it against.
   const { dayMinutes, nightMinutes } = splitDayNight(startHHMM, endHHMM);
 
-  const rate = Number(hourlyRate);
-  if (!Number.isFinite(rate) || rate <= 0) return 0;
-
-  return Math.round(
-    (dayMinutes / 60) * rate * multipliers.day +
-      (nightMinutes / 60) * rate * multipliers.night,
-  );
+  return overtimePayFromMinutesVnd({ hourlyRate, dayType, dayMinutes, nightMinutes });
 }

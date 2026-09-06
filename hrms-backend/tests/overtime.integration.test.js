@@ -822,3 +822,64 @@ describe("POST /overtime-requests - working-day start boundary", () => {
     expect(res.body.data.dayType).toBe("restDay");
   });
 });
+
+describe("GET /overtime-requests - attendance evidence on queue rows", () => {
+  async function makeAttendance(employee, dateKey, overrides) {
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+    return AttendanceModel.create({
+      employee: employee._id,
+      date: utcMidnight(dateKey),
+      checkIn: "09:00",
+      status: "present",
+      ...overrides,
+    });
+  }
+
+  it("attaches otEvidence from the attendance record, not the request", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // The request records what was ASKED FOR; the attendance record what
+    // actually happened. The queue's warning triangle needs the latter, and
+    // without this join the field is simply absent from the payload - so the
+    // flag renders nothing at all, silently.
+    await makeAttendance(org.employees.dev, TOMORROW, {
+      checkOut: "22:00", rawCheckOut: "22:00",
+      otMinutes: 240, otNightMinutes: 0, otUnapprovedMinutes: 30,
+      otDayType: "normal", otEvidence: "clocked",
+    });
+    await apply(org.tokens.dev, weekdayEvening());
+
+    const res = await request.get(`${URL}?status=pending`).set(auth(org.tokens.hr));
+    const row = res.body.items.find((i) => i.employeeId === String(org.employees.dev._id));
+
+    expect(row.otEvidence).toBe("clocked");
+    expect(row.actualHours).toBe(4);
+    expect(row.unapprovedHours).toBe(0.5);
+  });
+
+  it("reports null evidence when no attendance record exists yet", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await apply(org.tokens.dev, weekdayEvening());
+
+    const res = await request.get(`${URL}?status=pending`).set(auth(org.tokens.hr));
+    const row = res.body.items.find((i) => i.employeeId === String(org.employees.dev._id));
+
+    // Null, not undefined: the field is always present so the client can
+    // decide, rather than having to distinguish "absent" from "none".
+    expect(row.otEvidence).toBeNull();
+    expect(row.actualHours).toBe(0);
+  });
+
+  it("does not match another employee's record for the same date", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await makeAttendance(org.employees.designer, TOMORROW, {
+      checkOut: "22:00", rawCheckOut: "22:00",
+      otMinutes: 240, otDayType: "normal", otEvidence: "clocked",
+    });
+    await apply(org.tokens.dev, weekdayEvening());
+
+    const res = await request.get(`${URL}?status=pending`).set(auth(org.tokens.hr));
+    const row = res.body.items.find((i) => i.employeeId === String(org.employees.dev._id));
+    expect(row.otEvidence).toBeNull();
+  });
+});

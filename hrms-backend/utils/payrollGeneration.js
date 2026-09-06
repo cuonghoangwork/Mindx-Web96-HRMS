@@ -17,12 +17,15 @@ import AttendanceModel from "../model/Attendance.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
 import HolidayModel from "../model/Holiday.js";
 import { autoDeductionVnd, computePayslip, seedBaseSalaryVnd } from "./payrollEngine.js";
+import { computeOvertimePay } from "./overtimePay.js";
 import {
+  attendanceDateKey,
   collectAbsentKeys,
   collectLeaveKeys,
   collectOnLeaveCoverageKeys,
   groupByEmployee,
   holidayKeySet,
+  monthPrefix,
   monthQueryWindowUtc,
   periodEndUtc,
 } from "./payrollPeriod.js";
@@ -71,6 +74,33 @@ export async function loadMonthDayCounts(year, month) {
   };
 }
 
+/**
+ * One query for the whole company's paid overtime in the period, keyed by
+ * employee — same batching reasoning as loadMonthDayCounts above.
+ *
+ * Filters on otMinutes > 0 rather than loading every attendance row: most days
+ * have no overtime, and only paid minutes matter here (otUnapprovedMinutes is
+ * never paid, by design).
+ */
+export async function loadMonthOvertime(year, month) {
+  const { lo, hi } = monthQueryWindowUtc(year, month);
+  const rows = await AttendanceModel.find(
+    { date: { $gte: lo, $lte: hi }, otMinutes: { $gt: 0 } },
+    "employee date otMinutes otNightMinutes otDayType",
+  );
+
+  const byEmployee = groupByEmployee(rows);
+  const prefix = monthPrefix(year, month);
+
+  return (employeeId) =>
+    (byEmployee.get(String(employeeId)) ?? []).filter((r) =>
+      // monthQueryWindowUtc deliberately over-fetches by two days either side
+      // (see its definition) so a record stored at a non-UTC-midnight instant
+      // is not missed; narrow back to the actual calendar month here.
+      attendanceDateKey(r.date).startsWith(prefix),
+    );
+}
+
 export async function buildPayslipRows(period) {
   const employees = await EmployeeModel.find(
     {
@@ -83,10 +113,17 @@ export async function buildPayslipRows(period) {
   if (!employees.length) return [];
 
   const dayCountsFor = await loadMonthDayCounts(period.year, period.month);
+  const overtimeRowsFor = await loadMonthOvertime(period.year, period.month);
 
   return employees.map((emp) => {
     const baseSalary = seedBaseSalaryVnd(emp.annualSalary, period.fxRate);
     const { unpaidLeaveDays, absentDays } = dayCountsFor(emp._id);
+    const overtime = computeOvertimePay({
+      baseSalary,
+      year: period.year,
+      month: period.month,
+      attendanceRows: overtimeRowsFor(emp._id),
+    });
     const autoDeduction = autoDeductionVnd({
       baseSalary,
       bonus: 0,
@@ -110,12 +147,16 @@ export async function buildPayslipRows(period) {
       absentDays,
       autoDeduction,
       deductionOverridden: false,
+      overtimeHours: overtime.hours,
+      overtimeNightHours: overtime.nightHours,
+      overtimeBreakdown: overtime.breakdown,
       ...computePayslip({
         baseSalary,
         bonus: 0,
         allowance: 0,
         deduction: autoDeduction,
         unpaidDays: unpaidLeaveDays + absentDays,
+        overtimePay: overtime.pay,
       }),
     };
   });

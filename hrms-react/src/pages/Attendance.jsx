@@ -716,7 +716,37 @@ function Attendance() {
                         <td style={{ color: "var(--txt-secondary)" }}>{r.department}</td>
                         <td style={{ color: r.status === "Late" ? "var(--txt-warning)" : "var(--txt-primary)" }}>{fmt(r.checkIn)}</td>
                         <td style={{ color: "var(--txt-secondary)" }}>{fmt(r.checkOut)}</td>
-                        <td><Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge></td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                            <Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge>
+                            {/* Paid overtime, with the rate that earned it. The
+                                percentages come from the server so the statutory
+                                multipliers are not duplicated here. */}
+                            {r.otHours > 0 && (
+                              <Badge variant="info" size="sm">
+                                {r.otNightHours > 0
+                                  ? t("attendance.overtime.badgeWithNight", {
+                                      hours: r.otHours, percent: r.otDayPercent, nightPercent: r.otNightPercent,
+                                      defaultValue: "OT {{hours}}h · {{percent}}% + {{nightPercent}}% night",
+                                    })
+                                  : t("attendance.overtime.badge", {
+                                      hours: r.otHours, percent: r.otDayPercent,
+                                      defaultValue: "OT {{hours}}h · {{percent}}%",
+                                    })}
+                              </Badge>
+                            )}
+                            {/* Recorded, never paid — the pattern a labour
+                                inspection actually looks for. */}
+                            {r.otUnapprovedHours > 0 && (
+                              <Badge variant="warning" size="sm">
+                                {t("attendance.overtime.unapproved", {
+                                  hours: r.otUnapprovedHours,
+                                  defaultValue: "⚠ {{hours}}h unapproved",
+                                })}
+                              </Badge>
+                            )}
+                          </div>
+                        </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           {r.canCheckIn && (
                             <Button

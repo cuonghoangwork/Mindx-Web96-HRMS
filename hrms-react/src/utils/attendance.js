@@ -49,6 +49,27 @@ export function hhmmOf(date) {
   }).format(date);
 }
 
+/**
+ * "HH:MM" to minutes since midnight, or null when unparseable.
+ *
+ * `allowEndOfDay` accepts "24:00" (1440) — the sentinel an overtime span uses
+ * for a shift running to the end of the day. It is opt-in because "24:00" is a
+ * legal *end* and never a legal *start*, matching the backend's split between
+ * parseHHMM and parseHHMMEnd.
+ *
+ * Returns null rather than throwing: every caller here is rendering, and a
+ * malformed stored time should degrade to "no chip" rather than a blank page.
+ */
+export function hhmmToMinutes(value, { allowEndOfDay = false } = {}) {
+  if (allowEndOfDay && value === "24:00") return 24 * 60;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value ?? "");
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
 /** Derives display status from a raw attendance record — flags "Present" as "Late" past 9am. */
 export function resolveStatus(record) {
   let s = record.status;

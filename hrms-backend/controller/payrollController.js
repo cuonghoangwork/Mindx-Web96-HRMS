@@ -1,6 +1,7 @@
 import PayrollPeriodModel, { PAYROLL_PERIOD_STATUSES } from "../model/PayrollPeriod.js";
 import PayslipModel from "../model/Payslip.js";
 import { DEFAULT_FX_RATE_VND_PER_USD, autoDeductionVnd, computePayslip, standardWorkingDaysInMonth } from "../utils/payrollEngine.js";
+import { overtimeSegments } from "../utils/overtimePay.js";
 import {
   buildPayslipRows,
   insertPayslips,
@@ -88,6 +89,13 @@ function payslipToClient(doc, period) {
     absentDays: o.absentDays ?? 0,
     autoDeduction: o.autoDeduction ?? 0,
     deductionOverridden: Boolean(o.deductionOverridden),
+    overtimeHours: o.overtimeHours ?? 0,
+    overtimeNightHours: o.overtimeNightHours ?? 0,
+    overtimePay: o.overtimePay ?? 0,
+    overtimeTaxExempt: o.overtimeTaxExempt !== false,
+    // Display-ready segments ("150% x 4h"), built server-side so the statutory
+    // multipliers live in exactly one place.
+    overtimeSegments: overtimeSegments(o.overtimeBreakdown),
     grossPay: o.grossPay ?? 0,
     insuranceBase: o.insuranceBase ?? 0,
     insuranceExempt: Boolean(o.insuranceExempt),
@@ -351,6 +359,12 @@ const payrollController = {
         computePayslip({
           ...merged,
           unpaidDays: payslip.unpaidLeaveDays + payslip.absentDays,
+          // Read back from the payslip, not recomputed from attendance.
+          // computePayslip returns a COMPLETE payslip, so omitting this would
+          // write overtimePay: 0 over the stored figure and silently erase an
+          // employee's overtime the moment HR nudged their bonus.
+          overtimePay: payslip.overtimePay,
+          overtimeTaxExempt: payslip.overtimeTaxExempt,
         }),
       );
       await payslip.save();
@@ -414,6 +428,9 @@ const payrollController = {
           allowance: payslip.allowance,
           deduction: autoDeduction,
           unpaidDays: unpaidLeaveDays + absentDays,
+          // Same reason as adjust() above — carried forward, never dropped.
+          overtimePay: payslip.overtimePay,
+          overtimeTaxExempt: payslip.overtimeTaxExempt,
         }),
       );
       await payslip.save();

@@ -4,7 +4,7 @@ import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
 import { idsMatch } from "../utils/id";
 import { translateApiError } from "../utils/apiError";
-import { hhmmOf, isoOf } from "../utils/attendance";
+import { hhmmOf, hhmmToMinutes, isoOf } from "../utils/attendance";
 
 /**
  * ClockInAction — topbar "Clock in" quick action, matching the mockup's
@@ -18,7 +18,7 @@ import { hhmmOf, isoOf } from "../utils/attendance";
  */
 function ClockInAction() {
   const { t } = useTranslation();
-  const { employees, attendance, getAppNow, clockIn } = useStore();
+  const { employees, attendance, overtimeRequests, getAppNow, clockIn } = useStore();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -45,6 +45,25 @@ function ClockInAction() {
   );
   const hasCheckedIn = Boolean(todayRecord?.checkIn);
 
+  // Once the employee is inside an approved overtime window, the chip stops
+  // saying when they clocked in and says how late they are approved until —
+  // the more useful fact at 7pm.
+  //
+  // The window comes from the request itself rather than a hardcoded 18:00,
+  // because on a rest day or holiday overtime can start at any hour: there is
+  // no normal shift for it to begin after.
+  const nowMinutes = hhmmToMinutes(hhmmOf(now));
+  const activeOvertime =
+    hasCheckedIn && nowMinutes !== null
+      ? (overtimeRequests ?? []).find((r) => {
+          if (r.status !== "approved" || r.date !== todayStr) return false;
+          if (!idsMatch(r.employeeId, myEmployee.id)) return false;
+          const start = hhmmToMinutes(r.plannedStart);
+          const end = hhmmToMinutes(r.plannedEnd, { allowEndOfDay: true });
+          return start !== null && end !== null && nowMinutes >= start && nowMinutes < end;
+        })
+      : null;
+
   const handleClick = async () => {
     if (hasCheckedIn || loading) return;
     setLoading(true);
@@ -67,9 +86,25 @@ function ClockInAction() {
       className="clock-in-btn"
       onClick={handleClick}
       disabled={hasCheckedIn || loading}
-      title={error || (hasCheckedIn ? t("clockIn.clockedInAtTitle", { defaultValue: "Clocked in at {{time}}", time: todayRecord.checkIn }) : t("clockIn.clockInTodayTitle", { defaultValue: "Clock in for today" }))}
+      title={
+        error ||
+        (activeOvertime
+          ? t("clockIn.overtimeUntilTitle", {
+              defaultValue: "Approved overtime until {{time}}",
+              time: activeOvertime.plannedEnd,
+            })
+          : hasCheckedIn
+            ? t("clockIn.clockedInAtTitle", { defaultValue: "Clocked in at {{time}}", time: todayRecord.checkIn })
+            : t("clockIn.clockInTodayTitle", { defaultValue: "Clock in for today" }))
+      }
     >
-      {hasCheckedIn ? t("clockIn.clockedIn", { defaultValue: "Clocked in {{time}}", time: todayRecord.checkIn }) : loading ? t("clockIn.inProgress", { defaultValue: "Clocking in…" }) : t("clockIn.buttonDefault", { defaultValue: "Clock in" })}
+      {activeOvertime
+        ? t("clockIn.overtimeUntil", { defaultValue: "OT until {{time}}", time: activeOvertime.plannedEnd })
+        : hasCheckedIn
+          ? t("clockIn.clockedIn", { defaultValue: "Clocked in {{time}}", time: todayRecord.checkIn })
+          : loading
+            ? t("clockIn.inProgress", { defaultValue: "Clocking in…" })
+            : t("clockIn.buttonDefault", { defaultValue: "Clock in" })}
     </button>
   );
 }

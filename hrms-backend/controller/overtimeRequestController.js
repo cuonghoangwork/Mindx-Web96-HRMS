@@ -309,6 +309,38 @@ const { list, review } = createReviewRequestController({
   resourceLabel: "overtime request",
   capability: "approveOvertimeRequests",
   toClient: toClientRequest,
+  /**
+   * The queue's warning triangle needs otEvidence, which lives on Attendance,
+   * not on the request — the request records what was *asked for*, the
+   * attendance record what actually happened. Without this the flag silently
+   * renders nothing, because the field is simply not in the payload.
+   *
+   * One query for the whole page rather than one per row: the pairs are
+   * {employee, date} and Attendance is indexed on exactly that.
+   */
+  enrichItems: async (items) => {
+    if (!items.length) return items;
+    const records = await AttendanceModel.find(
+      {
+        employee: { $in: items.map((i) => i.employeeId) },
+        date: { $in: items.map((i) => utcMidnight(i.date)) },
+      },
+      "employee date otEvidence otMinutes otNightMinutes otUnapprovedMinutes",
+    );
+    const key = (employee, date) => String(employee) + "|" + dateOnly(date);
+    const byKey = new Map(records.map((r) => [key(r.employee, r.date), r]));
+
+    return items.map((item) => {
+      const rec = byKey.get(key(item.employeeId, item.date));
+      return {
+        ...item,
+        otEvidence: rec?.otEvidence ?? null,
+        actualHours: minutesToHours(rec?.otMinutes ?? 0),
+        actualNightHours: minutesToHours(rec?.otNightMinutes ?? 0),
+        unapprovedHours: minutesToHours(rec?.otUnapprovedMinutes ?? 0),
+      };
+    });
+  },
   onApprove: async (request) => {
     const employeeId = request.employee?._id ?? request.employee;
     const record = await AttendanceModel.findOne({ employee: employeeId, date: request.date });
