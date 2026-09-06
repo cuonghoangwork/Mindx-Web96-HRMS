@@ -6,6 +6,7 @@ import EmployeeModel from "../model/Employee.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { getRemainingDays, getAllBalances, countWorkingDays } from "../utils/leaveBalance.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
+import { departmentManagerUserIds } from "../utils/performanceScope.js";
 import { AppError } from "../utils/appError.js";
 
 function dateOnly(d) {
@@ -231,11 +232,27 @@ const leaveRequestController = {
       await request.populate("employee", "name email employeeId");
 
       // Addressed one-per-reviewer rather than an "hr" broadcast: MANAGER is
-      // department-scoped and a broadcast carries no department. Who belongs in
-      // this set is this call site's decision, not the spine's — see the header
-      // of utils/notify.js.
-      const reviewers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
-      await emitNotificationEach(reviewers.map((u) => u._id), {
+      // department-scoped and a broadcast carries no department (see
+      // AUDIENCES_BY_ROLE in model/Notification.js).
+      //
+      // The HR half stays ADDRESSED rather than becoming a notifyHR broadcast
+      // like overtime uses, because read state on a broadcast is shared: one
+      // HR person marking it read clears it from every other reviewer's badge.
+      // A request each of them has to act on should not disappear because a
+      // colleague glanced at it.
+      //
+      // The manager half is scoped to the requester's OWN department. It used
+      // to be every MANAGER in the company, so a manager was pinged about leave
+      // in departments they have no authority to approve — the mirror image of
+      // the overtime bug, where the department manager was the one person NOT
+      // told. Excluding the caller stops a reviewer notifying themselves about
+      // their own request.
+      const [hrTier, departmentManagers] = await Promise.all([
+        UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } }, "_id"),
+        departmentManagerUserIds(employee.department, req.user.id),
+      ]);
+
+      await emitNotificationEach([...hrTier.map((u) => u._id), ...departmentManagers], {
         category: "leave",
         title: "New leave request",
         message: `${employee.name} requested ${days} ${type} leave day${days === 1 ? "" : "s"} (${dateOnly(start)} → ${dateOnly(end)}).`,
