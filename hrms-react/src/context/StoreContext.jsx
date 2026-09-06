@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { idsMatch } from "../utils/id";
+import { translateNotification } from "../utils/notifications";
+import { shouldNotify, showDesktopNotification } from "../utils/desktopNotify";
 import { translateApiError } from "../utils/apiError";
 import { useAuth } from "./AuthContext";
 import {
@@ -15,6 +18,7 @@ import {
 } from "../api";
 import { setDemoClockOffset } from "../api/client";
 import { connectNotificationStream } from "../api/notificationStream";
+import { useLanguage } from "./LanguageContext";
 
 const StoreContext = createContext(null);
 
@@ -43,6 +47,8 @@ function upsertAttendanceRecord(prev, record) {
 
 export function StoreProvider({ children }) {
   const { t } = useTranslation();
+  const { language } = useLanguage();
+  const navigate = useNavigate();
   const { isAuthenticated, mustChangePassword } = useAuth();
 
   const [employees, setEmployees] = useState([]);
@@ -158,16 +164,40 @@ export function StoreProvider({ children }) {
     }
   }, []);
 
+  // Held in a ref, not closed over by the effect below, so that switching
+  // language or navigating does not tear down and re-open the SSE
+  // connection — which would cost a fresh ticket and a catch-up refetch
+  // every time someone flips EN/VI.
+  const desktopToastRef = useRef(null);
+  desktopToastRef.current = (incoming) => {
+    if (!shouldNotify(incoming)) return;
+    // Translated, so the OS toast respects the EN/VI toggle exactly as the
+    // in-app list does — the stored title/message are English literals.
+    const { title, message } = translateNotification(incoming, t, language);
+    showDesktopNotification({
+      title,
+      body: message,
+      // Two open tabs both receive the same SSE event, and a notification
+      // written in the narrow window between a reconnect's catch-up fetch
+      // and the stream registering can arrive twice. A shared tag makes the
+      // OS collapse either case into a single toast.
+      tag: String(incoming.id),
+      onActivate: () => incoming.link && navigate(incoming.link),
+    });
+  };
+
   useEffect(() => {
     if (!isAuthenticated || mustChangePassword) return undefined;
 
     const connection = connectNotificationStream({
-      onNotification: (incoming) =>
+      onNotification: (incoming) => {
         setNotifications((prev) =>
           // A reconnect refetch races the stream: the catch-up GET and a live
           // event can both carry the same notification. Dedupe on id.
           prev.some((n) => idsMatch(n.id, incoming.id)) ? prev : [incoming, ...prev],
-        ),
+        );
+        desktopToastRef.current?.(incoming);
+      },
       onReconnect: refreshNotifications,
     });
 

@@ -1057,7 +1057,14 @@
   "notificationsTab": {
    "title": "Notifications",
    "subtitle": "Control what you get notified about.",
-   "gapNotice": "Per-category notification preferences aren't configurable yet — you'll receive all in-app notifications relevant to your role.",
+   "inAppLabel": "In-app notifications",
+   "inAppHint": "Delivered live to the bell in the header — no refresh needed.",
+   "alwaysOn": "Always on",
+   "desktopLabel": "Desktop notifications",
+   "desktopHint": "Show an operating-system notification when something arrives while HRMS is in the background. Applies to this browser only.",
+   "desktopBlocked": "Blocked for this site. Allow notifications in your browser's site settings to turn this on.",
+   "desktopUnsupported": "This browser doesn't support desktop notifications.",
+   "gapNotice": "Per-category preferences aren't configurable yet — you'll receive all in-app notifications relevant to your role.",
    "viewAll": "View notifications"
   },
   "appearanceTab": {

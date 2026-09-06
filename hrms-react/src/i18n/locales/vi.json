@@ -1051,7 +1051,14 @@
   "notificationsTab": {
    "title": "Thông báo",
    "subtitle": "Quản lý những gì bạn nhận được thông báo.",
-   "gapNotice": "Tùy chọn thông báo theo từng danh mục chưa khả dụng — bạn sẽ nhận mọi thông báo trong ứng dụng phù hợp với vai trò của mình.",
+   "inAppLabel": "Thông báo trong ứng dụng",
+   "inAppHint": "Hiển thị ngay tại chuông thông báo trên thanh tiêu đề — không cần tải lại trang.",
+   "alwaysOn": "Luôn bật",
+   "desktopLabel": "Thông báo trên máy tính",
+   "desktopHint": "Hiện thông báo của hệ điều hành khi có tin mới trong lúc HRMS chạy nền. Chỉ áp dụng cho trình duyệt này.",
+   "desktopBlocked": "Đã bị chặn cho trang này. Hãy cho phép thông báo trong cài đặt trình duyệt để bật lại.",
+   "desktopUnsupported": "Trình duyệt này không hỗ trợ thông báo trên máy tính.",
+   "gapNotice": "Tùy chọn theo từng danh mục chưa khả dụng — bạn sẽ nhận mọi thông báo trong ứng dụng phù hợp với vai trò của mình.",
    "viewAll": "Xem thông báo"
   },
   "appearanceTab": {

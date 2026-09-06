@@ -8,6 +8,7 @@ import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI, PermissionsAPI } fro
 import { apiFetch } from '../api/client'
 import { getRoleLabel } from '../utils/roles'
 import { translateApiError } from '../utils/apiError'
+import { permissionState, isWanted, setWanted, ensurePermission } from '../utils/desktopNotify'
 import Button from "../components/Button";
 
 /* ─────────────────────────────────────────────
@@ -568,19 +569,122 @@ function MyProfileEditSection() {
    model has no per-user prefs), so this is a
    disclosed gap rather than a fake checkbox table.
 ───────────────────────────────────────────── */
+function SettingRow({ label, hint, control }) {
+  return (
+    <div style={{
+      padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-surface-alt)',
+      border: '1px solid var(--bdr-subtle)', borderRadius: 'var(--radius-md)',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      gap: 'var(--sp-4)', flexWrap: 'wrap',
+    }}>
+      <div style={{ minWidth: '220px', flex: 1 }}>
+        <p style={{ fontSize: 'var(--fs-sm)', fontWeight: 'var(--fw-medium)', color: 'var(--txt-primary)', margin: 0 }}>{label}</p>
+        {hint && <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-secondary)', margin: '4px 0 0' }}>{hint}</p>}
+      </div>
+      {control}
+    </div>
+  )
+}
+
+function Switch({ checked, onChange, disabled, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: '44px', height: '24px', flexShrink: 0, padding: '2px',
+        borderRadius: 'var(--radius-full)', cursor: disabled ? 'not-allowed' : 'pointer',
+        border: '1px solid var(--bdr-default)',
+        background: checked ? 'var(--bg-primary)' : 'var(--bg-surface-alt)',
+        opacity: disabled ? 0.5 : 1,
+        display: 'flex', alignItems: 'center',
+        justifyContent: checked ? 'flex-end' : 'flex-start',
+        transition: 'background 120ms ease',
+      }}
+    >
+      <span style={{
+        width: '18px', height: '18px', borderRadius: 'var(--radius-full)',
+        background: checked ? 'var(--txt-on-brand)' : 'var(--txt-secondary)',
+        display: 'block',
+      }} />
+    </button>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Notifications tab — in-app is always on (it is
+   the notification record itself). Desktop toasts
+   are opt-in and deliberately per-device: the
+   browser owns permission, so a preference stored
+   on the User document would claim "on" for a
+   device that never granted it. See
+   utils/desktopNotify.js.
+───────────────────────────────────────────── */
 function NotificationsTab() {
   const { t } = useTranslation()
+  const [permission, setPermission] = useState(() => permissionState())
+  const [wanted, setWantedState] = useState(() => isWanted())
+
+  const unsupported = permission === 'unsupported'
+  const blocked = permission === 'denied'
+
+  const handleToggle = async (next) => {
+    if (!next) {
+      setWantedState(setWanted(false))
+      return
+    }
+    // Asking must happen inside this click — a permission prompt raised on
+    // page load gets reflexively blocked, and "denied" cannot be undone
+    // from script.
+    const result = await ensurePermission()
+    setPermission(result)
+    setWantedState(setWanted(result === 'granted'))
+  }
+
   return (
     <Panel title={t('settings.notificationsTab.title')} subtitle={t('settings.notificationsTab.subtitle')}>
-      <div style={{
-        padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-surface-alt)',
-        border: '1px solid var(--bdr-subtle)', borderRadius: 'var(--radius-md)',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-4)', flexWrap: 'wrap',
-      }}>
-        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)', margin: 0 }}>
-          {t('settings.notificationsTab.gapNotice')}
-        </p>
-        <a href="/notifications" className="btn btn-secondary btn-sm">{t('settings.notificationsTab.viewAll')}</a>
+      <div style={{ display: 'grid', gap: 'var(--sp-3)' }}>
+        <SettingRow
+          label={t('settings.notificationsTab.inAppLabel')}
+          hint={t('settings.notificationsTab.inAppHint')}
+          control={
+            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-success)', fontWeight: 'var(--fw-medium)' }}>
+              {t('settings.notificationsTab.alwaysOn')}
+            </span>
+          }
+        />
+
+        <SettingRow
+          label={t('settings.notificationsTab.desktopLabel')}
+          hint={
+            unsupported ? t('settings.notificationsTab.desktopUnsupported')
+              : blocked ? t('settings.notificationsTab.desktopBlocked')
+              : t('settings.notificationsTab.desktopHint')
+          }
+          control={
+            <Switch
+              checked={wanted && permission === 'granted'}
+              onChange={handleToggle}
+              disabled={unsupported || blocked}
+              label={t('settings.notificationsTab.desktopLabel')}
+            />
+          }
+        />
+
+        <div style={{
+          padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-surface-alt)',
+          border: '1px solid var(--bdr-subtle)', borderRadius: 'var(--radius-md)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--sp-4)', flexWrap: 'wrap',
+        }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-secondary)', margin: 0 }}>
+            {t('settings.notificationsTab.gapNotice')}
+          </p>
+          <a href="/notifications" className="btn btn-secondary btn-sm">{t('settings.notificationsTab.viewAll')}</a>
+        </div>
       </div>
     </Panel>
   )
