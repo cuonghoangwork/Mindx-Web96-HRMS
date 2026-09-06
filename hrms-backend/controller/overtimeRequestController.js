@@ -25,7 +25,8 @@ import {
   assertNoPendingRequest,
 } from "../utils/reviewQueue.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
-import { notifyHR } from "../utils/notify.js";
+import { emitNotificationEach, notifyHR } from "../utils/notify.js";
+import { departmentManagerUserIds } from "../utils/performanceScope.js";
 import { AppError } from "../utils/appError.js";
 import { dateKeyInTz, parseHHMM, utcMidnight } from "../utils/workday.js";
 import { serverNow } from "../utils/appNow.js";
@@ -459,7 +460,7 @@ const overtimeRequestController = {
       await assertCapsAfterCommit(request, dateKey);
       await request.populate("employee", "name email employeeId");
 
-      await notifyHR({
+      const reviewerNotice = {
         title: "New overtime request",
         message: `${employee.name} requested overtime on ${dateKey} (${payload.plannedStart}-${payload.plannedEnd}).`,
         category: "employee",
@@ -473,7 +474,29 @@ const overtimeRequestController = {
           start: payload.plannedStart,
           end: payload.plannedEnd,
         },
-      });
+      };
+
+      // The unscoped company-wide tier.
+      await notifyHR(reviewerNotice);
+
+      // ...and the requester's own department manager, who is ALSO an approver
+      // (router/overtimeRequestRouter.js) but is not in the "hr" broadcast
+      // audience — MANAGER is department-scoped and a broadcast carries no
+      // department (see AUDIENCES_BY_ROLE in model/Notification.js). Without
+      // this the one person who has to act on the request was the one person
+      // never told, while leave — the identical workflow — did notify them.
+      //
+      // Scoped to this employee's department, deliberately unlike
+      // leaveRequestController.create, which still notifies every manager in
+      // the company about leave they have no authority to approve.
+      //
+      // Excluding the caller covers a MANAGER applying for their own
+      // overtime: HR/ADMIN still get it above, and a second manager in the
+      // same department still gets it here.
+      await emitNotificationEach(
+        await departmentManagerUserIds(employee.department, req.user.id),
+        reviewerNotice,
+      );
 
       res.status(201).json({ success: true, data: toClientRequest(request) });
     } catch (error) {

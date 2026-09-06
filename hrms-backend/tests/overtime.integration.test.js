@@ -1009,3 +1009,114 @@ describe("employment status — overtime may only go to someone payroll pays", (
     expect((await loadRequest(created.id)).status).toBe("rejected");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   Who is told a request arrived.
+
+   The department's manager approves overtime for their own team
+   (router/overtimeRequestRouter.js), but MANAGER is not in the "hr"
+   broadcast audience — a broadcast carries no department, so it cannot
+   be scoped. notifyHR alone therefore reached everyone EXCEPT the person
+   who had to act, while leave (the identical workflow) notified them.
+   ══════════════════════════════════════════════════════════════════ */
+describe("POST /overtime-requests — reviewers are notified", () => {
+  async function notices(filter = {}) {
+    const { default: NotificationModel } = await import("../model/Notification.js");
+    return NotificationModel.find({ titleKey: "overtimeRequestSubmitted", ...filter });
+  }
+
+  /** A MANAGER in a second department, to prove the notice is scoped. */
+  async function seedOtherDepartmentManager() {
+    const { default: EmployeeModel } = await import("../model/Employee.js");
+    const { seedUserAndLogin } = await import("./testHelpers.js");
+
+    const employee = await EmployeeModel.create({
+      employeeId: "EMP201",
+      name: "Design Manager",
+      email: "designmgr@t.test",
+      department: org.departments.design._id,
+      status: "active",
+      contractType: "full-time",
+      annualSalary: 60000,
+    });
+    const seeded = await seedUserAndLogin(app, {
+      email: "designmgr@t.test",
+      name: "Design Manager",
+      role: "MANAGER",
+      employee: employee._id,
+    });
+    await EmployeeModel.updateOne({ _id: employee._id }, { $set: { userId: seeded.user._id } });
+    return seeded;
+  }
+
+  it("tells the requester's own department manager, addressed not broadcast", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    expect((await apply(org.tokens.dev, weekdayEvening())).status).toBe(201);
+
+    const addressed = await notices({ user: { $ne: null } });
+    expect(addressed).toHaveLength(1);
+    expect(String(addressed[0].user)).toBe(String(org.users.manager.userId));
+  });
+
+  it("still notifies the unscoped HR tier as before", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    await apply(org.tokens.dev, weekdayEvening());
+
+    // The existing broadcast is unchanged — this is an addition, not a swap.
+    const broadcast = await notices({ user: null });
+    expect(broadcast).toHaveLength(1);
+    expect(broadcast[0].audience).toBe("hr");
+  });
+
+  it("does not tell a manager from another department", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const designManager = await seedOtherDepartmentManager();
+
+    await apply(org.tokens.dev, weekdayEvening());
+
+    // Engineering's request is not Design's business, and that manager has
+    // no authority to approve it. This is the leak leaveRequestController
+    // still has, and the reason this fan-out is department-scoped.
+    const recipients = (await notices({ user: { $ne: null } })).map((n) => String(n.user));
+    expect(recipients).toContain(String(org.users.manager.userId));
+    expect(recipients).not.toContain(String(designManager.user._id));
+  });
+
+  it("does not notify a manager applying for their own overtime", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    expect((await apply(org.tokens.manager, weekdayEvening())).status).toBe(201);
+
+    // They already know. HR/ADMIN still get the broadcast above.
+    expect(await notices({ user: { $ne: null } })).toHaveLength(0);
+    expect(await notices({ user: null })).toHaveLength(1);
+  });
+
+  it("does not fail when the requester's department has no manager", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    // Design has no manager in the base fixture. An empty recipient list is a
+    // normal state, not an error — and must not fall back to a broadcast.
+    expect((await apply(org.tokens.designer, weekdayEvening())).status).toBe(201);
+
+    expect(await notices({ user: { $ne: null } })).toHaveLength(0);
+    expect(await notices({ user: null })).toHaveLength(1);
+  });
+
+  it("carries the same copy to both audiences", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    await apply(org.tokens.dev, weekdayEvening());
+
+    const [addressed] = await notices({ user: { $ne: null } });
+    const [broadcast] = await notices({ user: null });
+    // One notice object, two recipient sets — the manager must not get a
+    // subtly different message from HR.
+    expect(addressed.title).toBe(broadcast.title);
+    expect(addressed.messageKey).toBe(broadcast.messageKey);
+    expect(addressed.params.employeeName).toBe(broadcast.params.employeeName);
+    expect(addressed.link).toBe("/attendance");
+  });
+});
