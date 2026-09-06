@@ -1,6 +1,20 @@
 import mongoose from "mongoose";
 import { POSITION_LEVELS } from "./PositionLevel.js";
 
+export const EMPLOYEE_STATUSES = ["active", "on-leave", "terminated"];
+
+/**
+ * The subset of EMPLOYEE_STATUSES that still earns money.
+ *
+ * Lives next to the enum on purpose: adding a fourth status forces a decision
+ * about whether it gets paid, instead of letting it default to "not paid"
+ * somewhere far away. Payroll skips everyone outside this list
+ * (utils/payrollGeneration.js), and overtime refuses to schedule or approve
+ * for them (controller/overtimeRequestController.js) — one constant so those
+ * two can't drift into "hours recorded, never paid".
+ */
+export const PAYABLE_EMPLOYEE_STATUSES = ["active", "on-leave"];
+
 const employeeSchema = new mongoose.Schema(
   {
     employeeId: { type: String, required: true, unique: true, trim: true },
@@ -30,7 +44,7 @@ const employeeSchema = new mongoose.Schema(
       default: "Full-time",
     },
     levelStartDate: { type: Date, default: null },
-    status: { type: String, enum: ["active", "on-leave", "terminated"], default: "active" },
+    status: { type: String, enum: EMPLOYEE_STATUSES, default: "active" },
     annualSalary: { type: Number, default: 0 },
     avatar: { type: String },
     // Task 1.4 — contract PDF. HR/Admin-uploaded only (see

@@ -238,6 +238,7 @@
    "OT_CROSSES_MIDNIGHT": "Ca làm thêm giờ không được kéo dài qua nửa đêm.",
    "OT_DATE_IN_PAST": "Không thể đăng ký làm thêm giờ cho ngày trong quá khứ.",
    "OT_DUPLICATE_FOR_DATE": "Đã có yêu cầu làm thêm giờ cho ngày này.",
+   "OT_EMPLOYEE_NOT_EMPLOYED": "Nhân viên này đã nghỉ việc nên không thể phân công hoặc duyệt làm thêm giờ.",
    "OT_EXCEEDS_ANNUAL_CAP": "Vượt quá giới hạn {{cap}} giờ làm thêm mỗi năm.",
    "OT_EXCEEDS_DAILY_CAP": "Số giờ làm thêm trong ngày này tối đa là {{cap}} giờ.",
    "OT_EXCEEDS_MONTHLY_CAP": "Vượt quá giới hạn {{cap}} giờ làm thêm mỗi tháng.",

@@ -12,7 +12,7 @@
  */
 
 import PayslipModel from "../model/Payslip.js";
-import EmployeeModel from "../model/Employee.js";
+import EmployeeModel, { PAYABLE_EMPLOYEE_STATUSES } from "../model/Employee.js";
 import AttendanceModel from "../model/Attendance.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
 import HolidayModel from "../model/Holiday.js";
@@ -29,8 +29,6 @@ import {
   monthQueryWindowUtc,
   periodEndUtc,
 } from "./payrollPeriod.js";
-
-export const PAYABLE_EMPLOYEE_STATUSES = ["active", "on-leave"];
 
 export const periodLabel = (p) => `${p.year}-${String(p.month).padStart(2, "0")}`;
 

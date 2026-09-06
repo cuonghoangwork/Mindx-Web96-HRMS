@@ -240,6 +240,7 @@
    "OT_CROSSES_MIDNIGHT": "Overtime cannot cross midnight.",
    "OT_DATE_IN_PAST": "Overtime cannot be applied for a date in the past.",
    "OT_DUPLICATE_FOR_DATE": "There is already an overtime request for this date.",
+   "OT_EMPLOYEE_NOT_EMPLOYED": "This employee is no longer employed, so overtime cannot be scheduled or approved for them.",
    "OT_EXCEEDS_ANNUAL_CAP": "This would exceed the {{cap}}-hour annual overtime cap.",
    "OT_EXCEEDS_DAILY_CAP": "Overtime on this day is capped at {{cap}} hours.",
    "OT_EXCEEDS_MONTHLY_CAP": "This would exceed the {{cap}}-hour monthly overtime cap.",

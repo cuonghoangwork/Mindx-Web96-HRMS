@@ -883,3 +883,129 @@ describe("GET /overtime-requests - attendance evidence on queue rows", () => {
     expect(row.otEvidence).toBeNull();
   });
 });
+
+describe("employment status — overtime may only go to someone payroll pays", () => {
+  async function setStatus(employee, status) {
+    const { default: EmployeeModel } = await import("../model/Employee.js");
+    await EmployeeModel.updateOne({ _id: employee._id }, { status });
+  }
+
+  const loadRequest = async (id) => {
+    const { default: OvertimeRequestModel } = await import("../model/OvertimeRequest.js");
+    return OvertimeRequestModel.findById(id);
+  };
+
+  const loadAttendance = async (employee, dateKey) => {
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+    return AttendanceModel.findOne({ employee: employee._id, date: utcMidnight(dateKey) });
+  };
+
+  it("refuses an application from a terminated employee", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await setStatus(org.employees.dev, "terminated");
+
+    const res = await apply(org.tokens.dev, weekdayEvening());
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("OT_EMPLOYEE_NOT_EMPLOYED");
+    expect(res.body.params.status).toBe("terminated");
+  });
+
+  it("still allows an on-leave employee — payroll pays them", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // "on-leave" is an employment status, not a booked day off. Payroll
+    // includes it (PAYABLE_EMPLOYEE_STATUSES), so overtime must too; a
+    // specific approved-leave DATE is what step 5 rejects, separately.
+    await setStatus(org.employees.dev, "on-leave");
+
+    const res = await apply(org.tokens.dev, weekdayEvening());
+    expect(res.status).toBe(201);
+  });
+
+  it("runs before the date checks — the cheapest failure is the one reported", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Both rules are broken here. Step 1b is meant to win, so a terminated
+    // employee is never told to go fix their date first.
+    await setStatus(org.employees.dev, "terminated");
+
+    const res = await apply(org.tokens.dev, weekdayEvening(YESTERDAY));
+    expect(res.body.code).toBe("OT_EMPLOYEE_NOT_EMPLOYED");
+  });
+
+  it("skips a terminated employee in a bulk assign without losing the rest", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await setStatus(org.employees.designer, "terminated");
+
+    const res = await assign(org.tokens.hr, {
+      ...weekdayEvening(),
+      employeeIds: [String(org.employees.dev._id), String(org.employees.designer._id)],
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.created).toHaveLength(1);
+    expect(res.body.created[0].employeeId).toBe(String(org.employees.dev._id));
+    expect(res.body.skipped).toHaveLength(1);
+    expect(res.body.skipped[0].employeeId).toBe(String(org.employees.designer._id));
+    expect(res.body.skipped[0].code).toBe("OT_EMPLOYEE_NOT_EMPLOYED");
+  });
+
+  it("refuses approval when the employee was terminated after applying", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // The gap the application-time check alone cannot close: nothing bounds
+    // how long a request may sit in the queue, and employment can end while
+    // it does.
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+    await setStatus(org.employees.dev, "terminated");
+
+    const res = await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "approved" });
+
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe("OT_EMPLOYEE_NOT_EMPLOYED");
+  });
+
+  it("leaves that request pending, with nothing written to attendance", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // onApprove runs before request.save(), so a throw must roll the whole
+    // decision back — not leave "approved" persisted with the side effect
+    // skipped, which is the shape of bug that produces unpayable hours.
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+    const { utcMidnight } = await import("../utils/workday.js");
+    await AttendanceModel.create({
+      employee: org.employees.dev._id,
+      date: utcMidnight(TOMORROW),
+      checkIn: "09:00",
+      checkOut: "22:00",
+      rawCheckOut: "22:00",
+      status: "present",
+    });
+
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+    await setStatus(org.employees.dev, "terminated");
+    await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "approved" });
+
+    expect((await loadRequest(created.id)).status).toBe("pending");
+    expect((await loadAttendance(org.employees.dev, TOMORROW)).otMinutes).toBe(0);
+  });
+
+  it("still allows rejecting it, so the request can be closed out", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    // Blocking approval must not strand the request: without a working
+    // rejection the live-status row would keep the date permanently blocked.
+    const created = (await apply(org.tokens.dev, weekdayEvening())).body.data;
+    await setStatus(org.employees.dev, "terminated");
+
+    const res = await request
+      .patch(`${URL}/${created.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "rejected", reviewNote: "left the company" });
+
+    expect(res.status).toBe(200);
+    expect((await loadRequest(created.id)).status).toBe("rejected");
+  });
+});

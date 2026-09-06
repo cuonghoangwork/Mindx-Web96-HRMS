@@ -16,7 +16,7 @@
 
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
-import EmployeeModel from "../model/Employee.js";
+import EmployeeModel, { PAYABLE_EMPLOYEE_STATUSES } from "../model/Employee.js";
 import AttendanceModel from "../model/Attendance.js";
 import { recomputeRecordOvertime } from "../utils/overtimeRecompute.js";
 import {
@@ -80,13 +80,39 @@ function toClientRequest(doc) {
 }
 
 /**
+ * Overtime may only be scheduled for someone payroll will actually pay.
+ *
+ * Without this the two halves of the system disagreed in silence: the request
+ * was accepted, approval wrote otMinutes onto the attendance record, the
+ * roster showed the hours — and then payroll skipped the employee entirely
+ * (utils/payrollGeneration.js filters on PAYABLE_EMPLOYEE_STATUSES), so the
+ * hours were recorded and never paid. Nothing errored; the numbers just did
+ * not add up. Reusing payroll's own constant is the fix, not merely a tidy
+ * one: the check and the exclusion cannot drift apart.
+ *
+ * Deliberately fails closed when `status` is absent. Every caller must load
+ * the field explicitly, and a narrow projection that forgets it should block
+ * overtime loudly rather than silently reopen the gap this exists to close.
+ */
+function assertEmployable(employee) {
+  if (PAYABLE_EMPLOYEE_STATUSES.includes(employee?.status)) return;
+  throw new AppError(
+    "This employee is no longer employed, so overtime cannot be scheduled or approved for them.",
+    "OT_EMPLOYEE_NOT_EMPLOYED",
+    { status: employee?.status ?? null },
+    409,
+  );
+}
+
+/**
  * Steps 2-10 of §7.4's validation, shared by create() (one employee) and
  * assign() (many). Throws an AppError with a specific code on the first
  * failure; returns the document payload on success.
  *
  * Step 1 (resolving *which* employee) is the caller's job, because it
  * differs: create() always uses the requester's own record, assign() takes
- * a list and checks departmental scope.
+ * a list and checks departmental scope. Step 1b below is the employment
+ * check on whatever that resolved to.
  */
 async function buildRequestPayload({
   employee,
@@ -98,6 +124,11 @@ async function buildRequestPayload({
   now,
   skipCutoff,
 }) {
+  // 1b. Still on the payroll. Lettered rather than renumbering §7.4's steps,
+  //     same as 7b below. Cheapest check in the function — the document is
+  //     already in hand — so it runs before anything touches the database.
+  assertEmployable(employee);
+
   // 2. A valid, non-past date. Compared as date *keys* in the scheduler's
   //    timezone — never via getHours()/getDate(), which read the container's
   //    clock (UTC on Render) and would shift the boundary by 7 hours.
@@ -343,6 +374,15 @@ const { list, review } = createReviewRequestController({
   },
   onApprove: async (request) => {
     const employeeId = request.employee?._id ?? request.employee;
+
+    // Checked again here, not only at application time: an employee can be
+    // terminated in the days between applying and being reviewed, and there is
+    // no cutoff on how late a review may happen. Throwing leaves the request
+    // "pending" rather than approved-with-no-effect (see the ordering note in
+    // utils/reviewQueue.js), so the reviewer rejects it explicitly and the
+    // employee gets a decision instead of a request that quietly does nothing.
+    assertEmployable(await EmployeeModel.findById(employeeId, "status"));
+
     const record = await AttendanceModel.findOne({ employee: employeeId, date: request.date });
     // No attendance row yet — approved ahead of the day, or the employee never
     // clocked in. Nothing to derive; the close job applies it at day's end.
@@ -472,7 +512,7 @@ const overtimeRequestController = {
 
       for (const employeeId of employeeIds) {
         try {
-          const employee = await EmployeeModel.findById(employeeId, "name email employeeId department");
+          const employee = await EmployeeModel.findById(employeeId, "name email employeeId department status");
           if (!employee) {
             throw new AppError("Employee not found.", "OT_ASSIGN_EMPLOYEE_NOT_FOUND", undefined, 404);
           }

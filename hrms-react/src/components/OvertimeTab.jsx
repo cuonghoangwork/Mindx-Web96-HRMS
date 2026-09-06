@@ -170,9 +170,15 @@ function OvertimeTab() {
   // and reports an out-of-department pick in `skipped`, so this is about not
   // offering a choice that would only be refused — same scoping as the roster.
   const assignableEmployees = useMemo(() => {
-    if (isHRTier) return employees;
+    // Terminated staff drop out for the same reason as out-of-department ones:
+    // payroll will not pay them, so the server refuses the assignment with
+    // OT_EMPLOYEE_NOT_EMPLOYED and offering the pick would only produce a skip
+    // line. "On Leave" stays selectable — they are still paid, and a specific
+    // approved-leave date is caught server-side instead.
+    const employable = employees.filter((e) => e.status !== "Terminated");
+    if (isHRTier) return employable;
     if (isManager && myEmployee?.department) {
-      return employees.filter((e) => e.department === myEmployee.department);
+      return employable.filter((e) => e.department === myEmployee.department);
     }
     return [];
   }, [employees, isHRTier, isManager, myEmployee]);
