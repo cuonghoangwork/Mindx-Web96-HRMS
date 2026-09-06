@@ -1,16 +1,51 @@
 import mongoose from "mongoose";
 
+export const NOTIFICATION_AUDIENCES = ["all", "employees", "hr"];
+
+/**
+ * Which broadcast audiences each role reads.
+ *
+ * Lives next to the enum on purpose: adding a fifth role, or a fourth
+ * audience, forces a decision here about who receives it — one map so the
+ * write side ("who is this for") and the read side ("what do I see") can't
+ * drift into notices nobody ever receives.
+ *
+ * "hr" means the UNSCOPED company-wide tier, not "everyone who approves
+ * things". MANAGER is deliberately excluded: it is department-scoped
+ * (utils/managerScope.js) and a broadcast carries no department, so a
+ * MANAGER reading "hr" would see every other department's hires, removals
+ * and payroll runs. Notices a MANAGER genuinely needs are written as
+ * targeted per-user documents instead, which can be scoped — see
+ * leaveRequestController.create and jobs/performanceReminders.js.
+ *
+ * Exported from the model rather than the controller so the read path, the
+ * write path and any future transport can share it without importing a
+ * controller (an SSE hub that did would close an import cycle).
+ */
+const AUDIENCES_BY_ROLE = {
+  ADMIN:    ["all", "hr"],
+  HR:       ["all", "hr"],
+  MANAGER:  ["all", "employees"],
+  EMPLOYEE: ["all", "employees"],
+};
+
+/** Broadcast audiences visible to `role`. Unknown roles get the least-privileged set. */
+export function broadcastAudiencesFor(role) {
+  return AUDIENCES_BY_ROLE[role] ?? AUDIENCES_BY_ROLE.EMPLOYEE;
+}
+
 const notificationSchema = new mongoose.Schema(
   {
     // null = broadcast to all users, per hrms_schema_docs.md.
     // For targeted single-recipient notices, set this to that user's _id.
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     // When `user` is null (broadcast), `audience` narrows who it's for.
-    // "all" = everyone (default/legacy behavior), "employees" = EMPLOYEE role only,
-    // "hr" = MANAGER + ADMIN only. Ignored when `user` is set.
+    // "all" = everyone (default/legacy behavior), "employees" = EMPLOYEE and
+    // MANAGER, "hr" = HR and ADMIN. Ignored when `user` is set.
+    // See AUDIENCES_BY_ROLE above for why MANAGER reads "employees", not "hr".
     audience: {
       type: String,
-      enum: ["all", "employees", "hr"],
+      enum: NOTIFICATION_AUDIENCES,
       default: "all",
     },
     category: {

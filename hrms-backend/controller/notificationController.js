@@ -1,13 +1,7 @@
-import NotificationModel from "../model/Notification.js";
+import NotificationModel, { broadcastAudiencesFor } from "../model/Notification.js";
 import EmployeeModel from "../model/Employee.js";
 import { notificationToClient, notificationFromClient } from "../utils/mappers.js";
 import { AppError } from "../utils/appError.js";
-
-// HR-tier: sees the "hr" broadcast audience company-wide; everyone else
-// (including the department-scoped MANAGER role) sees "employees" instead.
-function isHRRole(role) {
-  return role === "ADMIN" || role === "HR";
-}
 
 const notificationController = {
   // Returns notifications addressed to the current user PLUS broadcasts that match
@@ -17,9 +11,7 @@ const notificationController = {
       const { category, read } = req.query;
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = isHRRole(role);
-
-      const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
+      const broadcastAudiences = broadcastAudiencesFor(role);
       const condition = {
         $or: [
           { user: userId },
@@ -107,8 +99,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = isHRRole(role);
-      const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
+      const broadcastAudiences = broadcastAudiencesFor(role);
       await NotificationModel.updateMany(
         { $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }] },
         { read: true },
@@ -123,8 +114,7 @@ const notificationController = {
     try {
       const userId = req.user?.id;
       const role = req.user?.role;
-      const isHR = isHRRole(role);
-      const broadcastAudiences = isHR ? ["all", "hr"] : ["all", "employees"];
+      const broadcastAudiences = broadcastAudiencesFor(role);
       await NotificationModel.deleteMany({
         $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }],
         read: true,
