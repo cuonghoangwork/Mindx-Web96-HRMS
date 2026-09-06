@@ -170,6 +170,18 @@ export function createReviewRequestController({
   employeeLinkLabel,
   capability,
   enrichItems,
+  /**
+   * Category for the outcome notice sent to the employee.
+   *
+   * Was hardcoded to "employee" for all three queues, which put "your leave
+   * was approved" in the same ambient bucket as "a department was created".
+   * That went unnoticed while every category behaved identically in-app; it
+   * stopped being cosmetic once utils/notifyPolicy.js began deciding what may
+   * leave the app, because the single most Telegram-worthy notice in the
+   * system was classified as ignorable. Defaults to the old value so the
+   * profile-edit and promotion queues are unchanged.
+   */
+  notifyCategory = "employee",
 }) {
   function applyPopulate(query) {
     for (const [path, select] of populate) query.populate(path, select);
@@ -302,7 +314,7 @@ export function createReviewRequestController({
 
             await emitNotification({
               user: employeeUser._id,
-              category: "employee",
+              category: notifyCategory,
               title: copy.title,
               message: copy.message,
               link: copy.link ?? resolvedLink,

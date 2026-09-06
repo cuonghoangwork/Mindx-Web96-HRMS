@@ -33,23 +33,70 @@
  */
 
 import NotificationModel from "../model/Notification.js";
+import UserModel from "../model/User.js";
 import { publish } from "./sseHub.js";
+import { allowsChannel } from "./notifyPolicy.js";
+import { languageFor, openInAppLabel, renderNotification } from "./notifyI18n.js";
+import { sendTelegramMessage, telegramEnabled } from "./telegram.js";
+
+/**
+ * Telegram delivery.
+ *
+ * ADDRESSED NOTIFICATIONS ONLY, which is narrower than the plan's table and
+ * deliberate. A broadcast is by definition not about you: "review cycle open"
+ * is category `performance`, which the policy permits, but buzzing every
+ * linked phone in the company for it is precisely the behaviour that gets a
+ * notification system muted. Everything the plan actually wants on a phone —
+ * a decision on your leave, a new request you have to review — is written as
+ * an addressed document already (see emitNotificationEach), so this rule
+ * costs nothing and removes the whole class of company-wide buzz.
+ */
+async function fanOutTelegram(doc) {
+  if (!doc.user || !telegramEnabled()) return;
+  if (!allowsChannel(doc.category, "telegram")) return;
+
+  const user = await UserModel.findById(doc.user, "language notify");
+  // A user's own toggle can only narrow the policy above, never widen it.
+  if (!user?.notify?.telegram || !user.notify.telegramChatId) return;
+
+  const language = languageFor(user);
+  const { title, message } = renderNotification(doc, language);
+
+  const result = await sendTelegramMessage({
+    chatId: user.notify.telegramChatId,
+    title,
+    body: message,
+    link: doc.link,
+    linkLabel: openInAppLabel(language),
+  });
+
+  // 403 means they blocked the bot or deleted the chat. That is permanent
+  // until they start it again, so unlink rather than retry forever — the
+  // same self-healing idea as the 410 cleanup Web Push will need.
+  if (result.blocked) {
+    await UserModel.updateOne(
+      { _id: user._id },
+      { $set: { "notify.telegram": false, "notify.telegramChatId": null } },
+    );
+    console.log(`[telegram] chat blocked — unlinked user ${user._id}`);
+  }
+}
 
 /**
  * Side-channel delivery.
  *
- * Level 1 wired the first channel: every open SSE connection whose viewer
- * matches the notification. sseHub.publish maps to the client shape itself
- * and swallows per-socket write failures, so one dead connection cannot stop
- * the others — or the request that produced the notification.
+ * Never awaited by emitNotification and never allowed to throw: a dead socket
+ * or a blocked bot must not fail the leave request that produced the
+ * notification.
  *
- * `channels` is the per-call override the later levels will consult (desktop,
- * push, email, Telegram). Nothing reads it yet; leaving the parameter in place
- * keeps the call signature stable while those land.
+ * `channels` is the per-call override the remaining levels will consult
+ * (push, email). Nothing reads it yet; the parameter keeps the call signature
+ * stable while those land.
  */
 // eslint-disable-next-line no-unused-vars
 async function fanOut(doc, channels) {
   publish(doc);
+  await fanOutTelegram(doc);
 }
 
 /** Optional fields are stored as explicit nulls, never undefined, so that a

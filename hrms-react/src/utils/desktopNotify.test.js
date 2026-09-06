@@ -209,13 +209,19 @@ describe("showDesktopNotification", () => {
     expect(instances[0].options).toEqual({ body: "Two days", tag: "n1" });
   });
 
-  it("routes a click to onActivate and closes the toast", () => {
+  it("focuses the window, routes a click to onActivate, and closes the toast", () => {
     const { instances } = stubNotification("granted");
     const onActivate = vi.fn();
+    // jsdom has no window.focus and logs "Not implemented" to stderr when it
+    // is called. Stubbing keeps the suite output clean and lets the focus
+    // itself be asserted — clicking a toast has to bring the tab forward,
+    // or the user lands on the right page in a window they cannot see.
+    const focus = vi.spyOn(window, "focus").mockImplementation(() => {});
 
     const toast = showDesktopNotification({ title: "x", body: "y", tag: "n1", onActivate });
     toast.onclick();
 
+    expect(focus).toHaveBeenCalledTimes(1);
     expect(onActivate).toHaveBeenCalledTimes(1);
     expect(instances[0].close).toHaveBeenCalledTimes(1);
   });

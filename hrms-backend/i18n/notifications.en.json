@@ -1,0 +1,65 @@
+{
+  "generated": {
+    "leaveRequestSubmitted": {
+      "title": "New leave request",
+      "message": "{{employeeName}} requested {{days}} {{leaveType}} leave day(s) ({{startDate}} → {{endDate}})."
+    },
+    "leaveApproved": {
+      "title": "Leave request approved",
+      "message": "Your {{leaveType}} leave from {{startDate}} to {{endDate}} has been approved."
+    },
+    "leaveRejected": {
+      "title": "Leave request rejected",
+      "message": "Your leave request was rejected."
+    },
+    "leaveRejectedWithNote": {
+      "message": "Your leave request was rejected. Note: {{note}}"
+    },
+    "appealFiled": {
+      "title": "Performance appeal filed",
+      "message": "{{employeeName}} appealed their {{cycleLabel}} manager rating."
+    },
+    "appealResolved": {
+      "title": "Performance appeal resolved",
+      "message": "Your {{cycleLabel}} appeal was {{resolution}}."
+    },
+    "managerReviewReminder": {
+      "title": "Manager review reminder — {{cycleKey}}",
+      "message": "You have {{count}} pending manager review(s) for {{cycleLabel}}, due in {{days}} day(s)."
+    },
+    "managerReviewSubmitted": {
+      "title": "Manager review submitted",
+      "message": "Your {{cycleLabel}} manager review is ready to read."
+    },
+    "performanceReviewsDueSoon": {
+      "title": "Performance reviews due soon — {{cycleKey}}",
+      "message": "{{totalPending}} performance review action(s) still pending for {{cycleLabel}}, due in {{days}} day(s)."
+    },
+    "reviewCycleOpen": {
+      "title": "Review cycle open",
+      "message": "{{cycleLabel}} is now open for performance reviews."
+    },
+    "selfReviewReminder": {
+      "title": "Self review reminder — {{cycleKey}}",
+      "message": "Your {{cycleLabel}} self review is due in {{days}} day(s)."
+    },
+    "selfReviewSubmitted": {
+      "title": "Self review submitted",
+      "message": "{{employeeName}} submitted their {{cycleLabel}} self review."
+    }
+  },
+  "labels": {
+    "leaveType": {
+      "annual": "Annual/PTO",
+      "sick": "Sick",
+      "parental": "Parental",
+      "bereavement": "Bereavement",
+      "unpaid": "Unpaid"
+    },
+    "resolution": {
+      "adjusted": "adjusted",
+      "upheld": "upheld"
+    },
+    "openInApp": "Open in HRMS"
+  }
+}

@@ -1059,7 +1059,16 @@
    "desktopBlocked": "Đã bị chặn cho trang này. Hãy cho phép thông báo trong cài đặt trình duyệt để bật lại.",
    "desktopUnsupported": "Trình duyệt này không hỗ trợ thông báo trên máy tính.",
    "gapNotice": "Tùy chọn theo từng danh mục chưa khả dụng — bạn sẽ nhận mọi thông báo trong ứng dụng phù hợp với vai trò của mình.",
-   "viewAll": "Xem thông báo"
+   "viewAll": "Xem thông báo",
+   "telegramLabel": "Telegram",
+   "telegramHint": "Nhận quyết định về nghỉ phép và đánh giá hiệu suất qua Telegram, kể cả khi đã đóng HRMS.",
+   "telegramConnected": "Đã kết nối. Tin nhắn được gửi theo ngôn ngữ tài khoản của bạn.",
+   "telegramUnavailable": "Chưa được cấu hình trên máy chủ này.",
+   "telegramConnect": "Kết nối",
+   "telegramDisconnect": "Ngắt kết nối",
+   "telegramStep": "Mở liên kết bên dưới và gửi mã cho bot. Mã hết hạn sau {{minutes}} phút.",
+   "telegramOpen": "Mở Telegram",
+   "telegramFailed": "Không kết nối được tới Telegram. Vui lòng thử lại."
   },
   "appearanceTab": {
    "title": "Giao diện",

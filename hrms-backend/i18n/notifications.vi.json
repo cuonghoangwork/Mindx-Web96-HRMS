@@ -1,0 +1,65 @@
+{
+  "generated": {
+    "leaveRequestSubmitted": {
+      "title": "Yêu cầu nghỉ phép mới",
+      "message": "{{employeeName}} đã yêu cầu {{days}} ngày nghỉ phép {{leaveType}} ({{startDate}} → {{endDate}})."
+    },
+    "leaveApproved": {
+      "title": "Yêu cầu nghỉ phép đã được duyệt",
+      "message": "Đơn xin nghỉ phép {{leaveType}} của bạn từ {{startDate}} đến {{endDate}} đã được duyệt."
+    },
+    "leaveRejected": {
+      "title": "Yêu cầu nghỉ phép bị từ chối",
+      "message": "Yêu cầu nghỉ phép của bạn đã bị từ chối."
+    },
+    "leaveRejectedWithNote": {
+      "message": "Yêu cầu nghỉ phép của bạn đã bị từ chối. Ghi chú: {{note}}"
+    },
+    "appealFiled": {
+      "title": "Đã gửi khiếu nại đánh giá hiệu suất",
+      "message": "{{employeeName}} đã khiếu nại đánh giá của quản lý cho chu kỳ {{cycleLabel}}."
+    },
+    "appealResolved": {
+      "title": "Khiếu nại đánh giá hiệu suất đã được giải quyết",
+      "message": "Khiếu nại {{cycleLabel}} của bạn đã được {{resolution}}."
+    },
+    "managerReviewReminder": {
+      "title": "Nhắc nhở đánh giá của quản lý — {{cycleKey}}",
+      "message": "Bạn có {{count}} đánh giá quản lý đang chờ cho {{cycleLabel}}, đến hạn trong {{days}} ngày."
+    },
+    "managerReviewSubmitted": {
+      "title": "Đã nộp đánh giá của quản lý",
+      "message": "Đánh giá {{cycleLabel}} của quản lý dành cho bạn đã sẵn sàng để xem."
+    },
+    "performanceReviewsDueSoon": {
+      "title": "Đánh giá hiệu suất sắp đến hạn — {{cycleKey}}",
+      "message": "Còn {{totalPending}} hành động đánh giá hiệu suất đang chờ cho {{cycleLabel}}, đến hạn trong {{days}} ngày."
+    },
+    "reviewCycleOpen": {
+      "title": "Chu kỳ đánh giá đã mở",
+      "message": "{{cycleLabel}} hiện đã mở để đánh giá hiệu suất."
+    },
+    "selfReviewReminder": {
+      "title": "Nhắc nhở tự đánh giá — {{cycleKey}}",
+      "message": "Bản tự đánh giá {{cycleLabel}} của bạn sẽ đến hạn trong {{days}} ngày."
+    },
+    "selfReviewSubmitted": {
+      "title": "Đã nộp tự đánh giá",
+      "message": "{{employeeName}} đã nộp bản tự đánh giá {{cycleLabel}} của mình."
+    }
+  },
+  "labels": {
+    "leaveType": {
+      "annual": "Phép năm",
+      "sick": "Nghỉ ốm",
+      "parental": "Nghỉ thai sản",
+      "bereavement": "Nghỉ tang",
+      "unpaid": "Nghỉ không lương"
+    },
+    "resolution": {
+      "adjusted": "đã điều chỉnh",
+      "upheld": "giữ nguyên"
+    },
+    "openInApp": "Mở trong HRMS"
+  }
+}

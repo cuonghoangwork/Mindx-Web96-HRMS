@@ -12,6 +12,7 @@ import { startScheduler } from "./jobs/index.js";
 import { runStartupMigrations } from "./utils/startupMigrations.js";
 import { seedRolePermissions } from "./utils/permissions.js";
 import { warnIfDemoMode } from "./utils/appNow.js";
+import { startTelegram } from "./utils/telegramBoot.js";
 
 // Attendance Overtime: DEMO_MODE lets an X-App-Now header override server
 // time, which is a bypass for every date rule in the system — not just the
@@ -71,6 +72,9 @@ connectDB()
   )
   .then(() => {
     startScheduler();
+    // No-op unless TELEGRAM_BOT_TOKEN is set — same graceful-degrade
+    // contract as Cloudinary and Gemini.
+    startTelegram();
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
   })
   .catch((err) => {

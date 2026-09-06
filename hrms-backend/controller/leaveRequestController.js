@@ -81,6 +81,9 @@ const { list, review } = createReviewRequestController({
   }),
   employeeLink: "/dashboard",
   employeeLinkLabel: "View leave balance",
+  // A decision on your own leave is the clearest case for reaching a phone
+  // (utils/notifyPolicy.js). It only qualifies if it is filed under "leave".
+  notifyCategory: "leave",
 });
 
 const leaveRequestController = {

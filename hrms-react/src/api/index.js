@@ -125,6 +125,12 @@ export const NotificationsAPI = {
   list: () => apiFetch("/notifications"),
   /** Single-use, 60-second credential for the SSE feed — see api/notificationStream.js. */
   streamTicket: () => apiFetch("/notifications/stream-ticket"),
+  // Telegram linking. `available` reports whether the server has a bot
+  // configured at all, so Settings can say "not set up" rather than showing
+  // a button that always fails.
+  telegramStatus: () => apiFetch("/notifications/telegram"),
+  telegramLinkCode: () => apiFetch("/notifications/telegram/link-code", { method: "POST" }),
+  telegramDisconnect: () => apiFetch("/notifications/telegram", { method: "DELETE" }),
   create: (data) => apiFetch("/notifications", { method: "POST", body: data }),
   recipients: () => apiFetch("/notifications/recipients"),
   markRead: (id) => apiFetch(`/notifications/${id}/read`, { method: "PATCH" }),

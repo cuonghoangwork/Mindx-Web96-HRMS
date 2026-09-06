@@ -4,7 +4,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useLanguage } from '../context/LanguageContext'
 import { formatDate, formatDateTime } from '../utils/format'
 import { useAuth } from '../context/AuthContext'
-import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI, PermissionsAPI } from '../api'
+import { EmployeesAPI, ProfileEditRequestsAPI, AuditLogAPI, PermissionsAPI, NotificationsAPI } from '../api'
 import { apiFetch } from '../api/client'
 import { getRoleLabel } from '../utils/roles'
 import { translateApiError } from '../utils/apiError'
@@ -616,6 +616,137 @@ function Switch({ checked, onChange, disabled, label }) {
 }
 
 /* ─────────────────────────────────────────────
+   Telegram linking. The code is minted server-side
+   and redeemed by the bot when the user sends
+   "/start <code>" — see hrms-backend/controller/
+   telegramController.js for the full handshake.
+
+   No QR code, deliberately: the only zero-dependency
+   way to render one is a third-party image service,
+   which would mean putting a live link code in a URL
+   owned by someone else. The deep link opens Telegram
+   Desktop and Telegram mobile directly.
+───────────────────────────────────────────── */
+function TelegramRow() {
+  const { t } = useTranslation()
+  const [status, setStatus] = useState(null)
+  const [invite, setInvite] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await NotificationsAPI.telegramStatus()
+      setStatus(res.data)
+      return res.data
+    } catch {
+      setStatus({ available: false })
+      return null
+    }
+  }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  // The user completes linking inside Telegram, so this page has no way to
+  // know it happened. Poll while a code is on screen, and stop as soon as it
+  // lands or the code expires — never an unbounded background poll.
+  useEffect(() => {
+    if (!invite || status?.connected) return undefined
+    const timer = setInterval(async () => {
+      if (Date.now() > new Date(invite.expiresAt).getTime()) {
+        setInvite(null)
+        return
+      }
+      const next = await refresh()
+      if (next?.connected) setInvite(null)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [invite, status?.connected, refresh])
+
+  const connect = async () => {
+    setBusy(true); setError('')
+    try {
+      const res = await NotificationsAPI.telegramLinkCode()
+      setInvite(res.data)
+    } catch (err) {
+      setError(translateApiError(err, t) || t('settings.notificationsTab.telegramFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const disconnect = async () => {
+    setBusy(true); setError('')
+    try {
+      await NotificationsAPI.telegramDisconnect()
+      setInvite(null)
+      await refresh()
+    } catch (err) {
+      setError(translateApiError(err, t) || t('settings.notificationsTab.telegramFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!status) return null
+
+  return (
+    <div style={{ display: 'grid', gap: 'var(--sp-3)' }}>
+      <SettingRow
+        label={t('settings.notificationsTab.telegramLabel')}
+        hint={
+          !status.available ? t('settings.notificationsTab.telegramUnavailable')
+            : status.connected ? t('settings.notificationsTab.telegramConnected')
+            : t('settings.notificationsTab.telegramHint')
+        }
+        control={
+          status.available ? (
+            <Button
+              variant={status.connected ? 'secondary' : 'primary'}
+              onClick={status.connected ? disconnect : connect}
+              disabled={busy}
+            >
+              {status.connected
+                ? t('settings.notificationsTab.telegramDisconnect')
+                : t('settings.notificationsTab.telegramConnect')}
+            </Button>
+          ) : null
+        }
+      />
+
+      {invite && !status.connected && (
+        <div style={{
+          padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-primary-subtle)',
+          border: '1px solid var(--bdr-default)', borderRadius: 'var(--radius-md)',
+          display: 'grid', gap: 'var(--sp-3)',
+        }}>
+          <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--txt-primary)', margin: 0 }}>
+            {t('settings.notificationsTab.telegramStep', { minutes: invite.expiresInMinutes })}
+          </p>
+          <code style={{
+            fontSize: 'var(--fs-lg)', fontWeight: 'var(--fw-semibold)',
+            letterSpacing: '0.15em', color: 'var(--txt-primary-brand)',
+          }}>{invite.code}</code>
+          <a
+            href={invite.deepLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-primary btn-sm"
+            style={{ justifySelf: 'start' }}
+          >
+            {t('settings.notificationsTab.telegramOpen')}
+          </a>
+        </div>
+      )}
+
+      {error && (
+        <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--txt-danger)', margin: 0 }}>{error}</p>
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
    Notifications tab — in-app is always on (it is
    the notification record itself). Desktop toasts
    are opt-in and deliberately per-device: the
@@ -674,6 +805,8 @@ function NotificationsTab() {
             />
           }
         />
+
+        <TelegramRow />
 
         <div style={{
           padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-surface-alt)',
