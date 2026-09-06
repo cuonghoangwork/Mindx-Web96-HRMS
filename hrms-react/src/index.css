@@ -7,8 +7,12 @@
 
 /* ============================================================
    1. FONT IMPORT
+   Archivo is requested from index.html, not with an @import here.
+   An @import is discovered only after this file has downloaded and
+   parsed, so the font request queues behind it; a <link> in the head
+   starts in parallel with the stylesheet and gets the benefit of the
+   preconnects that were already sitting there.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap');
 
 /* ============================================================
    2. DESIGN TOKENS — LIGHT MODE
