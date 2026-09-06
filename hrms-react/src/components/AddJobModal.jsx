@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useStore } from "../context/StoreContext";
+import { isoOf } from "../utils/attendance";
 import Button from "./Button";
 
 /**
@@ -20,6 +22,7 @@ import Button from "./Button";
  */
 function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
   const { t } = useTranslation();
+  const { getAppNow } = useStore();
   const isEdit = Boolean(job);
 
   const [formData, setFormData] = useState({
@@ -87,7 +90,11 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       companyInfo: formData.companyInfo.trim(),
       applicationInstructions: formData.applicationInstructions.trim(),
       deadline: formData.deadline || null,
-      postedDate: job?.postedDate ?? new Date().toISOString().split("T")[0],
+      // isoOf, not toISOString().split("T")[0]: the latter converts to UTC
+      // first, so a job posted before 07:00 Vietnam time was stamped with
+      // yesterday's date. getAppNow() rather than new Date() matches every
+      // other "today" in the app and keeps the demo clock honest.
+      postedDate: job?.postedDate ?? isoOf(getAppNow()),
     });
     onClose();
   };

@@ -519,7 +519,6 @@ function AddEmployee() {
         ...form,
         age: Number(form.age),
         salary: Number(form.salary),
-        createdAt: new Date().toISOString().split("T")[0],
       });
       setCreatedAccount(res?.account || null);
       setSubmitted(true);

@@ -61,10 +61,7 @@ function EmployeeModal({ onClose }) {
 
     setSubmitError("");
     try {
-      await addEmployee({
-        ...formData,
-        createdAt: new Date().toISOString().split("T")[0],
-      });
+      await addEmployee(formData);
       onClose();
     } catch (err) {
       setSubmitError(translateApiError(err, t) || t("employees.employeeModal.submitFailed", { defaultValue: "Failed to add employee." }));
