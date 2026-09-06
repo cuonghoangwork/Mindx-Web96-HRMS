@@ -109,6 +109,22 @@ export async function seedPerformanceOrg(app) {
   };
 }
 
+/**
+ * A MANAGER in a department the base org has none for.
+ *
+ * Every reviewer-fan-out test needs one: without a second department's
+ * manager there is nobody the notice must NOT reach, and a test that only
+ * checks who WAS notified passes just as happily when everyone was.
+ */
+export async function seedDepartmentManager(
+  app,
+  department,
+  { employeeId = "EMP301", name = "Second Manager", email = "secondmgr@t.test" } = {},
+) {
+  const employee = await makeEmployee({ employeeId, name, email, department });
+  return linkUser(app, { email, name, role: "MANAGER", employee });
+}
+
 export function auth(token) {
   return { Authorization: `Bearer ${token}` };
 }

@@ -3,6 +3,7 @@ import EmployeeModel from "../model/Employee.js";
 import UserModel from "../model/User.js";
 import { emitNotificationEach } from "../utils/notify.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
+import { departmentManagerUserIds } from "../utils/performanceScope.js";
 
 /* ── client-shape field name → DB field name (mirrors mappers.js) ── */
 const CLIENT_TO_DB = {
@@ -140,9 +141,19 @@ const profileEditRequestController = {
         status: "pending",
       });
 
-      // Same reviewer set as a leave request, and for the same reason.
-      const reviewers = await UserModel.find({ role: { $in: ["MANAGER", "HR", "ADMIN"] } }, "_id");
-      await emitNotificationEach(reviewers.map((u) => u._id), {
+      // Same reviewer set as a leave request, and split the same way: the
+      // unscoped HR/ADMIN tier plus the requester's OWN department manager.
+      // It used to be every MANAGER in the company, which meant a manager was
+      // notified about profile edits in departments they cannot approve for.
+      // Addressed rather than an "hr" broadcast because MANAGER is not in that
+      // audience, and because broadcast read state is shared — see
+      // controller/leaveRequestController.js for the full reasoning.
+      const [hrTier, departmentManagers] = await Promise.all([
+        UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: userId } }, "_id"),
+        departmentManagerUserIds(employee.department, userId),
+      ]);
+
+      await emitNotificationEach([...hrTier.map((u) => u._id), ...departmentManagers], {
         category: "employee",
         title: "Profile edit request",
         message: `${employee.name} has submitted a request to update their profile.`,

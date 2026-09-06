@@ -24,7 +24,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import supertest from "supertest";
 import { startDb, stopDb, clearDb, createApp } from "./testHelpers.js";
-import { auth, seedPerformanceOrg } from "./performanceFixtures.js";
+import { auth, seedPerformanceOrg, seedDepartmentManager } from "./performanceFixtures.js";
 
 let dbAvailable = false;
 let app;
@@ -1025,29 +1025,6 @@ describe("POST /overtime-requests — reviewers are notified", () => {
     return NotificationModel.find({ titleKey: "overtimeRequestSubmitted", ...filter });
   }
 
-  /** A MANAGER in a second department, to prove the notice is scoped. */
-  async function seedOtherDepartmentManager() {
-    const { default: EmployeeModel } = await import("../model/Employee.js");
-    const { seedUserAndLogin } = await import("./testHelpers.js");
-
-    const employee = await EmployeeModel.create({
-      employeeId: "EMP201",
-      name: "Design Manager",
-      email: "designmgr@t.test",
-      department: org.departments.design._id,
-      status: "active",
-      contractType: "full-time",
-      annualSalary: 60000,
-    });
-    const seeded = await seedUserAndLogin(app, {
-      email: "designmgr@t.test",
-      name: "Design Manager",
-      role: "MANAGER",
-      employee: employee._id,
-    });
-    await EmployeeModel.updateOne({ _id: employee._id }, { $set: { userId: seeded.user._id } });
-    return seeded;
-  }
 
   it("tells the requester's own department manager, addressed not broadcast", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
@@ -1072,7 +1049,7 @@ describe("POST /overtime-requests — reviewers are notified", () => {
 
   it("does not tell a manager from another department", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
-    const designManager = await seedOtherDepartmentManager();
+    const designManager = await seedDepartmentManager(app, org.departments.design);
 
     await apply(org.tokens.dev, weekdayEvening());
 
