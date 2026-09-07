@@ -33,7 +33,7 @@ services:
       - key: RT_SECRETKEY
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://hrms-frontend.onrender.com   # update after the static site is created
+        value: https://hrms-frontend-svkb.onrender.com   # the deployed static site
       - key: CLOUD_NAME
         sync: false           # optional — leave blank to disable avatar upload
       - key: API_KEY
@@ -46,16 +46,26 @@ services:
         value: "false"        # accounts are created through the Add Employee flow
       - key: ACCOUNT_EMAIL_DOMAIN
         value: hrms.com
-      # Free web services sleep after ~15 min idle, so an in-process cron never
-      # fires. Leave this false here and trigger POST /api/v1/attendance/close-day
-      # from a Render Cron Job (or GitHub Actions) with an ADMIN token.
-      # Switch to "true" once this service runs on an always-on paid plan.
+      # Free web services sleep after ~15 min idle, so an in-process cron only
+      # fires when the instance happens to be awake - which made the monthly
+      # payroll run nondeterministic rather than simply off. Leave this false:
+      # all six jobs in hrms-backend/jobs/index.js are driven over HTTP by
+      # .github/workflows/scheduled-jobs.yml, which logs in as an ADMIN and
+      # calls each job's trigger endpoint on its own schedule.
+      #
+      # Switch to "true" only on an always-on paid plan, and disable that
+      # workflow at the same time so nothing is driven from both sides.
       - key: ENABLE_SCHEDULER
         value: "false"
       - key: SCHEDULER_TZ
         value: Asia/Ho_Chi_Minh
+      # 23:00, not 22:00: the overtime window ends at 22:00 (18:00 + the 4h
+      # daily cap), so a 22:00 run would close records mid-overtime-shift -
+      # see the same warning in jobs/index.js and .env.example. Only read when
+      # ENABLE_SCHEDULER is true; the workflow carries its own schedule
+      # (16:00 UTC = 23:00 Asia/Ho_Chi_Minh).
       - key: CRON_CLOSE_ATTENDANCE
-        value: 0 22 * * *
+        value: 0 23 * * *
       - key: WORKDAY_END
         value: "18:00"
       - key: WORKDAY_LATE_AFTER
@@ -73,7 +83,7 @@ services:
       - key: NODE_VERSION
         value: "24"
       - key: VITE_API_URL
-        value: https://hrms-backend.onrender.com/api/v1   # update to match your actual backend URL
+        value: https://hrms-backend-xhtu.onrender.com/api/v1   # the deployed backend
     routes:
       - type: rewrite
         source: /*
