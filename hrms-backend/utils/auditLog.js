@@ -19,7 +19,11 @@
 import AuditLog from "../model/AuditLog.js";
 
 /**
- * @param {import("express").Request} req
+ * @param {import("express").Request | null} req  — null or {} for a write with
+ *   no request behind it (a scheduled job, a startup migration, the seeder);
+ *   both take the "system" actor below. `null` used to throw here, which meant
+ *   the one caller that passed it — utils/startupMigrations.js — never managed
+ *   to record its row at all.
  * @param {{
  *   action: string,
  *   resource: string,
@@ -30,7 +34,7 @@ import AuditLog from "../model/AuditLog.js";
  */
 export async function logAction(req, { action, resource, resourceId, label, changes } = {}) {
   try {
-    const actor = req.user
+    const actor = req?.user
       ? { id: req.user.id, name: req.user.name, role: req.user.role }
       : { id: null, name: "system", role: "system" };
 

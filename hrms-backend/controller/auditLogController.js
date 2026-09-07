@@ -92,6 +92,9 @@ function buildTitle({ action, resource, label, actor }) {
     case "login":           return `${who} signed in`;
     case "logout":          return `${who} signed out`;
     case "registered":      return `New account registered: ${who}`;
+    // `label` already reads "<email>: MANAGER -> HR (reason)", so it carries
+    // the whole story — a prefix here would only repeat it.
+    case "role_migrated":   return `Role migrated — ${who}`;
     default:                return `${who} — ${action}`;
   }
 }

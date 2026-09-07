@@ -36,6 +36,11 @@ const auditLogSchema = new mongoose.Schema(
         "login",
         "logout",
         "registered",
+        // Written only by utils/startupMigrations.js's MANAGER -> HR fixup.
+        // Absent from this enum until 2026-09-07, so every one of those rows
+        // failed validation and was swallowed by auditLog.js's catch — the
+        // demotions happened, but nothing recorded that they had.
+        "role_migrated",
       ],
     },
     resource: {
