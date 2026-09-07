@@ -1018,33 +1018,46 @@ describe("employment status — overtime may only go to someone payroll pays", (
    broadcast audience — a broadcast carries no department, so it cannot
    be scoped. notifyHR alone therefore reached everyone EXCEPT the person
    who had to act, while leave (the identical workflow) notified them.
+
+   The HR half was a broadcast until 2026-09-07. Broadcast read state is
+   SHARED, so one reviewer opening it cleared it from every other
+   reviewer's badge — a request each of them may need to act on should
+   not vanish because a colleague glanced at it. Both halves are now
+   addressed documents, matching leave and profile-edit.
+
+   Deliberately mirrors tests/{leave,profileEdit}Notifications.integration
+   .test.js: the three producers share one recipient rule, and the tests
+   should make that obvious rather than each expressing it differently.
    ══════════════════════════════════════════════════════════════════ */
 describe("POST /overtime-requests — reviewers are notified", () => {
   async function notices(filter = {}) {
     const { default: NotificationModel } = await import("../model/Notification.js");
     return NotificationModel.find({ titleKey: "overtimeRequestSubmitted", ...filter });
   }
+  const recipientIds = async () => (await notices()).map((n) => String(n.user)).sort();
 
-
-  it("tells the requester's own department manager, addressed not broadcast", async (ctx) => {
+  it("notifies the HR tier and the requester's own department manager", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
     expect((await apply(org.tokens.dev, weekdayEvening())).status).toBe(201);
 
-    const addressed = await notices({ user: { $ne: null } });
-    expect(addressed).toHaveLength(1);
-    expect(String(addressed[0].user)).toBe(String(org.users.manager.userId));
+    expect(await recipientIds()).toEqual(
+      [org.users.admin.userId, org.users.hr.userId, org.users.manager.userId].map(String).sort(),
+    );
   });
 
-  it("still notifies the unscoped HR tier as before", async (ctx) => {
+  it("addresses every notice, so read state stays per-person", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
     await apply(org.tokens.dev, weekdayEvening());
 
-    // The existing broadcast is unchanged — this is an addition, not a swap.
-    const broadcast = await notices({ user: null });
-    expect(broadcast).toHaveLength(1);
-    expect(broadcast[0].audience).toBe("hr");
+    // The fix. A single broadcast row here meant the first HR person to open
+    // it cleared it for everyone else.
+    const docs = await notices();
+    expect(docs).toHaveLength(3);
+    expect(docs.every((n) => n.user !== null)).toBe(true);
+    expect(docs.every((n) => n.audience === "all")).toBe(true);
+    expect(docs.every((n) => n.read === false)).toBe(true);
   });
 
   it("does not tell a manager from another department", async (ctx) => {
@@ -1054,9 +1067,8 @@ describe("POST /overtime-requests — reviewers are notified", () => {
     await apply(org.tokens.dev, weekdayEvening());
 
     // Engineering's request is not Design's business, and that manager has
-    // no authority to approve it. This is the leak leaveRequestController
-    // still has, and the reason this fan-out is department-scoped.
-    const recipients = (await notices({ user: { $ne: null } })).map((n) => String(n.user));
+    // no authority to approve it.
+    const recipients = await recipientIds();
     expect(recipients).toContain(String(org.users.manager.userId));
     expect(recipients).not.toContain(String(designManager.user._id));
   });
@@ -1066,34 +1078,89 @@ describe("POST /overtime-requests — reviewers are notified", () => {
 
     expect((await apply(org.tokens.manager, weekdayEvening())).status).toBe(201);
 
-    // They already know. HR/ADMIN still get the broadcast above.
-    expect(await notices({ user: { $ne: null } })).toHaveLength(0);
-    expect(await notices({ user: null })).toHaveLength(1);
+    // They already know. The HR tier still gets it.
+    const recipients = await recipientIds();
+    expect(recipients).not.toContain(String(org.users.manager.userId));
+    expect(recipients).toEqual([org.users.admin.userId, org.users.hr.userId].map(String).sort());
   });
 
-  it("does not fail when the requester's department has no manager", async (ctx) => {
+  it("still reaches HR and ADMIN when the department has no manager", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
-    // Design has no manager in the base fixture. An empty recipient list is a
-    // normal state, not an error — and must not fall back to a broadcast.
+    // Design has no manager in the base fixture. Scoping must not leave a
+    // request unreviewed — the unscoped tier is the safety net.
     expect((await apply(org.tokens.designer, weekdayEvening())).status).toBe(201);
 
-    expect(await notices({ user: { $ne: null } })).toHaveLength(0);
-    expect(await notices({ user: null })).toHaveLength(1);
+    expect(await recipientIds()).toEqual(
+      [org.users.admin.userId, org.users.hr.userId].map(String).sort(),
+    );
   });
 
-  it("carries the same copy to both audiences", async (ctx) => {
+  it("sends the same copy to every reviewer", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
 
     await apply(org.tokens.dev, weekdayEvening());
 
-    const [addressed] = await notices({ user: { $ne: null } });
-    const [broadcast] = await notices({ user: null });
-    // One notice object, two recipient sets — the manager must not get a
-    // subtly different message from HR.
-    expect(addressed.title).toBe(broadcast.title);
-    expect(addressed.messageKey).toBe(broadcast.messageKey);
-    expect(addressed.params.employeeName).toBe(broadcast.params.employeeName);
-    expect(addressed.link).toBe("/attendance");
+    const docs = await notices();
+    expect(new Set(docs.map((n) => n.title)).size).toBe(1);
+    expect(docs[0].params.employeeName).toBe("Dev One");
+    expect(docs[0].link).toBe("/attendance");
+  });
+
+  it("files the notice under `overtime`, so it may leave the app", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { channelsFor } = await import("../utils/notifyPolicy.js");
+
+    await apply(org.tokens.dev, weekdayEvening());
+
+    // Was category "employee", which notifyPolicy maps to [] — so the single
+    // most deadline-bound notice in the system (overtime closes at 13:00 on
+    // the day) was in-app only, while leave went out on three channels.
+    const docs = await notices();
+    expect(docs.every((n) => n.category === "overtime")).toBe(true);
+    expect(channelsFor("overtime")).toEqual(["push", "email", "telegram"]);
+  });
+});
+
+describe("overtime decisions and assignments are categorised too", () => {
+  async function noticesFor(titleKey) {
+    const { default: NotificationModel } = await import("../model/Notification.js");
+    return NotificationModel.find({ titleKey });
+  }
+
+  it("files the approval notice under `overtime`", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const created = await apply(org.tokens.dev, weekdayEvening());
+    expect(created.status).toBe(201);
+
+    const res = await request
+      .patch(`/api/v1/overtime-requests/${created.body.data.id}/review`)
+      .set(auth(org.tokens.hr))
+      .send({ decision: "approved" });
+    expect(res.status).toBe(200);
+
+    // reviewQueue.js defaults notifyCategory to "employee"; overtime never
+    // overrode it, so the employee learned about a shift that may be the same
+    // evening from the bell alone.
+    const [notice] = await noticesFor("overtimeApproved");
+    expect(notice.category).toBe("overtime");
+    expect(String(notice.user)).toBe(String(org.users.dev.user._id));
+  });
+
+  it("addresses the assignment notice to the HR tier rather than broadcasting", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+
+    const res = await assign(org.tokens.manager, {
+      ...weekdayEvening(),
+      employeeIds: [String(org.employees.dev._id)],
+    });
+    expect(res.status).toBe(201);
+
+    const docs = await noticesFor("overtimeAssigned");
+    expect(docs.length).toBeGreaterThan(0);
+    expect(docs.every((n) => n.user !== null)).toBe(true);
+    expect(docs.every((n) => n.category === "overtime")).toBe(true);
+    // The assigning manager is not told about their own assignment.
+    expect(docs.map((n) => String(n.user))).not.toContain(String(org.users.manager.userId));
   });
 });

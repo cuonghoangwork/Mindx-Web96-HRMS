@@ -595,6 +595,8 @@
   },
   "categories": {
    "leave": "Leave",
+   "overtime": "Overtime",
+   "performance": "Performance",
    "interview": "Hiring",
    "payroll": "Payroll",
    "employee": "Employee",

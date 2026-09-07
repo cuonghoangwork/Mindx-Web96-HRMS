@@ -3,6 +3,30 @@ import mongoose from "mongoose";
 export const NOTIFICATION_AUDIENCES = ["all", "employees", "hr"];
 
 /**
+ * Every category a notification may carry. Exported because utils/notifyPolicy.js
+ * is keyed on these values and tests/notifyI18n.test.js derives its coverage
+ * check from this list — a category added here with out-of-app channels but no
+ * mirrored copy would otherwise ship an English Telegram message to a
+ * Vietnamese reader, silently.
+ *
+ * "overtime" is separate from "leave" despite the identical review workflow,
+ * because the two need to be tunable apart in notifyPolicy and because the
+ * Notifications page filters on this value — folding overtime into "leave"
+ * would hide it behind a tab labelled for something else.
+ */
+export const NOTIFICATION_CATEGORIES = [
+  "leave",
+  "overtime",
+  "hiring",
+  "payroll",
+  "employee",
+  "holiday",
+  "system",
+  "announcement",
+  "performance",
+];
+
+/**
  * Which broadcast audiences each role reads.
  *
  * Lives next to the enum on purpose: adding a fifth role, or a fourth
@@ -64,7 +88,7 @@ const notificationSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      enum: ["leave", "hiring", "payroll", "employee", "holiday", "system", "announcement", "performance"],
+      enum: NOTIFICATION_CATEGORIES,
       required: true,
     },
     title: { type: String, required: true },

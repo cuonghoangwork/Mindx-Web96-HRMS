@@ -46,14 +46,33 @@ afterAll(async () => {
 
 beforeEach(async () => {
   if (!dbAvailable) return;
+  // clearDb() now clears `_migrations` too. It did not originally — it walked
+  // mongoose.connection.collections, which only holds collections that have a
+  // MODEL — so a marker left by the previous test made the next
+  // runStartupMigrations() a silent no-op. That is pinned directly below,
+  // because every test in this file depends on it and the failure it caused
+  // pointed nowhere near the real cause.
   await clearDb();
-  // clearDb() iterates mongoose.connection.collections, which only holds
-  // collections Mongoose has a MODEL for. `_migrations` is touched through the
-  // raw driver, so it survives — and a marker left by the previous test makes
-  // the next runStartupMigrations() a silent no-op. Found the hard way: the
-  // "earlier migrations already applied" test below failed because the test
-  // before it had already stamped the backfill as done.
-  await mongoose.connection.db.collection("_migrations").deleteMany({});
+});
+
+describe("clearDb", () => {
+  it("clears collections that have no Mongoose model", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await mongoose.connection.db.collection("_migrations").insertOne({ key: "leftover" });
+
+    await clearDb();
+
+    expect(await mongoose.connection.db.collection("_migrations").countDocuments()).toBe(0);
+  });
+
+  it("still clears the model-backed ones", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    await seedUser("Grace Hopper");
+
+    await clearDb();
+
+    expect(await UserModel.countDocuments()).toBe(0);
+  });
 });
 
 const seedUser = (name, role = "HR") =>

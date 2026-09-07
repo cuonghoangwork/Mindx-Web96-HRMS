@@ -63,7 +63,7 @@ const ATTENDANCE_STATUS = {
 // data and Notifications.jsx CATEGORY_CONFIG both actually use "interview" for the same
 // thing. Bridge it here rather than picking a side. "announcement" passes through as-is
 // since it's a new category with no legacy naming mismatch.
-const NOTIFICATION_CATEGORY = { interview: "hiring" };
+export const NOTIFICATION_CATEGORY = { interview: "hiring" };
 
 function invert(map) {
   return Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));

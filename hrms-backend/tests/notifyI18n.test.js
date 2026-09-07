@@ -11,6 +11,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { renderNotification, languageFor, openInAppLabel } from "../utils/notifyI18n.js";
 import { channelsFor } from "../utils/notifyPolicy.js";
+import { NOTIFICATION_CATEGORIES as CATEGORIES } from "../model/Notification.js";
+import { NOTIFICATION_CATEGORY } from "../utils/mappers.js";
 
 const frontend = (lang) =>
   JSON.parse(readFileSync(new URL(`../../hrms-react/src/i18n/locales/${lang}.json`, import.meta.url), "utf8"));
@@ -126,23 +128,53 @@ describe("drift from the frontend copy", () => {
   });
 
   it("covers every key the out-of-app categories can actually emit", () => {
-    // The mirror only needs the categories notifyPolicy lets out — but that
-    // set differs per channel. Telegram carries leave + performance; email
-    // adds payroll, so payroll copy has to be mirrored too even though
-    // Telegram will never render it.
-    const telegram = ["leave", "performance", "payroll"].filter((c) => channelsFor(c).includes("telegram"));
-    const email = ["leave", "performance", "payroll"].filter((c) => channelsFor(c).includes("email"));
-    expect(telegram).toEqual(["leave", "performance"]);
-    expect(email).toEqual(["leave", "performance", "payroll"]);
+    // Derived from the model enum rather than a hand-written list, so adding a
+    // ninth category with out-of-app channels fails HERE instead of shipping a
+    // Telegram message in English to a Vietnamese user. That is the failure
+    // this test exists to prevent, and a hardcoded list cannot see it coming.
+    const outOfApp = CATEGORIES.filter((c) => channelsFor(c).length > 0);
+    expect(outOfApp.sort()).toEqual(["leave", "overtime", "payroll", "performance"]);
+
+    // The set still differs per channel: telegram carries leave, overtime and
+    // performance; email adds payroll, so payroll copy has to be mirrored too
+    // even though Telegram will never render it.
+    expect(outOfApp.filter((c) => channelsFor(c).includes("telegram")).sort())
+      .toEqual(["leave", "overtime", "performance"]);
+    expect(outOfApp.filter((c) => channelsFor(c).includes("email")).sort())
+      .toEqual(["leave", "overtime", "payroll", "performance"]);
 
     const mirrored = Object.keys(backend("en").generated);
     for (const key of [
       "leaveApproved", "leaveRejected", "leaveRequestSubmitted", "appealResolved",
       "payrollPaid", "payrollDraftsGenerated", "monthlyPayrollDraftReady",
       "monthlyPayrollRunSkippedNoPeriod",
+      // Overtime went out-of-app on 2026-09-07. Every key its three producers
+      // can emit has to be here, including the *WithNote variant, which is a
+      // separate key rather than a parameter.
+      "overtimeRequestSubmitted", "overtimeApproved", "overtimeRejected",
+      "overtimeRejectedWithNote", "overtimeAssigned",
     ]) {
       expect(mirrored).toContain(key);
     }
+  });
+
+  it.each(["en", "vi"])("%s: every model category has a tab label on the client", (lang) => {
+    // The first hop of the chain the frontend's
+    // src/utils/notificationCategories.test.jsx completes. That test ties
+    // CATEGORY_CONFIG to these labels; this one ties these labels to the model
+    // enum. Neither half can see the other's file, so a category added to the
+    // enum alone fails HERE, before it can ship as an untabbed grey "System"
+    // row — which is exactly how `performance` shipped.
+    //
+    // Through the naming bridge in utils/mappers.js: the database says
+    // "hiring", the client says "interview". Everything else passes straight
+    // through, so the inverted map only ever rewrites that one value.
+    const toClient = Object.fromEntries(
+      Object.entries(NOTIFICATION_CATEGORY).map(([client, db]) => [db, client]),
+    );
+    const expected = CATEGORIES.map((c) => toClient[c] ?? c).sort();
+
+    expect(Object.keys(frontend(lang).notifications.categories).sort()).toEqual(expected);
   });
 
   it("localizes the rateSource token payroll copy interpolates", () => {

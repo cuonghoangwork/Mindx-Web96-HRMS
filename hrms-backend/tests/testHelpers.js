@@ -60,12 +60,26 @@ export async function stopDb() {
   await mongod?.stop().catch(() => {});
 }
 
-/** Clear every collection between tests to keep them independent. */
+/**
+ * Clear every collection between tests to keep them independent.
+ *
+ * Enumerated through the DRIVER, not `mongoose.connection.collections` — that
+ * property only holds collections Mongoose has a MODEL for, so anything
+ * touched through the raw driver survived and leaked into the next test. The
+ * real case: `_migrations` (utils/startupMigrations.js has no model for it),
+ * where a marker left behind made the next runStartupMigrations() a silent
+ * no-op and the test failed for a reason nowhere near the assertion.
+ *
+ * Views and MongoDB's own `system.*` collections are skipped: neither is test
+ * data and deleteMany on a view throws.
+ */
 export async function clearDb() {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany({});
-  }
+  const collections = await mongoose.connection.db.listCollections().toArray();
+  await Promise.all(
+    collections
+      .filter((c) => c.type !== "view" && !c.name.startsWith("system."))
+      .map((c) => mongoose.connection.db.collection(c.name).deleteMany({})),
+  );
 }
 
 /** Build and return an Express app using the same router tree as production. */

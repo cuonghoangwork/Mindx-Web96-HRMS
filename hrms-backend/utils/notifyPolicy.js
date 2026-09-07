@@ -26,6 +26,13 @@ const CATEGORY_CHANNELS = {
   leave: ["push", "email", "telegram"],
   performance: ["push", "email", "telegram"],
 
+  // Same three channels as leave, and for a stronger reason: overtime has a
+  // 13:00 application cutoff (utils/overtimeCutoff.js), so a reviewer who does
+  // not look at the bell before lunch cannot act at all. This was
+  // category "employee" — in-app only — until 2026-09-07, which made the most
+  // deadline-bound notice in the system the quietest one.
+  overtime: ["push", "email", "telegram"],
+
   // Money is worth an email and a push, but a payslip is not urgent enough to
   // buzz a private messenger — it will still be there in the morning.
   payroll: ["push", "email"],

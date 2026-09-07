@@ -16,6 +16,7 @@
 
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
 import LeaveRequestModel from "../model/LeaveRequest.js";
+import UserModel from "../model/User.js";
 import EmployeeModel, { PAYABLE_EMPLOYEE_STATUSES } from "../model/Employee.js";
 import AttendanceModel from "../model/Attendance.js";
 import { recomputeRecordOvertime } from "../utils/overtimeRecompute.js";
@@ -25,7 +26,7 @@ import {
   assertNoPendingRequest,
 } from "../utils/reviewQueue.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
-import { emitNotificationEach, notifyHR } from "../utils/notify.js";
+import { emitNotificationEach } from "../utils/notify.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
 import { AppError } from "../utils/appError.js";
 import { dateKeyInTz, parseHHMM, utcMidnight } from "../utils/workday.js";
@@ -340,6 +341,12 @@ const { list, review } = createReviewRequestController({
   Model: OvertimeRequestModel,
   resourceLabel: "overtime request",
   capability: "approveOvertimeRequests",
+  // Without this the decision notice falls back to reviewQueue.js's
+  // "employee" default, which utils/notifyPolicy.js keeps in-app only — so the
+  // employee learned their shift was approved or rejected from the bell alone,
+  // for a shift that may be the same evening. leaveRequestController sets its
+  // own for exactly this reason.
+  notifyCategory: "overtime",
   toClient: toClientRequest,
   /**
    * The queue's warning triangle needs otEvidence, which lives on Attendance,
@@ -463,7 +470,7 @@ const overtimeRequestController = {
       const reviewerNotice = {
         title: "New overtime request",
         message: `${employee.name} requested overtime on ${dateKey} (${payload.plannedStart}-${payload.plannedEnd}).`,
-        category: "employee",
+        category: "overtime",
         link: "/attendance",
         linkLabel: "Review overtime",
         titleKey: "overtimeRequestSubmitted",
@@ -476,25 +483,31 @@ const overtimeRequestController = {
         },
       };
 
-      // The unscoped company-wide tier.
-      await notifyHR(reviewerNotice);
+      // Two tiers, one addressed notice each — the same split
+      // leaveRequestController.create and profileEditRequestController use.
+      //
+      // The department's manager approves overtime for their own team
+      // (router/overtimeRequestRouter.js) but is NOT in the "hr" broadcast
+      // audience: MANAGER is department-scoped and a broadcast carries no
+      // department (see AUDIENCES_BY_ROLE in model/Notification.js). So the
+      // one person who had to act was the one person never told.
+      //
+      // The HR half was a notifyHR() broadcast until 2026-09-07. Broadcast
+      // read state is SHARED — one reviewer opening it cleared it from every
+      // other reviewer's badge — so a request each of them may need to act on
+      // could vanish because a colleague glanced at it. Addressed documents
+      // keep read state per person.
+      //
+      // Excluding the caller covers a reviewer applying for their own
+      // overtime: the other tier still gets it, and so does a second manager
+      // in the same department.
+      const [hrTier, departmentManagers] = await Promise.all([
+        UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } }, "_id"),
+        departmentManagerUserIds(employee.department, req.user.id),
+      ]);
 
-      // ...and the requester's own department manager, who is ALSO an approver
-      // (router/overtimeRequestRouter.js) but is not in the "hr" broadcast
-      // audience — MANAGER is department-scoped and a broadcast carries no
-      // department (see AUDIENCES_BY_ROLE in model/Notification.js). Without
-      // this the one person who has to act on the request was the one person
-      // never told, while leave — the identical workflow — did notify them.
-      //
-      // Scoped to this employee's department, deliberately unlike
-      // leaveRequestController.create, which still notifies every manager in
-      // the company about leave they have no authority to approve.
-      //
-      // Excluding the caller covers a MANAGER applying for their own
-      // overtime: HR/ADMIN still get it above, and a second manager in the
-      // same department still gets it here.
       await emitNotificationEach(
-        await departmentManagerUserIds(employee.department, req.user.id),
+        [...hrTier.map((u) => u._id), ...departmentManagers],
         reviewerNotice,
       );
 
@@ -585,10 +598,19 @@ const overtimeRequestController = {
       }
 
       if (created.length) {
-        await notifyHR({
+        // Addressed rather than broadcast for the same read-state reason as
+        // the apply path above. This one is an FYI rather than an action item,
+        // but "one colleague opened it so it left your badge" is just as
+        // surprising for an FYI, and having two notice shapes in one file
+        // invites the next reader to copy the wrong one.
+        const hrTier = await UserModel.find(
+          { role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } },
+          "_id",
+        );
+        await emitNotificationEach(hrTier.map((u) => u._id), {
           title: "Overtime assigned",
           message: `${created.length} employee(s) were assigned overtime on ${dateKey} (${plannedStart}-${plannedEnd}).`,
-          category: "employee",
+          category: "overtime",
           link: "/attendance",
           linkLabel: "Review overtime",
           titleKey: "overtimeAssigned",

@@ -15,6 +15,25 @@
     "leaveRejectedWithNote": {
       "message": "Your leave request was rejected. Note: {{note}}"
     },
+    "overtimeRequestSubmitted": {
+      "title": "New overtime request",
+      "message": "{{employeeName}} requested overtime on {{date}} ({{start}}–{{end}})."
+    },
+    "overtimeApproved": {
+      "title": "Overtime approved",
+      "message": "Your overtime on {{date}} ({{start}}–{{end}}) has been approved."
+    },
+    "overtimeRejected": {
+      "title": "Overtime rejected",
+      "message": "Your overtime request for {{date}} was rejected."
+    },
+    "overtimeRejectedWithNote": {
+      "message": "Your overtime request for {{date}} was rejected. Note: {{note}}"
+    },
+    "overtimeAssigned": {
+      "title": "Overtime assigned",
+      "message": "{{count}} employee(s) were assigned overtime on {{date}} ({{start}}–{{end}})."
+    },
     "appealFiled": {
       "title": "Performance appeal filed",
       "message": "{{employeeName}} appealed their {{cycleLabel}} manager rating."

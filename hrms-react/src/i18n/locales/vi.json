@@ -595,6 +595,8 @@
   },
   "categories": {
    "leave": "Nghỉ phép",
+   "overtime": "Làm thêm giờ",
+   "performance": "Hiệu suất",
    "interview": "Tuyển dụng",
    "payroll": "Lương",
    "employee": "Nhân viên",

@@ -15,6 +15,25 @@
     "leaveRejectedWithNote": {
       "message": "Yêu cầu nghỉ phép của bạn đã bị từ chối. Ghi chú: {{note}}"
     },
+    "overtimeRequestSubmitted": {
+      "title": "Yêu cầu làm thêm giờ mới",
+      "message": "{{employeeName}} đã yêu cầu làm thêm giờ ngày {{date}} ({{start}}–{{end}})."
+    },
+    "overtimeApproved": {
+      "title": "Đã duyệt làm thêm giờ",
+      "message": "Ca làm thêm ngày {{date}} ({{start}}–{{end}}) của bạn đã được duyệt."
+    },
+    "overtimeRejected": {
+      "title": "Từ chối làm thêm giờ",
+      "message": "Yêu cầu làm thêm giờ ngày {{date}} của bạn đã bị từ chối."
+    },
+    "overtimeRejectedWithNote": {
+      "message": "Yêu cầu làm thêm giờ ngày {{date}} của bạn đã bị từ chối. Ghi chú: {{note}}"
+    },
+    "overtimeAssigned": {
+      "title": "Đã phân công làm thêm giờ",
+      "message": "{{count}} nhân viên được phân công làm thêm giờ ngày {{date}} ({{start}}–{{end}})."
+    },
     "appealFiled": {
       "title": "Đã gửi khiếu nại đánh giá hiệu suất",
       "message": "{{employeeName}} đã khiếu nại đánh giá của quản lý cho chu kỳ {{cycleLabel}}."
