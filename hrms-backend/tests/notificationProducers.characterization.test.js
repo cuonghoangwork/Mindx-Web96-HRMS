@@ -297,16 +297,12 @@ describe("HR compose (POST /notifications)", () => {
     expect(doc.isCustom).toBe(true);
     expect(String(doc.sender.id)).toBe(String(org.users.admin.userId));
 
-    // KNOWN BUG, pinned rather than fixed: sender.name is always null.
-    // The JWT payload is { id, email, role, mustChangePassword } — there is
-    // no `name` on it (controller/authController.js), so `req.user.name` is
-    // undefined at every call site. The consequence is invisible: the
-    // "· from <name>" attribution in pages/Notifications.jsx is guarded by
-    // `notification.senderName &&`, so it simply never renders and no error
-    // is ever raised. utils/notifyActor.js already works around this same
-    // gap for the department/employee notices; the compose path does not.
-    // Change this assertion when the JWT gains a name, not before.
-    expect(doc.sender.name).toBeNull();
+    // Was pinned as `toBeNull()` while the JWT carried no `name`, which made
+    // the "· from <name>" attribution in pages/Notifications.jsx dead code —
+    // it is guarded by `notification.senderName &&`, so it simply never
+    // rendered and nothing ever errored. controller/authController.js now
+    // signs `name` into the token, so the sender is real.
+    expect(doc.sender.name).toBe("Admin User");
     // Hand-written copy has no translation keys — it renders as typed.
     expect(doc.titleKey).toBeNull();
     expect(doc.category).toBe("announcement");

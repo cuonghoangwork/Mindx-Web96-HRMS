@@ -267,3 +267,93 @@ describe("POST /api/v1/auth/refresh-token", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ══════════════════════════════════════════════════════════
+// JWT payload — what every request downstream can read
+// ══════════════════════════════════════════════════════════
+
+/**
+ * `name` was missing from the payload for the life of the project, so
+ * `req.user.name` was undefined at every call site. Nothing errored: a blank
+ * name renders as nothing. The two visible consequences were an empty actor on
+ * EVERY audit-log row, and hand-composed notices with no sender.
+ */
+describe("JWT payload", () => {
+  const decode = (token) => JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+
+  async function seedAndLogin(name = "Ada Lovelace") {
+    const bcrypt = (await import("bcryptjs")).default;
+    const { default: UserModel } = await import("../model/User.js");
+    await UserModel.create({
+      email: "ada@hrms.com",
+      password: bcrypt.hashSync("admin123", 10),
+      name,
+      role: "ADMIN",
+    });
+    const res = await request.post("/api/v1/auth/login").send({ email: "ada@hrms.com", password: "admin123" });
+    return res.body.data;
+  }
+
+  it("carries the display name on the access token", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { access_token } = await seedAndLogin();
+
+    const payload = decode(access_token);
+    expect(payload.name).toBe("Ada Lovelace");
+    // The rest of the contract, unchanged.
+    expect(payload.email).toBe("ada@hrms.com");
+    expect(payload.role).toBe("ADMIN");
+    expect(payload.tokenType).toBe("AT");
+  });
+
+  it("carries it on the refresh token too", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { refresh_token } = await seedAndLogin();
+    expect(decode(refresh_token).name).toBe("Ada Lovelace");
+  });
+
+  it("keeps the name across a token refresh", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { refresh_token } = await seedAndLogin();
+
+    const res = await request.post("/api/v1/auth/refresh-token").send({ refresh_token });
+
+    // Also the upgrade path for sessions issued before `name` existed: an
+    // access token lasts 20 minutes, so they pick it up without re-login.
+    expect(res.status).toBe(200);
+    expect(decode(res.body.data.access_token).name).toBe("Ada Lovelace");
+  });
+
+  it("keeps the name on the token issued by a password change", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { access_token } = await seedAndLogin();
+
+    const res = await request
+      .post("/api/v1/auth/change-password")
+      .set({ Authorization: `Bearer ${access_token}` })
+      .send({ currentPassword: "admin123", newPassword: "newpass123" });
+
+    expect(res.status).toBe(200);
+    expect(decode(res.body.data.access_token).name).toBe("Ada Lovelace");
+  });
+
+  it("reaches the audit log as the acting user", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { default: AuditLog } = await import("../model/AuditLog.js");
+    const { access_token } = await seedAndLogin("Grace Hopper");
+
+    // Any mutating request writes an audit row through utils/auditLog.js,
+    // which reads req.user.name. This is the compliance-facing half of the
+    // bug: without a name on the token every historical row says nothing
+    // about who acted.
+    await request
+      .post("/api/v1/departments")
+      .set({ Authorization: `Bearer ${access_token}` })
+      .send({ name: "Research" });
+
+    const entry = await AuditLog.findOne({ resource: "department" });
+    expect(entry).not.toBeNull();
+    expect(entry.actor.name).toBe("Grace Hopper");
+    expect(entry.actor.role).toBe("ADMIN");
+  });
+});

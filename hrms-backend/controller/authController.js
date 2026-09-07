@@ -112,6 +112,11 @@ const authController = {
       const { access_token, refresh_token } = signTokens({
         id: user._id,
         email: user.email,
+        // Carried so req.user.name is populated for every request. Without it
+        // utils/auditLog.js wrote a blank actor name on EVERY row, and
+        // hand-composed notices had no sender — both silently, because a
+        // missing name renders as nothing rather than as an error.
+        name: user.name,
         role: user.role,
         mustChangePassword,
       });
@@ -166,6 +171,10 @@ const authController = {
       const { access_token, refresh_token: new_refresh_token } = signTokens({
         id: user._id,
         email: user.email,
+        // Also the upgrade path for tokens minted before `name` existed:
+        // an access token lasts 20 minutes, so a session issued by the old
+        // code picks the name up at its next refresh without re-login.
+        name: user.name,
         role: user.role,
         mustChangePassword: Boolean(user.mustChangePassword),
       });
@@ -237,6 +246,7 @@ const authController = {
       const { access_token, refresh_token } = signTokens({
         id: user._id,
         email: user.email,
+        name: user.name,
         role: user.role,
         mustChangePassword: false,
       });
