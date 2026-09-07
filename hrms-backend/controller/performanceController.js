@@ -17,6 +17,10 @@ import { emitNotification, notifyHR } from "../utils/notify.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
 import { askGemini } from "../utils/geminiClient.js";
 import { buildInsightPrompt } from "../utils/performanceInsightPrompt.js";
+// Cyclic on purpose and safe: performanceReminders.js imports
+// findUserForEmployee back from this module, but only calls it inside a
+// function body, and both sides are hoisted `export function` declarations.
+import { sendPerformanceReminders } from "../jobs/performanceReminders.js";
 import { computeAnalytics, computeAppealRate, computeComparison, reviewStatusOf } from "../utils/performanceAnalytics.js";
 import {
   APPEAL_WINDOW_DAYS,
@@ -891,6 +895,32 @@ const performanceController = {
       }
 
       res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
+    } catch (error) {
+      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    }
+  },
+
+  // Manual trigger for the daily reminder sweep, matching the ADMIN-only job
+  // triggers in attendanceRouter.js, payrollRouter.js and
+  // promotionRequestRouter.js. Needed because ENABLE_SCHEDULER is false on
+  // Render's free plan (render.yaml).
+  //
+  // Optional asOf shifts the "cycle ends within 7 days" window. Re-running is
+  // safe: the job checks for an existing Notification with the same title
+  // (which embeds the cycle key) before sending, so nobody is reminded twice
+  // for the same cycle.
+  sendReminders: async (req, res) => {
+    try {
+      const raw = req.body?.asOf;
+      const asOf = raw ? new Date(raw) : new Date();
+      if (Number.isNaN(asOf.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
+      }
+
+      const result = await sendPerformanceReminders({ asOf });
+      res.json({ success: true, data: result });
     } catch (error) {
       res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }

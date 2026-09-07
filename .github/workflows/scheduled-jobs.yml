@@ -1,0 +1,184 @@
+# Drives every job in hrms-backend/jobs/index.js over HTTP.
+#
+# WHY THIS EXISTS: the backend runs with ENABLE_SCHEDULER=false (render.yaml),
+# because Render's free plan sleeps after ~15 minutes idle - an in-process cron
+# only fires when the instance happens to be awake, which makes monthly payroll
+# nondeterministic. Each job has an ADMIN-only trigger endpoint instead, and
+# this workflow is the scheduler.
+#
+# ONE JOB PER CRON. GitHub fires the whole workflow for every schedule entry,
+# so each job below gates itself on github.event.schedule. The other five show
+# as "skipped" on any given run - that is expected, and it means a failure names
+# the job that failed rather than burying it in a shared log.
+#
+# TIMES ARE UTC. GitHub has no timezone option. Asia/Ho_Chi_Minh is UTC+7 with
+# no DST, so the conversion is a fixed -7h and stays correct year-round. Note
+# GitHub may delay a scheduled run by tens of minutes under load, and disables
+# schedules entirely after 60 days with no repository activity.
+#
+# Required repository configuration:
+#   Variable  HRMS_API_URL         e.g. https://hrms-backend-xhtu.onrender.com/api/v1
+#   Secret    HRMS_ADMIN_EMAIL     an ADMIN account
+#   Secret    HRMS_ADMIN_PASSWORD
+#
+# The ADMIN account must NOT be flagged mustChangePassword - verifyToken returns
+# 403 PASSWORD_CHANGE_REQUIRED for those and none of these endpoints are on
+# PASSWORD_GATE_ALLOW. Prefer a dedicated service account over a human one.
+
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: "0 16 * * *"   # 23:00 ICT same day     - close attendance day
+    - cron: "0 19 * * *"   # 02:00 ICT next day     - promotion eligibility
+    - cron: "0 21 * * *"   # 04:00 ICT next day     - annual salary raise
+    - cron: "0 2 * * *"    # 09:00 ICT same day     - performance reminders
+    - cron: "0 1 1 * *"    # 08:00 ICT on the 1st   - monthly payroll draft
+    - cron: "0 1 10 * *"   # 08:00 ICT on the 10th  - monthly payroll run
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run"
+        required: true
+        type: choice
+        options:
+          - close-attendance-day
+          - promotion-eligibility
+          - annual-raise
+          - performance-reminders
+          - payroll-draft
+          - payroll-run
+      date:
+        description: "close-attendance-day only: day to close (YYYY-MM-DD). Blank = today."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  API_URL: ${{ vars.HRMS_API_URL }}
+  ADMIN_EMAIL: ${{ secrets.HRMS_ADMIN_EMAIL }}
+  ADMIN_PASSWORD: ${{ secrets.HRMS_ADMIN_PASSWORD }}
+
+jobs:
+  # 23:00 ICT, not 22:00: the overtime window now ends at 22:00 (18:00 + the 4h
+  # daily cap), so an earlier run would close records mid-overtime-shift.
+  close-attendance-day:
+    name: Close attendance day
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 16 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'close-attendance-day')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-close-attendance-day
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve target date
+        id: target
+        env:
+          # Through env, never inline in the script body: interpolating a
+          # dispatch input directly would let a crafted value run as shell.
+          DATE_INPUT: ${{ inputs.date }}
+        run: |
+          set -euo pipefail
+          if [ -n "$DATE_INPUT" ]; then
+            DATE="$DATE_INPUT"
+          else
+            # The schedule fires at 16:00 UTC = 23:00 ICT on the SAME calendar
+            # date, so today's UTC date is the ICT day to close. Still correct
+            # if GitHub delays the run, because the UTC date does not roll over
+            # until 00:00 UTC, a full 8 hours later.
+            DATE="$(date -u +%F)"
+          fi
+          case "$DATE" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+            *) echo "::error::invalid date, expected YYYY-MM-DD"; exit 1 ;;
+          esac
+          echo "date=$DATE" >> "$GITHUB_OUTPUT"
+      - name: Trigger
+        env:
+          TARGET_DATE: ${{ steps.target.outputs.date }}
+        run: |
+          bash .github/scripts/trigger-job.sh /attendance/close-day \
+            "$(jq -nc --arg d "$TARGET_DATE" '{date:$d}')"
+
+  # The remaining jobs take no parameters - the endpoints default asOf to now,
+  # which is what a scheduled run wants. asOf exists for replaying a missed day
+  # by hand, and every one of these jobs dedups, so a repeat is a no-op.
+  promotion-eligibility:
+    name: Promotion eligibility sweep
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 19 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'promotion-eligibility')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-promotion-eligibility
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/trigger-job.sh /promotion-requests/check-eligibility
+
+  annual-raise:
+    name: Annual salary raise sweep
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 21 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'annual-raise')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-annual-raise
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/trigger-job.sh /promotion-requests/annual-raise
+
+  performance-reminders:
+    name: Performance review reminders
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'performance-reminders')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-performance-reminders
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/trigger-job.sh /performance/send-reminders
+
+  # 01:00 ICT on the 1st is 18:00 UTC on the LAST day of the previous month,
+  # which cron cannot express (GitHub supports no "L"). Both monthly jobs
+  # therefore run at 01:00 UTC on their nominal date instead - 08:00 ICT. Safe
+  # because both derive their target month from the date, not the hour, and the
+  # draft-then-run ordering across the 1st and the 10th is unchanged.
+  payroll-draft:
+    name: Monthly payroll draft
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 1 1 * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'payroll-draft')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-payroll-draft
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/trigger-job.sh /payroll/generate-monthly-draft
+
+  payroll-run:
+    name: Monthly payroll run
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 1 10 * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'payroll-run')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: scheduled-job-payroll-run
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/trigger-job.sh /payroll/run-monthly

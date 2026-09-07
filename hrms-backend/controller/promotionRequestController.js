@@ -10,6 +10,8 @@ import { logAction } from "../utils/auditLog.js";
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
 import { AppError } from "../utils/appError.js";
+import { checkPromotionEligibility } from "../jobs/checkPromotionEligibility.js";
+import { annualSalaryRaise } from "../jobs/annualSalaryRaise.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
@@ -343,6 +345,53 @@ const promotionRequestController = {
           params: error instanceof AppError ? error.params : undefined,
         });
       }
+    }
+  },
+
+  // Manual triggers for the two scheduled sweeps that create pending
+  // PromotionRequests. ADMIN-only, mirroring attendanceController.closeDay
+  // and payrollController.generateMonthlyDraft/runMonthly: this service runs
+  // with ENABLE_SCHEDULER=false on Render's free plan (render.yaml), which
+  // sleeps when idle, so an external scheduler drives the jobs over HTTP.
+  //
+  // Optional asOf runs the sweep as at another date, to cover a missed day.
+  // Re-running is safe: both jobs flag a given employee at most once per
+  // level transition / anniversary, so a repeat is a no-op rather than a
+  // duplicate request.
+  checkEligibility: async (req, res) => {
+    try {
+      const raw = req.body?.asOf;
+      const asOf = raw ? new Date(raw) : new Date();
+      if (Number.isNaN(asOf.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
+      }
+
+      const result = await checkPromotionEligibility({ asOf });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    }
+  },
+
+  // Lives here rather than under /payroll because it proposes a raise as a
+  // pending PromotionRequest for HR to review - it never changes salary
+  // directly, so it feeds the same review queue as checkEligibility above.
+  annualRaise: async (req, res) => {
+    try {
+      const raw = req.body?.asOf;
+      const asOf = raw ? new Date(raw) : new Date();
+      if (Number.isNaN(asOf.getTime())) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
+      }
+
+      const result = await annualSalaryRaise({ asOf });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
   },
 };

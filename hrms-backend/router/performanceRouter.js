@@ -92,4 +92,10 @@ router.patch(
   performanceController.resolveAppeal,
 );
 
+
+// Manual trigger for the daily performance-reminder job
+// (jobs/performanceReminders.js), mirroring the other ADMIN-only job
+// triggers now that ENABLE_SCHEDULER is false on the deployed instance.
+router.post("/send-reminders", ...admin, performanceController.sendReminders);
+
 export default router;
