@@ -35,9 +35,10 @@ const pushController = {
         success: true,
         data: {
           available: pushEnabled(),
-          // The frontend also reads this from VITE_VAPID_PUBLIC_KEY at build
-          // time; serving it here means a deployment cannot end up with a
-          // frontend keyed to a different pair than the backend signs with.
+          // The ONLY way the browser gets this key: pages/Settings.jsx reads
+          // it off this response and hands it to subscribeToPush(). There is
+          // no build-time copy, which is what stops a frontend ending up
+          // keyed to a different pair than the backend signs with.
           publicKey: vapidPublicKey(),
           subscribed,
         },
