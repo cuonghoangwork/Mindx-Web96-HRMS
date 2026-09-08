@@ -7,22 +7,19 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { channelsFor, allowsChannel, OUT_OF_APP_CHANNELS } from "../utils/notifyPolicy.js";
-import { NOTIFICATION_AUDIENCES } from "../model/Notification.js";
+import {
+  channelsFor,
+  allowsChannel,
+  OUT_OF_APP_CHANNELS,
+  DECIDED_CATEGORIES,
+} from "../utils/notifyPolicy.js";
+import { NOTIFICATION_AUDIENCES, NOTIFICATION_CATEGORIES } from "../model/Notification.js";
 
-// The full category enum from model/Notification.js. Duplicated on purpose:
-// if someone adds a category there, the "every category has a decision" test
-// below fails until they decide what it may do.
-const CATEGORIES = [
-  "leave",
-  "hiring",
-  "payroll",
-  "employee",
-  "holiday",
-  "system",
-  "announcement",
-  "performance",
-];
+// The schema enum itself, not a copy of it. It used to be hand-duplicated
+// here, which is how "overtime" went missing: it was added to the enum on
+// 2026-09-07 and never added to the copy, so every loop below silently
+// skipped the category with the WIDEST channel set in the table.
+const CATEGORIES = NOTIFICATION_CATEGORIES;
 
 describe("channelsFor", () => {
   it("lets a decision about you reach a phone", () => {
@@ -35,6 +32,17 @@ describe("channelsFor", () => {
     expect(allowsChannel("payroll", "telegram")).toBe(false);
     expect(allowsChannel("payroll", "email")).toBe(true);
     expect(allowsChannel("payroll", "push")).toBe(true);
+  });
+
+  it("lets overtime reach a phone, like leave and performance", () => {
+    // The widest channel set in the table, for a stronger reason than leave:
+    // overtime has a 13:00 same-day application cutoff
+    // (utils/overtimeCutoff.js), so a reviewer who does not check the bell
+    // before lunch cannot act at all. Asserted by name rather than left to
+    // the loops below, because this was category "employee" -- in-app only --
+    // until 2026-09-07, which made the most deadline-bound notice in the
+    // system the quietest one.
+    expect(channelsFor("overtime")).toEqual(["push", "email", "telegram"]);
   });
 
   it("keeps ambient categories entirely in-app", () => {
@@ -52,7 +60,7 @@ describe("channelsFor", () => {
   });
 
   it("fails closed for a category nobody has decided about", () => {
-    // The important one. A ninth category added to the Notification enum
+    // The important one. A tenth category added to the Notification enum
     // must be in-app only until someone chooses otherwise — never "inherits
     // the default and starts emailing everyone".
     expect(channelsFor("a-brand-new-category")).toEqual([]);
@@ -61,9 +69,14 @@ describe("channelsFor", () => {
   });
 
   it("has a decision recorded for every category in the schema enum", () => {
-    for (const category of CATEGORIES) {
-      expect(Array.isArray(channelsFor(category))).toBe(true);
-    }
+    // Set equality, both directions. The previous version of this test looped
+    // the enum asserting Array.isArray(channelsFor(c)), which could never
+    // fail: channelsFor falls back to [] for ANY input by design, so it
+    // returned an array for "banana" just as happily. Comparing the policy
+    // table's own keys against the enum is what actually catches a category
+    // added to the schema with no delivery decision -- and, the other way,
+    // a policy entry for a category that no longer exists.
+    expect([...DECIDED_CATEGORIES].sort()).toEqual([...NOTIFICATION_CATEGORIES].sort());
   });
 
   it("only ever names channels that exist", () => {

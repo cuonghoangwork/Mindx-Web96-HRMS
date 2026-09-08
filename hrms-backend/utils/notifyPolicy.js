@@ -49,9 +49,20 @@ const CATEGORY_CHANNELS = {
 };
 
 /**
+ * The categories this table has actually decided about.
+ *
+ * Exported for tests/notifyPolicy.test.js, which compares it against
+ * NOTIFICATION_CATEGORIES in model/Notification.js. That comparison is the
+ * only thing that can catch a category added to the schema enum without a
+ * delivery decision: channelsFor() cannot detect it, because falling through
+ * to [] is exactly what it is supposed to do for unknown input.
+ */
+export const DECIDED_CATEGORIES = Object.keys(CATEGORY_CHANNELS);
+
+/**
  * Channels a category may use. Unknown categories get nothing.
  *
- * Fail-closed on purpose: adding a ninth category to the Notification enum
+ * Fail-closed on purpose: adding a tenth category to the Notification enum
  * without deciding its policy should make it in-app only, never "inherits
  * whatever the default was and starts emailing 50 people".
  */
