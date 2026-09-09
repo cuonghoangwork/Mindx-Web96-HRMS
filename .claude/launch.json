@@ -4,14 +4,35 @@
     {
       "name": "hrms-react",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "hrms-react", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "hrms-react",
+        "run",
+        "dev"
+      ],
       "port": 3000
     },
     {
       "name": "hrms-backend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "hrms-backend", "run", "dev:env"],
+      "runtimeArgs": [
+        "--prefix",
+        "hrms-backend",
+        "run",
+        "dev:env"
+      ],
       "port": 8080
+    },
+    {
+      "name": "hrms-react-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "hrms-react",
+        "run",
+        "preview"
+      ],
+      "port": 4173
     }
   ]
 }

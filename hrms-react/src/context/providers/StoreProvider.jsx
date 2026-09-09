@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { idsMatch } from "../../utils/id";
@@ -560,7 +560,8 @@ export function StoreProvider({ children }) {
 
   const unreadNotificationCount = notifications.filter((n) => !n.read).length;
 
-  const value = {
+  const value = useMemo(
+    () => ({
     // State
     employees,
     jobs,
@@ -637,8 +638,93 @@ export function StoreProvider({ children }) {
     markAllNotificationsRead,
     removeNotification,
     clearReadNotifications,
-    sendNotification,
-  };
+      sendNotification,
+    }),
+    // Dependency list computed by react-hooks/exhaustive-deps, not by hand.
+    // The rule is enabled at "warn" and npm run lint runs --max-warnings 0, so
+    // this array cannot silently drift out of date: add a field to the value
+    // above without listing it here and the build fails.
+    //
+    // Scope note: this stops the value's identity changing when StoreProvider
+    // re-renders for a reason unrelated to its own state (an auth flag
+    // flipping, a language switch, a parent re-render). It does NOT stop the
+    // notification cascade -- an arriving notification really does change
+    // `notifications`, so the value really is new and all 25 consumers really
+    // do re-render. Only splitting this context (Phase 2) fixes that.
+    [
+      activePage,
+      addCandidate,
+      addDepartment,
+      addEmployee,
+      addHoliday,
+      addJob,
+      applyOvertime,
+      assignOvertime,
+      attendance,
+      cancelOvertime,
+      candidates,
+      clearFilters,
+      clearReadNotifications,
+      clockIn,
+      clockOffset,
+      clockOut,
+      closeAllModals,
+      closeModal,
+      departments,
+      dismissToast,
+      employees,
+      fetchOvertimeBalance,
+      filters,
+      getAppNow,
+      getApplicantCount,
+      getCandidatesByJob,
+      getEmployeeCountByDepartment,
+      getEmployeesByDepartment,
+      getJobById,
+      getTotalSalaryByDepartment,
+      holidays,
+      isClockAdjusted,
+      jobs,
+      loadingStore,
+      markAllNotificationsRead,
+      markNotificationRead,
+      modals,
+      notifications,
+      openModal,
+      overtimeRequests,
+      refreshAll,
+      refreshOvertimeRequests,
+      removeCandidate,
+      removeDepartment,
+      removeEmployee,
+      removeEmployeeDocument,
+      removeHoliday,
+      removeJob,
+      removeNotification,
+      resetAppDateTime,
+      reviewOvertime,
+      selectEmployee,
+      selectedEmployee,
+      sendNotification,
+      setAppDateTime,
+      setDepartmentFilter,
+      setSearchFilter,
+      setTypeFilter,
+      storeError,
+      toast,
+      unreadNotificationCount,
+      updateCandidate,
+      updateDepartmentBudget,
+      updateDepartmentManager,
+      updateEmployee,
+      updateHoliday,
+      updateJob,
+      uploadCandidateCv,
+      uploadEmployeeAvatar,
+      uploadEmployeeContract,
+      uploadEmployeeDocuments,
+    ],
+  );
 
   return (
     <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

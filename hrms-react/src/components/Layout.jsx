@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
 import SideMenu from "./SideMenu";
@@ -6,6 +6,26 @@ import Header from "./Header";
 import { useStore } from "../context/StoreContext";
 import Button from "./Button";
 import ChatWidget from "./ChatWidget";
+
+/* Shown while the store is loading and while a route chunk is in flight. */
+function ContentSkeleton() {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--sp-3)",
+        padding: "var(--sp-6) 0",
+      }}
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <div className="skeleton skeleton-text" style={{ width: "40%" }} />
+      <div className="skeleton skeleton-text" style={{ width: "70%" }} />
+      <div className="skeleton skeleton-text" style={{ width: "55%" }} />
+    </div>
+  );
+}
 
 function Layout() {
   const { t } = useTranslation();
@@ -56,22 +76,16 @@ function Layout() {
               </Button>
             </div>
           ) : loadingStore ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--sp-3)",
-                padding: "var(--sp-6) 0",
-              }}
-              aria-busy="true"
-              aria-live="polite"
-            >
-              <div className="skeleton skeleton-text" style={{ width: "40%" }} />
-              <div className="skeleton skeleton-text" style={{ width: "70%" }} />
-              <div className="skeleton skeleton-text" style={{ width: "55%" }} />
-            </div>
+            <ContentSkeleton />
           ) : (
-            <Outlet />
+            // Route chunks resolve at this boundary rather than App.jsx's, so the
+            // sidebar and header stay mounted while a lazy page loads instead of
+            // the whole window blanking on every navigation. Reusing the skeleton
+            // above is deliberate: a chunk fetch and a data fetch are both just
+            // "content is not here yet" and should not look like different states.
+            <Suspense fallback={<ContentSkeleton />}>
+              <Outlet />
+            </Suspense>
           )}
         </div>
       </main>

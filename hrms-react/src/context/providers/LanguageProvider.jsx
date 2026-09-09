@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import i18n, { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE } from '../../i18n'
+import i18n, { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, loadLanguage } from '../../i18n'
 import { LanguageContext } from '../LanguageContext'
 
 // Task 6.1 — mirrors ThemeContext.jsx's shape/pattern (localStorage-backed
@@ -16,9 +16,35 @@ export function LanguageProvider({ children }) {
     return isSupported(stored) ? stored : DEFAULT_LANGUAGE
   })
 
+  // Only the default locale ships in the initial chunk (see i18n/index.js), so
+  // a returning Vietnamese user would otherwise paint an English UI and then
+  // swap it a moment later. Gate the first paint until their dictionary is in.
+  //
+  // This starts true for the default language, which is the common case and
+  // means English users get no extra wait and no behaviour change. It also
+  // never returns to false, so switching language later is non-blocking: the
+  // UI stays up in the old language until the new dictionary resolves, exactly
+  // as it did when both were bundled.
+  const [ready, setReady] = useState(() => language === DEFAULT_LANGUAGE)
+
   useEffect(() => {
     localStorage.setItem('hrms-language', language)
-    i18n.changeLanguage(language)
+    let cancelled = false
+    loadLanguage(language)
+      .then(() => {
+        if (cancelled) return
+        i18n.changeLanguage(language)
+        setReady(true)
+      })
+      .catch(() => {
+        // loadLanguage resolves for unknown languages, so reaching here means
+        // the chunk request itself failed. Unblock anyway: fallbackLng renders
+        // English, which beats holding a blank screen forever.
+        if (!cancelled) setReady(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [language])
 
   const setLanguage = (newLanguage) => {
@@ -32,8 +58,7 @@ export function LanguageProvider({ children }) {
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, toggleLanguage, supportedLanguages: SUPPORTED_LANGUAGES }}>
-      {children}
+      {ready ? children : null}
     </LanguageContext.Provider>
   )
 }
-
