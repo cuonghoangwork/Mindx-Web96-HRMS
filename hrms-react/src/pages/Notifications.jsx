@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
+import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { translateNotification } from "../utils/notifications";
@@ -38,8 +39,8 @@ function Notifications() {
     removeNotification,
     clearReadNotifications,
     sendNotification,
-    getAppNow,
-  } = useStore();
+  } = useNotifications();
+  const { getAppNow } = useStore();
   const { isHRTier } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();

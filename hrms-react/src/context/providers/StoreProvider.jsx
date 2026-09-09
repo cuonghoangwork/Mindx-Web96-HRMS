@@ -1,9 +1,6 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import { idsMatch } from "../../utils/id";
-import { translateNotification } from "../../utils/notifications";
-import { shouldNotify, showDesktopNotification } from "../../utils/desktopNotify";
 import { translateApiError } from "../../utils/apiError";
 import { useAuth } from "../AuthContext";
 import {
@@ -13,12 +10,9 @@ import {
   CandidatesAPI,
   HolidaysAPI,
   AttendanceAPI,
-  NotificationsAPI,
   OvertimeRequestsAPI,
 } from "../../api";
 import { setDemoClockOffset } from "../../api/client";
-import { connectNotificationStream } from "../../api/notificationStream";
-import { useLanguage } from "../LanguageContext";
 import { StoreContext } from "../StoreContext";
 
 /* ─── Helper: upsert an attendance record returned by the API into local state ─── */
@@ -46,8 +40,6 @@ function upsertAttendanceRecord(prev, record) {
 
 export function StoreProvider({ children }) {
   const { t } = useTranslation();
-  const { language } = useLanguage();
-  const navigate = useNavigate();
   const { isAuthenticated, mustChangePassword } = useAuth();
 
   const [employees, setEmployees] = useState([]);
@@ -56,16 +48,8 @@ export function StoreProvider({ children }) {
   const [candidates, setCandidates] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [attendance, setAttendance] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   const [loadingStore, setLoadingStore] = useState(true);
   const [storeError, setStoreError] = useState(null);
-  const [toast, setToast] = useState(null); // { type: "error"|"success", message } | null
-
-  const showToast = useCallback((type, message) => {
-    setToast({ type, message });
-  }, []);
-  const dismissToast = useCallback(() => setToast(null), []);
-
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [modals, setModals] = useState({
     employee: false,
@@ -106,14 +90,13 @@ export function StoreProvider({ children }) {
     setLoadingStore(true);
     setStoreError(null);
     try {
-      const [emp, dept, job, cand, hol, att, notif, ot] = await Promise.all([
+      const [emp, dept, job, cand, hol, att, ot] = await Promise.all([
         EmployeesAPI.list(),
         DepartmentsAPI.list(),
         JobsAPI.list(),
         CandidatesAPI.list(),
         HolidaysAPI.list(),
         AttendanceAPI.list(),
-        NotificationsAPI.list(),
         OvertimeRequestsAPI.list(),
       ]);
       setEmployees(emp.items || []);
@@ -122,7 +105,6 @@ export function StoreProvider({ children }) {
       setCandidates(cand.items || []);
       setHolidays(hol.items || []);
       setAttendance(att.items || []);
-      setNotifications(notif.items || []);
       // Role-scoped server-side: an employee gets only their own rows.
       setOvertimeRequests(ot.items || []);
     } catch (err) {
@@ -142,103 +124,11 @@ export function StoreProvider({ children }) {
       setCandidates([]);
       setHolidays([]);
       setAttendance([]);
-      setNotifications([]);
       setOvertimeRequests([]);
       setStoreError(null);
       setLoadingStore(false);
     }
   }, [isAuthenticated, mustChangePassword, refreshAll]);
-
-  /* ── Out-of-app language ── */
-
-  // Email and Telegram are rendered on the server, which has no way to read
-  // the UI toggle — it reads User.language instead. Mirroring the choice here
-  // is what keeps an email from arriving in a different language than the app
-  // the reader just set, and avoids a second language picker in Settings that
-  // could disagree with the first.
-  useEffect(() => {
-    if (!isAuthenticated || mustChangePassword || !language) return;
-    NotificationsAPI.updatePreferences({ language }).catch(() => {
-      // Nothing to recover: the app language is already applied locally, and
-      // this only affects copy the server renders later.
-    });
-  }, [isAuthenticated, mustChangePassword, language]);
-
-  /* ── Live notifications (SSE) ── */
-
-  // Notifications only, unlike refreshAll: used to catch up after the stream
-  // has been down, where refetching the whole store would flash every list.
-  const refreshNotifications = useCallback(async () => {
-    try {
-      const notif = await NotificationsAPI.list();
-      setNotifications(notif.items || []);
-    } catch {
-      // The stream is already retrying on its own; a failed catch-up is not
-      // worth a toast, and the next reconnect will try again.
-    }
-  }, []);
-
-  // Held in a ref, not closed over by the effect below, so that switching
-  // language or navigating does not tear down and re-open the SSE
-  // connection — which would cost a fresh ticket and a catch-up refetch
-  // every time someone flips EN/VI.
-  const desktopToastRef = useRef(null);
-  desktopToastRef.current = (incoming) => {
-    if (!shouldNotify(incoming)) return;
-    // Translated, so the OS toast respects the EN/VI toggle exactly as the
-    // in-app list does — the stored title/message are English literals.
-    const { title, message } = translateNotification(incoming, t, language);
-    showDesktopNotification({
-      title,
-      body: message,
-      // Two open tabs both receive the same SSE event, and a notification
-      // written in the narrow window between a reconnect's catch-up fetch
-      // and the stream registering can arrive twice. A shared tag makes the
-      // OS collapse either case into a single toast.
-      tag: String(incoming.id),
-      onActivate: () => incoming.link && navigate(incoming.link),
-    });
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated || mustChangePassword) return undefined;
-
-    const connection = connectNotificationStream({
-      onNotification: (incoming) => {
-        setNotifications((prev) =>
-          // A reconnect refetch races the stream: the catch-up GET and a live
-          // event can both carry the same notification. Dedupe on id.
-          prev.some((n) => idsMatch(n.id, incoming.id)) ? prev : [incoming, ...prev],
-        );
-        desktopToastRef.current?.(incoming);
-      },
-      onReconnect: refreshNotifications,
-    });
-
-    return () => connection.close();
-  }, [isAuthenticated, mustChangePassword, refreshNotifications]);
-
-  /* ── Service worker bridge (Web Push) ── */
-
-  // public/sw.js hands a push to the page instead of showing an OS
-  // notification whenever a tab is visible — that is the double-toast fix.
-  // The push payload is deliberately tiny (id/title/body/url), not a whole
-  // notification, so refetch rather than trying to insert a partial row.
-  useEffect(() => {
-    if (!isAuthenticated || mustChangePassword) return undefined;
-    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return undefined;
-
-    const onMessage = (event) => {
-      const { type, url } = event.data ?? {};
-      if (type === "notification") refreshNotifications();
-      // Sent when the user clicks an OS notification and an HRMS tab already
-      // exists: focus it and route in place rather than opening another tab.
-      if (type === "navigate" && url) navigate(url);
-    };
-
-    navigator.serviceWorker.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [isAuthenticated, mustChangePassword, refreshNotifications, navigate]);
 
   /* ── Employee actions ── */
   const addEmployee = useCallback(async (employee) => {
@@ -506,60 +396,6 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
-  /* ── Notification actions (optimistic, backed by the API) ── */
-  const markNotificationRead = useCallback(async (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (idsMatch(n.id, id) ? { ...n, read: true } : n)),
-    );
-    try {
-      await NotificationsAPI.markRead(id);
-    } catch (err) {
-      showToast("error", translateApiError(err, t) || "Failed to mark notification as read.");
-    }
-  }, [showToast, t]);
-
-  const markAllNotificationsRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    try {
-      await NotificationsAPI.markAllRead();
-    } catch (err) {
-      showToast("error", translateApiError(err, t) || "Failed to mark all notifications as read.");
-    }
-  }, [showToast, t]);
-
-  const removeNotification = useCallback(async (id) => {
-    setNotifications((prev) => prev.filter((n) => !idsMatch(n.id, id)));
-    try {
-      await NotificationsAPI.remove(id);
-    } catch (err) {
-      showToast("error", translateApiError(err, t) || "Failed to dismiss notification.");
-    }
-  }, [showToast, t]);
-
-  const clearReadNotifications = useCallback(async () => {
-    setNotifications((prev) => prev.filter((n) => !n.read));
-    try {
-      await NotificationsAPI.clearRead();
-    } catch (err) {
-      showToast("error", translateApiError(err, t) || "Failed to clear read notifications.");
-    }
-  }, [showToast, t]);
-
-  // HR/Admin: compose and send a custom notice. Doesn't optimistically add to local
-  // state for targeted sends (the recipient isn't necessarily "me"), but does for
-  // broadcasts the sender themself would also see.
-  const sendNotification = useCallback(async (payload) => {
-    const res = await NotificationsAPI.create(payload);
-    const isBroadcastToSelf =
-      !payload.recipientId && (!payload.recipientIds || payload.recipientIds.length === 0);
-    if (isBroadcastToSelf && res.data) {
-      setNotifications((prev) => [res.data, ...prev]);
-    }
-    return res.data;
-  }, []);
-
-  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
-
   const value = useMemo(
     () => ({
     // State
@@ -567,8 +403,6 @@ export function StoreProvider({ children }) {
     jobs,
     candidates,
     holidays,
-    notifications,
-    unreadNotificationCount,
     selectedEmployee,
     modals,
     filters,
@@ -579,8 +413,6 @@ export function StoreProvider({ children }) {
     isClockAdjusted,
     loadingStore,
     storeError,
-    toast,
-    dismissToast,
     getAppNow,
     setAppDateTime,
     resetAppDateTime,
@@ -634,12 +466,7 @@ export function StoreProvider({ children }) {
     addHoliday,
     updateHoliday,
     removeHoliday,
-    markNotificationRead,
-    markAllNotificationsRead,
-    removeNotification,
-    clearReadNotifications,
-      sendNotification,
-    }),
+      }),
     // Dependency list computed by react-hooks/exhaustive-deps, not by hand.
     // The rule is enabled at "warn" and npm run lint runs --max-warnings 0, so
     // this array cannot silently drift out of date: add a field to the value
@@ -647,10 +474,12 @@ export function StoreProvider({ children }) {
     //
     // Scope note: this stops the value's identity changing when StoreProvider
     // re-renders for a reason unrelated to its own state (an auth flag
-    // flipping, a language switch, a parent re-render). It does NOT stop the
-    // notification cascade -- an arriving notification really does change
-    // `notifications`, so the value really is new and all 25 consumers really
-    // do re-render. Only splitting this context (Phase 2) fixes that.
+    // flipping, a parent re-render).
+    //
+    // The notification cascade it used to be unable to help with is now gone
+    // for a different reason: notifications no longer live here at all. They
+    // moved to NotificationProvider, so an arriving notification changes that
+    // context and leaves this one's value identical.
     [
       activePage,
       addCandidate,
@@ -664,14 +493,12 @@ export function StoreProvider({ children }) {
       cancelOvertime,
       candidates,
       clearFilters,
-      clearReadNotifications,
       clockIn,
       clockOffset,
       clockOut,
       closeAllModals,
       closeModal,
       departments,
-      dismissToast,
       employees,
       fetchOvertimeBalance,
       filters,
@@ -686,10 +513,7 @@ export function StoreProvider({ children }) {
       isClockAdjusted,
       jobs,
       loadingStore,
-      markAllNotificationsRead,
-      markNotificationRead,
       modals,
-      notifications,
       openModal,
       overtimeRequests,
       refreshAll,
@@ -700,19 +524,15 @@ export function StoreProvider({ children }) {
       removeEmployeeDocument,
       removeHoliday,
       removeJob,
-      removeNotification,
       resetAppDateTime,
       reviewOvertime,
       selectEmployee,
       selectedEmployee,
-      sendNotification,
       setAppDateTime,
       setDepartmentFilter,
       setSearchFilter,
       setTypeFilter,
       storeError,
-      toast,
-      unreadNotificationCount,
       updateCandidate,
       updateDepartmentBudget,
       updateDepartmentManager,

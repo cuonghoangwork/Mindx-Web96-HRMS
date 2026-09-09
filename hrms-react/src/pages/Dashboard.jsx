@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
+import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
 import { EmployeesAPI, LeaveRequestsAPI, PayrollAPI, PerformanceReviewsAPI } from "../api";
@@ -212,8 +213,9 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const {
     employees, attendance, departments, getEmployeeCountByDepartment, getAppNow,
-    candidates, unreadNotificationCount,
+    candidates,
   } = useStore();
+  const { unreadNotificationCount } = useNotifications();
 
   // ── Stats ──
   const totalEmployees = employees.length;

@@ -4,6 +4,7 @@ import { Outlet } from "react-router-dom";
 import SideMenu from "./SideMenu";
 import Header from "./Header";
 import { useStore } from "../context/StoreContext";
+import { useNotifications } from "../context/NotificationContext";
 import Button from "./Button";
 import ChatWidget from "./ChatWidget";
 
@@ -30,7 +31,8 @@ function ContentSkeleton() {
 function Layout() {
   const { t } = useTranslation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { loadingStore, storeError, refreshAll, toast, dismissToast } = useStore();
+  const { loadingStore, storeError, refreshAll } = useStore();
+  const { toast, dismissToast } = useNotifications();
 
   const closeSidebar = () => setSidebarOpen(false);
 

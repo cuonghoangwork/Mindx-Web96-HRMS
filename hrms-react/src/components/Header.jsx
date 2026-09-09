@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useStore } from "../context/StoreContext";
+import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import { useCurrency } from "../context/CurrencyContext";
 import { useLocation, useMatch, Link } from "react-router-dom";
@@ -10,7 +11,8 @@ import ClockInAction from "./ClockInAction";
 
 function Header({ onMenuToggle }) {
   const { t } = useTranslation();
-  const { unreadNotificationCount, employees } = useStore();
+  const { unreadNotificationCount } = useNotifications();
+  const { employees } = useStore();
   const { isHRTier, isManager, user } = useAuth();
   const isPlainManager = isManager && !isHRTier;
   // Mirrors SideMenu.jsx's isPlainEmployee — role is EMPLOYEE exactly.
