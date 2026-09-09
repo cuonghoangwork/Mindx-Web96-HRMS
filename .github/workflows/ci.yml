@@ -1,0 +1,93 @@
+# Runs the test suites on every push and pull request.
+#
+# WHY THIS EXISTS: until now .github/workflows/ held only scheduled-jobs.yml,
+# so nothing ran the ~1,212 existing tests on a commit. The refactor in
+# HRMS_REFACTOR_PLAN_V2.md moves a lot of code between files, and a move-only
+# change that quietly drops a state variable fails no test that nobody runs.
+#
+# The two packages are independent (separate package.json, separate lockfile,
+# separate vitest config), so they run as two jobs rather than a matrix - a
+# red build then names which tier broke without opening the log.
+#
+# NO DATABASE SERVICE IS NEEDED. The backend suite starts its own in-process
+# MongoDB via mongodb-memory-server (a devDependency); it downloads a mongod
+# binary on the first run of a fresh cache, which is why vitest.config.js sets
+# hookTimeout to 120s. Do not add a `services: mongo:` block here - it would be
+# ignored and would only slow the run down.
+#
+# Node 24 matches NODE_VERSION in render.yaml for both services. Keep the three
+# in step: CI passing on a Node version production does not run is not a gate.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A second push to the same branch makes the first run irrelevant. Cancel it
+# rather than queueing behind it - free runners are the scarce resource here.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (hrms-react)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hrms-react
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: hrms-react/package-lock.json
+
+      - run: npm ci
+
+      # Runs before the tests on purpose: the lint script carries
+      # --max-warnings 0, so this is the gate that keeps the codebase at zero
+      # warnings now that the provider/hook split has cleared the last six.
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Catches what neither lint nor the tests can: a broken import path that
+      # only the bundler resolves. Cheap (~3s) and it is the same command
+      # Render runs on deploy, so a green build here means a green deploy.
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend (hrms-backend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hrms-backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: hrms-backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+        env:
+          # The suite runs against mongodb-memory-server, never a real cluster.
+          # NODE_ENV=test also short-circuits startScheduler() in jobs/index.js,
+          # so no cron is armed inside a test run.
+          NODE_ENV: test
