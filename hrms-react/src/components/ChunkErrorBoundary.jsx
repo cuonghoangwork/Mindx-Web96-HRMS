@@ -4,32 +4,35 @@ import { isChunkLoadError } from "../utils/chunkErrors";
 /**
  * ChunkErrorBoundary — recovers from a stale lazy-loaded chunk after a deploy.
  *
- * WHY THIS EXISTS. render.yaml ends with a catch-all rewrite:
+ * WHY THIS EXISTS. Vite emits content-hashed chunk names, so every redeploy
+ * renames all of them. A user with the tab already open then navigates, the
+ * browser requests the OLD chunk path, and that file no longer exists. The
+ * dynamic import rejects — and a rejected React.lazy throws past every
+ * Suspense boundary to the nearest error boundary. Before this file there were
+ * none anywhere in src/, so the whole tree unmounted to a blank white page.
  *
- *   routes: [{ type: rewrite, source: /*, destination: /index.html }]
+ * WHAT THE SERVER ACTUALLY DOES, measured against the deployed site on
+ * 2026-09-11 rather than inferred from render.yaml:
  *
- * Files that exist are served first, so this is invisible while the app ships
- * as one bundle. Route-level React.lazy changes that. Vite emits content-hashed
- * chunk names, so every redeploy renames all of them. A user with the tab
- * already open then navigates, the browser requests the OLD chunk path, that
- * file no longer exists, and the rewrite answers with index.html carrying
- * HTTP 200 and Content-Type: text/html. The browser tries to parse HTML as
- * JavaScript and the dynamic import rejects.
+ *   /employees, /made-up-page   (no extension)  -> 200, index.html
+ *   /assets/nope.js, /nope.js   (has extension) -> 404, text/plain
  *
- * Nothing upstream can catch this: the status is 200, fetch resolves happily,
- * and the failure only surfaces in the module parser two hops later. Without a
- * boundary the rejection unmounts the whole tree to a blank white page, because
- * a rejected React.lazy throws past every Suspense boundary to the nearest
- * error boundary — and before this file there were none anywhere in src/.
+ * So Render's `source: /*` rewrite does NOT swallow asset requests, and a
+ * missing chunk is an honest 404. An earlier version of this comment claimed
+ * the rewrite returned index.html with a 200, making the browser choke on
+ * `Unexpected token '<'`. That is the classic SPA-host trap and it is what the
+ * config looks like it should do — it just is not what this host does.
+ *
+ * The boundary is needed either way: a 404 rejects the import just as surely,
+ * and utils/chunkErrors.js matches all three browsers' wordings for it. The
+ * `Unexpected token '<'` pattern stays in the matcher because other hosts
+ * (Netlify, S3+CloudFront) can be configured to rewrite assets too.
  *
  * The fix is to reload once, which re-fetches index.html and picks up the new
  * chunk names. The reload is rate-limited through sessionStorage so a genuinely
  * broken deploy degrades to a readable error instead of an infinite refresh
  * loop. The timestamp expires on its own, so there is nothing to clean up on a
  * successful load.
- *
- * This trap is not Render-specific — any host with a `/* -> index.html` rule
- * (Netlify, Vercel, S3+CloudFront) behaves the same way.
  */
 
 const RELOAD_KEY = "hrms-chunk-reload-at";
