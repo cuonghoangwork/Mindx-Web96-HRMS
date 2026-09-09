@@ -48,20 +48,15 @@ import {
   yearBoundsUtc,
 } from "../utils/overtimeBalance.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { toPlainObject, reviewRequestBase, dateOnly } from "../utils/mappers.js";
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function dateOnly(d) {
-  return d ? new Date(d).toISOString().slice(0, 10) : null;
-}
-
 function toClientRequest(doc) {
   if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const o = toPlainObject(doc);
   return {
-    id: String(o._id),
-    employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
-    employeeName: o.employee?.name ?? null,
+    ...reviewRequestBase(o),
     employeeCode: o.employee?.employeeId ?? null,
     requestedBy: o.requestedBy ? String(o.requestedBy._id ?? o.requestedBy) : null,
     date: dateOnly(o.date),
@@ -74,11 +69,6 @@ function toClientRequest(doc) {
     dayType: o.dayType,
     reason: o.reason ?? "",
     appliedAt: o.appliedAt,
-    status: o.status,
-    reviewNote: o.reviewNote ?? "",
-    reviewedBy: o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
-    reviewedAt: o.reviewedAt ?? null,
-    createdAt: o.createdAt,
   };
 }
 

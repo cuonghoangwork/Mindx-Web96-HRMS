@@ -243,7 +243,7 @@ function Notifications() {
                       {cfg.icon}
                     </span>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                      <div className="flex items-center gap-2">
                         <h3 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                           {title}
                         </h3>

@@ -89,7 +89,7 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
     return (
       <div style={{ marginBottom: "var(--sp-3)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-xs)", marginBottom: "4px" }}>
-          <span style={{ color: "var(--txt-secondary)" }}>{label}</span>
+          <span className="text-secondary">{label}</span>
           <span style={{ color: "var(--txt-primary)", fontWeight: "var(--fw-medium)" }}>
             {t("overtime.meter.usedOfCap", { used, cap })}
           </span>
@@ -213,7 +213,7 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
                 {meterRow(t("overtime.meter.year"), balance.yearUsed, balance.yearCap, balance.yearRemaining)}
               </>
             ) : (
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+              <div className="meta-xs">
                 {t("overtime.meter.loading")}
               </div>
             )}

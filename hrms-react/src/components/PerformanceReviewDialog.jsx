@@ -362,7 +362,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
         <div className="modal-header">
           <h2>{employeeName}</h2>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+          <div className="flex items-center gap-2">
             {!loading && review && (
               <Button variant="secondary" size="sm" type="button" onClick={handleAskAI} loading={aiInsightLoading}>
                 {t("performance.dialog.askAi")}
@@ -420,7 +420,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
         )}
 
         {loading ? (
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.dialog.loading")}</p>
+          <p className="meta-sm">{t("performance.dialog.loading")}</p>
         ) : (
           <>
             <section>
@@ -453,7 +453,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
                   <p style={readonlyCommentsStyle}>{review.selfComments}</p>
                 </>
               ) : (
-                <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.dialog.notSubmittedYet")}</p>
+                <p className="meta-sm">{t("performance.dialog.notSubmittedYet")}</p>
               )}
             </section>
 
@@ -467,7 +467,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
                 return (
                   <div key={key} style={{ padding: "9px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                      <div className="flex items-center gap-2">
                         <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>{competencyLabel(key)}</div>
                         {(canComment || hasComment) && (
                           <button
@@ -593,7 +593,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
                   <p style={readonlyCommentsStyle}>{review.managerComments}</p>
                 </>
               ) : (
-                <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.dialog.notSubmittedYet")}</p>
+                <p className="meta-sm">{t("performance.dialog.notSubmittedYet")}</p>
               )}
             </section>
 
@@ -706,7 +706,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
                 <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
                   <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline" }}>
                     <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)" }}>{p.name}</span>
-                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{p.relation}</span>
+                    <span className="meta-xs">{p.relation}</span>
                   </div>
                   <p style={readonlyCommentsStyle}>{p.comments}</p>
                 </div>

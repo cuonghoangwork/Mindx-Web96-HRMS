@@ -256,7 +256,7 @@ function Register() {
               <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                 {t("auth.register.roleInfoTitle", { defaultValue: "Employee Account" })}
               </div>
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+              <div className="hint-xs">
                 {t("auth.register.roleInfoDescription", { defaultValue: "All new accounts start as Employee. An Admin can promote you to HR/Manager." })}
               </div>
             </div>

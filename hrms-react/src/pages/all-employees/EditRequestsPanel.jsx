@@ -178,7 +178,7 @@ export function EditRequestsPanel({ onChanged }) {
                     <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                       {req.employeeName ?? t("employees.allEmployees.editRequests.unknownEmployee", { defaultValue: "Unknown employee" })}
                     </div>
-                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                    <div className="hint-xs">
                       {Object.keys(req.changes || {}).join(", ")} · {formatDate(req.createdAt)}
                     </div>
                   </div>

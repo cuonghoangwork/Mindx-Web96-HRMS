@@ -142,7 +142,7 @@ function ChatWidget() {
               gap: "var(--sp-3)",
             }}
           >
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("chat.greeting")}</div>
+            <div className="meta-sm">{t("chat.greeting")}</div>
             {messages.map((m, i) => (
               <div
                 key={i}
@@ -160,7 +160,7 @@ function ChatWidget() {
               </div>
             ))}
             {sending && (
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("chat.thinking")}</div>
+              <div className="meta-xs">{t("chat.thinking")}</div>
             )}
           </div>
 

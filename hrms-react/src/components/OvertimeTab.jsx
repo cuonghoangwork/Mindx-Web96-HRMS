@@ -208,10 +208,10 @@ function OvertimeTab() {
       <div className="content-card">
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: "200px" }}>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            <h3 className="panel-title">
               {t("overtime.mine.title")}
             </h3>
-            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            <p className="hint-sm">
               {t("overtime.mine.description")}
             </p>
           </div>
@@ -290,10 +290,10 @@ function OvertimeTab() {
       {isManagerTier && (
         <div className="content-card">
           <div style={{ marginBottom: "var(--sp-5)" }}>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            <h3 className="panel-title">
               {t("overtime.queue.title")}
             </h3>
-            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            <p className="hint-sm">
               {t("overtime.queue.description")}
             </p>
           </div>
@@ -358,7 +358,7 @@ function OvertimeTab() {
                             ({r.employeeCode})
                           </span>
                         </div>
-                        <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                        <div className="hint-xs">
                           {t("overtime.queue.rowLine", {
                             date: formatDate(r.date, language),
                             span: spanOf(r),
@@ -368,7 +368,7 @@ function OvertimeTab() {
                         </div>
                         <div style={{ display: "flex", gap: "var(--sp-3)", marginTop: "4px", flexWrap: "wrap" }}>
                           {bal && (
-                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                            <span className="meta-xs">
                               {t("overtime.queue.totals", {
                                 monthUsed: bal.monthUsed, monthCap: bal.monthCap,
                                 yearUsed: bal.yearUsed, yearCap: bal.yearCap,
@@ -377,7 +377,7 @@ function OvertimeTab() {
                           )}
                           <EvidenceFlag evidence={r.otEvidence} t={t} />
                           {r.origin === "assigned" && (
-                            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                            <span className="meta-xs">
                               {t("overtime.queue.assigned")}
                             </span>
                           )}

@@ -108,7 +108,7 @@ export function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
                   borderRadius: "var(--radius-md)", padding: "var(--sp-2) var(--sp-3)",
                 }}>
                   <span style={{ fontWeight: "var(--fw-medium)" }}>{r.employeeName}</span>
-                  <span style={{ color: "var(--txt-secondary)" }}>
+                  <span className="text-secondary">
                     {formatDate(r.startDate, language)} – {formatDate(r.endDate, language)} · {r.days}d · {leaveTypeLabel(r.type, t)}
                   </span>
                   <div style={{ display: "flex", gap: "var(--sp-1)" }}>
@@ -136,7 +136,7 @@ export function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
       )}
 
       <div style={{ marginBottom: "var(--sp-6)" }}>
-        <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+        <h3 className="panel-title">
           {t("employees.viewEmployee.leaveTab.balanceTitle", { defaultValue: "Leave balance" })}
         </h3>
         <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px", marginBottom: "var(--sp-4)" }}>

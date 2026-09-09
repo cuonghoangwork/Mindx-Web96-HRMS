@@ -31,7 +31,7 @@ function OrgChart() {
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0 }}>{t("orgChart.title")}</h2>
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-sm">
             {t("orgChart.subtitle")}
           </p>
         </div>
@@ -95,12 +95,12 @@ function DepartmentCluster({ department, employees, onSelectEmployee }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-5)", flexWrap: "wrap", gap: "var(--sp-3)" }}>
         <div>
           <h3 className="section-title" style={{ margin: 0 }}>{department.name}</h3>
-          <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-xs">
             {t("orgChart.employeeCount", { count: employees.length })}
           </p>
         </div>
         {!manager && department.manager && (
-          <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+          <span className="meta-xs">
             {t("orgChart.managerOnFile", { name: department.manager })}
           </span>
         )}

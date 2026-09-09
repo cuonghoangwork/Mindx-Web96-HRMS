@@ -24,7 +24,7 @@ export function PendingPromotionsPanel({ requests, onReview }) {
               <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
                 {req.employeeName}
               </div>
-              <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+              <div className="hint-sm">
                 {req.proposed?.designation} · {req.proposed?.positionLevel} level
                 {req.proposed?.salary != null && ` · ${usdFmt(req.proposed.salary)}`}
               </div>

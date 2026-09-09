@@ -88,7 +88,7 @@ export function DocumentsList({ employee, canManage, uploadEmployeeDocuments, re
   return (
     <div className={embedded ? undefined : "content-card"} style={{ marginTop: "var(--sp-5)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-        <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+        <h3 className="panel-title">
           {t("documents.title")}
         </h3>
         {canManage && !adding && (
@@ -146,7 +146,7 @@ export function DocumentsList({ employee, canManage, uploadEmployeeDocuments, re
 
       <div style={{ marginTop: "var(--sp-4)", display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
         {documents.length === 0 && (
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("documents.noDocuments")}</p>
+          <p className="meta-sm">{t("documents.noDocuments")}</p>
         )}
         {documents.map((doc) => (
           <div
@@ -164,7 +164,7 @@ export function DocumentsList({ employee, canManage, uploadEmployeeDocuments, re
               <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)" }}>
                 {doc.label || typeLabel(doc.type)}
               </div>
-              <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+              <div className="meta-xs">
                 {typeLabel(doc.type)} · {formatDate(doc.uploadedAt, language)}
               </div>
             </div>

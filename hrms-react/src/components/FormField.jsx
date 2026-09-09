@@ -129,7 +129,7 @@ function FormField({
           {hint && (
             <div
               id={`${fieldId}-hint`}
-              style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}
+              className="hint-sm"
             >
               {hint}
             </div>

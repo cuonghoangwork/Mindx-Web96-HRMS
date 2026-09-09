@@ -227,7 +227,7 @@ function AddNotificationModal({ onClose, onSend }) {
           {recipientMode === "individual" && (
             <div className="form-group">
               {loadingEmployees ? (
-                <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("notifications.addModal.loadingEmployees", { defaultValue: "Loading employees…" })}</p>
+                <p className="meta-sm">{t("notifications.addModal.loadingEmployees", { defaultValue: "Loading employees…" })}</p>
               ) : (
                 <>
                   {employees.length > 5 && (

@@ -77,7 +77,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
             <div style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
               {candidate.name}
             </div>
-            <div style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
+            <div className="meta-sm">
               {candidate.role}
             </div>
           </div>
@@ -200,7 +200,7 @@ function ResumeField({ candidate, onUploadCv }) {
             {t("candidates.panel.viewResume")}
           </a>
         ) : (
-          <span style={{ color: "var(--txt-secondary)" }}>{t("candidates.panel.noCv")}</span>
+          <span className="text-secondary">{t("candidates.panel.noCv")}</span>
         )}
 
         {onUploadCv && (

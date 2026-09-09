@@ -227,7 +227,7 @@ export function AdminDashboard() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
               <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.attendanceTrend.title")}</h3>
-              <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+              <p className="hint-xs">
                 {t("dashboard.attendanceTrend.subtitle")}
               </p>
             </div>
@@ -256,7 +256,7 @@ export function AdminDashboard() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
               <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.headcount.title")}</h3>
-              <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+              <p className="hint-xs">
                 {t("dashboard.headcount.subtitle")}
               </p>
             </div>

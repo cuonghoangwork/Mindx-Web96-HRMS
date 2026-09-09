@@ -17,26 +17,20 @@
 
 import NoShowReviewModel from "../model/NoShowReview.js";
 import { createReviewRequestController } from "../utils/reviewQueue.js";
+import { toPlainObject, reviewRequestBase } from "../utils/mappers.js";
 
 const POPULATE = [["employee", "name email employeeId"]];
 
 function toClientRequest(doc) {
   if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const o = toPlainObject(doc);
   return {
-    id: String(o._id),
-    employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
-    employeeName: o.employee?.name ?? null,
+    ...reviewRequestBase(o),
     employeeCode: o.employee?.employeeId ?? null,
     noShowCount: o.noShowCountAtFlag,
     reason: o.reason ?? "",
     systemGenerated: Boolean(o.systemGenerated),
     flaggedAt: o.flaggedAt,
-    status: o.status,
-    reviewNote: o.reviewNote ?? "",
-    reviewedBy: o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
-    reviewedAt: o.reviewedAt ?? null,
-    createdAt: o.createdAt,
   };
 }
 

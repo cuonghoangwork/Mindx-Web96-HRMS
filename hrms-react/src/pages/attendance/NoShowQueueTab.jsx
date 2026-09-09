@@ -62,10 +62,10 @@ export function NoShowQueueTab() {
   return (
     <div className="content-card">
       <div style={{ marginBottom: "var(--sp-5)" }}>
-        <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+        <h3 className="panel-title">
           {t("settings.sections.noShowReviewQueue.title")}
         </h3>
-        <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+        <p className="hint-sm">
           {t("settings.sections.noShowReviewQueue.description")}
         </p>
       </div>
@@ -136,7 +136,7 @@ export function NoShowQueueTab() {
                     <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                       {req.employeeName} <span style={{ color: "var(--txt-secondary)", fontWeight: "var(--fw-regular)" }}>({req.employeeCode})</span>
                     </div>
-                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                    <div className="hint-xs">
                       {t("settings.noShowReview.recordLine", { count: req.noShowCount, date: formatDate(req.flaggedAt ?? req.createdAt, language) })}
                     </div>
                   </div>

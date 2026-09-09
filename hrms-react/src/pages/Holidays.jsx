@@ -129,8 +129,8 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
     <div className="content-card">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
         <div>
-          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.balances.heading", { defaultValue: "Leave balances" })}</h3>
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <h3 className="panel-title">{t("holidays.balances.heading", { defaultValue: "Leave balances" })}</h3>
+          <div className="hint-xs">
             {t("holidays.balances.hint", { defaultValue: "Click a row for the full ledger" })}
           </div>
         </div>
@@ -177,7 +177,7 @@ function LeaveBalancesPanel({ rows, loading, error, search, onSearchChange }) {
                       style={{ cursor: "pointer", background: isExpanded ? "var(--bg-surface-alt)" : undefined }}
                     >
                       <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                        <div className="flex items-center gap-2">
                           <Avatar name={r.name} size="xs" />
                           <div>
                             <div style={{ fontWeight: "var(--fw-medium)" }}>{r.name}</div>
@@ -419,8 +419,8 @@ function Holidays() {
       <div className="content-card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
           <div>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.companyHolidays.heading", { defaultValue: "Company holidays" })}</h3>
-            <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            <h3 className="panel-title">{t("holidays.companyHolidays.heading", { defaultValue: "Company holidays" })}</h3>
+            <div className="hint-xs">
               {t("holidays.companyHolidays.scheduledCount", { count: sortedHolidays.length, defaultValue: "{{count}} scheduled" })}
             </div>
           </div>
@@ -528,8 +528,8 @@ function Holidays() {
       {canManageLeave && (
         <div className="content-card">
           <div style={{ marginBottom: "var(--sp-5)" }}>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("holidays.leaveRequests.heading", { defaultValue: "Leave requests" })}</h3>
-            <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>{t("holidays.leaveRequests.subtitle", { defaultValue: "Pending requests need your review" })}</div>
+            <h3 className="panel-title">{t("holidays.leaveRequests.heading", { defaultValue: "Leave requests" })}</h3>
+            <div className="hint-xs">{t("holidays.leaveRequests.subtitle", { defaultValue: "Pending requests need your review" })}</div>
           </div>
           <LeaveRequestsPanel
             requests={sortedLeaveRequests}

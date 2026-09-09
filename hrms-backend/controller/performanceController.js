@@ -1,7 +1,4 @@
-import mongoose from "mongoose";
 import { createHash } from "crypto";
-import EmployeeModel from "../model/Employee.js";
-import UserModel from "../model/User.js";
 import PerformanceCycleModel from "../model/PerformanceCycle.js";
 import PerformanceReviewModel, {
   APPEAL_REASON_CATEGORIES,
@@ -11,24 +8,20 @@ import PerformanceReviewModel, {
   GOAL_PROGRESS_STEP,
   RATING_LABELS,
   RATING_OPTIONS,
-  REVIEW_STATUSES,
+  REVIEW_STATUSES
 } from "../model/PerformanceReview.js";
-import { emitNotification, notifyHR } from "../utils/notify.js";
+import { notifyHR } from "../utils/notify.js";
 import { diffChanges, logAction } from "../utils/auditLog.js";
 import { askGemini } from "../utils/geminiClient.js";
 import { buildInsightPrompt } from "../utils/performanceInsightPrompt.js";
-// Cyclic on purpose and safe: performanceReminders.js imports
-// findUserForEmployee back from this module, but only calls it inside a
-// function body, and both sides are hoisted `export function` declarations.
 import { sendPerformanceReminders } from "../jobs/performanceReminders.js";
-import { computeAnalytics, computeAppealRate, computeComparison, reviewStatusOf } from "../utils/performanceAnalytics.js";
+import { computeAnalytics, computeComparison, reviewStatusOf } from "../utils/performanceAnalytics.js";
 import {
   APPEAL_WINDOW_DAYS,
-  appealDeadlineKey,
   ensureStandardCycles,
   isWithinAppealWindow,
   loadCycleOrThrow,
-  previousStandardCycleKey,
+  previousStandardCycleKey
 } from "../utils/performanceCycles.js";
 import {
   assertCanRateAsManager,
@@ -36,252 +29,30 @@ import {
   assertIsSelf,
   departmentManagerUserIds,
   describePermissions,
-  evaluateAccess,
-  idOf,
-  resolveRosterScope,
+  resolveRosterScope
 } from "../utils/performanceScope.js";
 import { AppError } from "../utils/appError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import {
+  cycleToClient,
+  emptyReviewDoc,
+  reviewToClient,
+  employeeSummary,
+  numberOr,
+  assertObjectId
+} from "../utils/performanceMappers.js";
+import {
+  REVIEW_LINK,
+  REVIEW_LINK_LABEL,
+  assertCycleOpen,
+  loadReviewContext,
+  loadScopedReviewData,
+  computeCycleStats,
+  findUserForEmployee,
+  broadcastCycleOpen,
+  notifyUsers
+} from "../utils/performanceDomain.js";
 
-const REVIEW_LINK = "/performance";
-const REVIEW_LINK_LABEL = "Open review";
-
-function cycleToClient(doc) {
-  if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
-  return {
-    id: o._id ? String(o._id) : null,
-    key: o.key,
-    label: o.label,
-    kind: o.kind,
-    status: o.status,
-    start: o.start ?? null,
-    end: o.end ?? null,
-    statusOverriddenAt: o.statusOverriddenAt ?? null,
-  };
-}
-
-function competenciesToClient(value) {
-  const source = value && typeof value.toObject === "function" ? value.toObject() : (value ?? {});
-  return Object.fromEntries(
-    COMPETENCIES.map((key) => [
-      key,
-      {
-        self: source?.[key]?.self ?? null,
-        selfComment: source?.[key]?.selfComment ?? "",
-        manager: source?.[key]?.manager ?? null,
-        managerComment: source?.[key]?.managerComment ?? "",
-      },
-    ]),
-  );
-}
-
-function goalToClient(doc) {
-  if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
-  return {
-    id: o._id ? String(o._id) : null,
-    text: o.text ?? "",
-    progress: o.progress ?? 0,
-  };
-}
-
-function peerFeedbackToClient(doc, includeAudit) {
-  if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
-  return {
-    id: o._id ? String(o._id) : null,
-    name: o.name ?? "",
-    relation: o.relation ?? "",
-    comments: o.comments ?? "",
-    addedAt: o.addedAt ?? null,
-    ...(includeAudit ? { addedBy: o.addedBy ? String(o.addedBy) : null } : {}),
-  };
-}
-
-function appealToClient(value) {
-  if (!value) return null;
-  const o = typeof value.toObject === "function" ? value.toObject() : value;
-  return {
-    reasonCategory: o.reasonCategory ?? null,
-    detail: o.detail ?? "",
-    status: o.status ?? null,
-    filedDate: o.filedDate ?? null,
-    resolution: o.resolution ?? null,
-    resolvedRating: o.resolvedRating ?? null,
-    resolverNote: o.resolverNote ?? "",
-    resolvedDate: o.resolvedDate ?? null,
-  };
-}
-
-function emptyReviewDoc(cycleKey, employeeId) {
-  return {
-    _id: null,
-    cycleKey,
-    employee: employeeId,
-    selfRating: null,
-    selfComments: "",
-    selfSubmittedDate: null,
-    managerRating: null,
-    managerComments: "",
-    managerSubmittedDate: null,
-    competencies: {},
-    goals: [],
-    peerFeedback: [],
-    appeal: null,
-    createdAt: null,
-    updatedAt: null,
-  };
-}
-
-function reviewToClient(doc, includeAudit = false) {
-  if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
-  return {
-    id: o._id ? String(o._id) : null,
-    cycleKey: o.cycleKey ?? null,
-    employeeId: idOf(o.employee),
-    selfRating: o.selfRating ?? null,
-    selfComments: o.selfComments ?? "",
-    selfSubmittedDate: o.selfSubmittedDate ?? null,
-    managerRating: o.managerRating ?? null,
-    managerComments: o.managerComments ?? "",
-    managerSubmittedDate: o.managerSubmittedDate ?? null,
-    competencies: competenciesToClient(o.competencies),
-    goals: (o.goals ?? []).map(goalToClient),
-    peerFeedback: (o.peerFeedback ?? []).map((row) => peerFeedbackToClient(row, includeAudit)),
-    appeal: appealToClient(o.appeal),
-    status: reviewStatusOf(o),
-    appealDeadline: appealDeadlineKey(o.managerSubmittedDate),
-    createdAt: o.createdAt ?? null,
-    updatedAt: o.updatedAt ?? null,
-  };
-}
-
-function employeeToClient(employee) {
-  return {
-    employeeId: String(employee._id),
-    employeeCode: employee.employeeId ?? null,
-    name: employee.name ?? null,
-    department: employee.department?.name ?? null,
-    departmentId: idOf(employee.department),
-  };
-}
-
-function numberOr(value, fallback) {
-  return value === undefined || value === null || value === "" ? fallback : Number(value);
-}
-
-function assertObjectId(value, label) {
-  if (!mongoose.Types.ObjectId.isValid(value)) {
-    const err = new AppError(`${label} is not a valid id.`, "INVALID_OBJECT_ID", { label });
-    err.status = 400;
-    throw err;
-  }
-}
-
-function assertCycleOpen(cycle) {
-  if (cycle.status !== "Open") {
-    const err = new AppError(
-      "This review cycle is closed. Ask an admin to reopen it before making changes.",
-      "PERFORMANCE_CYCLE_CLOSED",
-    );
-    err.status = 409;
-    throw err;
-  }
-}
-
-async function loadEmployeeOrThrow(employeeId) {
-  assertObjectId(employeeId, "Employee id");
-  const employee = await EmployeeModel.findById(
-    employeeId,
-    "name email employeeId department",
-  ).populate("department", "name");
-  if (!employee) {
-    const err = new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-    err.status = 404;
-    throw err;
-  }
-  return employee;
-}
-
-async function loadReviewContext(req) {
-  const cycle = await loadCycleOrThrow(req.params.cycleKey);
-  const employee = await loadEmployeeOrThrow(req.params.employeeId);
-  const access = await evaluateAccess(req, employee);
-  return { cycle, employee, access };
-}
-
-async function loadScopedReviewData(cycleKey, employeeCondition) {
-  if (!employeeCondition) return { employees: [], reviews: [] };
-
-  const employees = await EmployeeModel.find(employeeCondition, "name employeeId department")
-    .populate("department", "name")
-    .sort({ name: 1 });
-  if (!employees.length) return { employees, reviews: [] };
-
-  const reviews = await PerformanceReviewModel.find({
-    cycleKey,
-    employee: { $in: employees.map((employee) => employee._id) },
-  });
-  return { employees, reviews };
-}
-
-/** computeAnalytics + appeal rate for one cycle — the pair every comparison
- * side (current and previous) needs. No department breakdown; comparison is
- * about cycle-over-cycle deltas, not a per-department view. */
-async function computeCycleStats(cycleKey, employeeCondition) {
-  const { employees, reviews } = await loadScopedReviewData(cycleKey, employeeCondition);
-  return {
-    ...computeAnalytics({ employees, reviews, includeDeptCompare: false }),
-    appealRate: computeAppealRate(reviews, employees.length),
-  };
-}
-
-export async function findUserForEmployee(employee) {
-  return UserModel.findOne(
-    { $or: [{ employee: employee._id }, { email: employee.email }] },
-    "_id",
-  );
-}
-
-async function broadcastCycleOpen(cycle) {
-  try {
-    await emitNotification({
-      audience: "all",
-      category: "performance",
-      title: "Review cycle open",
-      message: `${cycle.label} is now open for performance reviews.`,
-      link: REVIEW_LINK,
-      linkLabel: REVIEW_LINK_LABEL,
-      titleKey: "reviewCycleOpen",
-      messageKey: "reviewCycleOpen",
-      params: { cycleLabel: cycle.label },
-    });
-  } catch (err) {
-    console.error("[performance] Failed to broadcast cycle status:", err.message);
-  }
-}
-
-async function notifyUsers(userIds, payload) {
-  await Promise.all(
-    userIds.map((userId) =>
-      emitNotification({
-        user: userId,
-        category: "performance",
-        title: payload.title,
-        message: payload.message,
-        link: REVIEW_LINK,
-        linkLabel: REVIEW_LINK_LABEL,
-        titleKey: payload.titleKey,
-        messageKey: payload.messageKey,
-        params: payload.params,
-      }).catch((err) =>
-        console.error("[performance] Failed to create notification:", err.message),
-      ),
-    ),
-  );
-}
 
 const performanceController = {
   meta: asyncHandler(async (req, res) => {
@@ -296,8 +67,8 @@ const performanceController = {
         appealReasonCategories: APPEAL_REASON_CATEGORIES,
         appealResolutions: APPEAL_RESOLUTIONS,
         appealWindowDays: APPEAL_WINDOW_DAYS,
-        goalProgressStep: GOAL_PROGRESS_STEP,
-      },
+        goalProgressStep: GOAL_PROGRESS_STEP
+      }
     });
   }, 500),
 
@@ -324,7 +95,7 @@ const performanceController = {
           start,
           end,
           statusOverriddenAt: null,
-          createdBy: req.user.id,
+          createdBy: req.user.id
         });
       } catch (error) {
         if (error?.code !== 11000 || attempt === 2) throw error;
@@ -335,7 +106,7 @@ const performanceController = {
       action: "created",
       resource: "performance",
       resourceId: cycle._id,
-      label: `${cycle.label} (${cycle.key})`,
+      label: `${cycle.label} (${cycle.key})`
     });
 
     await broadcastCycleOpen(cycle);
@@ -357,7 +128,7 @@ const performanceController = {
         action: "status_changed",
         resource: "performance",
         resourceId: cycle._id,
-        label: `${cycle.label}: ${before} -> ${after}`,
+        label: `${cycle.label}: ${before} -> ${after}`
       });
 
       if (after === "Open") await broadcastCycleOpen(cycle);
@@ -375,7 +146,7 @@ const performanceController = {
       success: true,
       cycle: cycleToClient(cycle),
       scope,
-      data: computeAnalytics({ employees, reviews, includeDeptCompare: scope === "all" }),
+      data: computeAnalytics({ employees, reviews, includeDeptCompare: scope === "all" })
     });
   }, 500),
 
@@ -400,8 +171,8 @@ const performanceController = {
       data: {
         current: currentStats,
         previous: previousStats,
-        deltas: computeComparison(currentStats, previousStats),
-      },
+        deltas: computeComparison(currentStats, previousStats)
+      }
     });
   }, 500),
 
@@ -414,14 +185,14 @@ const performanceController = {
     const items = employees.map((employee) => {
       const review = byEmployee.get(String(employee._id));
       return {
-        ...employeeToClient(employee),
+        ...employeeSummary(employee),
         selfRating: review?.selfRating ?? null,
         managerRating: review?.managerRating ?? null,
         selfSubmittedDate: review?.selfSubmittedDate ?? null,
         managerSubmittedDate: review?.managerSubmittedDate ?? null,
         status: reviewStatusOf(review),
         hasAppeal: Boolean(review?.appeal),
-        appealStatus: review?.appeal?.status ?? null,
+        appealStatus: review?.appeal?.status ?? null
       };
     });
 
@@ -434,18 +205,18 @@ const performanceController = {
 
     const review = await PerformanceReviewModel.findOne({
       cycleKey: cycle.key,
-      employee: employee._id,
+      employee: employee._id
     });
 
     res.json({
       success: true,
       cycle: cycleToClient(cycle),
-      employee: employeeToClient(employee),
+      employee: employeeSummary(employee),
       permissions: describePermissions(access, cycle, review),
       data: reviewToClient(
         review ?? emptyReviewDoc(cycle.key, employee._id),
         access.isAdmin || access.isHR,
-      ),
+      )
     });
   }, 500),
 
@@ -455,14 +226,14 @@ const performanceController = {
 
     const review = await PerformanceReviewModel.findOne({
       cycleKey: cycle.key,
-      employee: employee._id,
+      employee: employee._id
     });
 
     const prompt = buildInsightPrompt({
       employee,
       cycle,
       review: reviewToClient(review ?? emptyReviewDoc(cycle.key, employee._id)),
-      language: req.body.language,
+      language: req.body.language
     });
 
     // Gemini's forced "thinking" adds ~15-20s of unavoidable latency per
@@ -494,7 +265,7 @@ const performanceController = {
       success: true,
       summary: insight.summary,
       strengths: insight.strengths,
-      growthAreas: insight.growthAreas,
+      growthAreas: insight.growthAreas
     });
   }, 502),
 
@@ -512,8 +283,8 @@ const performanceController = {
         $set: {
           selfRating: Number(req.body.selfRating),
           selfComments: (req.body.selfComments ?? "").trim(),
-          selfSubmittedDate: new Date(),
-        },
+          selfSubmittedDate: new Date()
+        }
       },
       { new: true, upsert: true, runValidators: true },
     );
@@ -522,7 +293,7 @@ const performanceController = {
       action: "updated",
       resource: "performance",
       resourceId: review._id,
-      label: `Self review — ${employee.name} (${cycle.key})`,
+      label: `Self review — ${employee.name} (${cycle.key})`
     });
 
     if (!before?.selfSubmittedDate) {
@@ -532,7 +303,7 @@ const performanceController = {
         message: `${employee.name} submitted their ${cycle.label} self review.`,
         titleKey: "selfReviewSubmitted",
         messageKey: "selfReviewSubmitted",
-        params: { employeeName: employee.name, cycleLabel: cycle.label },
+        params: { employeeName: employee.name, cycleLabel: cycle.label }
       };
       if (managerIds.length) {
         await notifyUsers(managerIds, copy);
@@ -559,8 +330,8 @@ const performanceController = {
           managerRating: Number(req.body.managerRating),
           managerComments: (req.body.managerComments ?? "").trim(),
           managerSubmittedDate: new Date(),
-          managerReviewedBy: req.user.id,
-        },
+          managerReviewedBy: req.user.id
+        }
       },
       { new: true, upsert: true, runValidators: true },
     );
@@ -569,7 +340,7 @@ const performanceController = {
       action: "updated",
       resource: "performance",
       resourceId: review._id,
-      label: `Manager review — ${employee.name} (${cycle.key})`,
+      label: `Manager review — ${employee.name} (${cycle.key})`
     });
 
     if (!before?.managerSubmittedDate) {
@@ -580,7 +351,7 @@ const performanceController = {
           message: `Your ${cycle.label} manager review is ready to read.`,
           titleKey: "managerReviewSubmitted",
           messageKey: "managerReviewSubmitted",
-          params: { cycleLabel: cycle.label },
+          params: { cycleLabel: cycle.label }
         });
       }
     }
@@ -628,16 +399,16 @@ const performanceController = {
           goals: {
             text: req.body.text.trim(),
             progress: numberOr(req.body.progress, 0),
-            createdBy: req.user.id,
-          },
-        },
+            createdBy: req.user.id
+          }
+        }
       },
       { new: true, upsert: true, runValidators: true },
     );
 
     res.status(201).json({
       success: true,
-      data: reviewToClient(review, access.isAdmin || access.isHR),
+      data: reviewToClient(review, access.isAdmin || access.isHR)
     });
   }, 400),
 
@@ -675,16 +446,16 @@ const performanceController = {
             relation: (req.body.relation ?? "").trim(),
             comments: req.body.comments.trim(),
             addedBy: req.user.id,
-            addedAt: new Date(),
-          },
-        },
+            addedAt: new Date()
+          }
+        }
       },
       { new: true, upsert: true, runValidators: true },
     );
 
     res.status(201).json({
       success: true,
-      data: reviewToClient(review, access.isAdmin || access.isHR),
+      data: reviewToClient(review, access.isAdmin || access.isHR)
     });
   }, 400),
 
@@ -727,9 +498,9 @@ const performanceController = {
             detail: req.body.detail.trim(),
             status: "Pending",
             filedDate: new Date(),
-            filedBy: req.user.id,
-          },
-        },
+            filedBy: req.user.id
+          }
+        }
       },
       { new: true, runValidators: true },
     );
@@ -744,7 +515,7 @@ const performanceController = {
       action: "created",
       resource: "performance",
       resourceId: review._id,
-      label: `Appeal — ${employee.name} (${cycle.key})`,
+      label: `Appeal — ${employee.name} (${cycle.key})`
     });
 
     await notifyHR({
@@ -755,12 +526,12 @@ const performanceController = {
       linkLabel: REVIEW_LINK_LABEL,
       titleKey: "appealFiled",
       messageKey: "appealFiled",
-      params: { employeeName: employee.name, cycleLabel: cycle.label },
+      params: { employeeName: employee.name, cycleLabel: cycle.label }
     });
 
     res.status(201).json({
       success: true,
-      data: reviewToClient(review, access.isAdmin || access.isHR),
+      data: reviewToClient(review, access.isAdmin || access.isHR)
     });
   }, 400),
 
@@ -790,7 +561,7 @@ const performanceController = {
       "appeal.resolvedRating": resolvedRating,
       "appeal.resolverNote": req.body.resolverNote.trim(),
       "appeal.resolvedBy": req.user.id,
-      "appeal.resolvedDate": new Date(),
+      "appeal.resolvedDate": new Date()
     };
     if (adjusted) update.managerRating = resolvedRating;
 
@@ -816,7 +587,7 @@ const performanceController = {
             { managerRating: existing.managerRating },
             { managerRating: resolvedRating },
           )
-        : undefined,
+        : undefined
     });
 
     const employeeUser = await findUserForEmployee(employee);
@@ -826,7 +597,7 @@ const performanceController = {
         message: `Your ${cycle.label} appeal was ${req.body.resolution.toLowerCase()}.`,
         titleKey: "appealResolved",
         messageKey: "appealResolved",
-        params: { cycleLabel: cycle.label, resolution: req.body.resolution.toLowerCase() },
+        params: { cycleLabel: cycle.label, resolution: req.body.resolution.toLowerCase() }
       });
     }
 
@@ -853,7 +624,7 @@ const performanceController = {
 
     const result = await sendPerformanceReminders({ asOf });
     res.json({ success: true, data: result });
-  }, 400),
+  }, 400)
 };
 
 export default performanceController;

@@ -149,7 +149,7 @@ function AddEmployee() {
             <h2 style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)", margin: 0 }}>
               {t("employees.addEmployee.header.title", { defaultValue: "Add New Employee" })}
             </h2>
-            <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            <p className="hint-xs">
               {t("employees.addEmployee.header.stepProgress", { defaultValue: "Step {{step}}/{{total}} · {{desc}}", step, total: STEPS.length, desc: currentStepDesc })}
             </p>
           </div>

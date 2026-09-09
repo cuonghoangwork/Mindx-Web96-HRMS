@@ -38,7 +38,7 @@ export function FinanceStep({ form, errors, touched, fieldProps, handleChange, i
                 borderRadius: "var(--radius-md)", border: "1px solid var(--bdr-subtle)",
               }}>
                 <div style={{ fontSize: "var(--fs-xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary-brand)" }}>{item.value}</div>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>{item.label}</div>
+                <div className="hint-xs">{item.label}</div>
               </div>
             ))}
           </div>

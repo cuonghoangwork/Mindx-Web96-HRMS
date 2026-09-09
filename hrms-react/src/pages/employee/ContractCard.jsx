@@ -54,10 +54,10 @@ export function ContractCard({ employee, canManage, uploadEmployeeContract, embe
         }}
       >
         <div>
-          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+          <h3 className="panel-title">
             {t("employees.viewEmployee.contractCard.title", { defaultValue: "Contract" })}
           </h3>
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-sm">
             {employee.contractUrl
               ? t("employees.viewEmployee.contractCard.uploaded", { defaultValue: "Uploaded {{date}}", date: formatDate(employee.contractUploadedAt, language) })
               : t("employees.viewEmployee.contractCard.noContract", { defaultValue: "No contract on file yet." })}

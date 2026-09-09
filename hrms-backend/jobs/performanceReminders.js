@@ -15,7 +15,7 @@ import NotificationModel from "../model/Notification.js";
 import PerformanceCycleModel from "../model/PerformanceCycle.js";
 import PerformanceReviewModel from "../model/PerformanceReview.js";
 import { emitNotification, notifyHR } from "../utils/notify.js";
-import { findUserForEmployee } from "../controller/performanceController.js";
+import { findUserForEmployee } from "../utils/performanceDomain.js";
 import { daysUntil } from "../utils/performanceCycles.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
 

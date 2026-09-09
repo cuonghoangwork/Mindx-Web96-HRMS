@@ -184,7 +184,7 @@ function Performance() {
   const handleSubmitted = () => { loadRoster(); loadAnalytics(); loadComparison(); };
 
   if (loading) {
-    return <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("performance.loading")}</p>;
+    return <p className="meta-sm">{t("performance.loading")}</p>;
   }
 
   return (
@@ -269,7 +269,7 @@ function Performance() {
                 <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   {t("performance.rosterLabel")}
                 </div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+                <h3 className="panel-title">
                   {selectedCycle?.label ?? ""}
                 </h3>
               </div>
@@ -309,7 +309,7 @@ function Performance() {
                         onClick={() => setOpenReview({ employeeId: r.employeeId, employeeName: r.name })}
                       >
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                          <div className="flex items-center gap-2">
                             <Avatar name={r.name} size="xs" />
                             <div style={{ fontWeight: "var(--fw-medium)" }}>{r.name}</div>
                           </div>
@@ -347,7 +347,7 @@ function Performance() {
 
               <div style={{ display: "grid", gridTemplateColumns: deptCompareRows?.length > 1 ? "1.3fr 1fr" : "1fr", gap: "var(--sp-5)" }}>
                 <div className="content-card">
-                  <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.ratingDistTitle")}</h3>
+                  <h3 className="panel-title">{t("performance.analytics.ratingDistTitle")}</h3>
                   <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.ratingDistSub")}</div>
                   <div style={{ display: "flex", gap: "var(--sp-5)" }}>
                     {[
@@ -376,13 +376,13 @@ function Performance() {
 
                 {deptCompareRows?.length > 1 && (
                   <div className="content-card">
-                    <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.deptCompareTitle")}</h3>
+                    <h3 className="panel-title">{t("performance.analytics.deptCompareTitle")}</h3>
                     <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.deptCompareSub")}</div>
                     {deptCompareRows.map((d) => (
                       <div key={d.departmentId ?? d.department} style={{ marginBottom: "var(--sp-3)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-sm)", marginBottom: "4px" }}>
                           <span>{d.department ?? "—"}</span>
-                          <span style={{ color: "var(--txt-secondary)" }}>{d.avgManager ?? "—"}</span>
+                          <span className="text-secondary">{d.avgManager ?? "—"}</span>
                         </div>
                         <div style={{ height: "6px", background: "var(--bg-surface-sub)" }}>
                           <div style={{ height: "100%", width: `${((d.avgManager ?? 0) / 5) * 100}%`, background: "var(--bg-primary)" }} />
@@ -394,7 +394,7 @@ function Performance() {
               </div>
 
               <div className="content-card">
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.analytics.competencyTitle")}</h3>
+                <h3 className="panel-title">{t("performance.analytics.competencyTitle")}</h3>
                 <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>{t("performance.analytics.competencySub")}</div>
                 {competencyRows.map((row) => (
                   <div key={row.key} style={{ padding: "8px 0", borderBottom: "1px solid var(--bdr-subtle)" }}>
@@ -419,7 +419,7 @@ function Performance() {
 
               {comparison && (
                 <div className="content-card">
-                  <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("performance.comparison.title")}</h3>
+                  <h3 className="panel-title">{t("performance.comparison.title")}</h3>
                   <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginBottom: "var(--sp-4)" }}>
                     {comparison.previous
                       ? t("performance.comparison.sub", { label: comparison.previous.label })

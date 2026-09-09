@@ -5,6 +5,7 @@ import { emitNotificationEach } from "../utils/notify.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { toPlainObject, reviewRequestBase } from "../utils/mappers.js";
 
 /* ── client-shape field name → DB field name (mirrors mappers.js) ── */
 const CLIENT_TO_DB = {
@@ -17,18 +18,11 @@ const CLIENT_TO_DB = {
 
 function toClientRequest(doc) {
   if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const o = toPlainObject(doc);
   return {
-    id:          String(o._id),
-    employeeId:  o.employee  ? String(o.employee._id  ?? o.employee)  : null,
-    employeeName: o.employee?.name ?? null,
+    ...reviewRequestBase(o),
     requestedBy: o.requestedBy ? String(o.requestedBy._id ?? o.requestedBy) : null,
     changes:     o.changes,
-    status:      o.status,
-    reviewNote:  o.reviewNote ?? "",
-    reviewedBy:  o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
-    reviewedAt:  o.reviewedAt ?? null,
-    createdAt:   o.createdAt,
   };
 }
 

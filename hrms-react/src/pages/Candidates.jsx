@@ -90,7 +90,7 @@ function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate 
               <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                 {t(`common.candidateStages.${stage}`, { defaultValue: stage })}
               </span>
-              <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{items.length}</span>
+              <span className="meta-xs">{items.length}</span>
             </div>
 
             {items.length === 0 ? (
@@ -121,7 +121,7 @@ function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate 
                       boxShadow: "var(--shadow-xs)",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                    <div className="flex items-center gap-2">
                       <Avatar name={candidate.name} size="sm" />
                       <span style={{
                         fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)",

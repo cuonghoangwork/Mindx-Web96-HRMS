@@ -259,7 +259,7 @@ function SideMenu({ isOpen = false, onNavigate }) {
               <circle cx="12" cy="8" r="4" />
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
             </svg>
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+            <span className="meta-xs">
               {t("sideMenu.employeeAccessBadge", { defaultValue: "Employee access" })}
             </span>
           </div>

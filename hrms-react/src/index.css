@@ -1835,3 +1835,17 @@ body {
 .rounded-full { border-radius: var(--radius-full); }
 .rounded-lg   { border-radius: var(--radius-lg); }
 .rounded-md   { border-radius: var(--radius-md); }
+
+/* ─── Composite text utilities ───────────────────────────────────────────
+   Extracted from repeated inline style objects (Phase 4). Each one reproduces
+   the exact declarations it replaced, so the conversion is a cascade change
+   only — and only on elements that carry no className and have no competing
+   descendant rule. Table cells were deliberately NOT converted: `.data-table
+   td` sets color at (0,1,1) and would out-specify a plain utility class,
+   silently turning muted cell text back to primary.
+------------------------------------------------------------------------- */
+.panel-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); margin: 0; }
+.meta-xs     { font-size: var(--fs-xs); color: var(--txt-secondary); }
+.meta-sm     { font-size: var(--fs-sm); color: var(--txt-secondary); }
+.hint-xs     { font-size: var(--fs-xs); color: var(--txt-secondary); margin-top: 2px; }
+.hint-sm     { font-size: var(--fs-sm); color: var(--txt-secondary); margin-top: 2px; }

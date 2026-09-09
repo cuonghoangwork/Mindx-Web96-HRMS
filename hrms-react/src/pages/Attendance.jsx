@@ -309,16 +309,16 @@ function Attendance() {
           <div className="content-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-4)", flexWrap: "wrap" }}>
               <div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+                <h3 className="panel-title">
                   {granularity === "monthly" ? t("attendance.granularity.monthlyHeading", { defaultValue: "Monthly attendance" }) : t("attendance.granularity.weeklyHeading", { defaultValue: "Weekly attendance" })}
                 </h3>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+                <div className="hint-xs">
                   {granularity === "monthly" ? `${months[viewMonth]} ${viewYear} · ` : ""}{t("attendance.granularity.clickToViewRoster", { defaultValue: "Click a day to view its roster" })}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
                 {granularity === "monthly" ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={prevMonth}>‹</Button>
                     <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", minWidth: "110px", textAlign: "center" }}>
                       {months[viewMonth]} {viewYear}
@@ -326,7 +326,7 @@ function Attendance() {
                     <Button variant="secondary" size="sm" onClick={nextMonth}>›</Button>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  <div className="flex items-center gap-2">
                     <Button variant="secondary" size="sm" onClick={prevWeek}>‹</Button>
                     <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", minWidth: "150px", textAlign: "center" }}>
                       {formatDate(weekDates[0], language, { month: "short", day: "numeric" })} – {weekDates[6].getMonth() !== weekDates[0].getMonth() ? `${formatDate(weekDates[6], language, { month: "short" })} ` : ""}{weekDates[6].getDate()}
@@ -364,7 +364,7 @@ function Attendance() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("attendance.roster.eyebrow", { defaultValue: "Roster" })}</div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.roster.heading", { day: dayLabel, defaultValue: "{{day}} roster" })}</h3>
+                <h3 className="panel-title">{t("attendance.roster.heading", { day: dayLabel, defaultValue: "{{day}} roster" })}</h3>
               </div>
               <input
                 type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -399,7 +399,7 @@ function Attendance() {
                     {rosterRows.map((r) => (
                       <tr key={r.employeeId} style={{ cursor: "pointer" }} onClick={() => navigate(`/employees/${r.employeeId}`)}>
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                          <div className="flex items-center gap-2">
                             <Avatar name={r.name} size="xs" />
                             <div>
                               <div style={{ fontWeight: "var(--fw-medium)" }}>{r.name}</div>
@@ -486,7 +486,7 @@ function Attendance() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--sp-5)" }}>
-              <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("attendance.report.heading", { month: months[viewMonth], year: viewYear, defaultValue: "{{month}} {{year}} attendance summary" })}</h3>
+              <h3 className="panel-title">{t("attendance.report.heading", { month: months[viewMonth], year: viewYear, defaultValue: "{{month}} {{year}} attendance summary" })}</h3>
               <button onClick={() => setShowReport(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--txt-secondary)", fontSize: "18px", lineHeight: 1 }}>×</button>
             </div>
 
@@ -502,7 +502,7 @@ function Attendance() {
 
             <h4 style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", marginBottom: "var(--sp-3)" }}>{t("attendance.report.mostMissed", { defaultValue: "Most missed this week" })}</h4>
             {missedThisWeek.length === 0 ? (
-              <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>{t("attendance.report.noneRecorded", { defaultValue: "No absences or late check-ins recorded this week." })}</p>
+              <p className="meta-sm">{t("attendance.report.noneRecorded", { defaultValue: "No absences or late check-ins recorded this week." })}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
                 {missedThisWeek.map((r) => (

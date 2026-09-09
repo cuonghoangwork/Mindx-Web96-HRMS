@@ -25,7 +25,7 @@ export function BulkActionBar({ count, onExport, onDelete, onStatusChange, onCle
       </Button>
 
       <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{t("employees.allEmployees.bulkBar.setStatus", { defaultValue: "Set status:" })}</span>
+        <span className="meta-xs">{t("employees.allEmployees.bulkBar.setStatus", { defaultValue: "Set status:" })}</span>
         {["Active", "On Leave", "Terminated"].map((s) => (
           <Button variant="secondary" size="sm" key={s} onClick={() => onStatusChange(s)}>
             {t(`common.employeeStatus.${s}`, { defaultValue: s })}

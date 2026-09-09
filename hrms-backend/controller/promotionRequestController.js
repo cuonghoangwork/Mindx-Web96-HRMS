@@ -13,15 +13,12 @@ import { AppError } from "../utils/appError.js";
 import { checkPromotionEligibility } from "../jobs/checkPromotionEligibility.js";
 import { annualSalaryRaise } from "../jobs/annualSalaryRaise.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { toPlainObject, reviewRequestBase, dateOnly } from "../utils/mappers.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
   ["requestedBy", "name email"],
 ];
-
-function dateOnly(d) {
-  return d ? new Date(d).toISOString().slice(0, 10) : null;
-}
 
 function changedFieldNames(doc) {
   return [
@@ -34,11 +31,9 @@ function changedFieldNames(doc) {
 
 function toClientRequest(doc) {
   if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const o = toPlainObject(doc);
   return {
-    id: String(o._id),
-    employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
-    employeeName: o.employee?.name ?? null,
+    ...reviewRequestBase(o),
     employeeCode: o.employee?.employeeId ?? null,
     requestedBy: o.requestedBy ? String(o.requestedBy._id ?? o.requestedBy) : null,
     requestedByName: o.requestedBy?.name ?? null,
@@ -57,11 +52,6 @@ function toClientRequest(doc) {
     systemGenerated: Boolean(o.systemGenerated),
     effectiveDate: dateOnly(o.effectiveDate),
     reason: o.reason ?? "",
-    status: o.status,
-    reviewNote: o.reviewNote ?? "",
-    reviewedBy: o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
-    reviewedAt: o.reviewedAt ?? null,
-    createdAt: o.createdAt,
   };
 }
 

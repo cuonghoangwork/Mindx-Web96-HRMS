@@ -14,6 +14,7 @@ import {
   holidayToClient, holidayFromClient,
   attendanceToClient, attendanceFromClient,
   notificationToClient, notificationFromClient,
+  dateOnly, reviewRequestBase,
 } from "../utils/mappers.js";
 
 // ─── helpers ───────────────────────────────────────────────
@@ -388,5 +389,72 @@ describe("notificationFromClient", () => {
   it("passes through non-bridged categories unchanged", () => {
     expect(notificationFromClient({ category: "leave" }).category).toBe("leave");
     expect(notificationFromClient({ category: "system" }).category).toBe("system");
+  });
+});
+
+// ─── dateOnly ──────────────────────────────────────────────
+describe("dateOnly", () => {
+  // These exist because dateOnly was, until now, defined four times: once
+  // here and once in each of leave/overtime/promotion controllers. The three
+  // controller copies read `new Date(d).toISOString().slice(0, 10)`, which
+  // THROWS a RangeError on an unparseable date rather than returning null.
+  // Nothing could reach that throw through the routes (validate.js's
+  // isDateString rejects bad dates with a 400 first), so this is the
+  // behaviour that was always intended and never written down.
+  it("formats a Date as YYYY-MM-DD", () => {
+    expect(dateOnly(new Date("2026-09-11T13:45:00.000Z"))).toBe("2026-09-11");
+  });
+
+  it("accepts a date string", () => {
+    expect(dateOnly("2026-09-11")).toBe("2026-09-11");
+  });
+
+  it("returns null for falsy input", () => {
+    for (const v of [null, undefined, "", 0]) expect(dateOnly(v)).toBeNull();
+  });
+
+  it("returns null for an unparseable value instead of throwing", () => {
+    // The divergence, pinned: the old controller copies threw here.
+    for (const v of ["not-a-date", "2026-13-45", "0000-00-00", {}]) {
+      expect(() => dateOnly(v)).not.toThrow();
+      expect(dateOnly(v)).toBeNull();
+    }
+  });
+});
+
+// ─── reviewRequestBase ─────────────────────────────────────
+describe("reviewRequestBase", () => {
+  // The eight fields every reviewable request DTO shares. Five controllers
+  // duplicated these with byte-identical expressions before consolidation.
+  const doc = {
+    _id: fakeId(7),
+    employee: { _id: fakeId(8), name: "Alice Nguyen" },
+    status: "pending",
+    reviewNote: "",
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
+  };
+
+  it("maps the shared envelope", () => {
+    const out = reviewRequestBase(doc);
+    expect(out.id).toBe(String(doc._id));
+    expect(out.employeeId).toBe(String(doc.employee._id));
+    expect(out.employeeName).toBe("Alice Nguyen");
+    expect(out.status).toBe("pending");
+    expect(out.reviewedBy).toBeNull();
+  });
+
+  it("handles an unpopulated employee reference", () => {
+    const id = fakeId(9);
+    expect(reviewRequestBase({ ...doc, employee: id }).employeeId).toBe(String(id));
+    expect(reviewRequestBase({ ...doc, employee: id }).employeeName).toBeNull();
+  });
+
+  it("returns no domain fields — callers add their own", () => {
+    expect(Object.keys(reviewRequestBase(doc)).sort()).toEqual([
+      "createdAt", "employeeId", "employeeName", "id",
+      "reviewNote", "reviewedAt", "reviewedBy", "status",
+    ]);
   });
 });

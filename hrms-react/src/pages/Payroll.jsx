@@ -647,8 +647,8 @@ function Payroll() {
           <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>{t("payroll.history.heading", { defaultValue: "Pay run history" })}</h3>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>{t("payroll.history.subtitle", { defaultValue: "Click a run to view its breakdown" })}</div>
+                <h3 className="panel-title">{t("payroll.history.heading", { defaultValue: "Pay run history" })}</h3>
+                <div className="hint-xs">{t("payroll.history.subtitle", { defaultValue: "Click a run to view its breakdown" })}</div>
               </div>
               {isHRTier && (
                 <Button variant="secondary" size="sm" onClick={() => setShowNewForm((v) => !v)}>
@@ -714,7 +714,7 @@ function Payroll() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{t("payroll.currentPeriod.eyebrow", { defaultValue: "Current period" })}</div>
-                <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+                <h3 className="panel-title">
                   {period ? `${months[period.month - 1]} ${period.year}` : "—"}
                 </h3>
               </div>
@@ -854,7 +854,7 @@ function Payroll() {
                                 <Avatar name={p.employeeName} size="sm" style={{ marginTop: "1px" }} />
                                 <div>
                                   <div style={{ fontWeight: "var(--fw-medium)", color: "var(--txt-primary)", lineHeight: 1.3 }}>{p.employeeName}</div>
-                                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>{p.employeeCode}</div>
+                                  <div className="meta-xs">{p.employeeCode}</div>
                                 </div>
                               </div>
                             </td>
@@ -907,7 +907,7 @@ function Payroll() {
                               {p.insuranceExempt ? (
                                 <span
                                   title={t("payroll.table.exemptTooltip", { days: p.unpaidLeaveDays + p.absentDays, defaultValue: "Exempt — {{days}} unpaid working days reached the 14-day threshold" })}
-                                  style={{ color: "var(--txt-secondary)" }}
+                                  className="text-secondary"
                                 >
                                   {t("payroll.table.exempt", { defaultValue: "Exempt" })}
                                 </span>

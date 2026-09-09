@@ -108,10 +108,10 @@ function AssignOvertimePanel({ employees, onAssigned }) {
       <div className="content-card">
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: "200px" }}>
-            <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+            <h3 className="panel-title">
               {t("overtime.assign.title")}
             </h3>
-            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+            <p className="hint-sm">
               {t("overtime.assign.description")}
             </p>
           </div>
@@ -125,10 +125,10 @@ function AssignOvertimePanel({ employees, onAssigned }) {
     <div className="content-card">
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: "200px" }}>
-          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+          <h3 className="panel-title">
             {t("overtime.assign.title")}
           </h3>
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-sm">
             {t("overtime.assign.description")}
           </p>
         </div>
@@ -265,7 +265,7 @@ function AssignOvertimePanel({ employees, onAssigned }) {
                     <Avatar name={e.name ?? "?"} size="sm" />
                     <span style={{ fontSize: "var(--fs-sm)", color: "var(--txt-primary)" }}>
                       {e.name}{" "}
-                      <span style={{ color: "var(--txt-secondary)" }}>({e.employeeId})</span>
+                      <span className="text-secondary">({e.employeeId})</span>
                     </span>
                     {e.department && (
                       <span style={{ marginLeft: "auto", fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>

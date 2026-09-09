@@ -9,18 +9,13 @@ import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
 import { AppError } from "../utils/appError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-
-function dateOnly(d) {
-  return d ? new Date(d).toISOString().slice(0, 10) : null;
-}
+import { toPlainObject, reviewRequestBase, dateOnly } from "../utils/mappers.js";
 
 function toClientRequest(doc) {
   if (!doc) return doc;
-  const o = typeof doc.toObject === "function" ? doc.toObject() : doc;
+  const o = toPlainObject(doc);
   return {
-    id: String(o._id),
-    employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
-    employeeName: o.employee?.name ?? null,
+    ...reviewRequestBase(o),
     requestedBy: o.requestedBy ? String(o.requestedBy._id ?? o.requestedBy) : null,
     startDate: dateOnly(o.startDate),
     endDate: dateOnly(o.endDate),
@@ -28,11 +23,6 @@ function toClientRequest(doc) {
     type: o.type,
     reason: o.reason ?? "",
     appliedAt: o.appliedAt,
-    status: o.status,
-    reviewNote: o.reviewNote ?? "",
-    reviewedBy: o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
-    reviewedAt: o.reviewedAt ?? null,
-    createdAt: o.createdAt,
   };
 }
 

@@ -107,7 +107,7 @@ function ViewDepartment() {
             </div>
             <h3 className="section-title" style={{ margin: 0 }}>{department.name}</h3>
           </div>
-          <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+          <div className="meta-xs">
             {t("employees.department.peopleCount", { count: roster.length, defaultValue_one: "{{count}} person", defaultValue_other: "{{count}} people" })}
           </div>
         </div>

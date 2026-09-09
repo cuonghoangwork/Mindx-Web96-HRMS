@@ -318,7 +318,7 @@ export default function AttendanceTrendChart({
                 width: "10px", height: "10px",
                 background: l.color, display: "inline-block", flexShrink: 0,
               }} />
-              <span style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+              <span className="meta-xs">
                 {l.label}
               </span>
             </div>

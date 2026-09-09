@@ -249,7 +249,7 @@ function AllDepartments() {
               </div>
               <h3 className="section-title" style={{ margin: 0 }}>{selectedDept.name}</h3>
             </div>
-            <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+            <div className="meta-xs">
               {t("employees.allDepartments.card.peopleSuffix", { defaultValue: "{{count}} people", count: roster.length })}
             </div>
           </div>

@@ -87,10 +87,10 @@ export function AttendanceReportCard({ employee, attendance, navigate, getAppNow
         }}
       >
         <div>
-          <h3 style={{ fontSize: "var(--fs-lg)", fontWeight: "var(--fw-semibold)", margin: 0 }}>
+          <h3 className="panel-title">
             {t("employees.viewEmployee.attendanceReport.title", { defaultValue: "Attendance Report" })}
           </h3>
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-sm">
             {t("employees.viewEmployee.attendanceReport.recordsOnFile", { count: total, defaultValue_one: "{{count}} record on file", defaultValue_other: "{{count}} records on file" })}
             {rate !== null ? t("employees.viewEmployee.attendanceReport.attendanceRateSuffix", { defaultValue: " · {{rate}}% attendance rate", rate }) : ""}
           </p>

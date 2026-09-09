@@ -318,7 +318,7 @@ function Jobs() {
                         <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-semibold)", color: "var(--txt-primary)" }}>
                           {applicantCount}
                         </div>
-                        <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                        <div className="meta-xs">
                           {t("jobs.card.applicantCount", { count: applicantCount, defaultValue_one: "{{count}} applicant", defaultValue_other: "{{count}} applicants" })}
                         </div>
                       </div>

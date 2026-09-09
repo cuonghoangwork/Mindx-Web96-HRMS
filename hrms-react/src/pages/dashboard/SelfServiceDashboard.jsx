@@ -118,7 +118,7 @@ export function SelfServiceDashboard() {
       <div className="toolbar" style={{ marginBottom: "var(--sp-5)" }}>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0 }}>{t("dashboard.title", { defaultValue: "Dashboard" })}</h2>
-          <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+          <p className="hint-sm">
             {t("dashboard.welcomeBack", { nameSuffix: user?.name ? `, ${user.name}` : "", defaultValue: "Welcome back{{nameSuffix}}." })}
           </p>
         </div>
@@ -180,7 +180,7 @@ export function SelfServiceDashboard() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
               <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.myLeave.heading", { defaultValue: "My leave requests" })}</h3>
-              <p style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)", marginTop: "2px" }}>
+              <p className="hint-xs">
                 {t("dashboard.myLeave.subtitle", { defaultValue: "Recent requests and their status" })}
               </p>
             </div>
@@ -254,7 +254,7 @@ export function SelfServiceDashboard() {
             )}
           </div>
           {upcomingHolidays.length === 0 ? (
-            <p style={{ fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
+            <p className="meta-sm">
               {t("dashboard.holidaysWidget.noneScheduled", { defaultValue: "No upcoming holidays scheduled." })}
             </p>
           ) : (
@@ -275,7 +275,7 @@ export function SelfServiceDashboard() {
                     <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-medium)", color: "var(--txt-primary)" }}>
                       {h.name}
                     </div>
-                    <div style={{ fontSize: "var(--fs-xs)", color: "var(--txt-secondary)" }}>
+                    <div className="meta-xs">
                       {formatDate(h.date, language)}
                     </div>
                   </div>

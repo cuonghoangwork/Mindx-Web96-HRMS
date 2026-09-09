@@ -92,7 +92,7 @@ function toClient(map, value) {
 
 /* ───────────────────────── shared helpers ───────────────────────── */
 
-function toPlainObject(doc) {
+export function toPlainObject(doc) {
   if (!doc) return doc;
   return typeof doc.toObject === "function" ? doc.toObject() : doc;
 }
@@ -104,7 +104,19 @@ function idOf(value) {
 }
 
 /** Mongo Date -> "YYYY-MM-DD", matching the date-input-driven strings the frontend stores. */
-function dateOnly(value) {
+/**
+ * A Date (or anything Date-parseable) as a bare YYYY-MM-DD string.
+ *
+ * Returns null for anything unparseable rather than throwing. Three
+ * controllers used to carry their own copy written as
+ * `new Date(d).toISOString().slice(0, 10)`, which throws a RangeError on an
+ * invalid date instead. Nothing could reach that throw through the HTTP
+ * routes — middleware/validate.js's isDateString rejects bad dates with a 400
+ * first — but one concept with two behaviours is a trap for the next caller,
+ * who may not come in through a validated route. This is the single
+ * definition; the semantics are pinned by tests/mappers.test.js.
+ */
+export function dateOnly(value) {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
@@ -416,4 +428,34 @@ export function notificationFromClient(body = {}) {
   carry(body, "audience", out, "audience");
   if (body.user !== undefined) out.user = body.user;
   return out;
+}
+
+/**
+ * The fields every reviewable request DTO shares.
+ *
+ * Five controllers each expose a `toClientRequest` — leave, no-show, overtime,
+ * profile-edit and promotion. They differ in their domain payload, but all
+ * five carried these eight fields with byte-identical expressions: the id, who
+ * the request is about, and the review outcome. That is the shared shape of
+ * "a thing somebody has to approve", so it lives here once.
+ *
+ * Callers spread it and add their own fields:
+ *
+ *   return { ...reviewRequestBase(o), days: o.days, type: o.type };
+ *
+ * NOT included, deliberately: `employeeCode` (only 3 of the 5 expose it),
+ * `requestedBy` (4 of 5), and every domain field. Adding a field here that
+ * only some callers want would put it in payloads that never had it.
+ */
+export function reviewRequestBase(o) {
+  return {
+    id: String(o._id),
+    employeeId: o.employee ? String(o.employee._id ?? o.employee) : null,
+    employeeName: o.employee?.name ?? null,
+    status: o.status,
+    reviewNote: o.reviewNote ?? "",
+    reviewedBy: o.reviewedBy ? String(o.reviewedBy._id ?? o.reviewedBy) : null,
+    reviewedAt: o.reviewedAt ?? null,
+    createdAt: o.createdAt,
+  };
 }
