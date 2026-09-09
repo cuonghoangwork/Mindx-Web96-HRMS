@@ -5,7 +5,7 @@ import Settings from "./Settings";
 import { EmployeesAPI, ProfileEditRequestsAPI, PermissionsAPI } from "../api";
 import { apiFetch } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-import { LanguageProvider } from "../context/LanguageContext";
+import { LanguageProvider } from "../context/providers/LanguageProvider";
 
 // Solo Gaps Milestone 3 — the permissions matrix (PermissionsMatrix,
 // rendered inside RolesTab). Settings.jsx has no prior test coverage, so

@@ -5,7 +5,8 @@
 import "../i18n";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import Avatar, { AvatarGroup, getInitials } from "./Avatar";
+import Avatar, { AvatarGroup } from "./Avatar";
+import { getInitials } from "../utils/initials";
 
 describe("getInitials", () => {
   it("takes the first letter of the first two words", () => {

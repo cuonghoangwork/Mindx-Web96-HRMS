@@ -1,31 +1,10 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext } from 'react'
 
-const ThemeContext = createContext(null)
-
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('hrms-theme') || 'light'
-  })
-
-  useEffect(() => {
-    localStorage.setItem('hrms-theme', theme)
-    document.body.setAttribute('data-theme', theme)
-  }, [theme])
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light')
-  }
-
-  const setThemeValue = (newTheme) => {
-    setTheme(newTheme)
-  }
-
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme: setThemeValue }}>
-      {children}
-    </ThemeContext.Provider>
-  )
-}
+// The context object and its hook live here; the provider component lives in
+// providers/ThemeProvider.jsx. Splitting them is what lets `npm run lint` gate
+// CI: react-refresh/only-export-components warns on any file exporting both a
+// component and a non-component. Consumers keep importing useTheme from here.
+export const ThemeContext = createContext(null)
 
 export function useTheme() {
   const context = useContext(ThemeContext)

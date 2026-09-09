@@ -5,7 +5,7 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 import ViewEmployee from "./ViewEmployee";
 import { useStore } from "../context/StoreContext";
 import { useAuth } from "../context/AuthContext";
-import { LanguageProvider } from "../context/LanguageContext";
+import { LanguageProvider } from "../context/providers/LanguageProvider";
 
 // Solo Gaps Milestone 1 — the Documents tab (DocumentsList, alongside the
 // existing ContractCard). ViewEmployee.jsx has no prior test coverage, so

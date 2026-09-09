@@ -26,6 +26,7 @@
  */
 
 import { useTranslation } from "react-i18next";
+import { getInitials } from "../utils/initials";
 
 /* ─── Color palette (auto-picked by name hash) ───
    v3 "Navy Signal Blue" — flat 5-color rotation lifted directly from
@@ -43,17 +44,6 @@ function hashName(name = "") {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
   return Math.abs(h) % PALETTE.length;
-}
-
-function getInitials(name = "") {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "?";
 }
 
 /* ─── Size config ─── */
@@ -242,6 +232,5 @@ export function AvatarGroup({ avatars = [], max = 4, size = "sm", gap = -8 }) {
 }
 
 /* ─── Exports ─── */
-export { getInitials };
 Avatar.displayName = "Avatar";
 export default Avatar;

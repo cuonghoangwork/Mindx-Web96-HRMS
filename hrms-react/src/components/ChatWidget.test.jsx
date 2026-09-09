@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import ChatWidget from "./ChatWidget";
 import { AiAPI } from "../api";
-import { LanguageProvider } from "../context/LanguageContext";
+import { LanguageProvider } from "../context/providers/LanguageProvider";
 
 vi.mock("../api", () => ({
   AiAPI: { chat: vi.fn() },

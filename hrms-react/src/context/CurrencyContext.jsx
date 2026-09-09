@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext } from 'react'
 
 /**
  * CurrencyContext — shared VND/USD display-currency preference, driving
@@ -10,29 +10,11 @@ import { createContext, useContext, useState } from 'react'
  * exists (Payroll.jsx reads fxRate off the selected pay period from the
  * real ExchangeRate-backed API) rather than inventing a fake "live" app-
  * wide rate that isn't backed by anything real.
+ *
+ * The provider component lives in providers/CurrencyProvider.jsx — see
+ * ThemeContext.jsx for why the two are split.
  */
-const CurrencyContext = createContext(null)
-
-export function CurrencyProvider({ children }) {
-  const [currency, setCurrency] = useState(() => {
-    return localStorage.getItem('hrms-currency') || 'VND'
-  })
-
-  const setCurrencyValue = (value) => {
-    setCurrency(value)
-    localStorage.setItem('hrms-currency', value)
-  }
-
-  const toggleCurrency = () => {
-    setCurrencyValue(currency === 'VND' ? 'USD' : 'VND')
-  }
-
-  return (
-    <CurrencyContext.Provider value={{ currency, setCurrency: setCurrencyValue, toggleCurrency }}>
-      {children}
-    </CurrencyContext.Provider>
-  )
-}
+export const CurrencyContext = createContext(null)
 
 export function useCurrency() {
   const context = useContext(CurrencyContext)

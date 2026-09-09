@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import PerformanceReviewDialog from "./PerformanceReviewDialog";
 import { PerformanceReviewsAPI } from "../api";
-import { LanguageProvider } from "../context/LanguageContext";
+import { LanguageProvider } from "../context/providers/LanguageProvider";
 
 vi.mock("../api", () => ({
   PerformanceReviewsAPI: {

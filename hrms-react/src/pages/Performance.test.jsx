@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import Performance from "./Performance";
 import { PerformanceReviewsAPI } from "../api";
-import { LanguageProvider } from "../context/LanguageContext";
+import { LanguageProvider } from "../context/providers/LanguageProvider";
 import { useAuth } from "../context/AuthContext";
 
 // LanguageProvider is required by PerformanceReviewDialog (opened on row
