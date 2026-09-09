@@ -7,159 +7,148 @@ import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions.js";
 import { AppError } from "../utils/appError.js";
 import { recomputeRecordOvertime } from "../utils/overtimeRecompute.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const attendanceController = {
-  getAll: async (req, res) => {
-    try {
-      const { pageSize = 50, pageNumber = 1, employeeId, from, to } = req.query;
+  getAll: asyncHandler(async (req, res) => {
+    const { pageSize = 50, pageNumber = 1, employeeId, from, to } = req.query;
 
-      const condition = {};
+    const condition = {};
 
-      // EMPLOYEE role: can only see their own attendance
-      if (req.user.role === "EMPLOYEE") {
-        const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
-        if (myEmp) {
-          condition.employee = myEmp._id;
-        } else {
-          // No linked employee — return empty
+    // EMPLOYEE role: can only see their own attendance
+    if (req.user.role === "EMPLOYEE") {
+      const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
+      if (myEmp) {
+        condition.employee = myEmp._id;
+      } else {
+        // No linked employee — return empty
+        return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
+      }
+    } else if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      const deptEmployees = await EmployeeModel.find({ department: deptId }, "_id");
+      const deptIds = deptEmployees.map((e) => String(e._id));
+      if (employeeId) {
+        if (!deptIds.includes(String(employeeId))) {
           return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
         }
-      } else if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        const deptEmployees = await EmployeeModel.find({ department: deptId }, "_id");
-        const deptIds = deptEmployees.map((e) => String(e._id));
-        if (employeeId) {
-          if (!deptIds.includes(String(employeeId))) {
-            return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
-          }
-          condition.employee = employeeId;
-        } else {
-          condition.employee = { $in: deptEmployees.map((e) => e._id) };
-        }
+        condition.employee = employeeId;
       } else {
-        if (employeeId) condition.employee = employeeId;
+        condition.employee = { $in: deptEmployees.map((e) => e._id) };
       }
-
-      if (from || to) {
-        condition.date = {};
-        if (from) condition.date.$gte = new Date(from);
-        if (to) condition.date.$lte = new Date(to);
-      }
-
-      const totalItems = await AttendanceModel.countDocuments(condition);
-      const totalPages = Math.ceil(totalItems / pageSize);
-      const skip = (pageNumber - 1) * pageSize;
-
-      const items = await AttendanceModel.find(condition)
-        .populate("employee", "name")
-        .sort({ date: -1 })
-        .skip(skip)
-        .limit(Number(pageSize));
-
-      res.json({
-        success: true,
-        totalItems,
-        totalPages,
-        currentPage: +pageNumber,
-        items: items.map(attendanceToClient),
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
+    } else {
+      if (employeeId) condition.employee = employeeId;
     }
-  },
 
-  checkIn: async (req, res) => {
-    try {
-      let { employeeId, date } = req.body;
-
-      // EMPLOYEE role can only clock in for themselves
-      if (req.user.role === "EMPLOYEE") {
-        const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
-        if (!myEmp) {
-          return res.status(400).json({ success: false, message: "No employee profile linked to your account. Please ask an admin to link one.", code: "NO_LINKED_EMPLOYEE_FOR_CLOCK_IN" });
-        }
-        employeeId = String(myEmp._id); // override whatever was sent
-      } else if (req.user.role === "MANAGER") {
-        if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
-        const deptId = await getManagerDepartmentId(req);
-        const target = await EmployeeModel.findById(employeeId, "department");
-        if (!target || String(target.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only check in employees in your own department.",
-            code: "MANAGER_CHECKIN_OUT_OF_DEPARTMENT",
-          });
-        }
-      }
-
-      if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
-
-      const data = attendanceFromClient({ ...req.body, employeeId });
-      const record = await AttendanceModel.findOneAndUpdate(
-        { employee: data.employee, date: data.date },
-        { checkIn: data.checkIn || new Date().toTimeString().slice(0, 5), status: "present" },
-        { new: true, upsert: true, runValidators: true },
-      ).populate("employee", "name");
-
-      res.status(201).json({ success: true, data: attendanceToClient(record) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    if (from || to) {
+      condition.date = {};
+      if (from) condition.date.$gte = new Date(from);
+      if (to) condition.date.$lte = new Date(to);
     }
-  },
 
-  checkOut: async (req, res) => {
-    try {
-      let { employeeId, date } = req.body;
+    const totalItems = await AttendanceModel.countDocuments(condition);
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const skip = (pageNumber - 1) * pageSize;
 
-      // EMPLOYEE role can only clock out for themselves
-      if (req.user.role === "EMPLOYEE") {
-        const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
-        if (!myEmp) {
-          return res.status(400).json({ success: false, message: "No employee profile linked to your account.", code: "NO_LINKED_EMPLOYEE_PROFILE" });
-        }
-        employeeId = String(myEmp._id);
-      } else if (req.user.role === "MANAGER") {
-        if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
-        const deptId = await getManagerDepartmentId(req);
-        const target = await EmployeeModel.findById(employeeId, "department");
-        if (!target || String(target.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only check out employees in your own department.",
-            code: "MANAGER_CHECKOUT_OUT_OF_DEPARTMENT",
-          });
-        }
+    const items = await AttendanceModel.find(condition)
+      .populate("employee", "name")
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(Number(pageSize));
+
+    res.json({
+      success: true,
+      totalItems,
+      totalPages,
+      currentPage: +pageNumber,
+      items: items.map(attendanceToClient),
+    });
+  }, 500),
+
+  checkIn: asyncHandler(async (req, res) => {
+    let { employeeId, date } = req.body;
+
+    // EMPLOYEE role can only clock in for themselves
+    if (req.user.role === "EMPLOYEE") {
+      const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
+      if (!myEmp) {
+        return res.status(400).json({ success: false, message: "No employee profile linked to your account. Please ask an admin to link one.", code: "NO_LINKED_EMPLOYEE_FOR_CLOCK_IN" });
       }
-
-      if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
-
-      const data = attendanceFromClient({ ...req.body, employeeId });
-      const record = await AttendanceModel.findOne({ employee: data.employee, date: data.date });
-      if (!record) throw new AppError("No check-in record found for this employee/date.", "NO_CHECKIN_RECORD");
-
-      record.checkOut = data.checkOut || new Date().toTimeString().slice(0, 5);
-      // The ONE place rawCheckOut is written. It is what makes a late overtime
-      // approval able to credit real hours: the close job overwrites checkOut,
-      // so without this a record auto-closed at 18:00 loses all evidence that
-      // the employee actually stayed until 21:30.
-      record.rawCheckOut = record.checkOut;
-      if (record.checkIn) {
-        const [h1, m1] = record.checkIn.split(":").map(Number);
-        const [h2, m2] = record.checkOut.split(":").map(Number);
-        record.hours = Math.max(0, (h2 * 60 + m2 - (h1 * 60 + m1)) / 60);
+      employeeId = String(myEmp._id); // override whatever was sent
+    } else if (req.user.role === "MANAGER") {
+      if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
+      const deptId = await getManagerDepartmentId(req);
+      const target = await EmployeeModel.findById(employeeId, "department");
+      if (!target || String(target.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only check in employees in your own department.",
+          code: "MANAGER_CHECKIN_OUT_OF_DEPARTMENT",
+        });
       }
-      // Clocking out is one of the inputs overtime is derived from. With no
-      // approved request this records the span as unapproved overtime; once HR
-      // approves, the same function moves those minutes across.
-      await recomputeRecordOvertime(record);
-      await record.save();
-      await record.populate("employee", "name");
-
-      res.json({ success: true, data: attendanceToClient(record) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
-  },
+
+    if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
+
+    const data = attendanceFromClient({ ...req.body, employeeId });
+    const record = await AttendanceModel.findOneAndUpdate(
+      { employee: data.employee, date: data.date },
+      { checkIn: data.checkIn || new Date().toTimeString().slice(0, 5), status: "present" },
+      { new: true, upsert: true, runValidators: true },
+    ).populate("employee", "name");
+
+    res.status(201).json({ success: true, data: attendanceToClient(record) });
+  }, 400),
+
+  checkOut: asyncHandler(async (req, res) => {
+    let { employeeId, date } = req.body;
+
+    // EMPLOYEE role can only clock out for themselves
+    if (req.user.role === "EMPLOYEE") {
+      const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
+      if (!myEmp) {
+        return res.status(400).json({ success: false, message: "No employee profile linked to your account.", code: "NO_LINKED_EMPLOYEE_PROFILE" });
+      }
+      employeeId = String(myEmp._id);
+    } else if (req.user.role === "MANAGER") {
+      if (!employeeId) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
+      const deptId = await getManagerDepartmentId(req);
+      const target = await EmployeeModel.findById(employeeId, "department");
+      if (!target || String(target.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only check out employees in your own department.",
+          code: "MANAGER_CHECKOUT_OUT_OF_DEPARTMENT",
+        });
+      }
+    }
+
+    if (!employeeId || !date) throw new AppError("employeeId and date are required.", "EMPLOYEE_ID_AND_DATE_REQUIRED");
+
+    const data = attendanceFromClient({ ...req.body, employeeId });
+    const record = await AttendanceModel.findOne({ employee: data.employee, date: data.date });
+    if (!record) throw new AppError("No check-in record found for this employee/date.", "NO_CHECKIN_RECORD");
+
+    record.checkOut = data.checkOut || new Date().toTimeString().slice(0, 5);
+    // The ONE place rawCheckOut is written. It is what makes a late overtime
+    // approval able to credit real hours: the close job overwrites checkOut,
+    // so without this a record auto-closed at 18:00 loses all evidence that
+    // the employee actually stayed until 21:30.
+    record.rawCheckOut = record.checkOut;
+    if (record.checkIn) {
+      const [h1, m1] = record.checkIn.split(":").map(Number);
+      const [h2, m2] = record.checkOut.split(":").map(Number);
+      record.hours = Math.max(0, (h2 * 60 + m2 - (h1 * 60 + m1)) / 60);
+    }
+    // Clocking out is one of the inputs overtime is derived from. With no
+    // approved request this records the span as unapproved overtime; once HR
+    // approves, the same function moves those minutes across.
+    await recomputeRecordOvertime(record);
+    await record.save();
+    await record.populate("employee", "name");
+
+    res.json({ success: true, data: attendanceToClient(record) });
+  }, 400),
 
   /**
    * Fetch-mutate-save rather than findByIdAndUpdate, because overtime is
@@ -168,78 +157,66 @@ const attendanceController = {
    * overtime changes, and it has to go through the same single derivation as
    * the other two or the numbers drift.
    */
-  update: async (req, res) => {
-    try {
-      const data = attendanceFromClient(req.body);
+  update: asyncHandler(async (req, res) => {
+    const data = attendanceFromClient(req.body);
 
-      const record = await AttendanceModel.findById(req.params.id);
-      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
+    const record = await AttendanceModel.findById(req.params.id);
+    if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
 
-      if (req.user.role === "MANAGER") {
-        if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
-        }
-        const deptId = await getManagerDepartmentId(req);
-        const emp = await EmployeeModel.findById(record.employee, "department");
-        if (!emp || String(emp.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only edit attendance for your own department.",
-            code: "MANAGER_EDIT_ATTENDANCE_OUT_OF_DEPARTMENT",
-          });
-        }
+    if (req.user.role === "MANAGER") {
+      if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
+        return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
       }
-
-      Object.assign(record, data);
-      // "manual" tells the approval queue that these hours rest on a human's
-      // edit rather than on a clock-out or an approved plan.
-      await recomputeRecordOvertime(record, { evidence: "manual" });
-      await record.save();
-      await record.populate("employee", "name");
-
-      res.json({ success: true, data: attendanceToClient(record) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
-
-  remove: async (req, res) => {
-    try {
-      if (req.user.role === "MANAGER") {
-        if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
-        }
-        const existing = await AttendanceModel.findById(req.params.id, "employee");
-        if (!existing) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
-        const deptId = await getManagerDepartmentId(req);
-        const emp = await EmployeeModel.findById(existing.employee, "department");
-        if (!emp || String(emp.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only delete attendance for your own department.",
-            code: "MANAGER_DELETE_ATTENDANCE_OUT_OF_DEPARTMENT",
-          });
-        }
+      const deptId = await getManagerDepartmentId(req);
+      const emp = await EmployeeModel.findById(record.employee, "department");
+      if (!emp || String(emp.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only edit attendance for your own department.",
+          code: "MANAGER_EDIT_ATTENDANCE_OUT_OF_DEPARTMENT",
+        });
       }
-
-      const record = await AttendanceModel.findByIdAndDelete(req.params.id);
-      if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
-      res.json({ success: true, message: "Attendance record deleted." });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
-  },
 
-  closeDay: async (req, res) => {
-    try {
-      const timeZone = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
-      const dateKey = req.body?.date || dateKeyInTz(new Date(), timeZone);
-      const result = await closeAttendanceDay({ dateKey });
-      res.json({ success: true, data: result });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    Object.assign(record, data);
+    // "manual" tells the approval queue that these hours rest on a human's
+    // edit rather than on a clock-out or an approved plan.
+    await recomputeRecordOvertime(record, { evidence: "manual" });
+    await record.save();
+    await record.populate("employee", "name");
+
+    res.json({ success: true, data: attendanceToClient(record) });
+  }, 400),
+
+  remove: asyncHandler(async (req, res) => {
+    if (req.user.role === "MANAGER") {
+      if (!(await hasCapability("MANAGER", "manageAttendanceRecords"))) {
+        return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
+      }
+      const existing = await AttendanceModel.findById(req.params.id, "employee");
+      if (!existing) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
+      const deptId = await getManagerDepartmentId(req);
+      const emp = await EmployeeModel.findById(existing.employee, "department");
+      if (!emp || String(emp.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only delete attendance for your own department.",
+          code: "MANAGER_DELETE_ATTENDANCE_OUT_OF_DEPARTMENT",
+        });
+      }
     }
-  },
+
+    const record = await AttendanceModel.findByIdAndDelete(req.params.id);
+    if (!record) throw new AppError("Attendance record not found.", "ATTENDANCE_RECORD_NOT_FOUND");
+    res.json({ success: true, message: "Attendance record deleted." });
+  }, 400),
+
+  closeDay: asyncHandler(async (req, res) => {
+    const timeZone = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
+    const dateKey = req.body?.date || dateKeyInTz(new Date(), timeZone);
+    const result = await closeAttendanceDay({ dateKey });
+    res.json({ success: true, data: result });
+  }, 400),
 };
 
 export default attendanceController;

@@ -12,6 +12,7 @@ import { hasCapability, CAPABILITY_DISABLED_MESSAGE } from "../utils/permissions
 import { AppError } from "../utils/appError.js";
 import { checkPromotionEligibility } from "../jobs/checkPromotionEligibility.js";
 import { annualSalaryRaise } from "../jobs/annualSalaryRaise.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const POPULATE = [
   ["employee", "name email employeeId"],
@@ -139,139 +140,130 @@ const { list, review: factoryReview } = createReviewRequestController({
 });
 
 const promotionRequestController = {
-  create: async (req, res) => {
-    try {
-      const { employeeId, designation, department, salary, positionLevel, effectiveDate, reason } = req.body;
+  create: asyncHandler(async (req, res) => {
+    const { employeeId, designation, department, salary, positionLevel, effectiveDate, reason } = req.body;
 
-      if (positionLevel !== undefined && positionLevel !== "" && !POSITION_LEVELS.includes(positionLevel)) {
-        return res.status(400).json({
-          success: false,
-          message: `positionLevel must be one of: ${POSITION_LEVELS.join(", ")}.`,
-          code: "INVALID_POSITION_LEVEL",
-          params: { levels: POSITION_LEVELS.join(", ") },
-        });
-      }
-
-      const employee = await EmployeeModel.findById(employeeId).populate("department", "name");
-      if (!employee) {
-        return res.status(404).json({ success: false, message: "Employee not found.", code: "EMPLOYEE_NOT_FOUND" });
-      }
-
-      // MANAGER can only propose promotions for employees in their own
-      // department, and can't use a promotion to move someone to another one.
-      if (req.user.role === "MANAGER") {
-        if (!(await hasCapability("MANAGER", "proposePromotions"))) {
-          return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
-        }
-        const deptId = await getManagerDepartmentId(req);
-        const empDeptId = employee.department?._id ?? employee.department;
-        if (!empDeptId || String(empDeptId) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only propose promotions for employees in your own department.",
-            code: "PROMOTION_OUTSIDE_MANAGER_DEPARTMENT",
-          });
-        }
-        if (department && String(department) !== String(employee.department?.name ?? "")) {
-          return res.status(403).json({
-            success: false,
-            message: "You cannot propose moving an employee to a different department.",
-            code: "CANNOT_PROPOSE_DEPARTMENT_CHANGE",
-          });
-        }
-      }
-
-      await assertNoPendingRequest(
-        PromotionRequestModel,
-        employee._id,
-        `${employee.name} already has a pending promotion proposal. It must be reviewed before another is submitted.`,
-        "PENDING_PROMOTION_REQUEST_EXISTS",
-        { name: employee.name },
-      );
-
-      const currentDepartmentName = employee.department?.name ?? null;
-
-      const doc = {
-        employee: employee._id,
-        requestedBy: req.user.id,
-        status: "pending",
-        currentDesignation: employee.designation ?? null,
-        currentDepartmentName,
-        currentAnnualSalary: employee.annualSalary ?? 0,
-        currentPositionLevel: employee.positionLevel ?? null,
-        proposedDesignation: null,
-        proposedDepartment: null,
-        proposedDepartmentName: null,
-        proposedAnnualSalary: null,
-        proposedPositionLevel: null,
-        effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
-        reason: reason ?? "",
-        appliedAt: new Date(),
-      };
-
-      if (designation && String(designation).trim() !== String(employee.designation ?? "")) {
-        doc.proposedDesignation = String(designation).trim();
-      }
-      if (department && String(department) !== String(currentDepartmentName ?? "")) {
-        doc.proposedDepartment = await resolveDepartmentIdByName(department);
-        doc.proposedDepartmentName = department;
-      }
-      if (
-        salary !== undefined &&
-        salary !== "" &&
-        Number(salary) !== Number(employee.annualSalary ?? 0)
-      ) {
-        doc.proposedAnnualSalary = Number(salary);
-      }
-      if (positionLevel && positionLevel !== employee.positionLevel) {
-        doc.proposedPositionLevel = positionLevel;
-      }
-
-      if (!changedFieldNames(doc).length) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "The proposal matches the employee's current designation, department and salary — nothing to change.",
-          code: "PROMOTION_PROPOSAL_NO_CHANGES",
-        });
-      }
-
-      const request = await PromotionRequestModel.create(doc);
-      await request.populate(POPULATE.map(([path, select]) => ({ path, select })));
-
-      // ADMIN only, deliberately narrower than the leave/profile-edit set:
-      // router/promotionRequestRouter.js lets only an ADMIN review a promotion,
-      // so telling anyone else would be a notice they cannot act on.
-      const admins = await UserModel.find({ role: "ADMIN" }, "_id");
-      await emitNotificationEach(admins.map((u) => u._id), {
-        category: "employee",
-        title: "Promotion proposal awaiting review",
-        message: `A promotion was proposed for ${employee.name} (${employee.employeeId}).`,
-        link: "/employees",
-        linkLabel: "Review promotion queue",
-        titleKey: "promotionProposalAwaitingReview",
-        messageKey: "promotionProposalAwaitingReview",
-        params: { employeeName: employee.name, employeeId: employee.employeeId },
-      });
-
-      await logAction(req, {
-        action: "created",
-        resource: "promotion",
-        resourceId: request._id,
-        label: `${employee.name} (${employee.employeeId}) — promotion proposed`,
-        changes: { fields: { from: null, to: changedFieldNames(doc).join(", ") } },
-      });
-
-      res.status(201).json({ success: true, data: toClientRequest(request) });
-    } catch (error) {
-      res.status(error.status || 400).json({
+    if (positionLevel !== undefined && positionLevel !== "" && !POSITION_LEVELS.includes(positionLevel)) {
+      return res.status(400).json({
         success: false,
-        message: error.message,
-        code: error instanceof AppError ? error.code : undefined,
-        params: error instanceof AppError ? error.params : undefined,
+        message: `positionLevel must be one of: ${POSITION_LEVELS.join(", ")}.`,
+        code: "INVALID_POSITION_LEVEL",
+        params: { levels: POSITION_LEVELS.join(", ") },
       });
     }
-  },
+
+    const employee = await EmployeeModel.findById(employeeId).populate("department", "name");
+    if (!employee) {
+      return res.status(404).json({ success: false, message: "Employee not found.", code: "EMPLOYEE_NOT_FOUND" });
+    }
+
+    // MANAGER can only propose promotions for employees in their own
+    // department, and can't use a promotion to move someone to another one.
+    if (req.user.role === "MANAGER") {
+      if (!(await hasCapability("MANAGER", "proposePromotions"))) {
+        return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
+      }
+      const deptId = await getManagerDepartmentId(req);
+      const empDeptId = employee.department?._id ?? employee.department;
+      if (!empDeptId || String(empDeptId) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only propose promotions for employees in your own department.",
+          code: "PROMOTION_OUTSIDE_MANAGER_DEPARTMENT",
+        });
+      }
+      if (department && String(department) !== String(employee.department?.name ?? "")) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot propose moving an employee to a different department.",
+          code: "CANNOT_PROPOSE_DEPARTMENT_CHANGE",
+        });
+      }
+    }
+
+    await assertNoPendingRequest(
+      PromotionRequestModel,
+      employee._id,
+      `${employee.name} already has a pending promotion proposal. It must be reviewed before another is submitted.`,
+      "PENDING_PROMOTION_REQUEST_EXISTS",
+      { name: employee.name },
+    );
+
+    const currentDepartmentName = employee.department?.name ?? null;
+
+    const doc = {
+      employee: employee._id,
+      requestedBy: req.user.id,
+      status: "pending",
+      currentDesignation: employee.designation ?? null,
+      currentDepartmentName,
+      currentAnnualSalary: employee.annualSalary ?? 0,
+      currentPositionLevel: employee.positionLevel ?? null,
+      proposedDesignation: null,
+      proposedDepartment: null,
+      proposedDepartmentName: null,
+      proposedAnnualSalary: null,
+      proposedPositionLevel: null,
+      effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
+      reason: reason ?? "",
+      appliedAt: new Date(),
+    };
+
+    if (designation && String(designation).trim() !== String(employee.designation ?? "")) {
+      doc.proposedDesignation = String(designation).trim();
+    }
+    if (department && String(department) !== String(currentDepartmentName ?? "")) {
+      doc.proposedDepartment = await resolveDepartmentIdByName(department);
+      doc.proposedDepartmentName = department;
+    }
+    if (
+      salary !== undefined &&
+      salary !== "" &&
+      Number(salary) !== Number(employee.annualSalary ?? 0)
+    ) {
+      doc.proposedAnnualSalary = Number(salary);
+    }
+    if (positionLevel && positionLevel !== employee.positionLevel) {
+      doc.proposedPositionLevel = positionLevel;
+    }
+
+    if (!changedFieldNames(doc).length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "The proposal matches the employee's current designation, department and salary — nothing to change.",
+        code: "PROMOTION_PROPOSAL_NO_CHANGES",
+      });
+    }
+
+    const request = await PromotionRequestModel.create(doc);
+    await request.populate(POPULATE.map(([path, select]) => ({ path, select })));
+
+    // ADMIN only, deliberately narrower than the leave/profile-edit set:
+    // router/promotionRequestRouter.js lets only an ADMIN review a promotion,
+    // so telling anyone else would be a notice they cannot act on.
+    const admins = await UserModel.find({ role: "ADMIN" }, "_id");
+    await emitNotificationEach(admins.map((u) => u._id), {
+      category: "employee",
+      title: "Promotion proposal awaiting review",
+      message: `A promotion was proposed for ${employee.name} (${employee.employeeId}).`,
+      link: "/employees",
+      linkLabel: "Review promotion queue",
+      titleKey: "promotionProposalAwaitingReview",
+      messageKey: "promotionProposalAwaitingReview",
+      params: { employeeName: employee.name, employeeId: employee.employeeId },
+    });
+
+    await logAction(req, {
+      action: "created",
+      resource: "promotion",
+      resourceId: request._id,
+      label: `${employee.name} (${employee.employeeId}) — promotion proposed`,
+      changes: { fields: { from: null, to: changedFieldNames(doc).join(", ") } },
+    });
+
+    res.status(201).json({ success: true, data: toClientRequest(request) });
+  }, 400),
 
   list,
 
@@ -358,42 +350,34 @@ const promotionRequestController = {
   // Re-running is safe: both jobs flag a given employee at most once per
   // level transition / anniversary, so a repeat is a no-op rather than a
   // duplicate request.
-  checkEligibility: async (req, res) => {
-    try {
-      const raw = req.body?.asOf;
-      const asOf = raw ? new Date(raw) : new Date();
-      if (Number.isNaN(asOf.getTime())) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
-      }
-
-      const result = await checkPromotionEligibility({ asOf });
-      res.json({ success: true, data: result });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+  checkEligibility: asyncHandler(async (req, res) => {
+    const raw = req.body?.asOf;
+    const asOf = raw ? new Date(raw) : new Date();
+    if (Number.isNaN(asOf.getTime())) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
     }
-  },
+
+    const result = await checkPromotionEligibility({ asOf });
+    res.json({ success: true, data: result });
+  }, 400),
 
   // Lives here rather than under /payroll because it proposes a raise as a
   // pending PromotionRequest for HR to review - it never changes salary
   // directly, so it feeds the same review queue as checkEligibility above.
-  annualRaise: async (req, res) => {
-    try {
-      const raw = req.body?.asOf;
-      const asOf = raw ? new Date(raw) : new Date();
-      if (Number.isNaN(asOf.getTime())) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
-      }
-
-      const result = await annualSalaryRaise({ asOf });
-      res.json({ success: true, data: result });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+  annualRaise: asyncHandler(async (req, res) => {
+    const raw = req.body?.asOf;
+    const asOf = raw ? new Date(raw) : new Date();
+    if (Number.isNaN(asOf.getTime())) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid asOf date.", code: "INVALID_ASOF" });
     }
-  },
+
+    const result = await annualSalaryRaise({ asOf });
+    res.json({ success: true, data: result });
+  }, 400),
 };
 
 export default promotionRequestController;

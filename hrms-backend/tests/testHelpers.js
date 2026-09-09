@@ -89,10 +89,12 @@ export async function createApp() {
   app.use(cors());
   app.use(express.json());
   app.use("/api/v1", rootRouter);
-  // minimal error handler
-  app.use((err, req, res, next) => {
-    res.status(err.status || 500).json({ success: false, message: err.message });
-  });
+  // The SAME handler production uses. It must not drift: since the
+  // controllers moved to asyncHandler this is what builds every error
+  // response, so a divergence here makes tests assert a body the real server
+  // never sends.
+  const { errorHandler } = await import("../middleware/errorHandler.js");
+  app.use(errorHandler);
   return app;
 }
 

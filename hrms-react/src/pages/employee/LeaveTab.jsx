@@ -3,22 +3,11 @@ import { useTranslation } from "react-i18next";
 import { useLanguage } from "../../context/LanguageContext";
 import { formatDate } from "../../utils/format";
 import { LeaveRequestsAPI } from "../../api";
-import Badge from "../../components/Badge";
 import { idsMatch } from "../../utils/id";
 import { leaveTypeLabel } from "../../utils/leaveTypes";
 import Button from "../../components/Button";
 import { translateApiError } from "../../utils/apiError";
-
-function capitalizeFirst(s) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
-function LeaveStatusBadge({ status }) {
-  const { t } = useTranslation();
-  const variant = status === "approved" ? "success" : status === "rejected" ? "danger" : "warning";
-  const label = status ? capitalizeFirst(t(`employees.allEmployees.editRequests.tabs.${status}`, { defaultValue: status })) : "—";
-  return <Badge variant={variant} size="sm" dot>{label}</Badge>;
-}
+import { LeaveStatusBadge } from "../../components/LeaveStatusBadge";
 
 /**
  * LeaveTab — ledger + request history for this employee (8.0e Day 7),

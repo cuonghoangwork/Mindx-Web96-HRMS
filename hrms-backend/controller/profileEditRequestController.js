@@ -4,6 +4,7 @@ import UserModel from "../model/User.js";
 import { emitNotificationEach } from "../utils/notify.js";
 import { createReviewRequestController, resolveRequestingEmployee, assertNoPendingRequest } from "../utils/reviewQueue.js";
 import { departmentManagerUserIds } from "../utils/performanceScope.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 /* ── client-shape field name → DB field name (mirrors mappers.js) ── */
 const CLIENT_TO_DB = {
@@ -75,100 +76,96 @@ const profileEditRequestController = {
      POST /api/v1/profile-edit-requests
      Employee submits a request to update their profile.
   ──────────────────────────────────────────── */
-  create: async (req, res) => {
-    try {
-      const userId = req.user.id;
+  create: asyncHandler(async (req, res) => {
+    const userId = req.user.id;
 
-      // Resolve the employee record linked to this user
-      const employee = await resolveRequestingEmployee(req);
+    // Resolve the employee record linked to this user
+    const employee = await resolveRequestingEmployee(req);
 
-      if (!employee) {
-        return res.status(404).json({
-          success: false,
-          message: "No employee profile is linked to your account. Ask HR to link your profile.",
-          code: "EMPLOYEE_PROFILE_NOT_LINKED",
-        });
-      }
-
-      const { changes } = req.body;
-      if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
-        return res.status(400).json({ success: false, message: "No changes were submitted.", code: "NO_CHANGES_SUBMITTED" });
-      }
-
-      // Validate only allowed fields
-      const badFields = Object.keys(changes).filter((f) => !EDITABLE_FIELDS.includes(f));
-      if (badFields.length) {
-        return res.status(400).json({
-          success: false,
-          message: `The following fields cannot be self-edited: ${badFields.join(", ")}`,
-          code: "FIELDS_NOT_SELF_EDITABLE",
-          params: { fields: badFields.join(", ") },
-        });
-      }
-
-      // Build a diff: { fieldName: { from: current, to: requested } }
-      const diff = {};
-      for (const field of Object.keys(changes)) {
-        const dbField = CLIENT_TO_DB[field] ?? field;
-        const currentValue = field === "sex" ? employee.gender : employee[dbField];
-        const newValue = changes[field];
-        // Skip fields that haven't actually changed
-        if (String(currentValue ?? "") !== String(newValue ?? "")) {
-          diff[field] = { from: currentValue ?? null, to: newValue };
-        }
-      }
-
-      if (Object.keys(diff).length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "The submitted values are the same as your current profile — nothing to change.",
-          code: "PROFILE_EDIT_NO_ACTUAL_CHANGES",
-        });
-      }
-
-      // Block if there's already a pending request for this employee
-      await assertNoPendingRequest(
-        ProfileEditRequestModel,
-        employee._id,
-        "You already have a pending profile edit request. Wait for HR to review it before submitting another.",
-        "PENDING_PROFILE_EDIT_REQUEST_EXISTS",
-      );
-
-      const request = await ProfileEditRequestModel.create({
-        employee: employee._id,
-        requestedBy: userId,
-        changes: diff,
-        status: "pending",
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "No employee profile is linked to your account. Ask HR to link your profile.",
+        code: "EMPLOYEE_PROFILE_NOT_LINKED",
       });
-
-      // Same reviewer set as a leave request, and split the same way: the
-      // unscoped HR/ADMIN tier plus the requester's OWN department manager.
-      // It used to be every MANAGER in the company, which meant a manager was
-      // notified about profile edits in departments they cannot approve for.
-      // Addressed rather than an "hr" broadcast because MANAGER is not in that
-      // audience, and because broadcast read state is shared — see
-      // controller/leaveRequestController.js for the full reasoning.
-      const [hrTier, departmentManagers] = await Promise.all([
-        UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: userId } }, "_id"),
-        departmentManagerUserIds(employee.department, userId),
-      ]);
-
-      await emitNotificationEach([...hrTier.map((u) => u._id), ...departmentManagers], {
-        category: "employee",
-        title: "Profile edit request",
-        message: `${employee.name} has submitted a request to update their profile.`,
-        link: "/employees?tab=editRequests",
-        linkLabel: "Review request",
-        titleKey: "profileEditRequestSubmitted",
-        messageKey: "profileEditRequestSubmitted",
-        params: { employeeName: employee.name },
-      });
-
-      res.status(201).json({ success: true, data: toClientRequest(request) });
-    } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
-  },
+
+    const { changes } = req.body;
+    if (!changes || typeof changes !== "object" || Object.keys(changes).length === 0) {
+      return res.status(400).json({ success: false, message: "No changes were submitted.", code: "NO_CHANGES_SUBMITTED" });
+    }
+
+    // Validate only allowed fields
+    const badFields = Object.keys(changes).filter((f) => !EDITABLE_FIELDS.includes(f));
+    if (badFields.length) {
+      return res.status(400).json({
+        success: false,
+        message: `The following fields cannot be self-edited: ${badFields.join(", ")}`,
+        code: "FIELDS_NOT_SELF_EDITABLE",
+        params: { fields: badFields.join(", ") },
+      });
+    }
+
+    // Build a diff: { fieldName: { from: current, to: requested } }
+    const diff = {};
+    for (const field of Object.keys(changes)) {
+      const dbField = CLIENT_TO_DB[field] ?? field;
+      const currentValue = field === "sex" ? employee.gender : employee[dbField];
+      const newValue = changes[field];
+      // Skip fields that haven't actually changed
+      if (String(currentValue ?? "") !== String(newValue ?? "")) {
+        diff[field] = { from: currentValue ?? null, to: newValue };
+      }
+    }
+
+    if (Object.keys(diff).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "The submitted values are the same as your current profile — nothing to change.",
+        code: "PROFILE_EDIT_NO_ACTUAL_CHANGES",
+      });
+    }
+
+    // Block if there's already a pending request for this employee
+    await assertNoPendingRequest(
+      ProfileEditRequestModel,
+      employee._id,
+      "You already have a pending profile edit request. Wait for HR to review it before submitting another.",
+      "PENDING_PROFILE_EDIT_REQUEST_EXISTS",
+    );
+
+    const request = await ProfileEditRequestModel.create({
+      employee: employee._id,
+      requestedBy: userId,
+      changes: diff,
+      status: "pending",
+    });
+
+    // Same reviewer set as a leave request, and split the same way: the
+    // unscoped HR/ADMIN tier plus the requester's OWN department manager.
+    // It used to be every MANAGER in the company, which meant a manager was
+    // notified about profile edits in departments they cannot approve for.
+    // Addressed rather than an "hr" broadcast because MANAGER is not in that
+    // audience, and because broadcast read state is shared — see
+    // controller/leaveRequestController.js for the full reasoning.
+    const [hrTier, departmentManagers] = await Promise.all([
+      UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: userId } }, "_id"),
+      departmentManagerUserIds(employee.department, userId),
+    ]);
+
+    await emitNotificationEach([...hrTier.map((u) => u._id), ...departmentManagers], {
+      category: "employee",
+      title: "Profile edit request",
+      message: `${employee.name} has submitted a request to update their profile.`,
+      link: "/employees?tab=editRequests",
+      linkLabel: "Review request",
+      titleKey: "profileEditRequestSubmitted",
+      messageKey: "profileEditRequestSubmitted",
+      params: { employeeName: employee.name },
+    });
+
+    res.status(201).json({ success: true, data: toClientRequest(request) });
+  }, 400),
 
   /* ────────────────────────────────────────────
      GET /api/v1/profile-edit-requests

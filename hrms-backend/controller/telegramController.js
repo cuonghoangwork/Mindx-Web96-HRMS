@@ -29,6 +29,7 @@ import {
   sendTelegramReply,
   escapeHtml,
 } from "../utils/telegram.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 /** Constant-time compare that also refuses when the secret is unset. */
 function secretMatches(candidate) {
@@ -97,74 +98,62 @@ export async function handleTelegramUpdate(update) {
 
 const telegramController = {
   /** GET /notifications/telegram — connection status for the Settings panel. */
-  status: async (req, res) => {
-    try {
-      const user = await UserModel.findById(req.user.id, "notify");
-      res.json({
-        success: true,
-        data: {
-          // Whether the feature exists at all on this deployment — Settings
-          // shows a "not configured" note rather than a dead button.
-          available: telegramEnabled() && Boolean(telegramBotUsername()),
-          botUsername: telegramBotUsername(),
-          connected: Boolean(user?.notify?.telegramChatId),
-          enabled: Boolean(user?.notify?.telegram),
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
-    }
-  },
+  status: asyncHandler(async (req, res) => {
+    const user = await UserModel.findById(req.user.id, "notify");
+    res.json({
+      success: true,
+      data: {
+        // Whether the feature exists at all on this deployment — Settings
+        // shows a "not configured" note rather than a dead button.
+        available: telegramEnabled() && Boolean(telegramBotUsername()),
+        botUsername: telegramBotUsername(),
+        connected: Boolean(user?.notify?.telegramChatId),
+        enabled: Boolean(user?.notify?.telegram),
+      },
+    });
+  }, 500),
 
   /** POST /notifications/telegram/link-code — mint a fresh code for this user. */
-  linkCode: async (req, res) => {
-    try {
-      if (!telegramEnabled() || !telegramBotUsername()) {
-        return res.status(503).json({
-          success: false,
-          message: "Telegram is not configured on this server.",
-          code: "TELEGRAM_NOT_CONFIGURED",
-        });
-      }
-
-      // One live code per user: minting a second should invalidate the first,
-      // or a code shown on a stale tab would still work.
-      await TelegramLinkCodeModel.deleteMany({ user: req.user.id });
-
-      const record = await TelegramLinkCodeModel.create({
-        code: generateLinkCode(),
-        user: req.user.id,
-        expiresAt: linkCodeExpiry(),
+  linkCode: asyncHandler(async (req, res) => {
+    if (!telegramEnabled() || !telegramBotUsername()) {
+      return res.status(503).json({
+        success: false,
+        message: "Telegram is not configured on this server.",
+        code: "TELEGRAM_NOT_CONFIGURED",
       });
-
-      res.status(201).json({
-        success: true,
-        data: {
-          code: record.code,
-          expiresAt: record.expiresAt,
-          expiresInMinutes: LINK_CODE_TTL_MINUTES,
-          botUsername: telegramBotUsername(),
-          deepLink: `https://t.me/${telegramBotUsername()}?start=${record.code}`,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
     }
-  },
+
+    // One live code per user: minting a second should invalidate the first,
+    // or a code shown on a stale tab would still work.
+    await TelegramLinkCodeModel.deleteMany({ user: req.user.id });
+
+    const record = await TelegramLinkCodeModel.create({
+      code: generateLinkCode(),
+      user: req.user.id,
+      expiresAt: linkCodeExpiry(),
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        code: record.code,
+        expiresAt: record.expiresAt,
+        expiresInMinutes: LINK_CODE_TTL_MINUTES,
+        botUsername: telegramBotUsername(),
+        deepLink: `https://t.me/${telegramBotUsername()}?start=${record.code}`,
+      },
+    });
+  }, 500),
 
   /** DELETE /notifications/telegram — unlink this account. */
-  disconnect: async (req, res) => {
-    try {
-      await UserModel.updateOne(
-        { _id: req.user.id },
-        { $set: { "notify.telegram": false, "notify.telegramChatId": null } },
-      );
-      await TelegramLinkCodeModel.deleteMany({ user: req.user.id });
-      res.json({ success: true, message: "Telegram disconnected." });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
-    }
-  },
+  disconnect: asyncHandler(async (req, res) => {
+    await UserModel.updateOne(
+      { _id: req.user.id },
+      { $set: { "notify.telegram": false, "notify.telegramChatId": null } },
+    );
+    await TelegramLinkCodeModel.deleteMany({ user: req.user.id });
+    res.json({ success: true, message: "Telegram disconnected." });
+  }, 500),
 
   /**
    * POST /notifications/telegram/webhook/:secret

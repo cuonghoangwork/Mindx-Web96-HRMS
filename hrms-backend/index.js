@@ -13,6 +13,7 @@ import { runStartupMigrations } from "./utils/startupMigrations.js";
 import { seedRolePermissions } from "./utils/permissions.js";
 import { warnIfDemoMode } from "./utils/appNow.js";
 import { startTelegram } from "./utils/telegramBoot.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 // Attendance Overtime: DEMO_MODE lets an X-App-Now header override server
 // time, which is a bypass for every date rule in the system — not just the
@@ -39,18 +40,8 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found", code: "ROUTE_NOT_FOUND" });
 });
 
-// Final error handler - catches anything thrown/passed via next(err) outside controller try/catch
-app.use((err, req, res, next) => {
-  console.error(err);
-  // Multer errors (oversized file, fileFilter rejection) are a bad request, not a server fault.
-  const isMulterError = err instanceof multer.MulterError || /image/i.test(err.message || "");
-  const status = err.status || (isMulterError ? 400 : 500);
-  res.status(status).json({
-    success: false,
-    message: err.message || "Internal server error",
-    code: err.code || (isMulterError ? "FILE_UPLOAD_ERROR" : "INTERNAL_ERROR"),
-  });
-});
+// Final error handler - shared with the test harness (middleware/errorHandler.js)
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 8080;
 

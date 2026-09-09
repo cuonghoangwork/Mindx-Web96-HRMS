@@ -47,6 +47,7 @@ import {
   usedMinutesInWindow,
   yearBoundsUtc,
 } from "../utils/overtimeBalance.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -532,107 +533,101 @@ const overtimeRequestController = {
    * queue stays the single place overtime becomes real, and the
    * approveOvertimeRequests capability keeps meaning what it says.
    */
-  assign: async (req, res) => {
-    try {
-      const { date: dateKey, plannedStart, plannedEnd, reason } = req.body ?? {};
-      const employeeIds = Array.isArray(req.body?.employeeIds) ? req.body.employeeIds : [];
-      if (!employeeIds.length) {
-        throw new AppError("Select at least one employee.", "OT_ASSIGN_NO_EMPLOYEES", undefined, 400);
-      }
+  assign: asyncHandler(async (req, res) => {
+    const { date: dateKey, plannedStart, plannedEnd, reason } = req.body ?? {};
+    const employeeIds = Array.isArray(req.body?.employeeIds) ? req.body.employeeIds : [];
+    if (!employeeIds.length) {
+      throw new AppError("Select at least one employee.", "OT_ASSIGN_NO_EMPLOYEES", undefined, 400);
+    }
 
-      const deptId = req.user.role === "MANAGER" ? await getManagerDepartmentId(req) : null;
-      const now = serverNow(req);
+    const deptId = req.user.role === "MANAGER" ? await getManagerDepartmentId(req) : null;
+    const now = serverNow(req);
 
-      const created = [];
-      const skipped = [];
+    const created = [];
+    const skipped = [];
 
-      for (const employeeId of employeeIds) {
-        try {
-          const employee = await EmployeeModel.findById(employeeId, "name email employeeId department status");
-          if (!employee) {
-            throw new AppError("Employee not found.", "OT_ASSIGN_EMPLOYEE_NOT_FOUND", undefined, 404);
-          }
-          if (deptId && String(employee.department) !== String(deptId)) {
-            throw new AppError(
-              "You can only assign overtime to employees in your own department.",
-              "OT_ASSIGN_OUT_OF_DEPARTMENT",
-              undefined,
-              403,
-            );
-          }
-
-          const payload = await buildRequestPayload({
-            employee,
-            dateKey,
-            plannedStart,
-            plannedEnd,
-            reason,
-            origin: "assigned",
-            now,
-            // Assignment is a management action — the cutoff exists to stop
-            // employees back-filling their own shifts, not to stop a manager
-            // scheduling one.
-            skipCutoff: true,
-          });
-
-          let request;
-          try {
-            request = await OvertimeRequestModel.create({ ...payload, requestedBy: req.user.id });
-          } catch (err) {
-            throw asDuplicateError(err, dateKey);
-          }
-          await assertCapsAfterCommit(request, dateKey);
-          await request.populate("employee", "name email employeeId");
-          created.push(toClientRequest(request));
-        } catch (err) {
-          skipped.push({
-            employeeId: String(employeeId),
-            code: err.code ?? "OT_ASSIGN_FAILED",
-            // params travels with the code so the client can interpolate the
-            // translated message ("...the {{cap}}-hour monthly cap") rather
-            // than rendering the placeholder.
-            params: err.params,
-            message: err.message,
-          });
+    for (const employeeId of employeeIds) {
+      try {
+        const employee = await EmployeeModel.findById(employeeId, "name email employeeId department status");
+        if (!employee) {
+          throw new AppError("Employee not found.", "OT_ASSIGN_EMPLOYEE_NOT_FOUND", undefined, 404);
         }
-      }
+        if (deptId && String(employee.department) !== String(deptId)) {
+          throw new AppError(
+            "You can only assign overtime to employees in your own department.",
+            "OT_ASSIGN_OUT_OF_DEPARTMENT",
+            undefined,
+            403,
+          );
+        }
 
-      if (created.length) {
-        // Addressed rather than broadcast for the same read-state reason as
-        // the apply path above. This one is an FYI rather than an action item,
-        // but "one colleague opened it so it left your badge" is just as
-        // surprising for an FYI, and having two notice shapes in one file
-        // invites the next reader to copy the wrong one.
-        const hrTier = await UserModel.find(
-          { role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } },
-          "_id",
-        );
-        await emitNotificationEach(hrTier.map((u) => u._id), {
-          title: "Overtime assigned",
-          message: `${created.length} employee(s) were assigned overtime on ${dateKey} (${plannedStart}-${plannedEnd}).`,
-          category: "overtime",
-          link: "/attendance",
-          linkLabel: "Review overtime",
-          titleKey: "overtimeAssigned",
-          messageKey: "overtimeAssigned",
-          params: { count: created.length, date: dateKey, start: plannedStart, end: plannedEnd },
+        const payload = await buildRequestPayload({
+          employee,
+          dateKey,
+          plannedStart,
+          plannedEnd,
+          reason,
+          origin: "assigned",
+          now,
+          // Assignment is a management action — the cutoff exists to stop
+          // employees back-filling their own shifts, not to stop a manager
+          // scheduling one.
+          skipCutoff: true,
+        });
+
+        let request;
+        try {
+          request = await OvertimeRequestModel.create({ ...payload, requestedBy: req.user.id });
+        } catch (err) {
+          throw asDuplicateError(err, dateKey);
+        }
+        await assertCapsAfterCommit(request, dateKey);
+        await request.populate("employee", "name email employeeId");
+        created.push(toClientRequest(request));
+      } catch (err) {
+        skipped.push({
+          employeeId: String(employeeId),
+          code: err.code ?? "OT_ASSIGN_FAILED",
+          // params travels with the code so the client can interpolate the
+          // translated message ("...the {{cap}}-hour monthly cap") rather
+          // than rendering the placeholder.
+          params: err.params,
+          message: err.message,
         });
       }
+    }
 
-      // Always a success when the batch itself was well-formed, even if every
-      // employee was skipped. The per-employee outcomes are DATA, not errors:
-      // success:false makes apiFetch throw, and the client then discards
-      // `skipped` — the only place the reasons live, and the whole point of
-      // the partial-success contract. A genuinely bad request (nothing
-      // selected, bad span, wrong role) still throws above and returns 4xx.
-      // 201 when something was created, 200 when the answer is just a report.
-      res.status(created.length ? 201 : 200).json({ success: true, created, skipped });
-    } catch (error) {
-      res.status(error.status || 400).json({
-        success: false, message: error.message, code: error.code, params: error.params,
+    if (created.length) {
+      // Addressed rather than broadcast for the same read-state reason as
+      // the apply path above. This one is an FYI rather than an action item,
+      // but "one colleague opened it so it left your badge" is just as
+      // surprising for an FYI, and having two notice shapes in one file
+      // invites the next reader to copy the wrong one.
+      const hrTier = await UserModel.find(
+        { role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } },
+        "_id",
+      );
+      await emitNotificationEach(hrTier.map((u) => u._id), {
+        title: "Overtime assigned",
+        message: `${created.length} employee(s) were assigned overtime on ${dateKey} (${plannedStart}-${plannedEnd}).`,
+        category: "overtime",
+        link: "/attendance",
+        linkLabel: "Review overtime",
+        titleKey: "overtimeAssigned",
+        messageKey: "overtimeAssigned",
+        params: { count: created.length, date: dateKey, start: plannedStart, end: plannedEnd },
       });
     }
-  },
+
+    // Always a success when the batch itself was well-formed, even if every
+    // employee was skipped. The per-employee outcomes are DATA, not errors:
+    // success:false makes apiFetch throw, and the client then discards
+    // `skipped` — the only place the reasons live, and the whole point of
+    // the partial-success contract. A genuinely bad request (nothing
+    // selected, bad span, wrong role) still throws above and returns 4xx.
+    // 201 when something was created, 200 when the answer is just a report.
+    res.status(created.length ? 201 : 200).json({ success: true, created, skipped });
+  }, 400),
 
   /* GET /api/v1/overtime-requests — role-scoped by the shared handler. */
   list,
@@ -647,39 +642,33 @@ const overtimeRequestController = {
    * MANAGER may pass ?employeeId= for someone in their own department. Same
    * scoping rule as leaveRequestController.balance.
    */
-  balance: async (req, res) => {
-    try {
-      const now = serverNow(req);
-      const todayKey = dateKeyInTz(now, OT_TIMEZONE);
-      const year = Number(req.query.year) || Number(todayKey.slice(0, 4));
-      const month = Number(req.query.month) || Number(todayKey.slice(5, 7));
+  balance: asyncHandler(async (req, res) => {
+    const now = serverNow(req);
+    const todayKey = dateKeyInTz(now, OT_TIMEZONE);
+    const year = Number(req.query.year) || Number(todayKey.slice(0, 4));
+    const month = Number(req.query.month) || Number(todayKey.slice(5, 7));
 
-      let employeeId = req.query.employeeId;
-      if (req.user.role === "EMPLOYEE" || !employeeId) {
-        const employee = await resolveRequestingEmployee(req);
-        if (!employee) {
-          return res.json({ success: true, data: await getOvertimeBalance(null, { year, month }) });
-        }
-        employeeId = employee._id;
-      } else if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        const target = await EmployeeModel.findById(employeeId, "department");
-        if (!target || String(target.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only view overtime balances for your own department.",
-            code: "OT_BALANCE_ACCESS_DENIED",
-          });
-        }
+    let employeeId = req.query.employeeId;
+    if (req.user.role === "EMPLOYEE" || !employeeId) {
+      const employee = await resolveRequestingEmployee(req);
+      if (!employee) {
+        return res.json({ success: true, data: await getOvertimeBalance(null, { year, month }) });
       }
-
-      res.json({ success: true, data: await getOvertimeBalance(employeeId, { year, month }) });
-    } catch (error) {
-      res.status(error.status || 500).json({
-        success: false, message: error.message, code: error.code, params: error.params,
-      });
+      employeeId = employee._id;
+    } else if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      const target = await EmployeeModel.findById(employeeId, "department");
+      if (!target || String(target.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view overtime balances for your own department.",
+          code: "OT_BALANCE_ACCESS_DENIED",
+        });
+      }
     }
-  },
+
+    res.json({ success: true, data: await getOvertimeBalance(employeeId, { year, month }) });
+  }, 500),
 
   /**
    * DELETE /api/v1/overtime-requests/:id — an employee withdraws their own
@@ -691,49 +680,43 @@ const overtimeRequestController = {
    * a corrected resubmission, which the partial unique index would otherwise
    * still block.
    */
-  remove: async (req, res) => {
-    try {
-      const request = await OvertimeRequestModel.findById(req.params.id);
-      if (!request) {
-        throw new AppError("Overtime request not found.", "OT_REQUEST_NOT_FOUND", undefined, 404);
-      }
-
-      const employee = await resolveRequestingEmployee(req);
-      if (!employee || String(request.employee) !== String(employee._id)) {
-        throw new AppError(
-          "You can only cancel your own overtime requests.",
-          "OT_CANCEL_NOT_OWNER",
-          undefined,
-          403,
-        );
-      }
-      if (request.status !== "pending") {
-        throw new AppError(
-          "Only a pending overtime request can be cancelled.",
-          "OT_CANCEL_NOT_PENDING",
-          { status: request.status },
-          409,
-        );
-      }
-
-      const dateKey = dateOnly(request.date);
-      if (isPastCutoff(serverNow(req), dateKey)) {
-        throw new AppError(
-          "Overtime requests can no longer be cancelled after the 13:00 cutoff.",
-          "OT_CANCEL_PAST_CUTOFF",
-          { date: dateKey },
-          409,
-        );
-      }
-
-      await OvertimeRequestModel.deleteOne({ _id: request._id });
-      res.json({ success: true, message: "Overtime request cancelled." });
-    } catch (error) {
-      res.status(error.status || 400).json({
-        success: false, message: error.message, code: error.code, params: error.params,
-      });
+  remove: asyncHandler(async (req, res) => {
+    const request = await OvertimeRequestModel.findById(req.params.id);
+    if (!request) {
+      throw new AppError("Overtime request not found.", "OT_REQUEST_NOT_FOUND", undefined, 404);
     }
-  },
+
+    const employee = await resolveRequestingEmployee(req);
+    if (!employee || String(request.employee) !== String(employee._id)) {
+      throw new AppError(
+        "You can only cancel your own overtime requests.",
+        "OT_CANCEL_NOT_OWNER",
+        undefined,
+        403,
+      );
+    }
+    if (request.status !== "pending") {
+      throw new AppError(
+        "Only a pending overtime request can be cancelled.",
+        "OT_CANCEL_NOT_PENDING",
+        { status: request.status },
+        409,
+      );
+    }
+
+    const dateKey = dateOnly(request.date);
+    if (isPastCutoff(serverNow(req), dateKey)) {
+      throw new AppError(
+        "Overtime requests can no longer be cancelled after the 13:00 cutoff.",
+        "OT_CANCEL_PAST_CUTOFF",
+        { date: dateKey },
+        409,
+      );
+    }
+
+    await OvertimeRequestModel.deleteOne({ _id: request._id });
+    res.json({ success: true, message: "Overtime request cancelled." });
+  }, 400),
 };
 
 export default overtimeRequestController;

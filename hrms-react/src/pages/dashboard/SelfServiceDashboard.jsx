@@ -10,21 +10,15 @@ import { formatDate } from "../../utils/format";
 import { fmtMoney } from "../../utils/payroll";
 import { idsMatch } from "../../utils/id";
 import { leaveTypeLabel } from "../../utils/leaveTypes";
-import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import ApplyLeaveModal from "../../components/ApplyLeaveModal";
 import { translateApiError } from "../../utils/apiError";
 import { StatCard } from '../../components/charts/StatCard'
+import { LeaveStatusBadge } from "../../components/LeaveStatusBadge";
 
 /* ─────────────────────────────────────────
    Leave status badge (pending/approved/rejected)
 ───────────────────────────────────────── */
-function LeaveStatusBadge({ status }) {
-  const variant = status === "approved" ? "success" : status === "rejected" ? "danger" : "warning";
-  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
-  return <Badge variant={variant} size="sm" dot>{label}</Badge>;
-}
-
 /* ═══════════════════════════════════════════
    SELF-SERVICE DASHBOARD — Manager + Employee (8.0e)
    "My Leave" table + upcoming holidays, shared by both.

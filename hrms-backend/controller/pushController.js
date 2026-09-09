@@ -15,6 +15,7 @@
 import PushSubscriptionModel from "../model/PushSubscription.js";
 import { pushEnabled, vapidPublicKey } from "../utils/webPush.js";
 import { AppError } from "../utils/appError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const pushController = {
   /**
@@ -24,91 +25,79 @@ const pushController = {
    * answer "is push configured at all", which is what Settings needs before
    * the service worker has registered.
    */
-  status: async (req, res) => {
-    try {
-      const { endpoint } = req.query;
-      const subscribed = endpoint
-        ? Boolean(await PushSubscriptionModel.exists({ endpoint, user: req.user.id }))
-        : false;
+  status: asyncHandler(async (req, res) => {
+    const { endpoint } = req.query;
+    const subscribed = endpoint
+      ? Boolean(await PushSubscriptionModel.exists({ endpoint, user: req.user.id }))
+      : false;
 
-      res.json({
-        success: true,
-        data: {
-          available: pushEnabled(),
-          // The ONLY way the browser gets this key: pages/Settings.jsx reads
-          // it off this response and hands it to subscribeToPush(). There is
-          // no build-time copy, which is what stops a frontend ending up
-          // keyed to a different pair than the backend signs with.
-          publicKey: vapidPublicKey(),
-          subscribed,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
-    }
-  },
+    res.json({
+      success: true,
+      data: {
+        available: pushEnabled(),
+        // The ONLY way the browser gets this key: pages/Settings.jsx reads
+        // it off this response and hands it to subscribeToPush(). There is
+        // no build-time copy, which is what stops a frontend ending up
+        // keyed to a different pair than the backend signs with.
+        publicKey: vapidPublicKey(),
+        subscribed,
+      },
+    });
+  }, 500),
 
   /** POST /notifications/push/subscribe — body is a PushSubscription JSON. */
-  subscribe: async (req, res) => {
-    try {
-      if (!pushEnabled()) {
-        return res.status(503).json({
-          success: false,
-          message: "Push notifications are not configured on this server.",
-          code: "PUSH_NOT_CONFIGURED",
-        });
-      }
-
-      const { endpoint, keys } = req.body ?? {};
-      if (!endpoint || !keys?.p256dh || !keys?.auth) {
-        throw new AppError(
-          "A push subscription with endpoint and keys is required.",
-          "PUSH_SUBSCRIPTION_INVALID",
-        );
-      }
-
-      // Upsert on endpoint, not insert. A browser re-subscribing returns the
-      // same endpoint, and re-registering after clearing site data is routine
-      // — an insert would collide on the unique index every time.
-      //
-      // Upserting also re-points an endpoint at whoever is signed in now,
-      // which is what a shared machine needs: the previous user's account
-      // must stop receiving pushes on a browser someone else is using.
-      const subscription = await PushSubscriptionModel.findOneAndUpdate(
-        { endpoint },
-        {
-          $set: {
-            user: req.user.id,
-            keys: { p256dh: keys.p256dh, auth: keys.auth },
-            userAgent: req.get("user-agent") ?? null,
-            failureCount: 0,
-          },
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
-      );
-
-      res.status(201).json({ success: true, data: { endpoint: subscription.endpoint } });
-    } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code });
+  subscribe: asyncHandler(async (req, res) => {
+    if (!pushEnabled()) {
+      return res.status(503).json({
+        success: false,
+        message: "Push notifications are not configured on this server.",
+        code: "PUSH_NOT_CONFIGURED",
+      });
     }
-  },
+
+    const { endpoint, keys } = req.body ?? {};
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      throw new AppError(
+        "A push subscription with endpoint and keys is required.",
+        "PUSH_SUBSCRIPTION_INVALID",
+      );
+    }
+
+    // Upsert on endpoint, not insert. A browser re-subscribing returns the
+    // same endpoint, and re-registering after clearing site data is routine
+    // — an insert would collide on the unique index every time.
+    //
+    // Upserting also re-points an endpoint at whoever is signed in now,
+    // which is what a shared machine needs: the previous user's account
+    // must stop receiving pushes on a browser someone else is using.
+    const subscription = await PushSubscriptionModel.findOneAndUpdate(
+      { endpoint },
+      {
+        $set: {
+          user: req.user.id,
+          keys: { p256dh: keys.p256dh, auth: keys.auth },
+          userAgent: req.get("user-agent") ?? null,
+          failureCount: 0,
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    res.status(201).json({ success: true, data: { endpoint: subscription.endpoint } });
+  }, 400),
 
   /** DELETE /notifications/push/subscribe — body/query carries the endpoint. */
-  unsubscribe: async (req, res) => {
-    try {
-      const endpoint = req.body?.endpoint ?? req.query.endpoint;
-      if (!endpoint) {
-        throw new AppError("An endpoint is required.", "PUSH_ENDPOINT_REQUIRED");
-      }
-
-      // Scoped to the caller: knowing someone else's endpoint must not be
-      // enough to unsubscribe them.
-      await PushSubscriptionModel.deleteOne({ endpoint, user: req.user.id });
-      res.json({ success: true, message: "Push subscription removed." });
-    } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code });
+  unsubscribe: asyncHandler(async (req, res) => {
+    const endpoint = req.body?.endpoint ?? req.query.endpoint;
+    if (!endpoint) {
+      throw new AppError("An endpoint is required.", "PUSH_ENDPOINT_REQUIRED");
     }
-  },
+
+    // Scoped to the caller: knowing someone else's endpoint must not be
+    // enough to unsubscribe them.
+    await PushSubscriptionModel.deleteOne({ endpoint, user: req.user.id });
+    res.json({ success: true, message: "Push subscription removed." });
+  }, 400),
 };
 
 export default pushController;

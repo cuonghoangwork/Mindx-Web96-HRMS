@@ -1,4 +1,5 @@
 import AuditLog from "../model/AuditLog.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const auditLogController = {
   /**
@@ -9,70 +10,62 @@ const auditLogController = {
    *   action     — filter by action
    *   actorId    — filter by actor user id
    */
-  getAll: async (req, res) => {
-    try {
-      const { limit = 20, resource, action, actorId } = req.query;
-      const safeLimit = Math.min(Number(limit) || 20, 100);
+  getAll: asyncHandler(async (req, res) => {
+    const { limit = 20, resource, action, actorId } = req.query;
+    const safeLimit = Math.min(Number(limit) || 20, 100);
 
-      const condition = {};
-      if (resource) condition.resource = resource;
-      if (action)   condition.action   = action;
-      if (actorId)  condition["actor.id"] = actorId;
+    const condition = {};
+    if (resource) condition.resource = resource;
+    if (action)   condition.action   = action;
+    if (actorId)  condition["actor.id"] = actorId;
 
-      const items = await AuditLog.find(condition)
-        .sort({ createdAt: -1 })
-        .limit(safeLimit);
+    const items = await AuditLog.find(condition)
+      .sort({ createdAt: -1 })
+      .limit(safeLimit);
 
-      res.json({ success: true, items });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+    res.json({ success: true, items });
+  }, 500),
 
   /**
    * GET /api/v1/audit-log/recent?limit=10
    * Shortcut used by Dashboard "Recent Activity" feed.
    * Returns the last N entries with a category/icon hint the frontend can map.
    */
-  getRecent: async (req, res) => {
-    try {
-      const limit = Math.min(Number(req.query.limit) || 10, 50);
+  getRecent: asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 10, 50);
 
-      const items = await AuditLog.find()
-        .select("-changes")
-        .sort({ createdAt: -1 })
-        .limit(limit);
+    const items = await AuditLog.find()
+      .select("-changes")
+      .sort({ createdAt: -1 })
+      .limit(limit);
 
-      // Enrich each entry with a `category` field that matches the
-      // frontend's Notifications.jsx CATEGORY_CONFIG keys so the same
-      // icon chips can be reused on the Dashboard.
-      const RESOURCE_CATEGORY = {
-        employee:     "employee",
-        department:   "employee",
-        attendance:   "leave",
-        job:          "interview",
-        candidate:    "interview",
-        holiday:      "holiday",
-        notification: "system",
-        user:         "system",
-        promotion:    "employee",
-        payroll:      "payroll",
-        performance:  "employee",
-      };
+    // Enrich each entry with a `category` field that matches the
+    // frontend's Notifications.jsx CATEGORY_CONFIG keys so the same
+    // icon chips can be reused on the Dashboard.
+    const RESOURCE_CATEGORY = {
+      employee:     "employee",
+      department:   "employee",
+      attendance:   "leave",
+      job:          "interview",
+      candidate:    "interview",
+      holiday:      "holiday",
+      notification: "system",
+      user:         "system",
+      promotion:    "employee",
+      payroll:      "payroll",
+      performance:  "employee",
+    };
 
-      const enriched = items.map((entry) => {
-        const e = entry.toObject();
-        e.category = RESOURCE_CATEGORY[e.resource] ?? "system";
-        // Human-readable title for the activity feed
-        e.title = buildTitle(e);
-        return e;
-      });
+    const enriched = items.map((entry) => {
+      const e = entry.toObject();
+      e.category = RESOURCE_CATEGORY[e.resource] ?? "system";
+      // Human-readable title for the activity feed
+      e.title = buildTitle(e);
+      return e;
+    });
 
-      res.json({ success: true, items: enriched });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+    res.json({ success: true, items: enriched });
+  }, 500),
 };
 
 /** Build a short, human-friendly activity title. */

@@ -19,135 +19,119 @@ import {
 import { getManagerDepartmentId } from "../utils/managerScope.js";
 import { AppError } from "../utils/appError.js";
 import { actorNotifyKeys } from "../utils/notifyActor.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const SALT_ROUNDS = 10;
 const DOCUMENT_TYPES = ["offer_letter", "id_scan", "other"];
 
 const employeeController = {
-  getAll: async (req, res) => {
-    try {
-      const {
-        pageSize = 10,
-        pageNumber = 1,
-        search,
-        department,
-        status,
-        type,
-        sortBy = "name",
-        sortDir = 1,
-      } = req.query;
+  getAll: asyncHandler(async (req, res) => {
+    const {
+      pageSize = 10,
+      pageNumber = 1,
+      search,
+      department,
+      status,
+      type,
+      sortBy = "name",
+      sortDir = 1,
+    } = req.query;
 
-      const condition = {};
-      if (search) condition.name = { $regex: search, $options: "i" };
+    const condition = {};
+    if (search) condition.name = { $regex: search, $options: "i" };
 
-      if (department) {
-        const names = department.split(",").map((d) => d.trim()).filter(Boolean);
-        if (names.length) {
-          const depts = await DepartmentModel.find({ name: { $in: names } }, "_id");
-          condition.department = { $in: depts.map((d) => d._id) };
-        }
+    if (department) {
+      const names = department.split(",").map((d) => d.trim()).filter(Boolean);
+      if (names.length) {
+        const depts = await DepartmentModel.find({ name: { $in: names } }, "_id");
+        condition.department = { $in: depts.map((d) => d._id) };
       }
-
-      // Deliberately NOT department-scoped for MANAGER: the roster/directory
-      // read has always been company-wide for every authenticated role (see
-      // the router comment — even plain EMPLOYEE sees all names/departments
-      // "for display"). Scoping this would make MANAGER's read visibility
-      // *more* restrictive than EMPLOYEE's, which is backwards. Real
-      // least-privilege for MANAGER lives on the write side (create is
-      // HR/ADMIN-only; update/avatar/contract/promote check
-      // getManagerDepartmentId — see those handlers below) and on the
-      // separate department-scoped views (attendance, payroll, "My
-      // Department" via departmentController.getDetail).
-      if (status && status !== "all") {
-        const mapped = employeeFromClient({ status });
-        if (mapped.status) condition.status = mapped.status;
-      }
-      if (type && type !== "all") {
-        const mapped = employeeFromClient({ type });
-        if (mapped.contractType) condition.contractType = mapped.contractType;
-      }
-
-      const SORT_FIELD_MAP = { type: "contractType", sex: "gender", salary: "annualSalary" };
-      const dbSortField = SORT_FIELD_MAP[sortBy] || sortBy;
-
-      const totalItems = await EmployeeModel.countDocuments(condition);
-      const totalPages = Math.ceil(totalItems / pageSize);
-      const skip = (pageNumber - 1) * pageSize;
-
-      const docs = await EmployeeModel.find(condition)
-        .populate("department", "name")
-        .sort({ [dbSortField]: Number(sortDir) })
-        .skip(skip)
-        .limit(Number(pageSize));
-
-      res.json({
-        success: true,
-        totalItems,
-        totalPages,
-        currentPage: +pageNumber,
-        items: docs.map(employeeToClient),
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: "Error getting employees",
-        error: error.message,
-        code: "GET_EMPLOYEES_FAILED",
-      });
     }
-  },
 
-  getDetail: async (req, res) => {
-    try {
-      const employee = await EmployeeModel.findById(req.params.id).populate("department", "name");
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-
-      // EMPLOYEE role users can only view their own profile
-      if (req.user.role === "EMPLOYEE") {
-        const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
-        if (!myEmp || String(myEmp._id) !== String(employee._id)) {
-          return res.status(403).json({ success: false, message: "Access denied.", code: "ACCESS_DENIED" });
-        }
-      }
-
-      // MANAGER can view any employee's basic profile (directory read is
-      // company-wide, see getAll above) — write actions (update/avatar/
-      // contract/promote) still enforce department scoping on their own.
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(404).json({ success: false, message: error.message, code: error.code, params: error.params });
+    // Deliberately NOT department-scoped for MANAGER: the roster/directory
+    // read has always been company-wide for every authenticated role (see
+    // the router comment — even plain EMPLOYEE sees all names/departments
+    // "for display"). Scoping this would make MANAGER's read visibility
+    // *more* restrictive than EMPLOYEE's, which is backwards. Real
+    // least-privilege for MANAGER lives on the write side (create is
+    // HR/ADMIN-only; update/avatar/contract/promote check
+    // getManagerDepartmentId — see those handlers below) and on the
+    // separate department-scoped views (attendance, payroll, "My
+    // Department" via departmentController.getDetail).
+    if (status && status !== "all") {
+      const mapped = employeeFromClient({ status });
+      if (mapped.status) condition.status = mapped.status;
     }
-  },
+    if (type && type !== "all") {
+      const mapped = employeeFromClient({ type });
+      if (mapped.contractType) condition.contractType = mapped.contractType;
+    }
+
+    const SORT_FIELD_MAP = { type: "contractType", sex: "gender", salary: "annualSalary" };
+    const dbSortField = SORT_FIELD_MAP[sortBy] || sortBy;
+
+    const totalItems = await EmployeeModel.countDocuments(condition);
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const skip = (pageNumber - 1) * pageSize;
+
+    const docs = await EmployeeModel.find(condition)
+      .populate("department", "name")
+      .sort({ [dbSortField]: Number(sortDir) })
+      .skip(skip)
+      .limit(Number(pageSize));
+
+    res.json({
+      success: true,
+      totalItems,
+      totalPages,
+      currentPage: +pageNumber,
+      items: docs.map(employeeToClient),
+    });
+  }, 500),
+
+  getDetail: asyncHandler(async (req, res) => {
+    const employee = await EmployeeModel.findById(req.params.id).populate("department", "name");
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+
+    // EMPLOYEE role users can only view their own profile
+    if (req.user.role === "EMPLOYEE") {
+      const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
+      if (!myEmp || String(myEmp._id) !== String(employee._id)) {
+        return res.status(403).json({ success: false, message: "Access denied.", code: "ACCESS_DENIED" });
+      }
+    }
+
+    // MANAGER can view any employee's basic profile (directory read is
+    // company-wide, see getAll above) — write actions (update/avatar/
+    // contract/promote) still enforce department scoping on their own.
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 404),
 
   // GET /api/v1/employees/me — returns the employee profile for the logged-in user
-  getMyProfile: async (req, res) => {
-    try {
-      const user = await UserModel.findById(req.user.id);
-      if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
+  getMyProfile: asyncHandler(async (req, res) => {
+    const user = await UserModel.findById(req.user.id);
+    if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
 
-      let employee = null;
-      if (user.employee) {
-        employee = await EmployeeModel.findById(user.employee).populate("department", "name");
-      }
-      if (!employee) {
-        // Fallback: match by email
-        employee = await EmployeeModel.findOne({ email: user.email }).populate("department", "name");
-        if (employee && !employee.userId) {
-          employee.userId = user._id;
-          await employee.save();
-        }
-      }
-
-      if (!employee) {
-        return res.json({ success: true, data: null, message: "No employee profile linked to this account." });
-      }
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
+    let employee = null;
+    if (user.employee) {
+      employee = await EmployeeModel.findById(user.employee).populate("department", "name");
     }
-  },
+    if (!employee) {
+      // Fallback: match by email
+      employee = await EmployeeModel.findOne({ email: user.email }).populate("department", "name");
+      if (employee && !employee.userId) {
+        employee.userId = user._id;
+        await employee.save();
+      }
+    }
+
+    if (!employee) {
+      return res.json({ success: true, data: null, message: "No employee profile linked to this account." });
+    }
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 500),
 
   create: async (req, res) => {
     let createdUserId = null;
@@ -253,294 +237,270 @@ const employeeController = {
     }
   },
 
-  update: async (req, res) => {
-    try {
-      const data = employeeFromClient(req.body);
-      if (req.body.department !== undefined) {
-        data.department = req.body.department
-          ? await resolveDepartmentIdByName(req.body.department)
-          : null;
-      }
-
-      // MANAGER can only update employees currently in their own department,
-      // and can't use this endpoint to move someone into a different one.
-      if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        const existing = await EmployeeModel.findById(req.params.id, "department");
-        if (!existing) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-        if (String(existing.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only update employees in your own department.",
-            code: "MANAGER_UPDATE_OUT_OF_DEPARTMENT",
-          });
-        }
-        if (data.department !== undefined && data.department !== null && String(data.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You cannot move an employee to a different department.",
-            code: "CANNOT_MOVE_DEPARTMENT",
-          });
-        }
-      }
-
-      const employee = await EmployeeModel.findByIdAndUpdate(req.params.id, data, {
-        new: true,
-        runValidators: true,
-      }).populate("department", "name");
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+  update: asyncHandler(async (req, res) => {
+    const data = employeeFromClient(req.body);
+    if (req.body.department !== undefined) {
+      data.department = req.body.department
+        ? await resolveDepartmentIdByName(req.body.department)
+        : null;
     }
-  },
 
-  remove: async (req, res) => {
-    try {
-      const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-
-      // Unlink the user account if one was linked
-      if (employee.userId) {
-        await UserModel.findByIdAndUpdate(employee.userId, { employee: null });
+    // MANAGER can only update employees currently in their own department,
+    // and can't use this endpoint to move someone into a different one.
+    if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      const existing = await EmployeeModel.findById(req.params.id, "department");
+      if (!existing) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+      if (String(existing.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only update employees in your own department.",
+          code: "MANAGER_UPDATE_OUT_OF_DEPARTMENT",
+        });
       }
-
-      notifyHR({
-        title: "Employee removed",
-        message: `${employee.name} (${employee.employeeId}) was removed by ${req.user?.name ?? "a team member"}.`,
-        category: "employee",
-        ...actorNotifyKeys(req, "employeeRemoved", { employeeName: employee.name, employeeId: employee.employeeId }),
-      });
-
-      res.json({ success: true, message: "Employee deleted." });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+      if (data.department !== undefined && data.department !== null && String(data.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot move an employee to a different department.",
+          code: "CANNOT_MOVE_DEPARTMENT",
+        });
+      }
     }
-  },
 
-  uploadAvatar: async (req, res) => {
-    try {
-      if (!isCloudinaryConfigured()) {
-        throw new AppError(
-          "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
-          "IMAGE_UPLOAD_NOT_CONFIGURED",
-        );
-      }
-      if (!req.file) throw new AppError("No image file was uploaded.", "NO_IMAGE_FILE");
+    const employee = await EmployeeModel.findByIdAndUpdate(req.params.id, data, {
+      new: true,
+      runValidators: true,
+    }).populate("department", "name");
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 400),
 
-      const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+  remove: asyncHandler(async (req, res) => {
+    const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-      // EMPLOYEE role can only upload their own avatar
-      if (req.user.role === "EMPLOYEE") {
-        if (!employee.userId || String(employee.userId) !== String(req.user.id)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only update your own avatar.",
-            code: "AVATAR_ACCESS_DENIED",
-          });
-        }
-      }
-
-      // MANAGER can only manage avatars for their own department
-      if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        if (!employee.department || String(employee.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only update avatars for employees in your own department.",
-            code: "MANAGER_AVATAR_OUT_OF_DEPARTMENT",
-          });
-        }
-      }
-
-      const result = await uploadBufferToCloudinary(req.file.buffer, {
-        folder: "hrms/avatars",
-        public_id: `employee_${employee._id}`,
-        overwrite: true,
-        resource_type: "image",
-      });
-
-      employee.avatar = result.secure_url;
-      await employee.save();
-      await employee.populate("department", "name");
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+    // Unlink the user account if one was linked
+    if (employee.userId) {
+      await UserModel.findByIdAndUpdate(employee.userId, { employee: null });
     }
-  },
+
+    notifyHR({
+      title: "Employee removed",
+      message: `${employee.name} (${employee.employeeId}) was removed by ${req.user?.name ?? "a team member"}.`,
+      category: "employee",
+      ...actorNotifyKeys(req, "employeeRemoved", { employeeName: employee.name, employeeId: employee.employeeId }),
+    });
+
+    res.json({ success: true, message: "Employee deleted." });
+  }, 400),
+
+  uploadAvatar: asyncHandler(async (req, res) => {
+    if (!isCloudinaryConfigured()) {
+      throw new AppError(
+        "Image uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        "IMAGE_UPLOAD_NOT_CONFIGURED",
+      );
+    }
+    if (!req.file) throw new AppError("No image file was uploaded.", "NO_IMAGE_FILE");
+
+    const employee = await EmployeeModel.findById(req.params.id);
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+
+    // EMPLOYEE role can only upload their own avatar
+    if (req.user.role === "EMPLOYEE") {
+      if (!employee.userId || String(employee.userId) !== String(req.user.id)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only update your own avatar.",
+          code: "AVATAR_ACCESS_DENIED",
+        });
+      }
+    }
+
+    // MANAGER can only manage avatars for their own department
+    if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      if (!employee.department || String(employee.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only update avatars for employees in your own department.",
+          code: "MANAGER_AVATAR_OUT_OF_DEPARTMENT",
+        });
+      }
+    }
+
+    const result = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "hrms/avatars",
+      public_id: `employee_${employee._id}`,
+      overwrite: true,
+      resource_type: "image",
+    });
+
+    employee.avatar = result.secure_url;
+    await employee.save();
+    await employee.populate("department", "name");
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 400),
 
   // Task 1.4 — contract PDF upload. Unlike avatars, HR/Admin-only (see
   // router/employeeRouter.js's authorize() on this route) — a contract is
   // an official HR document, not something an employee self-serves.
   // Employees view it read-only via employeeToClient's contractUrl
   // (already returned by GET /employees/me and GET /employees/:id).
-  uploadContract: async (req, res) => {
-    try {
-      if (!isCloudinaryConfigured()) {
-        throw new AppError(
-          "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
-          "DOCUMENT_UPLOAD_NOT_CONFIGURED",
-        );
-      }
-      if (!req.file) throw new AppError("No contract file was uploaded.", "NO_CONTRACT_FILE");
-
-      const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-
-      // MANAGER can only manage contracts for their own department
-      if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        if (!employee.department || String(employee.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only manage contracts for employees in your own department.",
-            code: "MANAGER_CONTRACT_OUT_OF_DEPARTMENT",
-          });
-        }
-      }
-
-      const result = await uploadBufferToCloudinary(req.file.buffer, {
-        folder: "hrms/contracts",
-        public_id: `employee_${employee._id}_contract`,
-        overwrite: true,
-        resource_type: "raw",
-        format: "pdf",
-      });
-
-      employee.contractUrl = result.secure_url;
-      employee.contractUploadedAt = new Date();
-      await employee.save();
-      await employee.populate("department", "name");
-
-      await logAction(req, {
-        action: "updated",
-        resource: "employee",
-        resourceId: employee._id,
-        label: `${employee.name} (${employee.employeeId}) — contract uploaded`,
-      });
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+  uploadContract: asyncHandler(async (req, res) => {
+    if (!isCloudinaryConfigured()) {
+      throw new AppError(
+        "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        "DOCUMENT_UPLOAD_NOT_CONFIGURED",
+      );
     }
-  },
+    if (!req.file) throw new AppError("No contract file was uploaded.", "NO_CONTRACT_FILE");
+
+    const employee = await EmployeeModel.findById(req.params.id);
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+
+    // MANAGER can only manage contracts for their own department
+    if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      if (!employee.department || String(employee.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only manage contracts for employees in your own department.",
+          code: "MANAGER_CONTRACT_OUT_OF_DEPARTMENT",
+        });
+      }
+    }
+
+    const result = await uploadBufferToCloudinary(req.file.buffer, {
+      folder: "hrms/contracts",
+      public_id: `employee_${employee._id}_contract`,
+      overwrite: true,
+      resource_type: "raw",
+      format: "pdf",
+    });
+
+    employee.contractUrl = result.secure_url;
+    employee.contractUploadedAt = new Date();
+    await employee.save();
+    await employee.populate("department", "name");
+
+    await logAction(req, {
+      action: "updated",
+      resource: "employee",
+      resourceId: employee._id,
+      label: `${employee.name} (${employee.employeeId}) — contract uploaded`,
+    });
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 400),
 
   // Solo Gaps Milestone 1 — arbitrary multi-document upload. Additive
   // alongside uploadContract above, not a replacement: each document gets
   // its own Cloudinary asset (unique public_id) since, unlike a contract,
   // there's no single "current" document to overwrite. label/type apply to
   // the whole batch (one upload action, up to 5 files at once).
-  uploadDocuments: async (req, res) => {
-    try {
-      if (!isCloudinaryConfigured()) {
-        throw new AppError(
-          "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
-          "DOCUMENT_UPLOAD_NOT_CONFIGURED",
-        );
-      }
-      if (!req.files?.length) throw new AppError("No document files were uploaded.", "NO_DOCUMENT_FILES");
-
-      const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
-
-      // MANAGER can only manage documents for their own department
-      if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        if (!employee.department || String(employee.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only manage documents for employees in your own department.",
-            code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
-          });
-        }
-      }
-
-      const label = typeof req.body.label === "string" ? req.body.label.trim() : "";
-      const type = DOCUMENT_TYPES.includes(req.body.type) ? req.body.type : "other";
-
-      for (let i = 0; i < req.files.length; i += 1) {
-        const file = req.files[i];
-        const result = await uploadBufferToCloudinary(file.buffer, {
-          folder: "hrms/documents",
-          public_id: `employee_${employee._id}_doc_${Date.now()}_${i}`,
-          resource_type: "raw",
-          format: "pdf",
-        });
-        employee.documents.push({
-          url: result.secure_url,
-          publicId: result.public_id,
-          label,
-          type,
-          uploadedAt: new Date(),
-          uploadedBy: req.user.id,
-        });
-      }
-
-      await employee.save();
-      await employee.populate("department", "name");
-
-      await logAction(req, {
-        action: "updated",
-        resource: "employee",
-        resourceId: employee._id,
-        label: `${employee.name} (${employee.employeeId}) — ${req.files.length} document(s) uploaded`,
-      });
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
+  uploadDocuments: asyncHandler(async (req, res) => {
+    if (!isCloudinaryConfigured()) {
+      throw new AppError(
+        "Document uploads are not configured on this server (missing CLOUD_NAME/API_KEY/API_SECRET).",
+        "DOCUMENT_UPLOAD_NOT_CONFIGURED",
+      );
     }
-  },
+    if (!req.files?.length) throw new AppError("No document files were uploaded.", "NO_DOCUMENT_FILES");
+
+    const employee = await EmployeeModel.findById(req.params.id);
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+
+    // MANAGER can only manage documents for their own department
+    if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      if (!employee.department || String(employee.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only manage documents for employees in your own department.",
+          code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
+        });
+      }
+    }
+
+    const label = typeof req.body.label === "string" ? req.body.label.trim() : "";
+    const type = DOCUMENT_TYPES.includes(req.body.type) ? req.body.type : "other";
+
+    for (let i = 0; i < req.files.length; i += 1) {
+      const file = req.files[i];
+      const result = await uploadBufferToCloudinary(file.buffer, {
+        folder: "hrms/documents",
+        public_id: `employee_${employee._id}_doc_${Date.now()}_${i}`,
+        resource_type: "raw",
+        format: "pdf",
+      });
+      employee.documents.push({
+        url: result.secure_url,
+        publicId: result.public_id,
+        label,
+        type,
+        uploadedAt: new Date(),
+        uploadedBy: req.user.id,
+      });
+    }
+
+    await employee.save();
+    await employee.populate("department", "name");
+
+    await logAction(req, {
+      action: "updated",
+      resource: "employee",
+      resourceId: employee._id,
+      label: `${employee.name} (${employee.employeeId}) — ${req.files.length} document(s) uploaded`,
+    });
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 400),
 
   // Solo Gaps Milestone 1 — deletes one document from the array. Best-effort
   // Cloudinary cleanup: a failure there logs but doesn't block the user's
   // delete, matching logAction's fire-and-forget philosophy — an orphaned
   // Cloudinary asset is a minor leak, not worth failing the request over.
-  removeDocument: async (req, res) => {
-    try {
-      const employee = await EmployeeModel.findById(req.params.id);
-      if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
+  removeDocument: asyncHandler(async (req, res) => {
+    const employee = await EmployeeModel.findById(req.params.id);
+    if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-      // MANAGER can only manage documents for their own department
-      if (req.user.role === "MANAGER") {
-        const deptId = await getManagerDepartmentId(req);
-        if (!employee.department || String(employee.department) !== String(deptId)) {
-          return res.status(403).json({
-            success: false,
-            message: "You can only manage documents for employees in your own department.",
-            code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
-          });
-        }
+    // MANAGER can only manage documents for their own department
+    if (req.user.role === "MANAGER") {
+      const deptId = await getManagerDepartmentId(req);
+      if (!employee.department || String(employee.department) !== String(deptId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only manage documents for employees in your own department.",
+          code: "MANAGER_DOCUMENTS_OUT_OF_DEPARTMENT",
+        });
       }
-
-      const doc = employee.documents.id(req.params.docId);
-      if (!doc) return res.status(404).json({ success: false, message: "Document not found.", code: "DOCUMENT_NOT_FOUND" });
-
-      const publicId = doc.publicId;
-      doc.deleteOne();
-      await employee.save();
-      await employee.populate("department", "name");
-
-      try {
-        await destroyCloudinaryAsset(publicId);
-      } catch (err) {
-        console.error("[uploadDocuments] Failed to delete Cloudinary asset:", err.message);
-      }
-
-      await logAction(req, {
-        action: "deleted",
-        resource: "employee",
-        resourceId: employee._id,
-        label: `${employee.name} (${employee.employeeId}) — document removed`,
-      });
-
-      res.json({ success: true, data: employeeToClient(employee) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
-  },
+
+    const doc = employee.documents.id(req.params.docId);
+    if (!doc) return res.status(404).json({ success: false, message: "Document not found.", code: "DOCUMENT_NOT_FOUND" });
+
+    const publicId = doc.publicId;
+    doc.deleteOne();
+    await employee.save();
+    await employee.populate("department", "name");
+
+    try {
+      await destroyCloudinaryAsset(publicId);
+    } catch (err) {
+      console.error("[uploadDocuments] Failed to delete Cloudinary asset:", err.message);
+    }
+
+    await logAction(req, {
+      action: "deleted",
+      resource: "employee",
+      resourceId: employee._id,
+      label: `${employee.name} (${employee.employeeId}) — document removed`,
+    });
+
+    res.json({ success: true, data: employeeToClient(employee) });
+  }, 400),
 };
 
 export default employeeController;

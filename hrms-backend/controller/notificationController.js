@@ -11,6 +11,7 @@ import {
 } from "../utils/tokens.js";
 import { subscribe, consumeTicketId } from "../utils/sseHub.js";
 import { SUPPORTED_LANGUAGES } from "../utils/notifyI18n.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 /* ── Level 1: live delivery over SSE ─────────────────────────────── */
 
@@ -29,134 +30,110 @@ const MAX_CONNECTION_MS = Number(process.env.SSE_MAX_CONNECTION_MS) || 15 * 60_0
 const notificationController = {
   // Returns notifications addressed to the current user PLUS broadcasts that match
   // their role-based audience (user: null, audience: "all" | role-appropriate).
-  getAll: async (req, res) => {
-    try {
-      const { category, read } = req.query;
-      const userId = req.user?.id;
-      const role = req.user?.role;
-      const broadcastAudiences = broadcastAudiencesFor(role);
-      const condition = {
-        $or: [
-          { user: userId },
-          { user: null, audience: { $in: broadcastAudiences } },
-        ],
-      };
-      if (category) {
-        const mapped = notificationFromClient({ category });
-        if (mapped.category) condition.category = mapped.category;
-      }
-      if (read !== undefined) condition.read = read === "true";
-
-      const items = await NotificationModel.find(condition).sort({ createdAt: -1 });
-      const unreadCount = await NotificationModel.countDocuments({ ...condition, read: false });
-
-      res.json({ success: true, items: items.map(notificationToClient), unreadCount });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
+  getAll: asyncHandler(async (req, res) => {
+    const { category, read } = req.query;
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    const broadcastAudiences = broadcastAudiencesFor(role);
+    const condition = {
+      $or: [
+        { user: userId },
+        { user: null, audience: { $in: broadcastAudiences } },
+      ],
+    };
+    if (category) {
+      const mapped = notificationFromClient({ category });
+      if (mapped.category) condition.category = mapped.category;
     }
-  },
+    if (read !== undefined) condition.read = read === "true";
+
+    const items = await NotificationModel.find(condition).sort({ createdAt: -1 });
+    const unreadCount = await NotificationModel.countDocuments({ ...condition, read: false });
+
+    res.json({ success: true, items: items.map(notificationToClient), unreadCount });
+  }, 500),
 
   // ADMIN/HR compose a custom notice. Body:
   //   { title, message, category="announcement", link?, linkLabel?, recipientId? | recipientIds?: [], audience? }
   // - recipientId / recipientIds: send to one or more specific employees (resolved to their User ids)
   // - omit recipients entirely (or pass recipientId: "all"): broadcast per `audience`
   //     ("all" default, or "employees" to exclude HR/Admin from seeing it)
-  create: async (req, res) => {
-    try {
-      const { category = "announcement", title, recipientId, recipientIds } = req.body;
-      if (!title) throw new AppError("title is required.", "TITLE_REQUIRED");
+  create: asyncHandler(async (req, res) => {
+    const { category = "announcement", title, recipientId, recipientIds } = req.body;
+    if (!title) throw new AppError("title is required.", "TITLE_REQUIRED");
 
-      const data = notificationFromClient({ ...req.body, category });
-      data.sender = { id: req.user.id, name: req.user.name };
-      data.isCustom = true;
+    const data = notificationFromClient({ ...req.body, category });
+    data.sender = { id: req.user.id, name: req.user.name };
+    data.isCustom = true;
 
-      const targets = Array.isArray(recipientIds) && recipientIds.length
-        ? recipientIds
-        : (recipientId && recipientId !== "all" ? [recipientId] : null);
+    const targets = Array.isArray(recipientIds) && recipientIds.length
+      ? recipientIds
+      : (recipientId && recipientId !== "all" ? [recipientId] : null);
 
-      if (targets) {
-        // Targeted send — resolve each Employee id to its linked User id (or accept a
-        // User id directly if the frontend already has one).
-        const userIds = [];
-        for (const target of targets) {
-          let uid = target;
-          const employee = await EmployeeModel.findById(target).catch(() => null);
-          if (employee?.userId) uid = String(employee.userId);
-          userIds.push(uid);
-        }
-        const created = await emitNotificationEach(userIds, data);
-        return res.status(201).json({
-          success: true,
-          data: notificationToClient(created[0]),
-          count: created.length,
-        });
+    if (targets) {
+      // Targeted send — resolve each Employee id to its linked User id (or accept a
+      // User id directly if the frontend already has one).
+      const userIds = [];
+      for (const target of targets) {
+        let uid = target;
+        const employee = await EmployeeModel.findById(target).catch(() => null);
+        if (employee?.userId) uid = String(employee.userId);
+        userIds.push(uid);
       }
-
-      // Broadcast
-      const notification = await emitNotification({
-        ...data,
-        user: null,
-        audience: data.audience || "all",
+      const created = await emitNotificationEach(userIds, data);
+      return res.status(201).json({
+        success: true,
+        data: notificationToClient(created[0]),
+        count: created.length,
       });
-      res.status(201).json({ success: true, data: notificationToClient(notification) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
     }
-  },
 
-  markRead: async (req, res) => {
-    try {
-      const notification = await NotificationModel.findByIdAndUpdate(
-        req.params.id,
-        { read: true },
-        { new: true },
-      );
-      if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
-      res.json({ success: true, data: notificationToClient(notification) });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+    // Broadcast
+    const notification = await emitNotification({
+      ...data,
+      user: null,
+      audience: data.audience || "all",
+    });
+    res.status(201).json({ success: true, data: notificationToClient(notification) });
+  }, 400),
 
-  markAllRead: async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      const role = req.user?.role;
-      const broadcastAudiences = broadcastAudiencesFor(role);
-      await NotificationModel.updateMany(
-        { $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }] },
-        { read: true },
-      );
-      res.json({ success: true, message: "All notifications marked as read." });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+  markRead: asyncHandler(async (req, res) => {
+    const notification = await NotificationModel.findByIdAndUpdate(
+      req.params.id,
+      { read: true },
+      { new: true },
+    );
+    if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
+    res.json({ success: true, data: notificationToClient(notification) });
+  }, 400),
 
-  clearRead: async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      const role = req.user?.role;
-      const broadcastAudiences = broadcastAudiencesFor(role);
-      await NotificationModel.deleteMany({
-        $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }],
-        read: true,
-      });
-      res.json({ success: true, message: "Read notifications cleared." });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+  markAllRead: asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    const broadcastAudiences = broadcastAudiencesFor(role);
+    await NotificationModel.updateMany(
+      { $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }] },
+      { read: true },
+    );
+    res.json({ success: true, message: "All notifications marked as read." });
+  }, 500),
 
-  remove: async (req, res) => {
-    try {
-      const notification = await NotificationModel.findByIdAndDelete(req.params.id);
-      if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
-      res.json({ success: true, message: "Notification deleted." });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+  clearRead: asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+    const role = req.user?.role;
+    const broadcastAudiences = broadcastAudiencesFor(role);
+    await NotificationModel.deleteMany({
+      $or: [{ user: userId }, { user: null, audience: { $in: broadcastAudiences } }],
+      read: true,
+    });
+    res.json({ success: true, message: "Read notifications cleared." });
+  }, 500),
+
+  remove: asyncHandler(async (req, res) => {
+    const notification = await NotificationModel.findByIdAndDelete(req.params.id);
+    if (!notification) throw new AppError("Notification not found.", "NOTIFICATION_NOT_FOUND");
+    res.json({ success: true, message: "Notification deleted." });
+  }, 400),
 
   /**
    * GET /notifications/preferences — the out-of-app channel toggles.
@@ -165,20 +142,16 @@ const notificationController = {
    * permission, so it is stored per-device in localStorage rather than
    * here (see hrms-react/src/utils/desktopNotify.js).
    */
-  getPreferences: async (req, res) => {
-    try {
-      const user = await UserModel.findById(req.user.id, "language notify");
-      res.json({
-        success: true,
-        data: {
-          email: Boolean(user?.notify?.email),
-          language: user?.language ?? "en",
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
-    }
-  },
+  getPreferences: asyncHandler(async (req, res) => {
+    const user = await UserModel.findById(req.user.id, "language notify");
+    res.json({
+      success: true,
+      data: {
+        email: Boolean(user?.notify?.email),
+        language: user?.language ?? "en",
+      },
+    });
+  }, 500),
 
   /**
    * PATCH /notifications/preferences — { email?, language? }
@@ -188,26 +161,22 @@ const notificationController = {
    * cannot end up in different languages; there is deliberately no second
    * language picker in Settings.
    */
-  updatePreferences: async (req, res) => {
-    try {
-      const update = {};
-      if (typeof req.body.email === "boolean") update["notify.email"] = req.body.email;
-      if (SUPPORTED_LANGUAGES.includes(req.body.language)) update.language = req.body.language;
+  updatePreferences: asyncHandler(async (req, res) => {
+    const update = {};
+    if (typeof req.body.email === "boolean") update["notify.email"] = req.body.email;
+    if (SUPPORTED_LANGUAGES.includes(req.body.language)) update.language = req.body.language;
 
-      if (!Object.keys(update).length) {
-        throw new AppError("No supported preference was provided.", "NO_PREFERENCES_PROVIDED");
-      }
-
-      await UserModel.updateOne({ _id: req.user.id }, { $set: update });
-      const user = await UserModel.findById(req.user.id, "language notify");
-      res.json({
-        success: true,
-        data: { email: Boolean(user?.notify?.email), language: user?.language ?? "en" },
-      });
-    } catch (error) {
-      res.status(error.status || 400).json({ success: false, message: error.message, code: error.code });
+    if (!Object.keys(update).length) {
+      throw new AppError("No supported preference was provided.", "NO_PREFERENCES_PROVIDED");
     }
-  },
+
+    await UserModel.updateOne({ _id: req.user.id }, { $set: update });
+    const user = await UserModel.findById(req.user.id, "language notify");
+    res.json({
+      success: true,
+      data: { email: Boolean(user?.notify?.email), language: user?.language ?? "en" },
+    });
+  }, 400),
 
   /**
    * GET /notifications/stream-ticket — normal Bearer auth.
@@ -217,14 +186,10 @@ const notificationController = {
    * utils/tokens.js for why this is not just the access token in a query
    * string.
    */
-  streamTicket: async (req, res) => {
-    try {
-      const ticket = signStreamTicket({ id: req.user.id, role: req.user.role });
-      res.json({ success: true, data: { ticket, expiresIn: STREAM_TICKET_TTL_SECONDS } });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code });
-    }
-  },
+  streamTicket: asyncHandler(async (req, res) => {
+    const ticket = signStreamTicket({ id: req.user.id, role: req.user.role });
+    res.json({ success: true, data: { ticket, expiresIn: STREAM_TICKET_TTL_SECONDS } });
+  }, 500),
 
   /**
    * GET /notifications/stream?ticket=... — the live feed.
@@ -292,23 +257,19 @@ const notificationController = {
 
   // GET /notifications/recipients — HR/Admin only: list of employees (id + name + email)
   // for the recipient picker in the compose modal.
-  listRecipients: async (req, res) => {
-    try {
-      const employees = await EmployeeModel.find({}, "name email employeeId userId").sort({ name: 1 });
-      res.json({
-        success: true,
-        items: employees.map((e) => ({
-          id: String(e._id),
-          name: e.name,
-          email: e.email,
-          employeeId: e.employeeId,
-          hasAccount: Boolean(e.userId),
-        })),
-      });
-    } catch (error) {
-      res.status(500).json({ success: false, message: error.message, code: error.code, params: error.params });
-    }
-  },
+  listRecipients: asyncHandler(async (req, res) => {
+    const employees = await EmployeeModel.find({}, "name email employeeId userId").sort({ name: 1 });
+    res.json({
+      success: true,
+      items: employees.map((e) => ({
+        id: String(e._id),
+        name: e.name,
+        email: e.email,
+        employeeId: e.employeeId,
+        hasAccount: Boolean(e.userId),
+      })),
+    });
+  }, 500),
 };
 
 export default notificationController;
