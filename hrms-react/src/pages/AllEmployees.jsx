@@ -10,6 +10,7 @@ import Avatar from "../components/Avatar";
 import { StatusBadge, TypeBadge } from "../components/Badge";
 import Button from "../components/Button";
 import ProposePromotionModal from "../components/ProposePromotionModal";
+import { SortableHeader } from "../components/SortableHeader";
 import { SidePanel } from './all-employees/SidePanel'
 import { BulkActionBar } from './all-employees/BulkActionBar'
 import { PendingPromotionsPanel } from './all-employees/PendingPromotionsPanel'
@@ -327,7 +328,7 @@ function AllEmployees() {
                 {SORTABLE_COLUMNS.map((col) => (
                   <SortableHeader
                     key={col.key} label={t(col.labelKey, { defaultValue: col.defaultLabel })} field={col.key}
-                    sortField={sortField} sortOrder={sortOrder} onSort={handleSort}
+                    sortField={sortField} sortDir={sortOrder} onSort={handleSort}
                   />
                 ))}
                 <th>{t("common.columns.action", { defaultValue: "Action" })}</th>
@@ -499,17 +500,5 @@ function AllEmployees() {
 }
 
 /* ─── Sortable column header ─── */
-function SortableHeader({ label, field, sortField, sortOrder, onSort }) {
-  const { t } = useTranslation();
-  const isActive = sortField === field;
-  return (
-    <th className="sortable-header" onClick={() => onSort(field)} title={t("employees.allEmployees.sortBy", { defaultValue: "Sort by {{label}}", label })}>
-      {label}
-      {isActive && (
-        <span className="sort-indicator" aria-hidden="true">{sortOrder === "asc" ? " ▲" : " ▼"}</span>
-      )}
-    </th>
-  );
-}
 
 export default AllEmployees;

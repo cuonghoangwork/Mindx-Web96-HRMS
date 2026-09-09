@@ -5,25 +5,20 @@ import { formatDate } from '../../utils/format'
 import { EmployeesAPI, ProfileEditRequestsAPI } from '../../api'
 import { translateApiError } from '../../utils/apiError'
 import Button from "../../components/Button";
+import Badge from "../../components/Badge";
 
 function StatusBadge({ status }) {
   const { t } = useTranslation()
+  // Profile-edit-request status (pending/approved/rejected) — a different
+  // domain from components/Badge.jsx's StatusBadge, which models EMPLOYEE
+  // status (Active/On Leave/...). Only the presentation was duplicated, so
+  // this keeps the status->variant mapping and hands the rendering to Badge.
   const cfg = {
-    pending:  { bg: 'var(--bg-warning-subtle)', color: 'var(--txt-warning)', border: 'var(--bdr-warning)', label: t('settings.status.pending') },
-    approved: { bg: 'var(--bg-success-subtle)', color: 'var(--txt-success)', border: 'var(--bdr-success)', label: t('settings.status.approved') },
-    rejected: { bg: 'var(--bg-danger-subtle)',  color: 'var(--txt-danger)',  border: 'var(--bdr-danger)',  label: t('settings.status.rejected') },
-  }[status] ?? { bg: 'var(--bg-surface-alt)', color: 'var(--txt-secondary)', border: 'var(--bdr-default)', label: status }
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '5px',
-      padding: '3px 10px', borderRadius: 'var(--radius-full)',
-      fontSize: 'var(--fs-xs)', fontWeight: 'var(--fw-medium)',
-      background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
-    }}>
-      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
-      {cfg.label}
-    </span>
-  )
+    pending:  { variant: 'warning', label: t('settings.status.pending') },
+    approved: { variant: 'success', label: t('settings.status.approved') },
+    rejected: { variant: 'danger',  label: t('settings.status.rejected') },
+  }[status] ?? { variant: 'neutral', label: status }
+  return <Badge variant={cfg.variant} size="sm" dot pill>{cfg.label}</Badge>
 }
 
 function FieldRow({ label, from, to }) {

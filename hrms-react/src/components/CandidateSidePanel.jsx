@@ -4,30 +4,12 @@ import Avatar from "./Avatar";
 import { CandidateStageBadge } from "./Badge";
 import Button from "./Button";
 import { translateApiError } from "../utils/apiError";
+import { StarRating } from "./StarRating";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 // Task 5.3 — same 10MB cap as employee contract uploads (ViewEmployee.jsx's
 // ContractCard) for consistency; a CV is a comparably-sized PDF.
 const MAX_CV_BYTES = 10 * 1024 * 1024;
-
-function StarRating({ rating }) {
-  const full = Math.round(rating);
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <svg key={i} width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9-6.3 3.9 1.7-7L1.9 9.2l7.1-.6z"
-            fill={i < full ? "var(--clr-warning-400)" : "var(--bdr-default)"}
-          />
-        </svg>
-      ))}
-      <span style={{ marginLeft: "4px", fontSize: "var(--fs-sm)", color: "var(--txt-secondary)" }}>
-        {rating.toFixed(1)}
-      </span>
-    </span>
-  );
-}
 
 function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDelete, onUploadCv }) {
   const { t } = useTranslation();
@@ -90,7 +72,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
           <InfoRow label={t("candidates.panel.appliedDate")} value={candidate.appliedDate} />
           <InfoRow
             label={t("candidates.panel.rating")}
-            value={<StarRating rating={candidate.rating} />}
+            value={<StarRating rating={candidate.rating} size={14} />}
           />
           <InfoRow
             label={t("candidates.panel.resume")}

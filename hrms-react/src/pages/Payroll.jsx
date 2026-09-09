@@ -15,7 +15,7 @@ import { DEPT_COLORS, colorForName, csvCell } from './payroll/helpers'
 import { StatusPill } from './payroll/StatusPill'
 import { DeptChart } from './payroll/DeptChart'
 import { TypeDonut } from './payroll/TypeDonut'
-import { SortableHeader } from './payroll/SortableHeader'
+import { SortableHeader } from "../components/SortableHeader";
 import { MoneyInput } from './payroll/MoneyInput'
 
 const PAYROLL_PER_PAGE = 10;
