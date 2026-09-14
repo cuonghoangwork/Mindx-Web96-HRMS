@@ -1,11 +1,8 @@
 /**
- * startupMigrations.js — idempotent data fixes that must have run before the
- * app serves traffic, so a deploy can never race a manual migration step
- * (both of these were previously "run this script by hand," which left a
- * window where stale data could hit code that assumes the migration already
- * happened). Guarded by a persisted marker (see MIGRATION_KEY below) so the
- * real work — a full collection scan on every restart — runs exactly once,
- * not on every boot forever.
+ * Idempotent data fixes that run before the app serves traffic. Each carries
+ * its OWN marker in the `_migrations` collection: bumping a shared key would
+ * re-run migrations that are unsafe to repeat (the MANAGER -> HR block below
+ * would demote a MANAGER created since, whose department link is pending).
  */
 import mongoose from "mongoose";
 import LeaveRequestModel from "../model/LeaveRequest.js";
@@ -16,18 +13,9 @@ import { resolveEmployeeForUser } from "./managerScope.js";
 import { logAction } from "./auditLog.js";
 
 const MIGRATION_KEY = "2026-startup-migrations-v1";
-// A SEPARATE key, deliberately — not a bump of MIGRATION_KEY to "-v2". Bumping
-// would re-run everything under that key, and the MANAGER -> HR block below is
-// explicitly documented as unsafe to repeat: it would demote a MANAGER created
-// after the first run whose department link is still pending. Each migration
-// therefore carries its own marker and is applied by once() independently.
 const AUDIT_ACTOR_NAME_KEY = "2026-audit-actor-name-backfill-v1";
 
-/**
- * Run `fn` unless its marker says it already ran, then persist the marker.
- * Returns whether the work was actually performed (used by the tests, and by
- * scripts/backfillAuditActorNames.js to report "already applied").
- */
+/** Runs `fn` unless its marker exists, then persists the marker. Returns whether it ran. */
 async function once(key, fn) {
   const marker = mongoose.connection.db.collection("_migrations");
   if (await marker.findOne({ key })) return false;
@@ -37,13 +25,9 @@ async function once(key, fn) {
 }
 
 /**
- * Leave-type rename ("paid" -> "annual"; also called standalone from
- * scripts/migrateLeaveTypes.js so it can be run manually without a full
- * server boot). Without this, a pre-existing "paid" document fails
- * Mongoose's full-document validation the next time it's saved for any
- * unrelated reason (e.g. reviewQueue.js's review(), attendanceController's
- * checkOut()), and un-migrated documents are silently excluded from
- * leaveBalance.js's per-type usage totals.
+ * "paid" -> "annual" leave-type rename. An unmigrated document fails
+ * full-document validation on its next unrelated save, and is excluded from
+ * per-type balance totals. Also run by scripts/migrateLeaveTypes.js.
  */
 export async function migratePaidLeaveType() {
   const leaveResult = await LeaveRequestModel.updateMany({ type: "paid" }, { $set: { type: "annual" } });
@@ -55,25 +39,10 @@ export async function migratePaidLeaveType() {
 }
 
 /**
- * Fills in `actor.name` on audit rows written before controller/authController.js
- * started signing `name` into the JWT (2026-09-07). Until then `req.user.name`
- * was always undefined, so utils/auditLog.js stored the actor's id and role but
- * no name — and because a missing name renders as "—" in the Settings audit
- * table and simply drops the " by X" suffix in auditLogController's dashboard
- * feed, nothing ever looked broken. The id was recorded throughout, so the name
- * is recoverable by joining back to User.
- *
- * Also called standalone from scripts/backfillAuditActorNames.js.
- *
- * Two things it deliberately does NOT touch:
- *   - rows that already have a name. That name is a SNAPSHOT of who the actor
- *     was at the time of the action; overwriting it with User.name today would
- *     rewrite history for anyone who has since been renamed.
- *   - rows with `actor.id: null`, which are the request-less writes stamped
- *     `name: "system"` by auditLog.js.
- *
- * Safe to re-run: the filter only matches rows still missing a name, so a
- * second pass matches nothing.
+ * Fills `actor.name` on audit rows written before the JWT carried a name, by
+ * joining back to User. Never overwrites an existing name (it is a snapshot
+ * of who the actor was at the time) and skips `actor.id: null` system rows.
+ * Also run by scripts/backfillAuditActorNames.js.
  */
 export async function backfillAuditActorNames() {
   const missingName = {
@@ -95,9 +64,7 @@ export async function backfillAuditActorNames() {
     updated += result.modifiedCount;
   }
 
-  // actors - resolved = actors whose User row is gone (hard-deleted account).
-  // Their rows keep a null name, which is the honest answer: the name was
-  // never recorded and there is nothing left to recover it from.
+  // actors - resolved = hard-deleted accounts; their rows keep a null name.
   return { actors: actorIds.length, resolved: users.length, updated };
 }
 
@@ -109,16 +76,11 @@ export async function runStartupMigrations() {
 async function runInitialMigrations() {
   await migratePaidLeaveType();
 
-  // MANAGER/HR role split: a MANAGER account whose linked Employee has no
-  // department can't function as a department-scoped manager under the new
-  // model (see managerScope.js, which 403s in that case), so it was
-  // necessarily using the old combined role as unscoped HR — promote it. A
-  // MANAGER whose Employee does have a department is left alone as a real
-  // department-scoped manager. This is a one-time cleanup of legacy
-  // accounts (guarded by the marker above), not an ongoing invariant check —
-  // a MANAGER created after this migration runs keeps that role even before
-  // their department is linked, since re-running this on every boot would
-  // silently overwrite a fresh, intentional admin decision mid-onboarding.
+  // MANAGER/HR role split: a MANAGER whose Employee has no department cannot
+  // be department-scoped (managerScope.js 403s), so it was the old combined
+  // role acting as unscoped HR — promote it. One-time cleanup, not an
+  // invariant: a MANAGER created later keeps the role while their department
+  // link is pending.
   const staleManagers = await UserModel.find({ role: "MANAGER" }, "_id employee email");
   for (const user of staleManagers) {
     const employee = await resolveEmployeeForUser(user, "department");

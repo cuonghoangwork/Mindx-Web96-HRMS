@@ -1,36 +1,10 @@
-/**
- * auditLog.js — fire-and-forget helper used by every mutating controller.
- *
- * Usage:
- *   import { logAction } from "../utils/auditLog.js";
- *
- *   // Inside a controller, after the DB write succeeds:
- *   await logAction(req, {
- *     action:     "created",
- *     resource:   "employee",
- *     resourceId: employee._id,
- *     label:      `${employee.name} (${employee.employeeId})`,
- *   });
- *
- * The function never throws — a failed audit write must never break the
- * main request. Errors are logged to stderr only.
- */
+/** Fire-and-forget audit writes. Never throws — a failed audit row must not break the request. */
 
 import AuditLog from "../model/AuditLog.js";
 
 /**
- * @param {import("express").Request | null} req  — null or {} for a write with
- *   no request behind it (a scheduled job, a startup migration, the seeder);
- *   both take the "system" actor below. `null` used to throw here, which meant
- *   the one caller that passed it — utils/startupMigrations.js — never managed
- *   to record its row at all.
- * @param {{
- *   action: string,
- *   resource: string,
- *   resourceId?: string | object,
- *   label?: string,
- *   changes?: object,
- * }} entry
+ * @param {import("express").Request | null} req  null or {} for request-less writes (jobs, migrations, the seeder) — recorded as the "system" actor
+ * @param {{ action: string, resource: string, resourceId?: string|object, label?: string, changes?: object }} entry  `action` must be in AuditLog's enum
  */
 export async function logAction(req, { action, resource, resourceId, label, changes } = {}) {
   try {
@@ -47,19 +21,11 @@ export async function logAction(req, { action, resource, resourceId, label, chan
       changes,
     });
   } catch (err) {
-    // Non-fatal — log to stderr, never surface to the client
     console.error("[AuditLog] Failed to write audit entry:", err.message);
   }
 }
 
-/**
- * Build a `changes` object by comparing two plain objects (before / after).
- * Only fields that actually changed are included.
- *
- * @param {object} before  — original values (flat, client-shaped)
- * @param {object} after   — new values (flat, client-shaped)
- * @returns {object|undefined}  undefined when nothing changed
- */
+/** Shallow before/after diff of two flat client-shaped objects; undefined when nothing changed. */
 export function diffChanges(before, after) {
   if (!before || !after) return undefined;
   const diff = {};
@@ -67,7 +33,6 @@ export function diffChanges(before, after) {
   for (const key of keys) {
     const a = before[key];
     const b = after[key];
-    // Simple shallow comparison — good enough for flat HR records
     if (String(a ?? "") !== String(b ?? "")) {
       diff[key] = { from: a ?? null, to: b ?? null };
     }

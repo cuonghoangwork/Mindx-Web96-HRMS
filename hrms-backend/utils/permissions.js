@@ -1,16 +1,8 @@
 /**
- * permissions.js — Solo Gaps Milestone 3 (permissions matrix).
- *
- * hasCapability(role, capability) is a second gate, checked AFTER
- * authorize() has already coarse-allowed the request — it can only narrow
- * MANAGER further, never widen anything authorize()'s role list doesn't
- * already permit. ADMIN always passes; every other role always fails (they
- * either already passed authorize() with no capability check needed, or
- * authorize() already rejected them before this is ever called).
- *
- * No caching here — a plain findOne on a 4-row collection isn't worth a new
- * caching pattern this codebase doesn't otherwise have (getManagerDepartmentId,
- * called just as often per-request, does a fresh lookup every time too).
+ * Capability matrix. hasCapability() is a second gate after authorize(): it
+ * can only narrow MANAGER further. ADMIN always passes; other roles always
+ * fail here (authorize() already decided them). No caching — a findOne on a
+ * 4-row collection.
  */
 
 import RolePermissionModel from "../model/RolePermission.js";
@@ -31,19 +23,11 @@ export async function hasCapability(role, capability) {
   if (role !== "MANAGER") return false;
 
   const row = await RolePermissionModel.findOne({ role, capability });
-  // No row yet (not seeded) — permissive default, so nothing changes until
-  // an admin actually flips a switch.
+  // No row yet → permissive, so nothing changes until an admin flips a switch.
   return row ? row.enabled : true;
 }
 
-/**
- * Ensures a row exists for every MANAGER_CAPABILITIES entry, defaulting to
- * enabled: true — nothing changes behaviorally until an admin flips one.
- * Idempotent per-row upsert (not a single global marker like
- * startupMigrations.js) so a capability added later just gets seeded on
- * the next boot without needing its own migration bump. Called from
- * index.js's boot sequence.
- */
+/** Per-row upsert at boot so a capability added later seeds itself; defaults to enabled. */
 export async function seedRolePermissions() {
   await Promise.all(
     MANAGER_CAPABILITIES.map((capability) =>

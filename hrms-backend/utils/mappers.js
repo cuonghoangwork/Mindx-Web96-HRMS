@@ -1,32 +1,13 @@
 /**
- * mappers.js — response/request mapping layer
- *
- * The frontend (StoreContext.jsx mock data + every page that reads it) speaks a
- * different vocabulary than the DB schema in hrms_schema_docs.md:
- *
- *   - enum casing:  "Active" / "Full-time" / "On Leave"  vs.  "active" / "full-time" / "on-leave"
- *   - field names:  employee.type / employee.sex / employee.salary
- *                   vs. employee.contractType / employee.gender / employee.annualSalary
- *   - refs as display strings: employee.department === "Engineering" (a name)
- *                   vs. employee.department === ObjectId("...")  (a reference)
- *   - Mongo's _id   vs. the frontend's `id` field
- *
- * Rather than touch either the documented schema or the existing frontend code, every
- * controller routes its Mongoose documents through a `*ToClient()` function before
- * sending JSON, and incoming `req.body` through a `*FromClient()` function before
- * writing to the DB. ObjectId <-> name lookups (department, manager) that need a DB
- * query live in utils/refResolvers.js and are applied by the controller in addition
- * to these pure functions.
- *
- * The one import below is deliberate and deliberately narrow: utils/overtime.js
- * is config plus arithmetic with no imports of its own, so it does not
- * compromise this file's DB-free contract.
+ * Client <-> DB mapping. The frontend's vocabulary differs from the schema's
+ * (label casing "Active"/"active", field names type/contractType,
+ * sex/gender, salary/annualSalary, `id`/`_id`, department names vs refs),
+ * so every controller maps documents through `*ToClient()` on the way out
+ * and `req.body` through `*FromClient()` on the way in. Lookups that need
+ * the database (department, manager) live in utils/refResolvers.js. This
+ * file stays DB-free — its two imports are pure arithmetic.
  */
 import { minutesToHours } from "./overtime.js";
-// overtimeRate.js is Mongoose-free (appError/workday/payrollEngine/overtime
-// only), so importing the rate table here does not compromise this file's
-// DB-free contract — and it keeps the statutory multipliers in one place
-// rather than duplicated into the React roster.
 import { OT_MULTIPLIERS } from "./overtimeRate.js";
 
 /* ───────────────────────── enum maps (client label -> db value) ───────────────────────── */
@@ -54,15 +35,11 @@ const ATTENDANCE_STATUS = {
   Late: "late",
   "On Leave": "on-leave",
   Absent: "absent",
-  // Task 4.6: automated end-of-day "no one heard from them" status, distinct from the
-  // manually-entered "Absent". See jobs/closeAttendanceDay.js markNoShow().
+  // Set by the close job; distinct from the HR-entered "Absent" (DECISIONS.md D4).
   "No-show": "no-show",
 };
 
-// hrms_schema_docs.md names this category "hiring"; the frontend's StoreContext mock
-// data and Notifications.jsx CATEGORY_CONFIG both actually use "interview" for the same
-// thing. Bridge it here rather than picking a side. "announcement" passes through as-is
-// since it's a new category with no legacy naming mismatch.
+// The schema says "hiring", the frontend says "interview"; bridged here rather than picking a side.
 export const NOTIFICATION_CATEGORY = { interview: "hiring" };
 
 function invert(map) {
@@ -99,23 +76,10 @@ export function toPlainObject(doc) {
 
 function idOf(value) {
   if (value === undefined || value === null) return null;
-  // Populated document, raw ObjectId, or already-a-string - all stringify cleanly.
   return String(value._id ?? value);
 }
 
-/** Mongo Date -> "YYYY-MM-DD", matching the date-input-driven strings the frontend stores. */
-/**
- * A Date (or anything Date-parseable) as a bare YYYY-MM-DD string.
- *
- * Returns null for anything unparseable rather than throwing. Three
- * controllers used to carry their own copy written as
- * `new Date(d).toISOString().slice(0, 10)`, which throws a RangeError on an
- * invalid date instead. Nothing could reach that throw through the HTTP
- * routes — middleware/validate.js's isDateString rejects bad dates with a 400
- * first — but one concept with two behaviours is a trap for the next caller,
- * who may not come in through a validated route. This is the single
- * definition; the semantics are pinned by tests/mappers.test.js.
- */
+/** Date (or anything Date-parseable) -> "YYYY-MM-DD"; null rather than a throw for unparseable input. */
 export function dateOnly(value) {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
@@ -149,18 +113,13 @@ export function employeeToClient(doc) {
     status: toClient(EMPLOYEE_STATUS_REV, o.status),
     salary: o.annualSalary,
     avatar: o.avatar ?? null,
-    // Position Ladder (tasks 2.1/2.2) — positionLevel/levelStartDate use
-    // the same string values client- and DB-side (Intern/Full-time/Senior/
-    // Manager), so no toClient/toDb translation table is needed here,
-    // unlike gender/contractType/status above.
+    // Same values on both sides, so no translation table.
     positionLevel: o.positionLevel ?? null,
     levelStartDate: o.levelStartDate ?? null,
-    // Task 1.4 — contract PDF, set only via uploadContract() below (not
-    // carried in employeeFromClient — see model/Employee.js's comment).
+    // Set only by the upload endpoints, never carried in employeeFromClient.
     contractUrl: o.contractUrl ?? null,
     contractUploadedAt: o.contractUploadedAt ?? null,
-    // Solo Gaps Milestone 1 — publicId is intentionally omitted, an
-    // internal Cloudinary detail the client never needs.
+    // publicId omitted — a Cloudinary detail the client never needs.
     documents: (o.documents || []).map((d) => ({
       id: idOf(d._id),
       url: d.url,
@@ -188,9 +147,7 @@ export function employeeFromClient(body = {}) {
   carry(body, "salary", out, "annualSalary", (v) => Number(v) || 0);
   carry(body, "avatar", out, "avatar");
   carry(body, "positionLevel", out, "positionLevel");
-  // contractUrl/contractUploadedAt/documents intentionally NOT carried
-  // here — see model/Employee.js's comment. Only uploadContract() /
-  // uploadDocuments() / removeDocument() may set them.
+  // contractUrl/contractUploadedAt/documents: only the upload endpoints may set them.
   return out;
 }
 
@@ -237,9 +194,7 @@ export function jobToClient(doc) {
     status: toClient(JOB_STATUS_REV, o.status),
     type: toClient(CONTRACT_TYPE_REV, o.type),
     description: o.description ?? "",
-    // Task 5.1 — requirements/benefits stay arrays client-side (one bullet
-    // per entry); the frontend joins them with "\n" for a textarea and
-    // splits back on submit via jobFromClient below.
+    // Arrays on both sides; the textarea joins/splits on newline.
     requirements: Array.isArray(o.requirements) ? o.requirements : [],
     benefits: Array.isArray(o.benefits) ? o.benefits : [],
     salaryMin: o.salaryMin ?? null,
@@ -354,13 +309,9 @@ export function attendanceToClient(doc) {
     checkOut: o.checkOut ?? null,
     hours: o.hours ?? 0,
     status: toClient(ATTENDANCE_STATUS_REV, o.status),
-    // Task 4.2 — "paid" | "unpaid" | null. Only ever set when status is "Late".
-    lateHalfDayType: o.lateHalfDayType ?? null,
+    lateHalfDayType: o.lateHalfDayType ?? null, // "annual" | "unpaid" | null; only when Late
 
-    // Attendance Overtime (M3). All derived by utils/overtimeRecompute.js.
-    // Exposed as hours as well as minutes: minutes are the stored source of
-    // truth (they accumulate against the caps without float drift), hours are
-    // what every surface actually renders.
+    // ot* fields are derived by utils/overtimeRecompute.js; minutes are stored, hours are rendered.
     rawCheckOut: o.rawCheckOut ?? null,
     otMinutes: o.otMinutes ?? 0,
     otHours: minutesToHours(o.otMinutes ?? 0),
@@ -369,7 +320,6 @@ export function attendanceToClient(doc) {
     otUnapprovedMinutes: o.otUnapprovedMinutes ?? 0,
     otUnapprovedHours: minutesToHours(o.otUnapprovedMinutes ?? 0),
     otDayType: o.otDayType ?? null,
-    // Display-ready rates for the roster badge ("OT 4h · 150%").
     otDayPercent: o.otDayType ? Math.round(OT_MULTIPLIERS[o.otDayType].day * 100) : null,
     otNightPercent: o.otDayType ? Math.round(OT_MULTIPLIERS[o.otDayType].night * 100) : null,
     otEvidence: o.otEvidence ?? null,
@@ -385,12 +335,8 @@ export function attendanceFromClient(body = {}) {
   carry(body, "checkOut", out, "checkOut");
   carry(body, "status", out, "status", (v) => toDb(ATTENDANCE_STATUS, v));
   carry(body, "lateHalfDayType", out, "lateHalfDayType");
-  // Attendance Overtime (M3): rawCheckOut is deliberately NOT carried from the
-  // client. It records a genuine employee clock-out, written only by
-  // attendanceController.checkOut - letting an HR edit set it would destroy the
-  // very distinction otEvidence exists to make. The ot* fields are likewise
-  // absent: they are derived by utils/overtimeRecompute.js from the clock times
-  // this mapper does carry, never accepted from a request body.
+  // rawCheckOut (a genuine clock-out, written only by checkOut) and the derived
+  // ot* fields are never accepted from a request body.
   return out;
 }
 
@@ -431,21 +377,8 @@ export function notificationFromClient(body = {}) {
 }
 
 /**
- * The fields every reviewable request DTO shares.
- *
- * Five controllers each expose a `toClientRequest` — leave, no-show, overtime,
- * profile-edit and promotion. They differ in their domain payload, but all
- * five carried these eight fields with byte-identical expressions: the id, who
- * the request is about, and the review outcome. That is the shared shape of
- * "a thing somebody has to approve", so it lives here once.
- *
- * Callers spread it and add their own fields:
- *
- *   return { ...reviewRequestBase(o), days: o.days, type: o.type };
- *
- * NOT included, deliberately: `employeeCode` (only 3 of the 5 expose it),
- * `requestedBy` (4 of 5), and every domain field. Adding a field here that
- * only some callers want would put it in payloads that never had it.
+ * The eight fields every reviewable-request DTO shares; callers spread it and
+ * add their domain fields. Nothing only some callers expose belongs here.
  */
 export function reviewRequestBase(o) {
   return {

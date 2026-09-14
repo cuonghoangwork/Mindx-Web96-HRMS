@@ -1,30 +1,17 @@
 /**
- * geminiClient.js — task 5 (Ask AI insight), Google AI Studio (Gemini).
- *
- * Same shape as utils/exchangeRate.js's fetchLiveFxRate: plain fetch, no
- * SDK, an injectable fetchImpl for tests, an AbortController timeout. The
- * one real difference is what callers do on failure — the FX job has a
- * sensible fallback rate to fall back to, an AI insight doesn't, so this
- * throws and lets performanceController decide the HTTP response instead
- * of masking the failure with a default value.
+ * Gemini client: plain fetch, injectable fetchImpl, AbortController timeout —
+ * same shape as exchangeRate.js. Unlike the FX client it throws on failure;
+ * an AI insight has no sensible fallback value.
  */
-
 export const DEFAULT_GEMINI_MODEL = "gemini-3.6-flash";
-// gemini-3.6-flash does extended "thinking" by default (no way to disable it -
-// thinkingConfig.thinkingBudget: 0 is rejected with 400 INVALID_ARGUMENT for
-// this model) and real calls have measured ~15s — well past the FX-rate
-// client's 8s. 30s gives real headroom instead of racing the model's own latency.
+// gemini-3.6-flash "thinks" by default (thinkingBudget: 0 is rejected) and measured ~15s per call.
 export const GEMINI_FETCH_TIMEOUT_MS = 30_000;
 
 function apiUrlFor(model, apiKey) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 }
 
-/**
- * Pulls the plain-text answer out of a Gemini generateContent response.
- * Kept separate from the network call so it's unit testable against
- * fixture JSON with no network involved.
- */
+/** The plain-text answer from a generateContent response. Separate from the fetch so it unit-tests on fixtures. */
 export function extractGeminiText(json) {
   const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (typeof text !== "string" || !text.trim()) {
@@ -33,12 +20,7 @@ export function extractGeminiText(json) {
   return text.trim();
 }
 
-/**
- * Same as extractGeminiText, but for a request made with `askGemini(..., {json: true})`
- * — Gemini still returns the JSON as the `text` part (guaranteed parseable by
- * responseMimeType: "application/json"), so this just adds a JSON.parse with
- * a clear error on malformed/truncated output instead of a raw SyntaxError.
- */
+/** extractGeminiText + JSON.parse, with a clear error on truncated output. */
 export function extractGeminiJson(json) {
   const text = extractGeminiText(json);
   try {
@@ -52,14 +34,8 @@ async function askGeminiOnce(prompt, { apiKey, model, fetchImpl, timeoutMs, json
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    // gemini-3.6-flash's "thinking" tokens come out of the same budget as
-    // the visible output and can't be disabled for this model (see the
-    // DEFAULT_GEMINI_MODEL comment above) — measured ~700-800 thinking
-    // tokens for a realistic prompt, so BOTH branches need real headroom
-    // above that or the response gets cut off mid-output (finishReason:
-    // "MAX_TOKENS") instead of ever reaching "STOP". JSON mode gets more
-    // room since a structured {summary, strengths, growthAreas} reply runs
-    // longer than a short plain-text chat answer.
+    // Thinking tokens (~700-800 measured) share this budget with the visible
+    // output; without headroom the reply is cut off with finishReason MAX_TOKENS.
     const generationConfig = { temperature: 0.4, maxOutputTokens: json ? 2000 : 1200 };
     if (json) generationConfig.responseMimeType = "application/json";
 
@@ -88,22 +64,10 @@ async function askGeminiOnce(prompt, { apiKey, model, fetchImpl, timeoutMs, json
 }
 
 /**
- * Sends `prompt` to Gemini and returns the response — plain text by default,
- * or a parsed JSON object when called with `{json: true}` (adds
- * responseMimeType: "application/json" to the request). Throws on any
- * failure (missing API key, network error, non-2xx, unparseable/malformed
- * body, timeout) — callers decide what to do about that.
- *
- * Retries once on a transient failure (timeout, network error, non-2xx).
- * Measured latency for this model is wildly bimodal — repeat real calls with
- * an identical prompt clocked anywhere from ~3s to 30s+ (enough to hit
- * GEMINI_FETCH_TIMEOUT_MS and abort) within the same minute, with no
- * apparent correlation to prompt size. A single retry turns most of those
- * timeouts into a successful response instead of a user-facing "AI insight
- * unavailable" that just makes them click the button again anyway. Not
- * retried: a missing API key (status 503) — that's a config problem, not a
- * transient one, and retrying it only doubles the wait for a guaranteed
- * second failure.
+ * Sends `prompt`; returns text, or a parsed object with `{json: true}`.
+ * Throws on any failure. Retries once on a transient one — latency is
+ * bimodal (3s to 30s+ for the same prompt), so one retry converts most
+ * timeouts into a reply. A missing API key (503) is not retried.
  */
 export async function askGemini(prompt, {
   apiKey = process.env.GEMINI_API_KEY,

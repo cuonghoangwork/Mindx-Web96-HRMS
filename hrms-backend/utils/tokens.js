@@ -1,11 +1,7 @@
 import jwt from "jsonwebtoken";
 import { randomUUID } from "node:crypto";
 
-/**
- * Signs an Access Token + Refresh Token pair from the same payload,
- * using two SEPARATE secrets (AT_SECRETKEY / RT_SECRETKEY) so a leaked
- * AT secret can't be used to forge refresh tokens.
- */
+/** Access + refresh pair, signed with SEPARATE secrets so a leaked AT secret cannot forge refresh tokens. */
 export function signTokens(payload) {
   const access_token = jwt.sign(
     { ...payload, tokenType: "AT" },
@@ -20,21 +16,13 @@ export function signTokens(payload) {
   return { access_token, refresh_token };
 }
 
-/* ─────────────────────────────────────────────────────────────
-   SSE stream tickets (Level 1 — live notifications)
-
-   EventSource cannot send an Authorization header, so the stream
-   endpoint cannot reuse the Bearer token every other route uses. The
-   alternative — putting the access token in the query string — writes a
-   20-minute credential into Render's access logs and every proxy in
-   between. A ticket is a separate, deliberately feeble credential:
-   60 seconds, single-use, and good for exactly one endpoint.
-
-   Signed with AT_SECRETKEY but stamped tokenType "SSE", so
-   middleware/auth.js's verifyToken rejects it everywhere else (it
-   requires "AT") and verifyStreamTicket rejects a real access token
-   here. The two can't be swapped in either direction.
-   ───────────────────────────────────────────────────────────── */
+/*
+ * SSE stream tickets. EventSource cannot send an Authorization header, and
+ * an access token in the query string would land in every proxy's access
+ * log — so the stream gets a deliberately feeble credential: 60 seconds,
+ * single-use, tokenType "SSE" so verifyToken rejects it everywhere else and
+ * verifyStreamTicket rejects a real access token here.
+ */
 
 export const STREAM_TICKET_TTL_SECONDS = 60;
 
@@ -46,12 +34,7 @@ export function signStreamTicket({ id, role }) {
   );
 }
 
-/**
- * Verifies signature, expiry and token type. Throws on anything wrong —
- * the caller turns that into a 401. Single-use enforcement is separate
- * (see consumeTicketId in utils/sseHub.js): this function is pure, so it
- * stays testable without touching the used-ticket store.
- */
+/** Signature, expiry and type. Throws → 401. Single-use is enforced separately (sseHub.consumeTicketId). */
 export function verifyStreamTicket(ticket) {
   const decoded = jwt.verify(ticket, process.env.AT_SECRETKEY);
   if (decoded.tokenType !== "SSE") {

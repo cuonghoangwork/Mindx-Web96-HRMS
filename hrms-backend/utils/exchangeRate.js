@@ -1,32 +1,16 @@
 /**
- * exchangeRate.js — task 3.8: monthly VND-per-USD snapshot.
- *
- * `getOrCreateMonthlyFxRate` is the entry point jobs/generateMonthlyPayrollDraft.js
- * and (optionally) payrollController.createPeriod call. It is idempotent per
- * {year, month} thanks to ExchangeRate's unique index: the first caller for a
- * given month fetches and persists a snapshot, every later caller that same
- * month just reads it back. That guarantees every payslip generated for a
- * period was priced off the exact same rate, even if the draft job and a
- * manual "create period" click race on the same day.
- *
- * Network fetch failures are swallowed here, not thrown: payroll must still
- * be able to run (with the existing hardcoded default) even if the FX
- * provider is down or unreachable from the host (e.g. a sandboxed CI runner
- * with restricted egress). Callers can check the returned `source` field to
- * see whether they got a live rate or the fallback.
+ * Monthly VND-per-USD snapshot (DECISIONS.md D9). Idempotent per {year, month}
+ * via ExchangeRate's unique index, so every payslip in a period is priced at
+ * the same rate even if the draft job and a manual "create period" race.
+ * Fetch failures fall back to the default rate — payroll must still run.
  */
-
 import ExchangeRateModel from "../model/ExchangeRate.js";
 import { DEFAULT_FX_RATE_VND_PER_USD } from "./payrollEngine.js";
 
 export const DEFAULT_FX_API_URL = "https://open.er-api.com/v6/latest/USD";
 export const FX_FETCH_TIMEOUT_MS = 8_000;
 
-/**
- * Pulls a VND-per-USD number out of a handful of common free-tier FX API
- * response shapes. Kept separate from the network call so it can be unit
- * tested against fixture JSON with no network/DB involved.
- */
+/** VND-per-USD from the common free-tier response shapes. Separate from the fetch so it unit-tests on fixtures. */
 export function parseFxRateResponse(json) {
   const candidate =
     json?.rates?.VND ?? // open.er-api.com, exchangerate.host, frankfurter-style
@@ -40,11 +24,7 @@ export function parseFxRateResponse(json) {
   return rate;
 }
 
-/**
- * Fetches the current USD->VND rate from the configured provider.
- * Throws on any failure (network error, non-2xx, unparseable body,
- * timeout) — callers decide what to do about that (see getOrCreateMonthlyFxRate).
- */
+/** Live USD->VND rate. Throws on any failure; getOrCreateMonthlyFxRate decides what that means. */
 export async function fetchLiveFxRate({
   apiUrl = process.env.FX_RATE_API_URL || DEFAULT_FX_API_URL,
   fetchImpl = globalThis.fetch,
@@ -68,12 +48,7 @@ export async function fetchLiveFxRate({
   }
 }
 
-/**
- * Returns the persisted snapshot for {year, month}, creating it on first
- * call for that month. Never throws for FX-provider reasons — a fetch
- * failure just downgrades the result to the default rate with
- * source: "fallback" so payroll generation can proceed unattended.
- */
+/** The month's snapshot, created on first call. A fetch failure yields the default rate with source: "fallback". */
 export async function getOrCreateMonthlyFxRate({ year, month, fetchImpl } = {}) {
   const existing = await ExchangeRateModel.findOne({ year, month });
   if (existing) return existing;
@@ -103,9 +78,7 @@ export async function getOrCreateMonthlyFxRate({ year, month, fetchImpl } = {}) 
       fetchedAt: new Date(),
     });
   } catch (err) {
-    // Duplicate-key race: another caller (e.g. the manual "create period"
-    // endpoint) won the create for this month between our findOne and here.
-    // Their snapshot wins; read it back rather than erroring out.
+    // Another caller won the create for this month; their snapshot wins.
     if (err?.code === 11000) {
       const winner = await ExchangeRateModel.findOne({ year, month });
       if (winner) return winner;

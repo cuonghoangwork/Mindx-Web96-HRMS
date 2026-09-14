@@ -1,15 +1,7 @@
 /**
- * mailer.js — outbound SMTP, wrapped so nothing else has to know about it.
- *
- * Same graceful-degrade contract as utils/cloudinary.js and the Gemini
- * client: with MAIL_HOST/MAIL_USER unset, every send logs once and no-ops.
- * A teammate cloning the repo gets a working app, not a crash on the first
- * leave approval.
- *
- * The transporter is built lazily and cached. Building it at import time
- * would make the module's behaviour depend on whether dotenv had run yet,
- * which is exactly the kind of ordering bug that only shows up in
- * production.
+ * Outbound SMTP. With MAIL_HOST/MAIL_USER unset every send logs once and
+ * no-ops. The transporter is built lazily so its behaviour cannot depend on
+ * whether dotenv had run at import time.
  */
 
 import nodemailer from "nodemailer";
@@ -28,21 +20,14 @@ function getTransporter() {
   transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port,
-    // 465 is implicit TLS; 587 starts plaintext and upgrades via STARTTLS.
-    // Getting this backwards produces a connection that hangs rather than a
-    // clear error, so derive it instead of asking for another env var.
+    // 465 is implicit TLS, 587 is STARTTLS; getting it backwards hangs rather than errors.
     secure: port === 465,
     auth: { user: process.env.MAIL_USER, pass: process.env.MAIL_PASS },
   });
   return transporter;
 }
 
-/**
- * Send one message. Never throws — a bounced email must not fail the request
- * that produced the notification.
- *
- * @returns {{ ok: boolean, disabled?: boolean, error?: string }}
- */
+/** Never throws. @returns {{ ok: boolean, disabled?: boolean, error?: string }} */
 export async function sendMail({ to, subject, html, text }) {
   if (!mailEnabled()) {
     if (!warnedDisabled) {
@@ -58,9 +43,7 @@ export async function sendMail({ to, subject, html, text }) {
       from: process.env.MAIL_FROM || process.env.MAIL_USER,
       to,
       subject,
-      // Always both. Some corporate clients strip HTML entirely, and a
-      // text/plain part is also what stops a message scoring as spam for
-      // being HTML-only.
+      // Always both: some clients strip HTML, and HTML-only scores as spam.
       text,
       html,
     });
@@ -71,7 +54,7 @@ export async function sendMail({ to, subject, html, text }) {
   }
 }
 
-/** Test seam — lets a suite reset the cached transporter and the once-only log. */
+/** Test seam. */
 export function resetMailer() {
   transporter = null;
   warnedDisabled = false;

@@ -1,22 +1,8 @@
-/**
- * cloudinary.js — config + upload helper.
- *
- * WEB96_BACKEND_REFERENCE.md §10 documents the course's lesson9 upload route, but flags
- * a real bug in it: `res.json(...)` fires *before* the `cloudinary.uploader.upload(...)`
- * callback resolves, so `secure_url` is logged but never actually returned to the client.
- *
- * This wraps the same callback-based `cloudinary.uploader.upload_stream` API in a Promise
- * so callers can `await` it and only respond once the URL is actually available.
- */
+/** Cloudinary config + a Promise wrapper over upload_stream, so callers respond only once the URL exists. */
 
 import { v2 as cloudinary } from "cloudinary";
 
-/**
- * Configure lazily — called once per upload — because cloudinary.config() runs
- * at module-import time in ESM, which is BEFORE dotenv.config() in index.js has
- * had a chance to populate process.env. Calling it here (inside the function)
- * guarantees the env vars are already set by the time we need them.
- */
+/** Configured lazily: at import time dotenv has not populated process.env yet. */
 function configureCloudinary() {
   cloudinary.config({
     cloud_name: process.env.CLOUD_NAME,
@@ -29,14 +15,7 @@ export function isCloudinaryConfigured() {
   return Boolean(process.env.CLOUD_NAME && process.env.API_KEY && process.env.API_SECRET);
 }
 
-/**
- * Uploads a buffer (e.g. from multer's memoryStorage) to Cloudinary and resolves with
- * the result once it's actually done - no race with the HTTP response.
- *
- * @param {Buffer} buffer
- * @param {object} options - passed through to cloudinary.uploader.upload_stream
- * @returns {Promise<{secure_url: string, public_id: string}>}
- */
+/** @param {object} options passed through to upload_stream. @returns {Promise<{secure_url: string, public_id: string}>} */
 export function uploadBufferToCloudinary(buffer, options = {}) {
   configureCloudinary();
   return new Promise((resolve, reject) => {

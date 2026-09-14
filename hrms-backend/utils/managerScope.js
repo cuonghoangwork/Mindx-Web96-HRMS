@@ -1,26 +1,13 @@
 /**
- * managerScope.js — resolves the single department a MANAGER (or EMPLOYEE,
- * for their own read-only "My Department" page) account is scoped to, from
- * their linked Employee record (same User.employee lookup used throughout
- * the review-queue pattern, see utils/reviewQueue.js).
- *
- * MANAGER is department-scoped; ADMIN is unscoped. Every controller that
- * lets MANAGER read/write employee-linked data (employees, attendance,
- * leave/profile-edit/promotion/no-show reviews) calls this to get the
- * department to filter/validate against instead of hand-rolling the
- * User -> Employee -> department lookup per call site. EMPLOYEE only needs
- * this for departmentController.getDetail's own-department view check.
+ * The single department a MANAGER (or EMPLOYEE, for their own "My Department"
+ * view) is scoped to, from their linked Employee record (DECISIONS.md D12).
+ * Every controller that scopes by department calls this rather than
+ * hand-rolling the User -> Employee -> department lookup.
  */
 import UserModel from "../model/User.js";
 import EmployeeModel from "../model/Employee.js";
 
-/**
- * Resolves the Employee record linked to a User document: prefers the
- * explicit User.employee link, falls back to an email match. The one place
- * this lookup's rule lives — getManagerDepartmentId (below),
- * reviewQueue.js's resolveRequestingEmployee, and startupMigrations.js's
- * stale-MANAGER fixup all call this instead of hand-rolling it.
- */
+/** The User.employee link, falling back to an email match. The one place this rule lives. */
 export async function resolveEmployeeForUser(user, projection) {
   if (!user) return null;
   return user.employee
@@ -29,12 +16,9 @@ export async function resolveEmployeeForUser(user, projection) {
 }
 
 /**
- * Returns the ObjectId of the department a MANAGER/EMPLOYEE is scoped to,
- * or null for any other role (caller should only call this when
- * role === "MANAGER" or "EMPLOYEE"). Throws (403) if the account has no
- * linked Employee record or that record has no department — silently
- * falling through to "sees everything" or "sees nothing" would both be
- * surprising here.
+ * Department ObjectId for a MANAGER/EMPLOYEE, null for other roles. Throws
+ * 403 when there is no linked Employee or department — falling through to
+ * "sees everything" or "sees nothing" would both be surprising.
  */
 export async function getManagerDepartmentId(req) {
   if (req.user.role !== "MANAGER" && req.user.role !== "EMPLOYEE") return null;

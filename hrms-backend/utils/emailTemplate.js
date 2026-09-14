@@ -1,19 +1,9 @@
 /**
- * emailTemplate.js — the one HTML shell every notification email uses.
- *
- * Email clients are not browsers. The rules this file follows, and why:
- *
- *   - Inline styles only. Gmail strips <style> blocks in some contexts and
- *     Outlook's rendering engine is Word's.
- *   - Tables for layout. Flexbox and grid do not exist in Outlook.
- *   - A real font stack, no webfont. HRMS_REALTIME_NOTIFICATIONS_PLAN.md
- *     §4a.2 says to brand this with Lexend and #7152F3; both are stale —
- *     the app's font is Archivo (see hrms-react/index.html) and the brand is
- *     #1359e1, "signal blue" (--clr-primary-400 in index.css). Archivo is
- *     named first and then falls back, because a webfont @import is
- *     unreliable-to-blocked in mail clients and must never be the only
- *     thing standing between the reader and legible text.
- *   - Everything escaped. Notification copy interpolates employee names.
+ * The one HTML shell every notification email uses. Email clients are not
+ * browsers: inline styles only (Gmail strips <style>; Outlook renders with
+ * Word), tables for layout (no flexbox in Outlook), a real font stack with
+ * no webfont (Archivo first, then fallbacks — an @import may never load),
+ * and everything escaped, since copy interpolates employee names.
  */
 
 const BRAND = "#1359e1";

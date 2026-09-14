@@ -1,22 +1,14 @@
 /**
- * webPush.js — VAPID-signed Web Push, wrapped so nothing else imports the
- * library or thinks about key configuration.
+ * VAPID-signed Web Push. With the keys unset every send logs once and no-ops.
  *
- * Same graceful-degrade contract as the mailer and the Telegram client: with
- * the VAPID keys unset, every send logs once and no-ops.
- *
- * SECURITY: VAPID_PRIVATE_KEY must never be given a VITE_ prefix or reach the
- * frontend in any other way — it is the signing key that proves a push came
- * from this server. Only the PUBLIC key goes to the browser, which needs it
- * to mint a subscription. The two are easy to mix up because they are both
- * opaque base64 strings.
+ * SECURITY: VAPID_PRIVATE_KEY must never get a VITE_ prefix or otherwise
+ * reach the frontend — it is the signing key. Only the PUBLIC key goes to
+ * the browser. Both are opaque base64 strings and easy to mix up.
  */
 
 import webpush from "web-push";
 
-// Push payloads are encrypted per-recipient and most push services reject
-// anything over ~4KB. Send identifiers and short display copy, never the
-// whole notification document.
+// Most push services reject payloads over ~4KB.
 export const MAX_PAYLOAD_BYTES = 3500;
 
 let configured = false;
@@ -33,8 +25,7 @@ export function vapidPublicKey() {
 function configure() {
   if (configured) return;
   webpush.setVapidDetails(
-    // A mailto: the push service can contact if this app misbehaves. Required
-    // by the VAPID spec; Firefox rejects subscriptions without it.
+    // Required by the VAPID spec; Firefox rejects subscriptions without it.
     process.env.VAPID_SUBJECT || "mailto:admin@example.com",
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY,
@@ -43,11 +34,8 @@ function configure() {
 }
 
 /**
- * Deliver one push. Never throws.
- *
+ * Never throws. `gone` means the browser permanently unsubscribed — delete the row, do not retry.
  * @returns {{ ok: boolean, disabled?: boolean, gone?: boolean, status?: number, error?: string }}
- *   `gone` means the browser has permanently unsubscribed — the caller must
- *   delete the row rather than retry.
  */
 export async function sendPush(subscription, payload) {
   if (!pushEnabled()) {
@@ -77,15 +65,14 @@ export async function sendPush(subscription, payload) {
     return {
       ok: false,
       status,
-      // 410 Gone is the standard "user unsubscribed"; 404 is what some
-      // services send for an endpoint they no longer know. Both are permanent.
+      // 410 is the standard "unsubscribed"; some services send 404. Both are permanent.
       gone: status === 410 || status === 404,
       error: err.message,
     };
   }
 }
 
-/** Test seam — resets the cached VAPID configuration and the once-only log. */
+/** Test seam. */
 export function resetWebPush() {
   configured = false;
   warnedDisabled = false;

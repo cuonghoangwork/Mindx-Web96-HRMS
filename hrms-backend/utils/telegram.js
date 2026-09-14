@@ -1,13 +1,6 @@
 /**
- * telegram.js — the Bot API client.
- *
- * No SDK. The whole surface this app needs is three POSTs to
- * api.telegram.org, and node-telegram-bot-api would mostly be buying a
- * polling loop we only want in local development.
- *
- * Graceful degrade is the same contract Cloudinary and Gemini already have
- * here: with TELEGRAM_BOT_TOKEN unset every call logs once and no-ops, so a
- * teammate cloning the repo is never blocked by a missing bot.
+ * Bot API client — three POSTs, no SDK. With TELEGRAM_BOT_TOKEN unset every
+ * call logs once and no-ops, like Cloudinary and Gemini.
  */
 
 const API_ROOT = "https://api.telegram.org";
@@ -22,12 +15,7 @@ export function telegramBotUsername() {
   return process.env.TELEGRAM_BOT_USERNAME || null;
 }
 
-/**
- * Telegram renders a subset of HTML, so anything interpolated from the
- * database has to be escaped. An employee named "Nguyen <Minh>" would
- * otherwise produce an unparseable message and a 400 from the API — and
- * `&` alone is enough to do it.
- */
+/** Telegram parses a subset of HTML; an unescaped `&` in a name is enough for a 400. */
 export function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -52,7 +40,6 @@ async function callTelegram(method, payload) {
       body: JSON.stringify(payload),
     });
   } catch (err) {
-    // Network unreachable, DNS, restricted egress. Not fatal to anything.
     return { ok: false, error: err.message };
   }
 
@@ -63,9 +50,7 @@ async function callTelegram(method, payload) {
     ok: false,
     status: response.status,
     description: body.description ?? `HTTP ${response.status}`,
-    // 403 is how Telegram reports "the user blocked this bot" or "the user
-    // deleted the chat". It is permanent until they start the bot again, so
-    // the caller should stop trying rather than retry forever.
+    // 403 = the user blocked the bot or deleted the chat; stop trying.
     blocked: response.status === 403,
   };
 }
@@ -74,14 +59,7 @@ function appBaseUrl() {
   return process.env.APP_BASE_URL || process.env.CORS_ORIGIN || "";
 }
 
-/**
- * Send one notification message.
- *
- * `link` is an in-app path ("/holidays"); it becomes an absolute URL button
- * only when APP_BASE_URL/CORS_ORIGIN says where the app lives. Telegram
- * rejects a relative url outright, so a missing base means no button rather
- * than a failed send.
- */
+/** `link` is an in-app path; it becomes a button only when APP_BASE_URL/CORS_ORIGIN is set (Telegram rejects relative URLs). */
 export async function sendTelegramMessage({ chatId, title, body, link, linkLabel }) {
   if (!chatId) return { ok: false, error: "no chat id" };
 
@@ -94,8 +72,6 @@ export async function sendTelegramMessage({ chatId, title, body, link, linkLabel
     chat_id: chatId,
     text,
     parse_mode: "HTML",
-    // The app's own links are the point of the message; the preview card
-    // Telegram would generate for them is noise.
     disable_web_page_preview: true,
     ...(url
       ? { reply_markup: { inline_keyboard: [[{ text: linkLabel || "Open in HRMS", url }]] } }
@@ -108,10 +84,7 @@ export async function sendTelegramReply(chatId, text) {
   return callTelegram("sendMessage", { chat_id: chatId, text, parse_mode: "HTML" });
 }
 
-/**
- * Point Telegram at our webhook. The secret is part of the PATH, so a
- * request that does not know it never reaches the handler.
- */
+/** The webhook secret is part of the path, so an unknowing request never reaches the handler. */
 export async function setTelegramWebhook(publicUrl) {
   return callTelegram("setWebhook", {
     url: publicUrl,

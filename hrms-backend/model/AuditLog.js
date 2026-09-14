@@ -1,17 +1,9 @@
 import mongoose from "mongoose";
 
 /**
- * AuditLog — records every mutating action performed through the API.
- *
- * Each document captures:
- *   actor     — who did it (User ObjectId + name snapshot)
- *   action    — verb: "created" | "updated" | "deleted" | "uploaded_avatar" |
- *               "checked_in" | "checked_out" | "status_changed" | "budget_updated"
- *   resource  — which collection was touched
- *   resourceId — the _id of the affected document (string so it survives deletions)
- *   label     — human-readable summary, e.g. "John Doe (EMP001)"
- *   changes   — optional before/after snapshot for updates
- *   timestamp — from Mongoose timestamps (createdAt)
+ * One row per mutating action: actor (id + name snapshot), action, resource,
+ * resourceId (a string, so it survives deletion), label, optional
+ * before/after `changes`. Adding an action needs an entry in the enum below.
  */
 const auditLogSchema = new mongoose.Schema(
   {
@@ -36,10 +28,7 @@ const auditLogSchema = new mongoose.Schema(
         "login",
         "logout",
         "registered",
-        // Written only by utils/startupMigrations.js's MANAGER -> HR fixup.
-        // Absent from this enum until 2026-09-07, so every one of those rows
-        // failed validation and was swallowed by auditLog.js's catch — the
-        // demotions happened, but nothing recorded that they had.
+        // Written only by the startup MANAGER -> HR migration.
         "role_migrated",
       ],
     },

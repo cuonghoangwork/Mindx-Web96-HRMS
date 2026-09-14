@@ -1,9 +1,4 @@
-/**
- * upload.js — Multer config for avatar/image uploads.
- *
- * memoryStorage() per WEB96_BACKEND_REFERENCE.md §10 - required because the buffer is
- * piped straight to Cloudinary (utils/cloudinary.js), never written to local disk.
- */
+/** Multer config. memoryStorage() because every buffer is piped straight to Cloudinary, never to disk. */
 
 import multer from "multer";
 
@@ -25,11 +20,7 @@ export const uploadImage = multer({
   limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },
 });
 
-// Task 1.4 — contract PDF upload. Same memoryStorage rationale as above;
-// piped straight to Cloudinary as a "raw" resource (see
-// utils/cloudinary.js / employeeController.uploadContract), never written
-// to local disk. A higher size cap than avatars since scanned/signed
-// contract PDFs run larger than a profile photo.
+// Contract PDFs — a higher cap than avatars; scanned contracts run large.
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 const ALLOWED_PDF_MIME_TYPES = new Set(["application/pdf"]);
 
@@ -46,9 +37,7 @@ export const uploadPdf = multer({
   limits: { fileSize: MAX_PDF_SIZE_BYTES, files: 1 },
 });
 
-// Solo Gaps Milestone 1 — multi-document upload. Same storage/filter as
-// uploadPdf above, just a higher files cap (a batch of offer letters/ID
-// scans/etc, not a single contract).
+// Same as uploadPdf with a higher files cap.
 export const uploadDocuments = multer({
   storage,
   fileFilter: pdfFileFilter,
@@ -56,14 +45,9 @@ export const uploadDocuments = multer({
 });
 
 /**
- * handleUploadErrors — wraps a multer middleware (e.g. `uploadImage.single("avatar")`)
- * so its errors (wrong mimetype from fileFilter, file too large, too many files, ...)
- * resolve to a clean 400 with `err.message` instead of falling through to the app's
- * generic error handler as an uncaught 500. Multer calls `next(err)` on failure rather
- * than throwing inside the request handler, so a route-level try/catch never sees it —
- * this has to sit between the multer middleware and the route to catch it.
- *
- * Usage: router.post("/:id/avatar", verifyToken, handleUploadErrors(uploadImage.single("avatar")), controller.uploadAvatar)
+ * Wraps a multer middleware so its errors become a clean 400. Multer calls
+ * next(err) rather than throwing, so a route-level try/catch never sees them.
+ *   router.post("/:id/avatar", verifyToken, handleUploadErrors(uploadImage.single("avatar")), controller.uploadAvatar)
  */
 export function handleUploadErrors(multerMiddleware) {
   return (req, res, next) => {

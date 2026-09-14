@@ -3,16 +3,7 @@ import { POSITION_LEVELS } from "./PositionLevel.js";
 
 export const EMPLOYEE_STATUSES = ["active", "on-leave", "terminated"];
 
-/**
- * The subset of EMPLOYEE_STATUSES that still earns money.
- *
- * Lives next to the enum on purpose: adding a fourth status forces a decision
- * about whether it gets paid, instead of letting it default to "not paid"
- * somewhere far away. Payroll skips everyone outside this list
- * (utils/payrollGeneration.js), and overtime refuses to schedule or approve
- * for them (controller/overtimeRequestController.js) — one constant so those
- * two can't drift into "hours recorded, never paid".
- */
+/** Statuses payroll pays and overtime may be scheduled for — one constant so the two cannot drift. */
 export const PAYABLE_EMPLOYEE_STATUSES = ["active", "on-leave"];
 
 const employeeSchema = new mongoose.Schema(
@@ -32,12 +23,8 @@ const employeeSchema = new mongoose.Schema(
       enum: ["full-time", "part-time", "contract", "intern"],
       default: "full-time",
     },
-    // Position Ladder (tasks 2.1/2.2) — deliberately separate from
-    // contractType (see DECISION_2.6_Manager_Level.md): contractType is
-    // employment terms (e.g. a part-time Senior is representable), while
-    // positionLevel is seniority/pay-grade on the ladder. levelStartDate
-    // tracks tenure-in-level so eligibility (task 2.4) is computed, not
-    // guessed from createdAt.
+    // Pay grade, independent of contractType (a part-time Senior is valid);
+    // levelStartDate drives promotion eligibility (DECISIONS.md D1).
     positionLevel: {
       type: String,
       enum: POSITION_LEVELS,
@@ -47,22 +34,12 @@ const employeeSchema = new mongoose.Schema(
     status: { type: String, enum: EMPLOYEE_STATUSES, default: "active" },
     annualSalary: { type: Number, default: 0 },
     avatar: { type: String },
-    // Task 1.4 — contract PDF. HR/Admin-uploaded only (see
-    // controller/employeeController.js uploadContract) — deliberately not
-    // exposed through the generic update endpoint (employeeFromClient
-    // doesn't carry it), so an employee or a plain PUT can't overwrite it
-    // with an arbitrary URL. A single current contract per employee, not a
-    // versioned collection — re-uploading overwrites the Cloudinary asset
-    // in place (see HRMS_IMPROVEMENT_TASKS.md 1.4's "or a versioned
-    // Contract collection" note — out of scope for this effort size).
+    // Contract PDF: set only by uploadContract (not the generic update), one
+    // current contract per employee — re-uploading overwrites the asset.
     contractUrl: { type: String, default: null },
     contractUploadedAt: { type: Date, default: null },
-    // Solo Gaps Milestone 1 — arbitrary multi-document uploads (offer
-    // letters, ID scans, other), additive alongside contractUrl above
-    // rather than a migration of it. publicId is stored (not just url) so
-    // removeDocument() can delete the matching Cloudinary asset — unlike
-    // the single-contract flow, which never deletes (it just overwrites
-    // one fixed public_id) and so never needed to keep one.
+    // Other uploads (offer letters, ID scans). publicId is kept so
+    // removeDocument() can delete the Cloudinary asset.
     documents: [
       {
         url: { type: String, required: true },
@@ -73,7 +50,6 @@ const employeeSchema = new mongoose.Schema(
         uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
       },
     ],
-    // Back-link to the User account that belongs to this employee (optional 1:1)
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true },
@@ -82,11 +58,7 @@ const employeeSchema = new mongoose.Schema(
 employeeSchema.index({ department: 1, status: 1 });
 employeeSchema.index({ positionLevel: 1, levelStartDate: 1 });
 
-// Default levelStartDate to startDate (or now, if startDate wasn't given)
-// on creation, so a brand-new employee's tenure clock starts from the
-// moment that's actually true rather than whenever this field happened to
-// be added to the schema. Existing employees are backfilled separately —
-// see utils/backfillPositionLadder.js.
+// A new employee's tenure clock starts at their startDate, not at insert time.
 employeeSchema.pre("validate", function setDefaultLevelStartDate(next) {
   if (this.isNew && !this.levelStartDate) {
     this.levelStartDate = this.startDate || new Date();

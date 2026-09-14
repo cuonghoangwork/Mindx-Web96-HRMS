@@ -1,14 +1,6 @@
 /**
- * payrollGeneration.js — the payslip-row generation logic shared between the
- * manual "create period" HTTP endpoint (payrollController.createPeriod /
- * .regenerate) and the scheduled monthly draft job
- * (jobs/generateMonthlyPayrollDraft.js, task 3.9).
- *
- * This used to live inline in payrollController.js. It was extracted so the
- * two callers can never drift apart — a period created by hand and a period
- * auto-drafted at the start of the month go through the exact same code
- * path, just with a different fxRate source (manual input / default vs. the
- * task-3.8 monthly snapshot).
+ * Payslip-row generation shared by the manual create/regenerate endpoints
+ * and the monthly draft job, so the two can never drift (DECISIONS.md D9).
  */
 
 import PayslipModel from "../model/Payslip.js";
@@ -72,14 +64,7 @@ export async function loadMonthDayCounts(year, month) {
   };
 }
 
-/**
- * One query for the whole company's paid overtime in the period, keyed by
- * employee — same batching reasoning as loadMonthDayCounts above.
- *
- * Filters on otMinutes > 0 rather than loading every attendance row: most days
- * have no overtime, and only paid minutes matter here (otUnapprovedMinutes is
- * never paid, by design).
- */
+/** The company's paid overtime for the period in one query, keyed by employee. Only otMinutes is paid (D5). */
 export async function loadMonthOvertime(year, month) {
   const { lo, hi } = monthQueryWindowUtc(year, month);
   const rows = await AttendanceModel.find(
@@ -92,9 +77,7 @@ export async function loadMonthOvertime(year, month) {
 
   return (employeeId) =>
     (byEmployee.get(String(employeeId)) ?? []).filter((r) =>
-      // monthQueryWindowUtc deliberately over-fetches by two days either side
-      // (see its definition) so a record stored at a non-UTC-midnight instant
-      // is not missed; narrow back to the actual calendar month here.
+      // monthQueryWindowUtc over-fetches two days either side; narrow to the calendar month.
       attendanceDateKey(r.date).startsWith(prefix),
     );
 }

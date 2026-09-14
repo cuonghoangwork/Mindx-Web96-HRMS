@@ -1,25 +1,13 @@
-/**
- * leaveBalance.js — paid-leave balance math for LeaveRequest (task 4.1) and,
- * as of Sprint 2, the late half-day deduction (task 4.2).
- *
- * Kept separate from the model/controller so the counting rules (which
- * statuses count against the balance, which days of the week count as
- * "working days") are in one place.
- */
+/** Leave balance math (DECISIONS.md D3) — the counting rules in one place. */
 
 import LeaveRequestModel from "../model/LeaveRequest.js";
 import AttendanceModel from "../model/Attendance.js";
 import { LEAVE_TYPES, LEAVE_TYPE_LABELS, LEAVE_TYPE_ALLOWANCES } from "../model/LeaveRequest.js";
 
 /**
- * Sums leave days of a given type an employee has already used (or has a
- * pending request in flight for) within a given calendar year.
- *
- * Pending requests count too, not just approved ones — otherwise two
- * concurrent requests could each look like they fit under the type's cap
- * and both get approved, together blowing past it. The tradeoff is a
- * pending-but-later-rejected request temporarily depresses the visible
- * balance; acceptable since rejections are meant to be reviewed promptly.
+ * Days of `type` used (or pending) in the calendar year. Pending counts, so
+ * two concurrent requests cannot both fit under the cap; a later rejection
+ * temporarily depressed the visible balance, which is acceptable.
  */
 export async function getUsedDaysFromRequests(employeeId, year, type) {
   const start = new Date(Date.UTC(year, 0, 1));
@@ -33,15 +21,7 @@ export async function getUsedDaysFromRequests(employeeId, year, type) {
   return requests.reduce((sum, r) => sum + r.days, 0);
 }
 
-/**
- * Task 4.2: each "late" day the end-of-day closer marked as consuming an
- * *Annual/PTO* half-day counts as 0.5 day against the same annual balance
- * as explicit LeaveRequests of type "annual". Counts already-closed days
- * only — the closer sets `lateHalfDayType` once per day, so this is a
- * straight count of matching Attendance records for the year, not a live
- * decision. Only the "annual" type has this extra source; other types are
- * never touched by the late-half-day rule.
- */
+/** Late days the close job charged to annual leave, at 0.5 each (D4). Only "annual" has this extra source. */
 export async function getLateHalfDayAnnualDays(employeeId, year) {
   const start = new Date(Date.UTC(year, 0, 1));
   const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
@@ -62,13 +42,7 @@ export async function getUsedDays(employeeId, year, type) {
   return fromRequests + fromLateHalfDays;
 }
 
-/**
- * Remaining days of a given type for an employee in a given year, floored
- * at 0. "unpaid" has no allowance entry in LEAVE_TYPE_ALLOWANCES — it's
- * uncapped, so this returns null for it without querying usage, matching
- * the "uncapped" sentinel used everywhere else (getAllBalances, the
- * balance HTTP handler, the frontend).
- */
+/** Remaining days, floored at 0; null for an uncapped type ("unpaid"). */
 export async function getRemainingDays(employeeId, year, type) {
   const allowance = LEAVE_TYPE_ALLOWANCES[type];
   if (allowance === undefined) return null;
@@ -76,17 +50,7 @@ export async function getRemainingDays(employeeId, year, type) {
   return Math.max(0, allowance - used);
 }
 
-/**
- * Full per-type leave balance breakdown for an employee/year, in the shape
- * the Leave tab / balance API return — one row per LEAVE_TYPES entry.
- * "unpaid" reports remaining as null (uncapped, "remaining" is meaningless).
- *
- * Unlike getUsedDays (one type at a time), this fetches every request for
- * the year in a single query and groups by type in memory — LEAVE_TYPES.map
- * calling getUsedDays per type would fire one LeaveRequestModel.find() per
- * type (5 queries) plus the attendance count (6 total) for what's really
- * one balance snapshot.
- */
+/** One row per LEAVE_TYPES entry for the Leave tab / balance API — two queries, grouped in memory. */
 export async function getAllBalances(employeeId, year) {
   const start = new Date(Date.UTC(year, 0, 1));
   const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
@@ -122,11 +86,7 @@ export async function getAllBalances(employeeId, year) {
   });
 }
 
-/**
- * Counts working days (Mon–Fri) inclusive between two Date objects.
- * Does not account for company holidays yet — HolidayModel integration
- * is a reasonable Sprint 3+ follow-up once this basic version is in use.
- */
+/** Inclusive Mon–Fri count. Does not subtract holidays. */
 export function countWorkingDays(startDate, endDate) {
   let count = 0;
   const cur = new Date(startDate);

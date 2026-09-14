@@ -1,27 +1,15 @@
 /**
- * telegramBoot.js — brings the bot's INBOUND side up at startup.
- *
- * Outbound sending needs nothing here; it is just a fetch (utils/telegram.js).
- * Receiving is what differs by environment:
- *
- *   webhook  — production. Telegram POSTs to a public HTTPS URL. Nothing runs
- *              in-process, so a sleeping Render instance is fine: the incoming
- *              request wakes it and Telegram retries if that first one times
- *              out.
- *   polling  — local development, where localhost has no public URL. A long
- *              poll holds a request open for ~25s and returns as soon as an
- *              update arrives.
- *
- * Both feed the same handleTelegramUpdate(), so the linking handshake cannot
- * behave differently between a developer's machine and production.
+ * Brings the bot's inbound side up: a webhook in production (Telegram POSTs
+ * to a public URL and retries, so a sleeping instance is fine) or long
+ * polling in local development (no public URL). Both feed the same
+ * handleTelegramUpdate().
  */
 
 import { getTelegramUpdates, setTelegramWebhook, telegramEnabled } from "./telegram.js";
 import { handleTelegramUpdate } from "../controller/telegramController.js";
 
 const POLL_TIMEOUT_SECONDS = 25;
-// Backoff after a failed poll, so a network outage does not become a tight
-// loop against Telegram's API.
+// Backoff after a failed poll.
 const POLL_ERROR_BACKOFF_MS = 5_000;
 
 let polling = false;
@@ -39,9 +27,7 @@ async function pollForever() {
     }
 
     for (const update of result.result ?? []) {
-      // Acknowledge by advancing past this update regardless of the outcome.
-      // Leaving the offset put would re-deliver a message we already failed
-      // on, forever.
+      // Advance past the update regardless, or a failing one is re-delivered forever.
       offset = update.update_id + 1;
       try {
         await handleTelegramUpdate(update);
@@ -61,9 +47,7 @@ export function startTelegram() {
   if (mode === "webhook") {
     const url = process.env.TELEGRAM_WEBHOOK_URL;
     if (!url) {
-      // Deliberately not derived from CORS_ORIGIN or a guessed host: pointing
-      // Telegram at the wrong URL fails silently — messages simply never
-      // arrive — so this asks rather than guesses.
+      // Not guessed from CORS_ORIGIN: a wrong webhook URL fails silently.
       console.warn(
         "[telegram] TELEGRAM_MODE=webhook but TELEGRAM_WEBHOOK_URL is unset — no webhook registered. " +
           "Set it to https://<your-api-host>/api/v1/notifications/telegram/webhook/<TELEGRAM_WEBHOOK_SECRET>",

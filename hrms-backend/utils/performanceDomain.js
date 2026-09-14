@@ -9,18 +9,9 @@ import { assertObjectId } from "./performanceMappers.js";
 import { AppError } from "./appError.js";
 
 /**
- * Performance domain helpers — loading, scoping and notifying. No Express.
- *
- * Lifted out of performanceController.js (B3: "leave the controller doing HTTP
- * only"), which held these ahead of its 18 handlers.
- *
- * THIS ALSO BREAKS A CYCLE. findUserForEmployee used to be exported from the
- * controller purely so jobs/performanceReminders.js could import it — while
- * the controller imported sendPerformanceReminders back from that same job.
- * The controller carried a comment explaining why the cycle was safe. It no
- * longer needs one: the job now imports this module instead, so the dependency
- * runs controller -> job -> utils and never back. A job depending on a
- * controller was the wrong direction to begin with.
+ * Performance domain helpers — loading, scoping, notifying. No Express. Lives
+ * outside the controller so jobs/performanceReminders.js can import it
+ * without a controller -> job -> controller cycle.
  */
 
 export const REVIEW_LINK = "/performance";
@@ -73,9 +64,7 @@ export async function loadScopedReviewData(cycleKey, employeeCondition) {
   return { employees, reviews };
 }
 
-/** computeAnalytics + appeal rate for one cycle — the pair every comparison
- * side (current and previous) needs. No department breakdown; comparison is
- * about cycle-over-cycle deltas, not a per-department view. */
+/** computeAnalytics + appeal rate for one cycle — what each side of a comparison needs. */
 export async function computeCycleStats(cycleKey, employeeCondition) {
   const { employees, reviews } = await loadScopedReviewData(cycleKey, employeeCondition);
   return {

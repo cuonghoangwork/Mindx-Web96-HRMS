@@ -1,19 +1,10 @@
 export const WORKDAY_END = process.env.WORKDAY_END || "18:00";
 export const WORKDAY_LATE_AFTER = process.env.WORKDAY_LATE_AFTER || "09:15";
 
-/**
- * The zone the company operates in — the single definition. The cron
- * scheduler (jobs/index.js), the overtime cutoff (utils/overtimeCutoff.js)
- * and the payroll period boundary (utils/payrollPeriod.js) all read it from
- * here, because a calendar day has to mean the same thing to all three.
- */
+/** The company's zone — the single definition every calendar-day rule reads (DECISIONS.md D10). */
 export const APP_TIMEZONE = process.env.SCHEDULER_TZ || "Asia/Ho_Chi_Minh";
 
-/**
- * The zone's UTC offset, in ms, at a specific instant. Sampled per instant
- * rather than assumed constant: Asia/Ho_Chi_Minh is a flat +07:00, but
- * SCHEDULER_TZ is configurable and plenty of zones move twice a year.
- */
+/** The zone's UTC offset at an instant — sampled, not assumed constant, since SCHEDULER_TZ is configurable. */
 function tzOffsetMs(instant, timeZone) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
@@ -42,17 +33,10 @@ function tzOffsetMs(instant, timeZone) {
 }
 
 /**
- * Turns a wall-clock reading in `timeZone` into the real instant it names.
- *
- * `naiveUtcMs` carries the wall-clock fields as though they were UTC — i.e.
- * exactly what Date.UTC(...) returns — and this subtracts the zone's offset
- * to land on the true moment. Never reads the host clock, so the answer is
- * the same on a developer's laptop and on a UTC container.
- *
- * Applied twice on purpose: the offset has to be sampled near the ANSWER,
- * not near the naive input, and for a zone observing DST those two can sit
- * on opposite sides of a transition. The second pass costs nothing and makes
- * the result correct for every zone rather than only fixed-offset ones.
+ * Wall-clock fields in `timeZone` (as Date.UTC would encode them) → the real
+ * instant. Never reads the host clock. The offset is applied twice on
+ * purpose: it must be sampled near the answer, which for a DST zone can sit
+ * on the other side of a transition from the naive input.
  */
 export function zonedWallClockToUtc(naiveUtcMs, timeZone = APP_TIMEZONE) {
   const first = naiveUtcMs - tzOffsetMs(new Date(naiveUtcMs), timeZone);

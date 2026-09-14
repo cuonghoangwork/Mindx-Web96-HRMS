@@ -1,12 +1,8 @@
 /**
- * validate.js — Server-side validation middleware
- *
- * Mirrors the frontend's client-side rules so the API enforces
- * the same constraints regardless of which client calls it.
- *
- * Usage:
+ * Request-body validation middleware, mirroring the frontend's rules so the
+ * API enforces them for any client:
  *   router.post("/", verifyToken, validate.employee.create, employeeController.create)
- *   router.put("/:id", verifyToken, validate.employee.update, employeeController.update)
+ * Framework/DB-free by convention — enum lists are literals, not model imports.
  */
 
 /* ─── Shared helpers ─── */
@@ -15,17 +11,13 @@ const EMPLOYEE_ID_RE = /^[A-Z]{2,4}\d{2,6}$/i; // matches AddEmployee.jsx RULES.
 
 const VALID_STATUSES = ["Active", "On Leave", "Terminated"];
 const VALID_TYPES    = ["Full-time", "Part-time", "Contract", "Intern"];
-// Position Ladder (task 2.1) — deliberately a separate list from VALID_TYPES
-// even though "Full-time" appears in both; contractType and positionLevel
-// are different concepts (see DECISION_2.6_Manager_Level.md).
+// Separate from VALID_TYPES although "Full-time" appears in both — contractType and positionLevel are different concepts (DECISIONS.md D1).
 const VALID_POSITION_LEVELS_EMPLOYEE = ["Intern", "Full-time", "Senior", "Manager"];
 const VALID_GENDERS  = ["Male", "Female", "Other"];
 const VALID_JOB_STATUSES     = ["Open", "Filled", "Closed"];
 const VALID_CANDIDATE_STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 const VALID_HOLIDAY_TYPES    = ["Public", "Company", "Optional"];
-// Mirrors model/LeaveRequest.js's LEAVE_TYPES — kept as a literal list here
-// (like every other VALID_* above) rather than importing the model, since
-// this file stays framework/DB-free by convention.
+// Mirrors model/LeaveRequest.js's LEAVE_TYPES.
 const VALID_LEAVE_TYPES      = ["annual", "sick", "parental", "bereavement", "unpaid"];
 const VALID_COMPETENCIES        = ["communication", "execution", "ownership", "collaboration", "leadership", "problemSolving"];
 const VALID_CYCLE_STATUSES      = ["Open", "Closed"];
@@ -177,9 +169,6 @@ const departmentUpdate = makeValidator([
 /* ══════════════════════════════════════════════════
    JOB
 ══════════════════════════════════════════════════ */
-// Task 5.1 — expanded Job fields. maxLength()/minLength() only run on strings
-// (see their definitions above), so they're safe no-ops against the
-// requirements/benefits arrays without special-casing them here.
 const isNonNegativeNumber = (field, label) => (body) =>
   body[field] !== undefined && body[field] !== "" && body[field] !== null &&
   (isNaN(Number(body[field])) || Number(body[field]) < 0)
@@ -328,7 +317,7 @@ const attendanceCheckOut = makeValidator([
 ]);
 
 /* ══════════════════════════════════════════════════
-   LEAVE REQUEST (task 4.1)
+   LEAVE REQUEST
 ══════════════════════════════════════════════════ */
 const leaveRequestCreate = makeValidator([
   required("startDate", "Start date"),
@@ -504,14 +493,8 @@ const performanceAppealResolve = makeValidator([
 /* ══════════════════════════════════════════════════
    OVERTIME REQUEST (Attendance Overtime, M2)
 ══════════════════════════════════════════════════ */
-// Shape checks only — the authoritative parsing lives in utils/workday.js's
-// parseHHMM and utils/overtimeRate.js's parseHHMMEnd, which the controller
-// calls. These exist so an obviously malformed body gets a field-named 400
-// before any database work happens.
-//
-// The end time additionally accepts "24:00" (END_OF_DAY): overtime spans may
-// not cross midnight, so a rest-day shift running to the end of the day needs
-// a representable end value. A *start* of "24:00" stays invalid.
+// Shape checks only (the controller parses authoritatively); the end time also
+// accepts "24:00" for a rest-day shift running to midnight.
 const OT_START_TIME_RE = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const OT_END_TIME_RE = /^(([01]?[0-9]|2[0-3]):[0-5][0-9]|24:00)$/;
 
@@ -541,7 +524,6 @@ const overtimeRequestAssign = makeValidator([
       : "Select at least one employee.",
 ]);
 
-// Solo Gaps Milestone 2 — AI chat widget.
 const aiChat = makeValidator([isRequiredText("message", "Message", 2000)]);
 
 /* ── Exports ── */
