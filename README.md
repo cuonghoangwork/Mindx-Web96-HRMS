@@ -142,7 +142,8 @@ VITE_API_URL=http://localhost:8080/api/v1
 | Command | Where | What it does |
 |---|---|---|
 | `npm run dev:env` | backend | Nodemon, `NODE_ENV=dev` |
-| `npm run seed:env` | backend | Reseed the demo dataset |
+| `npm run seed:env` | backend | Seed the demo dataset (idempotent: skips what already exists) |
+| `npm run reset:env` | backend | Dry-run of a demo-data reset; add `-- --confirm` to drop everything except kept users, then reseed. Run the seed the morning of a demo — the nightly close-day job marks every business day after the seed as no-shows |
 | `npm start` | backend | Production start |
 | `npm test` | both | Vitest, single run |
 | `npm run dev` | frontend | Vite dev server |

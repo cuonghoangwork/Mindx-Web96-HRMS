@@ -11,6 +11,8 @@
     "start": "node index.js",
     "seed:env": "cross-env NODE_ENV=dev node seed.js",
     "seed:prod": "cross-env NODE_ENV=production node seed.js",
+    "reset:env": "cross-env NODE_ENV=dev node scripts/resetDemoData.js",
+    "reset:prod": "cross-env NODE_ENV=production node scripts/resetDemoData.js",
     "migrate:leave-types": "cross-env NODE_ENV=dev node scripts/migrateLeaveTypes.js",
     "test": "vitest run",
     "test:watch": "vitest"

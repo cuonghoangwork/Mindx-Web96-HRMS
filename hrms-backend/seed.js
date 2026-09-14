@@ -12,6 +12,7 @@ const env = process.env.NODE_ENV || "dev";
 dotenv.config({ path: `.env.${env}` });
 
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import { connectDB } from "./config/db.js";
 import UserModel from "./model/User.js";
 import EmployeeModel from "./model/Employee.js";
@@ -29,7 +30,11 @@ import { closeAttendanceDay } from "./jobs/closeAttendanceDay.js";
 import { generateMonthlyPayrollDraft } from "./jobs/generateMonthlyPayrollDraft.js";
 import { runMonthlyPayroll } from "./jobs/runMonthlyPayroll.js";
 import { checkPromotionEligibility } from "./jobs/checkPromotionEligibility.js";
+import { annualSalaryRaise } from "./jobs/annualSalaryRaise.js";
 import PromotionRequestModel from "./model/PromotionRequest.js";
+import OvertimeRequestModel from "./model/OvertimeRequest.js";
+import NoShowReviewModel from "./model/NoShowReview.js";
+import { resolveDayType, splitDayNight } from "./utils/overtimeRate.js";
 import { buildPayslipRows, insertPayslips } from "./utils/payrollGeneration.js";
 import ProfileEditRequestModel from "./model/ProfileEditRequest.js";
 import PerformanceCycleModel from "./model/PerformanceCycle.js";
@@ -235,17 +240,44 @@ async function seedDepartments() {
   return byName;
 }
 
+/* ── Tenure for the original 8 ──
+ * positionLevel + the date they entered it (used as startDate,
+ * levelStartDate and createdAt alike). Every non-Manager here is kept
+ * under their ELIGIBILITY_THRESHOLD_MONTHS (utils/positionLadder.js:
+ * Full-time 48mo, Senior 60mo) with at least a year of margin, so the
+ * promotion queue stays limited to the two deliberate cases (EMP010,
+ * EMP013) no matter when the seed next runs. EMP003/EMP005 are Managers
+ * because their designations already said so; Manager is the top rung, so
+ * their long tenure never flags anything.
+ */
+const ORIGINAL_ROSTER_TENURE = {
+  EMP001: { positionLevel: "Full-time", startDate: "2023-03-06" },
+  EMP002: { positionLevel: "Full-time", startDate: "2023-07-03" },
+  EMP003: { positionLevel: "Manager",   startDate: "2019-04-01" },
+  EMP004: { positionLevel: "Full-time", startDate: "2024-01-08" },
+  EMP005: { positionLevel: "Manager",   startDate: "2018-10-01" },
+  EMP006: { positionLevel: "Full-time", startDate: "2024-09-02" },
+  EMP007: { positionLevel: "Senior",    startDate: "2022-11-07" },
+  EMP008: { positionLevel: "Senior",    startDate: "2023-01-16" },
+};
+
 /* ── Employees — each gets a linked User account (EMPLOYEE role) ── */
 async function seedEmployees(deptByName) {
+  // The original 8 carry a startDate too (see ORIGINAL_ROSTER_TENURE for
+  // the values and why). Without one, Employee.js defaults levelStartDate
+  // to "now" and createdAt lands at seed time — which every history phase
+  // below reads as "not hired yet", so these eight got no attendance, no
+  // historical payslips, and had their leave requests silently skipped.
+  // Spreading the tenure entry keeps the two definitions in one place.
   const defs = [
-    { employeeId: "EMP001", name: "John Doe",      email: "john.doe@hrms.com",      department: "Engineering",  designation: "Software Engineer",  contractType: "full-time", status: "active",    age: 28, gender: "male",   address: "123 Main St, New York, NY",        annualSalary: 85000 },
-    { employeeId: "EMP002", name: "Jane Smith",    email: "jane.smith@hrms.com",    department: "Design",       designation: "UI Designer",        contractType: "full-time", status: "active",    age: 32, gender: "female", address: "456 Oak Ave, Los Angeles, CA",     annualSalary: 75000 },
-    { employeeId: "EMP003", name: "Bob Johnson",   email: "bob.johnson@hrms.com",   department: "Marketing",    designation: "Marketing Manager",  contractType: "full-time", status: "on-leave",  age: 45, gender: "male",   address: "789 Pine Rd, Chicago, IL",         annualSalary: 95000 },
-    { employeeId: "EMP004", name: "Alice Brown",   email: "alice.brown@hrms.com",   department: "Finance",      designation: "HR Specialist",      contractType: "part-time", status: "active",    age: 29, gender: "female", address: "321 Elm St, Houston, TX",          annualSalary: 45000 },
-    { employeeId: "EMP005", name: "Mike Wilson",   email: "mike.wilson@hrms.com",   department: "Sales",        designation: "Sales Manager",      contractType: "contract",  status: "active",    age: 38, gender: "male",   address: "654 Maple Dr, Phoenix, AZ",        annualSalary: 80000 },
-    { employeeId: "EMP006", name: "Sarah Lee",     email: "sarah.lee@hrms.com",     department: "IT",           designation: "DevOps Engineer",    contractType: "part-time", status: "active",    age: 26, gender: "female", address: "987 Cedar Ln, Seattle, WA",        annualSalary: 55000 },
-    { employeeId: "EMP007", name: "Tom Davis",     email: "tom.davis@hrms.com",     department: "Management",   designation: "Product Manager",    contractType: "full-time", status: "active",    age: 42, gender: "male",   address: "147 Birch Blvd, Boston, MA",       annualSalary: 110000 },
-    { employeeId: "EMP008", name: "Lisa Chen",     email: "lisa.chen@hrms.com",     department: "Design",       designation: "UX Designer",        contractType: "contract",  status: "on-leave",  age: 31, gender: "female", address: "258 Spruce Way, San Francisco, CA", annualSalary: 90000 },
+    { employeeId: "EMP001", name: "John Doe",      email: "john.doe@hrms.com",      department: "Engineering",  designation: "Software Engineer",  contractType: "full-time", status: "active",    age: 28, gender: "male",   address: "123 Main St, New York, NY",        annualSalary: 85000,  ...ORIGINAL_ROSTER_TENURE.EMP001 },
+    { employeeId: "EMP002", name: "Jane Smith",    email: "jane.smith@hrms.com",    department: "Design",       designation: "UI Designer",        contractType: "full-time", status: "active",    age: 32, gender: "female", address: "456 Oak Ave, Los Angeles, CA",     annualSalary: 75000,  ...ORIGINAL_ROSTER_TENURE.EMP002 },
+    { employeeId: "EMP003", name: "Bob Johnson",   email: "bob.johnson@hrms.com",   department: "Marketing",    designation: "Marketing Manager",  contractType: "full-time", status: "on-leave",  age: 45, gender: "male",   address: "789 Pine Rd, Chicago, IL",         annualSalary: 95000,  ...ORIGINAL_ROSTER_TENURE.EMP003 },
+    { employeeId: "EMP004", name: "Alice Brown",   email: "alice.brown@hrms.com",   department: "Finance",      designation: "HR Specialist",      contractType: "part-time", status: "active",    age: 29, gender: "female", address: "321 Elm St, Houston, TX",          annualSalary: 45000,  ...ORIGINAL_ROSTER_TENURE.EMP004 },
+    { employeeId: "EMP005", name: "Mike Wilson",   email: "mike.wilson@hrms.com",   department: "Sales",        designation: "Sales Manager",      contractType: "contract",  status: "active",    age: 38, gender: "male",   address: "654 Maple Dr, Phoenix, AZ",        annualSalary: 80000,  ...ORIGINAL_ROSTER_TENURE.EMP005 },
+    { employeeId: "EMP006", name: "Sarah Lee",     email: "sarah.lee@hrms.com",     department: "IT",           designation: "DevOps Engineer",    contractType: "part-time", status: "active",    age: 26, gender: "female", address: "987 Cedar Ln, Seattle, WA",        annualSalary: 55000,  ...ORIGINAL_ROSTER_TENURE.EMP006 },
+    { employeeId: "EMP007", name: "Tom Davis",     email: "tom.davis@hrms.com",     department: "Management",   designation: "Product Manager",    contractType: "full-time", status: "active",    age: 42, gender: "male",   address: "147 Birch Blvd, Boston, MA",       annualSalary: 110000, ...ORIGINAL_ROSTER_TENURE.EMP007 },
+    { employeeId: "EMP008", name: "Lisa Chen",     email: "lisa.chen@hrms.com",     department: "Design",       designation: "UX Designer",        contractType: "contract",  status: "on-leave",  age: 31, gender: "female", address: "258 Spruce Way, San Francisco, CA", annualSalary: 90000,  ...ORIGINAL_ROSTER_TENURE.EMP008 },
 
     // ── Extended roster (Sample Data plan, Phase 1) — 26 more employees so
     // every department has a real team instead of ~1 person, OrgChart has
@@ -347,32 +379,33 @@ async function seedEmployees(deptByName) {
 }
 
 /**
- * Bob Johnson (EMP003, Marketing) and Mike Wilson (EMP005, Sales) were
- * seeded pre-Position-Ladder with designations that already say "Manager"
- * but no positionLevel to match (they default to "Full-time"). This backs
- * that up to reality so they're valid Manager-tier candidates for
- * linkDepartmentManagers() below, without touching anything else about
- * either record. Idempotent — a no-op once already applied.
+ * Backfills positionLevel / levelStartDate / startDate / createdAt for the
+ * original 8 on a database seeded before ORIGINAL_ROSTER_TENURE existed
+ * (they were created with none of these, so they defaulted to "Full-time"
+ * as of whenever the seed first ran). A fresh database never needs this —
+ * seedEmployees() already spreads the same table into each definition —
+ * so it's a no-op there. Idempotent: skips any record that already matches.
  */
-async function backfillMarketingAndSalesManagers() {
-  const fixes = [
-    { employeeId: "EMP003", startDate: new Date("2019-04-01") },
-    { employeeId: "EMP005", startDate: new Date("2018-10-01") },
-  ];
-  for (const fix of fixes) {
-    const emp = await EmployeeModel.findOne({ employeeId: fix.employeeId });
+async function backfillOriginalRosterTenure() {
+  for (const [employeeId, tenure] of Object.entries(ORIGINAL_ROSTER_TENURE)) {
+    const emp = await EmployeeModel.findOne({ employeeId });
     if (!emp) continue;
-    if (emp.positionLevel === "Manager" && emp.levelStartDate) continue;
-    emp.positionLevel = "Manager";
-    emp.levelStartDate = fix.startDate;
-    if (!emp.startDate) emp.startDate = fix.startDate;
+    const startDate = new Date(tenure.startDate);
+    const upToDate =
+      emp.positionLevel === tenure.positionLevel &&
+      emp.startDate && +emp.startDate === +startDate &&
+      emp.levelStartDate && +emp.levelStartDate === +startDate;
+    if (upToDate) continue;
+    emp.positionLevel = tenure.positionLevel;
+    emp.startDate = startDate;
+    emp.levelStartDate = startDate;
     await emp.save({ validateBeforeSave: false });
     await EmployeeModel.updateOne(
-      { _id: emp._id, createdAt: { $gt: fix.startDate } },
-      { $set: { createdAt: fix.startDate } },
+      { _id: emp._id, createdAt: { $gt: startDate } },
+      { $set: { createdAt: startDate } },
       { timestamps: false },
     );
-    console.log("✓ Backfilled positionLevel=Manager for", fix.employeeId, emp.name);
+    console.log(`✓ Backfilled tenure for ${employeeId} ${emp.name}: ${tenure.positionLevel} since ${tenure.startDate}`);
   }
 }
 
@@ -439,11 +472,22 @@ async function seedJobs(deptByName) {
 async function seedCandidates(jobs) {
   const byTitle = Object.fromEntries(jobs.map((j) => [j.title, j]));
   const defs = [
-    { name: "Mike Wilson",  jobTitle: "Senior Software Engineer", stage: "interview", rating: 4.5, email: "mike.wilson.cand@example.com", phone: "+84 90 123 4567", notes: "Strong backend experience." },
-    { name: "Sarah Lee",    jobTitle: "UI/UX Designer",           stage: "screening", rating: 4.0, email: "sarah.lee.cand@example.com",   phone: "+84 91 234 5678", notes: "Great portfolio."           },
-    { name: "Tom Brown",    jobTitle: "DevOps Engineer",          stage: "offer",     rating: 4.8, email: "tom.brown@example.com",        phone: "+84 92 345 6789", notes: "Offer extended."            },
-    { name: "Emily Davis",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.8, email: "emily.davis@example.com",      phone: "+84 93 456 7890", notes: ""                           },
-    { name: "James Nguyen", jobTitle: "Marketing Intern",         stage: "hired",     rating: 4.2, email: "james.nguyen@example.com",     phone: "+84 94 567 8901", notes: "Starts soon."              },
+    // Candidate names deliberately don't collide with anyone on the
+    // roster — "Mike Wilson" and "Sarah Lee" used to be both a candidate and
+    // an employee, which reads as a data bug on a projector.
+    { name: "Michael Foster",  jobTitle: "Senior Software Engineer", stage: "interview", rating: 4.5, email: "michael.foster@example.com",  phone: "+84 90 123 4567", notes: "Strong backend experience." },
+    { name: "Sara Lindqvist",  jobTitle: "UI/UX Designer",           stage: "screening", rating: 4.0, email: "sara.lindqvist@example.com",  phone: "+84 91 234 5678", notes: "Great portfolio."           },
+    { name: "Tom Brown",       jobTitle: "DevOps Engineer",          stage: "offer",     rating: 4.8, email: "tom.brown@example.com",       phone: "+84 92 345 6789", notes: "Offer extended."            },
+    { name: "Emily Davis",     jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.8, email: "emily.davis@example.com",     phone: "+84 93 456 7890", notes: ""                           },
+    // Hired → the same person exists as EMP020 in seedEmployees, so the
+    // recruiting funnel and the roster tell one story.
+    { name: "Noah Fischer",    jobTitle: "Marketing Intern",         stage: "hired",     rating: 4.2, email: "noah.fischer.cand@example.com", phone: "+84 94 567 8901", notes: "Hired — started 15 Jul 2026 as EMP020." },
+    // Closed / filled roles keep their outcome on record instead of
+    // showing an empty pipeline.
+    { name: "Pham Van Duc",    jobTitle: "Sales Associate",          stage: "hired",     rating: 4.4, email: "duc.pham.sales@example.com",   phone: "+84 90 222 8811", notes: "Hired — role closed." },
+    { name: "Lena Hoffmann",   jobTitle: "Sales Associate",          stage: "rejected",  rating: 3.1, email: "lena.hoffmann@example.com",    phone: "+84 91 333 9922", notes: "Went with a candidate with more B2B experience." },
+    { name: "Arjun Mehta",     jobTitle: "Product Manager",          stage: "hired",     rating: 4.6, email: "arjun.mehta@example.com",      phone: "+84 92 444 0033", notes: "Hired — role filled." },
+    { name: "Claire Dubois",   jobTitle: "Product Manager",          stage: "rejected",  rating: 3.7, email: "claire.dubois@example.com",    phone: "+84 93 555 1144", notes: "Strong, but looking for a more senior scope than this role." },
     // ── Sample Data plan, Phase 8 — more candidates per open pipeline so
     // the Jobs/Candidates pages show a real funnel instead of one name per role.
     { name: "Daniel Park",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.5, email: "daniel.park@example.com",      phone: "+84 90 111 2233", notes: ""                                     },
@@ -468,18 +512,38 @@ async function seedCandidates(jobs) {
   }
 }
 
-/* ── Holidays ── */
+/* ── Holidays ──
+ * One list, two consumers: seedHolidays() writes it to the Holiday
+ * collection, and collectBusinessDayKeys() below skips these dates when
+ * generating attendance. Deriving the attendance skip-set from this list
+ * (rather than a second hand-copied set) is what keeps the two from
+ * drifting — a hand-copied set once stopped at June and left National Day
+ * (Sep 2) with a full day of check-ins, which the real close job then
+ * closed as 9 hours of holiday overtime for everyone.
+ *
+ * Every Holiday type counts as a day off to utils/holidayLookup.js, so
+ * "company"/"optional" entries here are real non-working days. The list
+ * runs a few months past "now" on purpose: the dashboard's "Upcoming
+ * company holidays" widget is empty otherwise.
+ */
+const HOLIDAY_DEFS = [
+  { name: "National Day",                    date: "2025-09-02", type: "public"   },
+  { name: "New Year's Day",                  date: "2026-01-01", type: "public"   },
+  { name: "Tet Holiday (Lunar New Year)",    date: "2026-02-17", type: "public"   },
+  { name: "Hung Kings' Temple Festival",     date: "2026-04-26", type: "public"   },
+  { name: "Reunification Day",               date: "2026-04-30", type: "public"   },
+  { name: "International Labor Day",         date: "2026-05-01", type: "public"   },
+  { name: "Company Anniversary",             date: "2026-06-15", type: "company"  },
+  { name: "National Day",                    date: "2026-09-02", type: "public"   },
+  { name: "Company Team-Building Day",       date: "2026-11-13", type: "company"  },
+  { name: "Year-End Wellness Day",           date: "2026-12-24", type: "optional" },
+  { name: "New Year's Day",                  date: "2027-01-01", type: "public"   },
+  { name: "Tet Holiday (Lunar New Year)",    date: "2027-02-08", type: "public"   },
+];
+const HOLIDAY_DATE_KEYS = new Set(HOLIDAY_DEFS.map((h) => h.date));
+
 async function seedHolidays() {
-  const defs = [
-    { name: "New Year's Day",                  date: "2026-01-01", type: "public"   },
-    { name: "Tet Holiday (Lunar New Year)",    date: "2026-02-17", type: "public"   },
-    { name: "Hung Kings' Temple Festival",     date: "2026-04-26", type: "public"   },
-    { name: "Reunification Day",               date: "2026-04-30", type: "public"   },
-    { name: "International Labor Day",         date: "2026-05-01", type: "public"   },
-    { name: "Company Anniversary",             date: "2026-06-15", type: "company"  },
-    { name: "National Day",                    date: "2026-09-02", type: "public"   },
-    { name: "Year-End Wellness Day",           date: "2026-12-24", type: "optional" },
-  ];
+  const defs = HOLIDAY_DEFS;
   for (const def of defs) {
     const date = new Date(def.date);
     const exists = await HolidayModel.findOne({ name: def.name, date });
@@ -507,10 +571,12 @@ async function seedHolidays() {
  *     and the auto NoShowReview flag are real business logic, not
  *     hand-faked. One deliberately-new hire (EMP028) is left uncovered
  *     often enough to cross the real 5-no-show threshold.
- *   - "Today" is left as in-progress check-ins with no checkOut and is
- *     never closed — ENABLE_SCHEDULER=false on Render's free tier means
- *     nothing auto-closes it in production either, so this matches what a
- *     freshly-deployed instance would actually look like.
+ *   - "Today" is left as in-progress check-ins with no checkOut. The
+ *     in-process scheduler is off (ENABLE_SCHEDULER=false), but
+ *     .github/workflows/scheduled-jobs.yml closes each day at 23:00 ICT —
+ *     and nobody clocks in on a demo system, so every business day AFTER
+ *     the seed run becomes a full-roster no-show day and the 5th one flags
+ *     everyone for review. For a demo, run the seed the same morning.
  *
  * All dates are handled in UTC calendar terms throughout (matching
  * utils/workday.js's utcMidnight/utcDateKey convention that the real job
@@ -566,25 +632,118 @@ async function insertAttendanceTolerantly(docs) {
   }
 }
 
-// Mirrors seedHolidays()'s 2026 dates that fall in this window, so bulk
-// attendance and the Holiday collection agree with each other.
-const SEEDED_2026_HOLIDAYS = new Set([
-  "2026-01-01",
-  "2026-02-17",
-  "2026-04-26",
-  "2026-04-30",
-  "2026-05-01",
-  "2026-06-15",
-]);
-
 function collectBusinessDayKeys(startUtc, endUtcInclusive) {
   const keys = [];
   for (let d = new Date(startUtc); d <= endUtcInclusive; d = addUtcDays(d, 1)) {
     if (isWeekendUtc(d)) continue;
-    if (SEEDED_2026_HOLIDAYS.has(toDateKeyUtc(d))) continue;
+    if (HOLIDAY_DATE_KEYS.has(toDateKeyUtc(d))) continue; // same list seedHolidays() writes
     keys.push(toDateKeyUtc(d));
   }
   return keys;
+}
+
+/* ── Overtime requests ──────────────────────────────────────────────────
+ * Runs BEFORE seedAttendanceHistory() on purpose. The recent-slice days are
+ * closed by the real closeAttendanceDay() job, and that job is where an
+ * approved shift becomes overtime on the attendance record (autoCheckOut
+ * closes at plannedEnd instead of WORKDAY_END and applyOvertimeToRecord
+ * derives the paid/night minutes). Seeding the approved shifts first means
+ * those attendance rows are produced by the same code path production
+ * uses, not hand-written.
+ *
+ * plannedMinutes/dayType are computed with the same helpers
+ * overtimeRequestController.js's create uses (splitDayNight, resolveDayType),
+ * so the caps/multipliers the UI shows are the real ones. Every date is a
+ * business day: past ones are counted back over the same holiday list
+ * attendance skips, future ones roll forward off a weekend.
+ */
+function businessDayKeyDaysAgo(n) {
+  let d = utcMidnight(toDateKeyUtc(new Date()));
+  let remaining = n;
+  while (remaining > 0) {
+    d = addUtcDays(d, -1);
+    if (!isWeekendUtc(d) && !HOLIDAY_DATE_KEYS.has(toDateKeyUtc(d))) remaining -= 1;
+  }
+  return toDateKeyUtc(d);
+}
+function businessDayKeyDaysAhead(n) {
+  let d = utcMidnight(toDateKeyUtc(new Date()));
+  let remaining = n;
+  while (remaining > 0) {
+    d = addUtcDays(d, 1);
+    if (!isWeekendUtc(d) && !HOLIDAY_DATE_KEYS.has(toDateKeyUtc(d))) remaining -= 1;
+  }
+  return toDateKeyUtc(d);
+}
+
+// Two approved shifts inside the job-closed slice (so the OT shows up on
+// real attendance rows and in this month's payroll), one approved and two
+// pending ahead of today (the review queue + "upcoming" state), one
+// rejected with a note. Employees chosen have no leave on these dates.
+const OVERTIME_REQUESTS = [
+  { employeeId: "EMP009", daysAgo: 6,   plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Release deployment — production cut-over" },
+  { employeeId: "EMP031", daysAgo: 3,   plannedStart: "18:00", plannedEnd: "20:30", status: "approved", origin: "assigned", reason: "Network maintenance window (assigned by IT manager)" },
+  { employeeId: "EMP016", daysAgo: 8,   plannedStart: "18:00", plannedEnd: "22:00", status: "rejected", origin: "self",     reason: "Design review prep", reviewNote: "Not needed — the review moved to next sprint. Please plan this within normal hours." },
+  { employeeId: "EMP014", daysAhead: 2, plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Sprint hardening before the client demo" },
+  { employeeId: "EMP023", daysAhead: 5, plannedStart: "18:00", plannedEnd: "20:00", status: "pending",  origin: "self",     reason: "Month-end close" },
+  { employeeId: "EMP026", daysAhead: 4, plannedStart: "18:00", plannedEnd: "21:00", status: "pending",  origin: "self",     reason: "Quarter-end pipeline calls with US accounts" },
+];
+
+async function seedOvertimeRequests(employees) {
+  const byId = new Map(employees.map((e) => [e.employeeId, e]));
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  let created = 0;
+
+  for (const spec of OVERTIME_REQUESTS) {
+    const emp = byId.get(spec.employeeId);
+    if (!emp) continue;
+
+    const dateKey = spec.daysAgo != null ? businessDayKeyDaysAgo(spec.daysAgo) : businessDayKeyDaysAhead(spec.daysAhead);
+    const date = utcMidnight(dateKey);
+
+    const exists = await OvertimeRequestModel.findOne({ employee: emp._id, date });
+    if (exists) continue;
+
+    const { dayMinutes, nightMinutes } = splitDayNight(spec.plannedStart, spec.plannedEnd);
+    const appliedAt = addUtcDays(date, -3);
+    const doc = {
+      employee: emp._id,
+      requestedBy: emp.userId ?? null,
+      date,
+      plannedStart: spec.plannedStart,
+      plannedEnd: spec.plannedEnd,
+      plannedMinutes: dayMinutes + nightMinutes,
+      origin: spec.origin,
+      dayType: resolveDayType(dateKey, { isHoliday: HOLIDAY_DATE_KEYS.has(dateKey) }),
+      reason: spec.reason,
+      status: spec.status,
+      appliedAt,
+    };
+    if (spec.status !== "pending") {
+      doc.reviewedBy = hrUser?._id ?? null;
+      doc.reviewedAt = addUtcDays(appliedAt, 1);
+      doc.reviewNote = spec.reviewNote ?? "";
+    }
+    await OvertimeRequestModel.create(doc);
+    created += 1;
+  }
+  console.log(`✓ Seeded ${created} overtime requests`);
+}
+
+/** {employeeId → Set<dateKey>} of approved shifts, so the recent-slice
+ * generator never rolls a random no-show on a day someone is booked to
+ * stay late — that would leave an approved shift with no attendance row. */
+async function approvedOvertimeDays(employees) {
+  const rows = await OvertimeRequestModel.find({ status: "approved" }, "employee date");
+  const idByObjectId = new Map(employees.map((e) => [String(e._id), e.employeeId]));
+  const out = new Map();
+  for (const r of rows) {
+    const employeeId = idByObjectId.get(String(r.employee));
+    if (!employeeId) continue;
+    if (!out.has(employeeId)) out.set(employeeId, new Set());
+    out.get(employeeId).add(toDateKeyUtc(r.date));
+  }
+  return out;
 }
 
 async function seedBulkAttendance(employees, bulkDateKeys) {
@@ -658,6 +817,7 @@ async function seedBulkAttendance(employees, bulkDateKeys) {
 
 async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
   let chronicNoShows = 0;
+  const otDays = await approvedOvertimeDays(employees);
 
   for (const dateKey of recentDateKeys) {
     const date = utcMidnight(dateKey);
@@ -677,11 +837,13 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
         continue; // no attendance record at all — the real markNoShow() below will catch it
       }
 
-      if (Math.random() < 0.03) continue; // an ordinary occasional no-show, rotates across everyone else
+      const bookedLate = otDays.get(emp.employeeId)?.has(dateKey) ?? false;
+      if (!bookedLate && Math.random() < 0.03) continue; // an ordinary occasional no-show, rotates across everyone else
 
       // Left open (no checkOut) — closeAttendanceDay()'s autoCheckOut() step
-      // fills that in below, exactly as it would in production.
-      const checkIn = Math.random() < 0.10 ? checkInLate() : checkInOnTime();
+      // fills that in below, exactly as it would in production (closing at
+      // the approved shift's plannedEnd where one exists).
+      const checkIn = !bookedLate && Math.random() < 0.10 ? checkInLate() : checkInOnTime();
       preSeedDocs.push({ employee: emp._id, date, checkIn, checkOut: null, hours: 0, status: "present" });
     }
 
@@ -718,8 +880,8 @@ async function seedTodayInProgress(employees, now) {
 
   const inserted = await insertAttendanceTolerantly(docs);
   console.log(
-    `✓ Seeded ${inserted} in-progress check-ins for today (${dateKey}) — left open, since ` +
-      "ENABLE_SCHEDULER=false in production means nothing auto-closes today's attendance.",
+    `✓ Seeded ${inserted} in-progress check-ins for today (${dateKey}) — left open; ` +
+      "the scheduled close-day job (GitHub Actions, 23:00 ICT) closes it tonight.",
   );
 }
 
@@ -1125,6 +1287,52 @@ async function seedPromotionRequests(employees) {
   });
 
   console.log("✓ Seeded 2 manually-proposed promotion requests (1 approved, 1 rejected)");
+}
+
+/* ── Annual raises ────────────────────────────────────────────────────────
+ * jobs/annualSalaryRaise.js proposes a 10% raise for every active employee
+ * on each anniversary of their createdAt. Because this seed back-dates
+ * createdAt by years, the job's FIRST real run (the 04:00 ICT cron) finds
+ * every anniversary already passed and floods the promotion queue with
+ * ~18 proposals at once. Running it here and resolving all but the most
+ * recent PENDING_ANNUAL_RAISES leaves a queue that looks like it has been
+ * worked, and the cron's later runs dedup against these rows.
+ *
+ * Approval mirrors promotionRequestController.js's onApprove (only the
+ * salary changes; no level, so levelStartDate is untouched). The current
+ * month's draft is regenerated afterwards by
+ * refreshCurrentDraftPayrollAfterPromotions() — older, already-paid
+ * months keep their pre-raise figures, which is what a real payroll
+ * history looks like.
+ */
+const PENDING_ANNUAL_RAISES = 2;
+
+async function seedAnnualRaises() {
+  const before = await PromotionRequestModel.countDocuments({ systemGenerated: true, proposedPositionLevel: null });
+  const result = await annualSalaryRaise({ asOf: new Date() });
+  console.log("✓ Ran annualSalaryRaise:", JSON.stringify(result));
+  if (before > 0) return; // already worked on a previous run — leave HR's decisions alone
+
+  const adminUser = await UserModel.findOne({ email: "admin@hrms.com" });
+  const pending = await PromotionRequestModel.find({
+    systemGenerated: true,
+    proposedPositionLevel: null,
+    status: "pending",
+  }).sort({ effectiveDate: -1, _id: 1 });
+
+  let approved = 0;
+  for (const request of pending.slice(PENDING_ANNUAL_RAISES)) {
+    request.status = "approved";
+    request.reviewedBy = adminUser?._id ?? null;
+    request.reviewedAt = addUtcDays(request.effectiveDate ?? new Date(), 3);
+    request.reviewNote = "Standard annual increase — approved.";
+    await request.save();
+    if (typeof request.proposedAnnualSalary === "number") {
+      await EmployeeModel.findByIdAndUpdate(request.employee, { annualSalary: request.proposedAnnualSalary });
+    }
+    approved += 1;
+  }
+  console.log(`✓ Annual raises: ${approved} approved, ${Math.min(pending.length, PENDING_ANNUAL_RAISES)} left pending for review`);
 }
 
 /* ── Post-promotion payroll refresh (cross-phase audit fix) ───────────────
@@ -1624,16 +1832,40 @@ async function backfillEmployeePositionLadder() {
   }
 }
 
-/* ── Notifications ── */
+/* ── Broadcast notifications (user: null → everyone) ──
+ * Each message is read off the data seeded above rather than typed, so
+ * it can't go stale: the newest hire, the next holiday, the candidate
+ * actually at "interview" stage. (Payroll and attendance notices come from
+ * the real jobs Phases 2/4 run, not from here.) (An earlier
+ * hand-typed set announced "May payroll" and a "Sarah Smith" who never
+ * existed, months after the fact.) Deduped by title.
+ */
 async function seedNotifications() {
+  const now = new Date();
+
+  const newestHire = await EmployeeModel.findOne({ status: "active" }).sort({ createdAt: -1 });
+  const nextHoliday = await HolidayModel.findOne({ date: { $gte: now } }).sort({ date: 1 });
+  const interviewing = await CandidateModel.findOne({ stage: "interview" }).populate("job", "title");
+
   const defs = [
-    { category: "leave",   title: "New leave request",    message: "John Doe requested 3 days off"                        },
-    { category: "hiring",  title: "Interview scheduled",  message: "Candidate interview for Design role"                  },
-    { category: "payroll", title: "Payroll processed",    message: "May payroll has been processed"                       },
-    { category: "employee",title: "New employee added",   message: "Sarah Smith has joined the team"                      },
-    { category: "holiday", title: "Upcoming holiday",     message: "Company Anniversary is coming up on Jun 15"          },
-    { category: "system",  title: "System maintenance",   message: "Scheduled maintenance this weekend"                   },
-  ];
+    interviewing && {
+      category: "hiring",
+      title: "Interview scheduled",
+      message: `Interview with ${interviewing.name} for ${interviewing.job?.title ?? "an open role"} is on the calendar this week.`,
+    },
+    newestHire && {
+      category: "employee",
+      title: "New employee added",
+      message: `${newestHire.name} has joined the team as ${newestHire.designation}.`,
+    },
+    nextHoliday && {
+      category: "holiday",
+      title: "Upcoming holiday",
+      message: `${nextHoliday.name} is coming up on ${nextHoliday.date.toLocaleString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.`,
+    },
+    { category: "system", title: "System maintenance", message: "Scheduled maintenance this weekend, Saturday 22:00–23:00 ICT." },
+  ].filter(Boolean);
+
   for (const def of defs) {
     const exists = await NotificationModel.findOne({ title: def.title, user: null });
     if (!exists) {
@@ -1857,6 +2089,103 @@ async function seedTargetedNotifications(employees) {
   console.log(`✓ Seeded ${created} targeted notifications`);
 }
 
+/* ── Backdate what the real jobs wrote ────────────────────────────────────
+ * Phases 2/4/5 run the real close-day, payroll and raise jobs, and each of
+ * those emits its own HR notification and audit entry — with createdAt =
+ * the moment the seed ran. Left alone that is ~80 broadcast notifications
+ * and a page of audit entries all stamped "just now", which is the first
+ * thing anyone sees after logging in. Every one of them names the day or
+ * period it describes, so the timestamp can be recovered from the record
+ * itself and moved to when that event would really have happened:
+ *
+ *   attendance closed for D          → D 23:00 ICT (the cron's slot)
+ *   payroll draft for Y-M            → 1st of Y-M, 08:00 ICT
+ *   payroll paid for Y-M             → 10th of the following month, 08:00 ICT
+ *   no-show flag                     → the day of that employee's 5th no-show
+ *   annual raise proposals           → the anniversary they're for; the ones
+ *                                      seedAnnualRaises() approved are cleared
+ *
+ * Anything older than a few days is also marked read, so the unread badge
+ * reflects the last week, not the last year. Mongoose `timestamps` would
+ * re-stamp updatedAt on save, so these are raw updateOne calls.
+ */
+const ICT_OFFSET_MS = 7 * 3600 * 1000;
+function ictTime(dateKey, hour) {
+  return new Date(utcMidnight(dateKey).getTime() + hour * 3600 * 1000 - ICT_OFFSET_MS);
+}
+function firstOfMonth(label) {
+  const [y, m] = label.split("-").map(Number);
+  return `${y}-${pad2(m)}-01`;
+}
+function tenthOfNextMonth(label) {
+  const [y, m] = label.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, 10)); // month is 0-indexed, so `m` is next month
+  return toDateKeyUtc(d);
+}
+
+async function backdateJobArtifacts() {
+  const now = new Date();
+  const readCutoff = addUtcDays(now, -3);
+  const notifications = NotificationModel.collection;
+  const auditLogs = mongoose.connection.db.collection("auditlogs");
+  let moved = 0;
+  let removed = 0;
+
+  async function stamp(collection, filter, createdAt) {
+    const res = await collection.updateMany(filter, {
+      $set: { createdAt, updatedAt: createdAt, ...(collection === notifications && createdAt < readCutoff ? { read: true } : {}) },
+    });
+    moved += res.modifiedCount;
+  }
+
+  // Attendance closes — notification (params.date) and audit (label).
+  for (const n of await notifications.find({ titleKey: { $in: ["attendanceClosed", "attendanceClosedWithFlagged"] } }).toArray()) {
+    if (n.params?.date) await stamp(notifications, { _id: n._id }, ictTime(n.params.date, 23));
+  }
+  for (const a of await auditLogs.find({ resource: "attendance", label: /^Attendance closed for (\d{4}-\d{2}-\d{2})$/ }).toArray()) {
+    await stamp(auditLogs, { _id: a._id }, ictTime(a.label.slice(-10), 23));
+  }
+
+  // Payroll drafts and pay runs.
+  for (const n of await notifications.find({ titleKey: "monthlyPayrollDraftReady" }).toArray()) {
+    if (n.params?.periodLabel) await stamp(notifications, { _id: n._id }, ictTime(firstOfMonth(n.params.periodLabel), 8));
+  }
+  for (const n of await notifications.find({ titleKey: "payrollPaid" }).toArray()) {
+    if (n.params?.periodLabel) await stamp(notifications, { _id: n._id }, ictTime(tenthOfNextMonth(n.params.periodLabel), 8));
+  }
+  for (const a of await auditLogs.find({ resource: "payroll", label: /^Payroll (\d{4}-\d{2})/ }).toArray()) {
+    const label = a.label.slice(8, 15);
+    if (/auto-drafted/.test(a.label)) await stamp(auditLogs, { _id: a._id }, ictTime(firstOfMonth(label), 8));
+    else if (/paid by the monthly run/.test(a.label)) await stamp(auditLogs, { _id: a._id }, ictTime(tenthOfNextMonth(label), 8));
+    else if (/draft to approved/.test(a.label)) await stamp(auditLogs, { _id: a._id }, ictTime(tenthOfNextMonth(label).replace(/-10$/, "-05"), 10));
+  }
+
+  // No-show flags: the notification, and the review row's flaggedAt, move
+  // to the day of the 5th no-show that triggered them.
+  for (const flag of await NoShowReviewModel.find()) {
+    const noShows = await AttendanceModel.find({ employee: flag.employee, status: "no-show" }, "date").sort({ date: 1 });
+    const trigger = noShows[Math.min(flag.noShowCountAtFlag, noShows.length) - 1];
+    if (!trigger) continue;
+    const when = ictTime(toDateKeyUtc(trigger.date), 23);
+    await NoShowReviewModel.collection.updateOne({ _id: flag._id }, { $set: { flaggedAt: when, createdAt: when, updatedAt: when } });
+    const emp = await EmployeeModel.findById(flag.employee, "name employeeId");
+    if (emp) await stamp(notifications, { titleKey: "noShowPatternFlagged", message: new RegExp(`\\(${emp.employeeId}\\)`) }, when);
+  }
+
+  // Annual raises: drop the notification for every proposal seedAnnualRaises()
+  // already approved (HR "worked" those), and date the rest to their anniversary.
+  for (const req of await PromotionRequestModel.find({ systemGenerated: true, proposedPositionLevel: null }).populate("employee", "name")) {
+    const filter = { titleKey: "annualRaiseAwaiting", "params.employeeName": req.employee?.name };
+    if (req.status === "approved") {
+      removed += (await notifications.deleteMany(filter)).deletedCount;
+    } else if (req.effectiveDate) {
+      await stamp(notifications, filter, ictTime(toDateKeyUtc(req.effectiveDate), 4));
+    }
+  }
+
+  console.log(`✓ Backdated ${moved} job-generated notifications/audit entries to the dates they describe; removed ${removed} already-handled raise notices`);
+}
+
 /* ── Main ── */
 async function main() {
   await connectDB();
@@ -1865,25 +2194,36 @@ async function main() {
   await upsertAdmin(deptByName);
   await upsertHRUser(deptByName);
   await upsertManagerUser(deptByName);
-  const employees  = await seedEmployees(deptByName);
+  // The three seed-only accounts (ADM001/MGR001/MGR002) are created by the
+  // upserts above, not by seedEmployees(), so they were missing from every
+  // history phase: no check-ins pre-seeded → the real close job marked them
+  // no-show daily and flagged all three for review by the 5th day, and
+  // their closed-cycle performance reviews were silently skipped.
+  const employees = [
+    ...(await seedEmployees(deptByName)),
+    ...(await EmployeeModel.find({ employeeId: { $in: ["ADM001", "MGR001", "MGR002"] } })),
+  ];
   const jobs       = await seedJobs(deptByName);
 
   await seedPositionLevels();
   await backfillEmployeePositionLadder();
-  await backfillMarketingAndSalesManagers();
+  await backfillOriginalRosterTenure();
   await linkDepartmentManagers(deptByName);
 
   await seedCandidates(jobs);
   await seedHolidays();
+  await seedOvertimeRequests(employees); // before attendance: the real close job must see approved shifts
   await seedAttendanceHistory(employees);
   await seedLeaveRequests(employees);
   await seedPayrollHistory();
   await seedPromotionRequests(employees);
+  await seedAnnualRaises();
   await refreshCurrentDraftPayrollAfterPromotions();
   await seedProfileEditRequests(employees);
   await seedPerformanceReviews(employees);
   await seedNotifications();
   await seedTargetedNotifications(employees);
+  await backdateJobArtifacts();
 
   console.log("\n✅ Seed complete.");
   console.log("   Admin    → admin@hrms.com    / admin123");
