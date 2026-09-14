@@ -13,18 +13,11 @@ import { subscribe, consumeTicketId } from "../utils/sseHub.js";
 import { SUPPORTED_LANGUAGES } from "../utils/notifyI18n.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-/* ── Level 1: live delivery over SSE ─────────────────────────────── */
-
-// Render's proxy closes an idle connection at ~60s and the browser then
-// reconnects, so a quiet app would otherwise produce a steady reconnect
-// churn. 25s leaves room to miss one beat and still stay under that.
+// Render's proxy closes an idle connection at ~60s; 25s survives one missed beat.
 const HEARTBEAT_MS = Number(process.env.SSE_HEARTBEAT_MS) || 25_000;
 
-// A connection caches the viewer's role at handshake time — sseHub matches
-// broadcasts against it without a DB lookup. Capping the connection bounds
-// how long someone demoted from HR keeps receiving "hr" broadcasts: the
-// client reconnects straight away and re-handshakes with a fresh ticket,
-// so this is invisible in the UI.
+// The role is cached at handshake, so the cap bounds how long a demoted user
+// keeps receiving "hr" broadcasts. The client reconnects transparently.
 const MAX_CONNECTION_MS = Number(process.env.SSE_MAX_CONNECTION_MS) || 15 * 60_000;
 
 const notificationController = {
@@ -135,13 +128,7 @@ const notificationController = {
     res.json({ success: true, message: "Notification deleted." });
   }, 400),
 
-  /**
-   * GET /notifications/preferences — the out-of-app channel toggles.
-   *
-   * Desktop notifications are deliberately absent: the browser owns that
-   * permission, so it is stored per-device in localStorage rather than
-   * here (see hrms-react/src/utils/desktopNotify.js).
-   */
+  /** GET /notifications/preferences — out-of-app toggles. Desktop is per-device, in the browser's localStorage. */
   getPreferences: asyncHandler(async (req, res) => {
     const user = await UserModel.findById(req.user.id, "language notify");
     res.json({
@@ -153,14 +140,7 @@ const notificationController = {
     });
   }, 500),
 
-  /**
-   * PATCH /notifications/preferences — { email?, language? }
-   *
-   * `language` is what anything rendered SERVER-side goes out in. The
-   * frontend keeps it in step with the UI toggle so an email and the app
-   * cannot end up in different languages; there is deliberately no second
-   * language picker in Settings.
-   */
+  /** PATCH /notifications/preferences — { email?, language? }. `language` is what server-rendered copy goes out in; the UI toggle keeps it in step. */
   updatePreferences: asyncHandler(async (req, res) => {
     const update = {};
     if (typeof req.body.email === "boolean") update["notify.email"] = req.body.email;
@@ -178,26 +158,13 @@ const notificationController = {
     });
   }, 400),
 
-  /**
-   * GET /notifications/stream-ticket — normal Bearer auth.
-   *
-   * Hands back the short-lived, single-use credential the stream endpoint
-   * wants, because EventSource cannot send an Authorization header. See
-   * utils/tokens.js for why this is not just the access token in a query
-   * string.
-   */
+  /** GET /notifications/stream-ticket — a 60s single-use credential, because EventSource cannot send an Authorization header. */
   streamTicket: asyncHandler(async (req, res) => {
     const ticket = signStreamTicket({ id: req.user.id, role: req.user.role });
     res.json({ success: true, data: { ticket, expiresIn: STREAM_TICKET_TTL_SECONDS } });
   }, 500),
 
-  /**
-   * GET /notifications/stream?ticket=... — the live feed.
-   *
-   * Deliberately NOT behind verifyToken: the credential is the ticket in
-   * the query string, and verifyToken would reject it for having
-   * tokenType "SSE" rather than "AT".
-   */
+  /** GET /notifications/stream?ticket=... — not behind verifyToken, which would reject the "SSE" token type. */
   stream: async (req, res) => {
     let ticket;
     try {
@@ -222,8 +189,7 @@ const notificationController = {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
-      // Stops nginx-style proxies (Render included) buffering the stream
-      // into oblivion — without it nothing arrives until the buffer fills.
+      // Without this Render's proxy buffers the stream until it fills.
       "X-Accel-Buffering": "no",
     });
     res.flushHeaders?.();
@@ -245,8 +211,6 @@ const notificationController = {
     heartbeat.unref?.();
     lifetime.unref?.();
 
-    // Miss this and every dropped connection leaks a 25s interval plus a
-    // reference to a dead socket that publish() keeps writing to.
     function cleanup() {
       clearInterval(heartbeat);
       clearTimeout(lifetime);

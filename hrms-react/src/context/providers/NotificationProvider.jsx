@@ -12,27 +12,11 @@ import { useLanguage } from "../LanguageContext";
 import { NotificationContext } from "../NotificationContext";
 
 /**
- * Everything notification-shaped, moved out of StoreProvider in Phase 2.
- *
- * WHY THIS IS THE FIRST SPLIT. Notifications were the noisiest state in the
- * store and the least shared: of the 25 components reading useStore(), only
- * four touch this domain (Header, Layout, Dashboard, Notifications). Every
- * arriving SSE event rebuilt the 74-field store value, so a single incoming
- * notification re-rendered all 25 — including AddJobModal, which wanted one
- * unrelated field. Splitting it costs the least and buys the most.
- *
- * Toast came with it rather than staying behind: showToast had exactly four
- * call sites in the old StoreProvider, and all four were notification actions.
- *
- * ONE DELIBERATE BEHAVIOUR CHANGE. The initial notification fetch used to be
- * the seventh entry in refreshAll's eight-way Promise.all, which meant a
- * failing notifications endpoint rejected the whole batch and put the app
- * behind a "Couldn't load data" banner. It is now an independent fetch through
- * refreshNotifications, whose catch is deliberately silent (the stream retries
- * on its own). So a notification outage now costs the bell and nothing else,
- * where it previously took down the dashboard with it. This is the one place
- * the split could not be a pure move, because the old code entangled this
- * request with seven unrelated ones.
+ * Notifications, unread count, toast and the SSE stream — kept out of
+ * StoreProvider because an arriving SSE event would otherwise re-render every
+ * store consumer. The initial fetch is independent of refreshAll's
+ * Promise.all on purpose: a notification outage costs the bell, not the
+ * dashboard.
  */
 export function NotificationProvider({ children }) {
   const { t } = useTranslation();
@@ -50,50 +34,36 @@ export function NotificationProvider({ children }) {
 
   /* ── Out-of-app language ── */
 
-  // Email and Telegram are rendered on the server, which has no way to read
-  // the UI toggle — it reads User.language instead. Mirroring the choice here
-  // is what keeps an email from arriving in a different language than the app
-  // the reader just set, and avoids a second language picker in Settings that
-  // could disagree with the first.
+  // Server-rendered channels (email, Telegram) read User.language, so mirror the UI toggle there.
   useEffect(() => {
     if (!isAuthenticated || mustChangePassword || !language) return;
     NotificationsAPI.updatePreferences({ language }).catch(() => {
-      // Nothing to recover: the app language is already applied locally, and
-      // this only affects copy the server renders later.
+      // nothing to recover — the app language is already applied locally
     });
   }, [isAuthenticated, mustChangePassword, language]);
 
   /* ── Live notifications (SSE) ── */
 
-  // Notifications only, unlike refreshAll: used to catch up after the stream
-  // has been down, where refetching the whole store would flash every list.
+  // Catch-up after the stream has been down; refetching the whole store would flash every list.
   const refreshNotifications = useCallback(async () => {
     try {
       const notif = await NotificationsAPI.list();
       setNotifications(notif.items || []);
     } catch {
-      // The stream is already retrying on its own; a failed catch-up is not
-      // worth a toast, and the next reconnect will try again.
+      // the stream is already retrying; the next reconnect tries again
     }
   }, []);
 
-  // Held in a ref, not closed over by the effect below, so that switching
-  // language or navigating does not tear down and re-open the SSE
-  // connection — which would cost a fresh ticket and a catch-up refetch
-  // every time someone flips EN/VI.
+  // A ref, not an effect dependency: flipping EN/VI must not tear down the SSE connection.
   const desktopToastRef = useRef(null);
   desktopToastRef.current = (incoming) => {
     if (!shouldNotify(incoming)) return;
-    // Translated, so the OS toast respects the EN/VI toggle exactly as the
-    // in-app list does — the stored title/message are English literals.
+    // Translated — the stored title/message are English literals.
     const { title, message } = translateNotification(incoming, t, language);
     showDesktopNotification({
       title,
       body: message,
-      // Two open tabs both receive the same SSE event, and a notification
-      // written in the narrow window between a reconnect's catch-up fetch
-      // and the stream registering can arrive twice. A shared tag makes the
-      // OS collapse either case into a single toast.
+      // A shared tag collapses two tabs (or a catch-up/stream race) into one toast.
       tag: String(incoming.id),
       onActivate: () => incoming.link && navigate(incoming.link),
     });
@@ -105,8 +75,7 @@ export function NotificationProvider({ children }) {
     const connection = connectNotificationStream({
       onNotification: (incoming) => {
         setNotifications((prev) =>
-          // A reconnect refetch races the stream: the catch-up GET and a live
-          // event can both carry the same notification. Dedupe on id.
+          // The catch-up GET and a live event can carry the same notification.
           prev.some((n) => idsMatch(n.id, incoming.id)) ? prev : [incoming, ...prev],
         );
         desktopToastRef.current?.(incoming);
@@ -119,10 +88,8 @@ export function NotificationProvider({ children }) {
 
   /* ── Service worker bridge (Web Push) ── */
 
-  // public/sw.js hands a push to the page instead of showing an OS
-  // notification whenever a tab is visible — that is the double-toast fix.
-  // The push payload is deliberately tiny (id/title/body/url), not a whole
-  // notification, so refetch rather than trying to insert a partial row.
+  // public/sw.js hands a push to the page when a tab is visible (the
+  // double-toast fix). The payload is tiny, so refetch rather than insert it.
   useEffect(() => {
     if (!isAuthenticated || mustChangePassword) return undefined;
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return undefined;
@@ -130,8 +97,7 @@ export function NotificationProvider({ children }) {
     const onMessage = (event) => {
       const { type, url } = event.data ?? {};
       if (type === "notification") refreshNotifications();
-      // Sent when the user clicks an OS notification and an HRMS tab already
-      // exists: focus it and route in place rather than opening another tab.
+      // OS notification clicked while a tab exists: route in place.
       if (type === "navigate" && url) navigate(url);
     };
 
@@ -141,9 +107,7 @@ export function NotificationProvider({ children }) {
 
   /* ── Initial load, once signed in ── */
 
-  // Mirrors the auth gate StoreProvider uses for its own eight lists, so the
-  // two clear at the same moment on sign-out. See the header note about why
-  // this is a separate request rather than part of that Promise.all.
+  // Same auth gate as StoreProvider, so both clear at the same moment on sign-out.
   useEffect(() => {
     if (isAuthenticated && !mustChangePassword) {
       refreshNotifications();
@@ -191,9 +155,7 @@ export function NotificationProvider({ children }) {
     }
   }, [showToast, t]);
 
-  // HR/Admin: compose and send a custom notice. Doesn't optimistically add to local
-  // state for targeted sends (the recipient isn't necessarily "me"), but does for
-  // broadcasts the sender themself would also see.
+  // HR/Admin compose. Optimistic only for broadcasts the sender would also see.
   const sendNotification = useCallback(async (payload) => {
     const res = await NotificationsAPI.create(payload);
     const isBroadcastToSelf =
@@ -219,8 +181,7 @@ export function NotificationProvider({ children }) {
       clearReadNotifications,
       sendNotification,
     }),
-    // Computed by react-hooks/exhaustive-deps, not by hand — same reasoning as
-    // StoreProvider's value.
+    // Dependency list computed by react-hooks/exhaustive-deps.
     [
       notifications,
       unreadNotificationCount,

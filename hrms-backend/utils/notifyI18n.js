@@ -1,23 +1,9 @@
 /**
- * notifyI18n.js — renders a notification's copy server-side.
- *
- * In-app notifications are translated in the browser, from the live UI
- * toggle, using hrms-react/src/i18n. A Telegram message has no browser to
- * ask, so anything leaving the app has to be rendered here against the
- * recipient's stored `User.language`.
- *
- * The bundles in ../i18n/ are a NARROW MIRROR of the frontend's
- * `notifications.generated` block — only the keys for categories that
- * utils/notifyPolicy.js actually lets out of the app (leave, performance),
- * which is 12 keys rather than all 51. They were generated from the
- * frontend files rather than retranslated, and
- * tests/notifyI18n.test.js fails if the two ever drift apart. When a
- * category is added to the policy table, copy its keys across and that test
- * will tell you if you missed one.
- *
- * Unknown key => the stored English literal. Every notification carries
- * `title`/`message` as plain text alongside the keys, so a missing
- * translation degrades to English rather than to an empty message.
+ * Renders a notification's copy server-side, for the channels that have no
+ * browser to translate in. The bundles in ../i18n/ are a narrow mirror of the
+ * frontend's `notifications.generated` block — only the keys for categories
+ * utils/notifyPolicy.js lets out of the app — and tests/notifyI18n.test.js
+ * fails if the two drift. An unknown key falls back to the stored English.
  */
 
 import { readFileSync } from "node:fs";
@@ -44,9 +30,7 @@ const MONTHS = {
 };
 
 function formatDate(value, language) {
-  // A "YYYY-MM-DD" string is a calendar date, not an instant. Parsing it into
-  // a Date first would reintroduce exactly the UTC-shift bug this codebase
-  // already fixed twice — read the parts and be done.
+  // A "YYYY-MM-DD" string is a calendar date, not an instant — never parse it into a Date.
   if (typeof value === "string" && DATE_ONLY_RE.test(value)) {
     const [y, m, d] = value.split("-").map(Number);
     return language === "vi"
@@ -57,8 +41,7 @@ function formatDate(value, language) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
 
-  // A real instant IS zone-sensitive, so pin it to company time rather than
-  // whatever the server happens to be set to.
+  // A real instant is zone-sensitive: pin it to company time.
   return new Intl.DateTimeFormat(language === "vi" ? "vi-VN" : "en-US", {
     year: "numeric",
     month: "short",
@@ -67,11 +50,7 @@ function formatDate(value, language) {
   }).format(date);
 }
 
-/**
- * Some params carry enum tokens rather than display text — translate those
- * before interpolating, or the sentence ends up half-English. Mirrors
- * localizeParams() in hrms-react/src/utils/notifications.js.
- */
+/** Translates enum-token params before interpolating; mirrors localizeParams() in the frontend. */
 function localizeParams(params, bundle, language) {
   if (!params) return {};
   const out = {};
@@ -86,9 +65,7 @@ function localizeParams(params, bundle, language) {
 }
 
 function interpolate(template, params) {
-  // An unknown placeholder is left visible rather than blanked: "{{days}}"
-  // in a message is a bug someone will report, an empty gap is one nobody
-  // notices.
+  // An unknown placeholder stays visible: "{{days}}" gets reported, a blank gap does not.
   return template.replace(/\{\{(\w+)\}\}/g, (whole, key) =>
     params[key] === undefined || params[key] === null ? whole : String(params[key]),
   );

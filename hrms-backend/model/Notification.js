@@ -3,16 +3,9 @@ import mongoose from "mongoose";
 export const NOTIFICATION_AUDIENCES = ["all", "employees", "hr"];
 
 /**
- * Every category a notification may carry. Exported because utils/notifyPolicy.js
- * is keyed on these values and tests/notifyI18n.test.js derives its coverage
- * check from this list — a category added here with out-of-app channels but no
- * mirrored copy would otherwise ship an English Telegram message to a
- * Vietnamese reader, silently.
- *
- * "overtime" is separate from "leave" despite the identical review workflow,
- * because the two need to be tunable apart in notifyPolicy and because the
- * Notifications page filters on this value — folding overtime into "leave"
- * would hide it behind a tab labelled for something else.
+ * Adding a category needs a delivery decision in utils/notifyPolicy.js and
+ * mirrored copy in utils/notifyI18n.js — tests/notifyPolicy.test.js and
+ * tests/notifyI18n.test.js both derive their coverage from this list.
  */
 export const NOTIFICATION_CATEGORIES = [
   "leave",
@@ -27,24 +20,10 @@ export const NOTIFICATION_CATEGORIES = [
 ];
 
 /**
- * Which broadcast audiences each role reads.
- *
- * Lives next to the enum on purpose: adding a fifth role, or a fourth
- * audience, forces a decision here about who receives it — one map so the
- * write side ("who is this for") and the read side ("what do I see") can't
- * drift into notices nobody ever receives.
- *
- * "hr" means the UNSCOPED company-wide tier, not "everyone who approves
- * things". MANAGER is deliberately excluded: it is department-scoped
- * (utils/managerScope.js) and a broadcast carries no department, so a
- * MANAGER reading "hr" would see every other department's hires, removals
- * and payroll runs. Notices a MANAGER genuinely needs are written as
- * targeted per-user documents instead, which can be scoped — see
- * leaveRequestController.create and jobs/performanceReminders.js.
- *
- * Exported from the model rather than the controller so the read path, the
- * write path and any future transport can share it without importing a
- * controller (an SSE hub that did would close an import cycle).
+ * Which broadcast audiences each role reads — one map for both the write
+ * side and the read side. "hr" is the unscoped company-wide tier; MANAGER
+ * is excluded because a broadcast carries no department, so anything a
+ * manager needs is written as an addressed document (DECISIONS.md D8).
  */
 const AUDIENCES_BY_ROLE = {
   ADMIN:    ["all", "hr"],
@@ -58,14 +37,7 @@ export function broadcastAudiencesFor(role) {
   return AUDIENCES_BY_ROLE[role] ?? AUDIENCES_BY_ROLE.EMPLOYEE;
 }
 
-/**
- * The inverse: which roles read a given audience.
- *
- * Needed by out-of-app delivery, which has to turn a broadcast into an actual
- * list of people (utils/notify.js). DERIVED from the same map rather than
- * written out a second time — two hand-maintained tables facing opposite
- * directions is precisely how "the email went to the wrong people" happens.
- */
+/** The inverse, derived rather than hand-maintained — used to turn a broadcast into recipients. */
 export function rolesForAudience(audience) {
   return Object.keys(AUDIENCES_BY_ROLE).filter((role) =>
     AUDIENCES_BY_ROLE[role].includes(audience),
@@ -74,13 +46,8 @@ export function rolesForAudience(audience) {
 
 const notificationSchema = new mongoose.Schema(
   {
-    // null = broadcast to all users, per hrms_schema_docs.md.
-    // For targeted single-recipient notices, set this to that user's _id.
+    // null = broadcast, narrowed by `audience`; a user id = addressed notice (audience ignored).
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    // When `user` is null (broadcast), `audience` narrows who it's for.
-    // "all" = everyone (default/legacy behavior), "employees" = EMPLOYEE and
-    // MANAGER, "hr" = HR and ADMIN. Ignored when `user` is set.
-    // See AUDIENCES_BY_ROLE above for why MANAGER reads "employees", not "hr".
     audience: {
       type: String,
       enum: NOTIFICATION_AUDIENCES,
@@ -93,24 +60,18 @@ const notificationSchema = new mongoose.Schema(
     },
     title: { type: String, required: true },
     message: { type: String },
-    // Optional translation keys for system-generated notifications — when set,
-    // the frontend renders notifications.generated.<titleKey>.title /
-    // <messageKey>.message (interpolated with `params`) instead of the literal
-    // title/message above. title/message are still always populated as the
-    // English fallback for old data and for anything reading them directly.
+    // When set, the client renders notifications.generated.<key> with `params`
+    // instead of the literal title/message, which remain the English fallback.
     titleKey: { type: String, default: null },
     messageKey: { type: String, default: null },
     params: { type: mongoose.Schema.Types.Mixed, default: null },
     read: { type: Boolean, default: false },
-    // In-app navigation target for click-to-open notices, e.g. "/employees/64f..."
     link: { type: String, default: null },
     linkLabel: { type: String, default: null },
-    // Who authored a manually-composed notice (null for system-generated ones)
     sender: {
       id:   { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
       name: { type: String, default: null },
     },
-    // True for notices an Admin/HR composed by hand, vs system-generated events
     isCustom: { type: Boolean, default: false },
   },
   { timestamps: true },
