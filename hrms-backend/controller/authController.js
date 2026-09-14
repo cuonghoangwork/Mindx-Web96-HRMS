@@ -10,13 +10,9 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 const SALT_ROUNDS = 10;
 
-// Some Employee records end up with `userId` set (e.g.
-// employeeController.create's existingUser branch, or a manually-fixed
-// record) without the reverse `User.employee` pointer ever being set — the
-// sidebar's "My Profile" link (and every self-service feature keyed off
-// user.employee) then silently stays broken for that account forever.
-// Self-heal here on every login/me/changePassword call, same fallback
-// employeeController.getMyProfile already does for its own lookup.
+// Self-heals a missing User.employee back-link on every login/me call; an
+// Employee with userId set but no reverse pointer otherwise breaks every
+// self-service feature for that account.
 async function resolveEmployeeId(user) {
   if (user.employee) return String(user.employee);
   const employee = await EmployeeModel.findOne({
@@ -63,7 +59,6 @@ const authController = {
       role: "EMPLOYEE", // always — no self-promotion
     });
 
-    // Attempt to link to an existing Employee record with the same email
     const empMatch = await EmployeeModel.findOne({ email: email.toLowerCase() });
     if (empMatch && !empMatch.userId) {
       empMatch.userId = newUser._id;
@@ -108,10 +103,7 @@ const authController = {
     const { access_token, refresh_token } = signTokens({
       id: user._id,
       email: user.email,
-      // Carried so req.user.name is populated for every request. Without it
-      // utils/auditLog.js wrote a blank actor name on EVERY row, and
-      // hand-composed notices had no sender — both silently, because a
-      // missing name renders as nothing rather than as an error.
+      // `name` in the JWT is what auditLog.js and composed notices read for the actor.
       name: user.name,
       role: user.role,
       mustChangePassword,
@@ -163,9 +155,6 @@ const authController = {
     const { access_token, refresh_token: new_refresh_token } = signTokens({
       id: user._id,
       email: user.email,
-      // Also the upgrade path for tokens minted before `name` existed:
-      // an access token lasts 20 minutes, so a session issued by the old
-      // code picks the name up at its next refresh without re-login.
       name: user.name,
       role: user.role,
       mustChangePassword: Boolean(user.mustChangePassword),
@@ -253,7 +242,7 @@ const authController = {
     });
   }, 400),
 
-  // GET /api/v1/auth/users — ADMIN only: list all accounts with their roles
+  // GET /api/v1/auth/users — ADMIN only
   listUsers: asyncHandler(async (req, res) => {
     const users = await UserModel.find({}, "-password -refreshToken").sort({ createdAt: -1 });
     res.json({

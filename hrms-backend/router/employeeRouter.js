@@ -6,19 +6,14 @@ import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
-// All authenticated users can get the full list (EMPLOYEE sees all names/dept for display)
-// and their own profile via /me.
+// The directory read is company-wide for every role.
 router.get("/me", verifyToken, employeeController.getMyProfile);
 router.get("/", verifyToken, employeeController.getAll);
 
-// Detail: accessible to all authenticated users; controller enforces EMPLOYEE can only
-// see their own profile.
+// Controller restricts EMPLOYEE to their own profile.
 router.get("/:id", verifyToken, employeeController.getDetail);
 
-// Create — HR (company-wide)/ADMIN only. Matches the demo's role model:
-// MANAGER has no "Add Employee" capability anywhere (no nav item, no
-// backend route) — only update/manage employees already in their own
-// department (see utils/managerScope.js).
+// Create is HR/ADMIN only; MANAGER manages existing employees in their own department (D12).
 router.post(
   "/",
   verifyToken,
@@ -27,8 +22,7 @@ router.post(
   employeeController.create,
 );
 
-// Update / delete — MANAGER (own department), HR (company-wide) and ADMIN
-// for update; delete stays ADMIN-only.
+// Update: MANAGER (own department)/HR/ADMIN. Delete: ADMIN only.
 router.put(
   "/:id",
   verifyToken,
@@ -38,9 +32,7 @@ router.put(
 );
 router.delete("/:id", verifyToken, authorize("ADMIN"), employeeController.remove);
 
-// Avatar upload: all authenticated users can upload (controller restricts EMPLOYEE to own avatar)
-// handleUploadErrors wraps multer so a bad mimetype/oversized file resolves to a clean
-// 400 (err.message) instead of an uncaught 500 from the app's generic error handler.
+// Any authenticated user; the controller restricts EMPLOYEE to their own avatar.
 router.post(
   "/:id/avatar",
   verifyToken,
@@ -48,10 +40,7 @@ router.post(
   employeeController.uploadAvatar,
 );
 
-// Contract PDF upload (task 1.4) — MANAGER (own department)/HR/ADMIN only,
-// unlike the avatar route above. Employees view their own contract
-// read-only via GET /employees/me (contractUrl is already in
-// employeeToClient's shape).
+// Contract PDF — MANAGER (own department)/HR/ADMIN; employees read it via /me.
 router.post(
   "/:id/contract",
   verifyToken,
@@ -60,10 +49,7 @@ router.post(
   employeeController.uploadContract,
 );
 
-// Multi-document upload (Solo Gaps Milestone 1) — offer letters/ID
-// scans/other, additive alongside the single-contract flow above. Same
-// gating as the contract route (MANAGER own-department, enforced in the
-// controller).
+// Other documents — same gating as the contract route.
 router.post(
   "/:id/documents",
   verifyToken,

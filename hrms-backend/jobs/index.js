@@ -119,11 +119,7 @@ export function startScheduler() {
     return null;
   }
 
-  // 23:00, not 22:00. Attendance Overtime moved the auto clock-out boundary to
-  // 22:00 (18:00 + the 4h daily cap), so a 22:00 close job would fire while an
-  // overtime shift was still being written. The job takes dateKey as a
-  // parameter and dateKeyInTz() at 23:00 still resolves to the same calendar
-  // day in SCHEDULER_TZ, so nothing else shifts.
+  // 23:00, after the 22:00 overtime boundary, so a shift is never closed mid-write.
   const expression = process.env.CRON_CLOSE_ATTENDANCE || "0 23 * * *";
   if (!cron.validate(expression)) {
     console.error(`[scheduler] invalid cron expression: ${expression} - scheduler not started`);
@@ -133,8 +129,6 @@ export function startScheduler() {
   const task = cron.schedule(expression, runCloseAttendance, { timezone: SCHEDULER_TZ });
   console.log(`[scheduler] closeAttendanceDay scheduled "${expression}" (${SCHEDULER_TZ})`);
 
-  // Runs once daily, well clear of closeAttendanceDay's own run — the two
-  // jobs share no state, but there's no reason to have them race either.
   const promotionExpression = process.env.CRON_PROMOTION_ELIGIBILITY || "0 2 * * *";
   let promotionTask = null;
   if (!cron.validate(promotionExpression)) {
@@ -144,9 +138,7 @@ export function startScheduler() {
     console.log(`[scheduler] checkPromotionEligibility scheduled "${promotionExpression}" (${SCHEDULER_TZ})`);
   }
 
-  // Tasks 3.8/3.9: FX snapshot + payroll draft, once at the start of the
-  // month. Default "0 1 1 * *" = 01:00 on the 1st, well clear of both jobs
-  // above and a full 9 days ahead of the 10th-of-month official run (3.5).
+  // FX snapshot + payroll draft on the 1st, nine days ahead of the pay run.
   const monthlyPayrollDraftExpression = process.env.CRON_MONTHLY_PAYROLL_DRAFT || "0 1 1 * *";
   let monthlyPayrollDraftTask = null;
   if (!cron.validate(monthlyPayrollDraftExpression)) {
@@ -184,8 +176,7 @@ export function startScheduler() {
     console.log(`[scheduler] annualSalaryRaise scheduled "${annualRaiseExpression}" (${SCHEDULER_TZ})`);
   }
 
-  // Task 5: daily check for performance review cycles nearing their
-  // deadline. Kept well clear of the other jobs' times above.
+  // Daily reminder for review cycles nearing their deadline.
   const performanceRemindersExpression = process.env.CRON_PERFORMANCE_REMINDERS || "0 9 * * *";
   let performanceRemindersTask = null;
   if (!cron.validate(performanceRemindersExpression)) {

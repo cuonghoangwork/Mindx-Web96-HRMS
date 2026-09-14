@@ -8,35 +8,28 @@ const router = Router();
 
 router.get("/", verifyToken, notificationController.getAll);
 
-// Live feed (Level 1). The ticket handshake is Bearer-authenticated; the
-// stream itself authenticates with the ticket it hands out, since
-// EventSource cannot set an Authorization header. Both are declared before
-// "/:id" so neither is swallowed by the parameterised routes below.
+// Live feed: the ticket handshake is Bearer-authenticated, the stream
+// authenticates with the ticket (EventSource cannot set a header). Declared
+// before "/:id".
 router.get("/stream-ticket", verifyToken, notificationController.streamTicket);
 router.get("/stream", notificationController.stream);
 
-// Out-of-app channel preferences (Level 4a). Desktop is not here — it is
-// per-device and lives in the browser.
+// Out-of-app preferences. Desktop is per-device, in the browser.
 router.get("/preferences", verifyToken, notificationController.getPreferences);
 router.patch("/preferences", verifyToken, notificationController.updatePreferences);
 
-// Web Push (Level 3). Per-device, so every route keys off the browser's
-// own endpoint rather than the user alone.
+// Web Push — per-device, keyed off the browser's endpoint.
 router.get("/push", verifyToken, pushController.status);
 router.post("/push/subscribe", verifyToken, pushController.subscribe);
 router.delete("/push/subscribe", verifyToken, pushController.unsubscribe);
 
-// Telegram (Level 4b). The webhook is deliberately outside verifyToken:
-// Telegram cannot present a JWT, so the secret in the path is the
-// credential (see telegramController.webhook). Declared before "/:id" so
-// none of these are swallowed by the parameterised routes below.
+// Telegram. The webhook is outside verifyToken — the path secret is the credential.
 router.get("/telegram", verifyToken, telegramController.status);
 router.post("/telegram/link-code", verifyToken, telegramController.linkCode);
 router.delete("/telegram", verifyToken, telegramController.disconnect);
 router.post("/telegram/webhook/:secret", telegramController.webhook);
 
-// Company-wide broadcast composer — HR/Admin only, not MANAGER's
-// department-scoped remit: employee picker for the compose-notice modal.
+// Recipient picker for the compose modal — HR/Admin only.
 router.get("/recipients", verifyToken, authorize("ADMIN", "HR"), notificationController.listRecipients);
 
 router.post("/", verifyToken, authorize("ADMIN", "HR"), notificationController.create);

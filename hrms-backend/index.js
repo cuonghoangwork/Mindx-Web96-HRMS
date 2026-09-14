@@ -15,10 +15,7 @@ import { warnIfDemoMode } from "./utils/appNow.js";
 import { startTelegram } from "./utils/telegramBoot.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
-// Attendance Overtime: DEMO_MODE lets an X-App-Now header override server
-// time, which is a bypass for every date rule in the system — not just the
-// overtime cutoff it was added for. Warn before anything else so a
-// production deploy that left it on is impossible to miss in the boot log.
+// DEMO_MODE lets a header override server time (utils/appNow.js); warn first so a production deploy cannot miss it.
 warnIfDemoMode();
 
 const app = express();
@@ -26,10 +23,7 @@ const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
 app.use(express.json());
 
-// Public health check for hosting platforms (e.g. Render) that poll this
-// path with no Authorization header. Every other /api/v1 route requires a
-// valid JWT (see middleware/auth.js), so this one is deliberately mounted
-// ahead of rootRouter and outside verifyToken.
+// Unauthenticated health check for the host's poller; mounted outside verifyToken.
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({ success: true, status: "ok" });
 });
@@ -40,31 +34,26 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found", code: "ROUTE_NOT_FOUND" });
 });
 
-// Final error handler - shared with the test harness (middleware/errorHandler.js)
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 8080;
 
 connectDB()
   .then(() =>
-    // A migration failure is a best-effort data fix gone wrong, not a
-    // reason to refuse to serve traffic — log it and keep booting.
+    // A failed migration is not a reason to refuse traffic.
     runStartupMigrations().catch((err) => {
       console.error("Startup migrations failed (continuing to start server):", err);
     }),
   )
   .then(() =>
-    // Solo Gaps Milestone 3 — ensure the 4 toggleable capability rows
-    // exist (enabled: true) so the permissions matrix has something to
-    // show on first load. Same "don't block boot" reasoning as above.
+    // Seeds the capability rows so the permissions matrix is not empty on first load.
     seedRolePermissions().catch((err) => {
       console.error("Seeding role permissions failed (continuing to start server):", err);
     }),
   )
   .then(() => {
     startScheduler();
-    // No-op unless TELEGRAM_BOT_TOKEN is set — same graceful-degrade
-    // contract as Cloudinary and Gemini.
+    // No-op unless TELEGRAM_BOT_TOKEN is set.
     startTelegram();
     app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
   })

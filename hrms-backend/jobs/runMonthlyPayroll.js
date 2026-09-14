@@ -42,6 +42,10 @@ async function refreshDayCounts(period) {
         allowance: payslip.allowance,
         deduction,
         unpaidDays: unpaidLeaveDays + absentDays,
+        // computePayslip returns a complete payslip; without these the pay
+        // run zeroed every approved shift in the period (D5).
+        overtimePay: payslip.overtimePay,
+        overtimeTaxExempt: payslip.overtimeTaxExempt,
       }),
     );
     await payslip.save();

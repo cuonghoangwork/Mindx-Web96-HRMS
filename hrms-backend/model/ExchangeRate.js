@@ -1,11 +1,6 @@
 import mongoose from "mongoose";
 
-/**
- * ExchangeRate — one persisted VND-per-USD snapshot per calendar month
- * (task 3.8). Payroll draft generation (3.9) and PayrollPeriod.fxRate both
- * read from this instead of re-fetching live on every request, so every
- * payslip in a given period is priced off the exact same number.
- */
+/** One VND-per-USD snapshot per calendar month, so every payslip in a period is priced at the same rate (DECISIONS.md D9). */
 const exchangeRateSchema = new mongoose.Schema(
   {
     year: { type: Number, required: true, min: 2000, max: 2100 },
@@ -13,9 +8,7 @@ const exchangeRateSchema = new mongoose.Schema(
 
     rateVndPerUsd: { type: Number, required: true, min: 1 },
 
-    // "api" - fetched live from the configured FX provider.
-    // "fallback" - live fetch failed or was disabled; DEFAULT_FX_RATE_VND_PER_USD used instead.
-    // "manual" - reserved for a future HR override path; not written by the job today.
+    // "api" live, "fallback" the default rate after a failed fetch, "manual" reserved (never written today).
     source: { type: String, enum: ["api", "fallback", "manual"], required: true },
     providerName: { type: String, default: null },
     fetchedAt: { type: Date, default: Date.now },

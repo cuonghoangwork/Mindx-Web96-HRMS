@@ -93,8 +93,6 @@ function payslipToClient(doc, period) {
     overtimeNightHours: o.overtimeNightHours ?? 0,
     overtimePay: o.overtimePay ?? 0,
     overtimeTaxExempt: o.overtimeTaxExempt !== false,
-    // Display-ready segments ("150% x 4h"), built server-side so the statutory
-    // multipliers live in exactly one place.
     overtimeSegments: overtimeSegments(o.overtimeBreakdown),
     grossPay: o.grossPay ?? 0,
     insuranceBase: o.insuranceBase ?? 0,
@@ -109,9 +107,7 @@ function payslipToClient(doc, period) {
   };
 }
 
-// departmentId scopes the aggregate to one department's payslips — used for
-// MANAGER's read-only, department-scoped payroll view (Payslip.departmentId
-// is denormalized onto every payslip, so this needs no Employee join).
+// departmentId scopes to one department (denormalized on every payslip, so no Employee join).
 async function totalsByPeriod(periodIds, departmentId = null) {
   if (!periodIds.length) return new Map();
   const match = { period: { $in: periodIds } };
@@ -137,8 +133,6 @@ async function totalsByPeriod(periodIds, departmentId = null) {
 }
 
 const payrollController = {
-  // MANAGER gets read-only, department-scoped totals (own department's
-  // payslips only) — HR/ADMIN see the company-wide totals unscoped.
   listPeriods: asyncHandler(async (req, res) => {
     const { status, year } = req.query;
     const condition = {};
@@ -346,10 +340,8 @@ const payrollController = {
       computePayslip({
         ...merged,
         unpaidDays: payslip.unpaidLeaveDays + payslip.absentDays,
-        // Read back from the payslip, not recomputed from attendance.
-        // computePayslip returns a COMPLETE payslip, so omitting this would
-        // write overtimePay: 0 over the stored figure and silently erase an
-        // employee's overtime the moment HR nudged their bonus.
+        // Carried from the stored payslip: computePayslip returns a complete
+        // payslip, so omitting this would erase overtime on every bonus edit.
         overtimePay: payslip.overtimePay,
         overtimeTaxExempt: payslip.overtimeTaxExempt,
       }),
@@ -411,7 +403,7 @@ const payrollController = {
         allowance: payslip.allowance,
         deduction: autoDeduction,
         unpaidDays: unpaidLeaveDays + absentDays,
-        // Same reason as adjust() above — carried forward, never dropped.
+        // Carried forward, as in adjust().
         overtimePay: payslip.overtimePay,
         overtimeTaxExempt: payslip.overtimeTaxExempt,
       }),
@@ -495,11 +487,8 @@ const payrollController = {
     });
 
     if (status === "paid") {
-      // NOTE: jobs/runMonthlyPayroll.js emits this same notice with
-      // audience "all". Whether HR/Admin see "Payroll paid" therefore depends
-      // on whether a human or the cron marked the period paid. Pinned as-is in
-      // tests/notificationProducers.characterization.test.js — reconciling the
-      // two is a behaviour decision, separate from moving the call site.
+      // jobs/runMonthlyPayroll.js emits the same notice with audience "all";
+      // the divergence is pinned by notificationProducers.characterization.test.js.
       await emitNotification({
         audience: "employees",
         category: "payroll",
@@ -539,14 +528,8 @@ const payrollController = {
     res.json({ success: true, message: "Payroll period deleted." });
   }, 400),
 
-  // Tasks 3.8/3.9: manual trigger for the same job the scheduler runs on the
-  // 1st of the month (jobs/generateMonthlyPayrollDraft.js). Mirrors
-  // attendanceController.closeDay's pattern — useful for demos, and for
-  // hosts where the scheduler is disabled (e.g. a free-tier host that sleeps
-  // when idle, same caveat already documented for CRON_CLOSE_ATTENDANCE).
-  // Optional { year, month } body lets HR backfill/regenerate a specific
-  // month; defaults to the current month otherwise. A no-op (skipped: true)
-  // if that month's period already exists.
+  // HTTP trigger for the 1st-of-month draft job (D11). Optional { year, month }
+  // body; a no-op if that period already exists.
   generateMonthlyDraft: asyncHandler(async (req, res) => {
     const { year, month } = req.body ?? {};
     const asOf =
@@ -561,12 +544,7 @@ const payrollController = {
     res.json({ success: true, data: result });
   }, 400),
 
-  // Task 10.8 — payroll self-service: any authenticated user gets their own
-  // payslips, resolved from their own Employee link (see
-  // utils/reviewQueue.js's resolveRequestingEmployee — same lookup every
-  // other self-service endpoint uses). Draft-period payslips are withheld:
-  // a draft's numbers are still subject to HR edits/recompute, so it isn't
-  // a real payslip yet from the employee's point of view.
+  // Own payslips for any authenticated user. Draft periods are withheld — their numbers are not final.
   myPayslips: asyncHandler(async (req, res) => {
     const employee = await resolveRequestingEmployee(req);
     if (!employee) {
@@ -585,12 +563,7 @@ const payrollController = {
     });
   }, 500),
 
-  // Task 3.8, frontend support: lets the "New period" form show HR the
-  // current month's FX snapshot (fetching/persisting it on first ask, same
-  // get-or-create-once-per-month contract the scheduled job uses) so they
-  // can prefill the manual fxRate field with a live number instead of
-  // typing one from memory. Read-only from the caller's point of view - it
-  // never creates a PayrollPeriod, only (at most) an ExchangeRate snapshot.
+  // The month's FX snapshot for the "New period" form (get-or-create, D9). Never creates a period.
   previewFxRate: asyncHandler(async (req, res) => {
     const year = Number(req.params.year);
     const month = Number(req.params.month);

@@ -1,15 +1,6 @@
 /**
- * pushController.js — Web Push subscription CRUD.
- *
- * Three endpoints, all per-device:
- *   GET    /notifications/push          is push available, is THIS browser subscribed
- *   POST   /notifications/push/subscribe
- *   DELETE /notifications/push/subscribe
- *
- * The browser owns the subscription object; the server only stores it and
- * signs pushes with the matching VAPID key. Nothing here trusts the caller
- * beyond their own JWT: a subscription is always written against req.user.id,
- * never a user id from the body.
+ * Web Push subscription CRUD, all per-device. A subscription is always
+ * written against req.user.id, never a user id from the body.
  */
 
 import PushSubscriptionModel from "../model/PushSubscription.js";
@@ -18,13 +9,7 @@ import { AppError } from "../utils/appError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 const pushController = {
-  /**
-   * GET /notifications/push?endpoint=...
-   *
-   * The endpoint identifies the browser asking. Without it this can only
-   * answer "is push configured at all", which is what Settings needs before
-   * the service worker has registered.
-   */
+  /** GET /notifications/push?endpoint=... — without an endpoint it only answers "is push configured". */
   status: asyncHandler(async (req, res) => {
     const { endpoint } = req.query;
     const subscribed = endpoint
@@ -35,10 +20,8 @@ const pushController = {
       success: true,
       data: {
         available: pushEnabled(),
-        // The ONLY way the browser gets this key: pages/Settings.jsx reads
-        // it off this response and hands it to subscribeToPush(). There is
-        // no build-time copy, which is what stops a frontend ending up
-        // keyed to a different pair than the backend signs with.
+        // The only way the browser gets the public key — no build-time copy
+        // that could drift from the pair the backend signs with.
         publicKey: vapidPublicKey(),
         subscribed,
       },
@@ -63,13 +46,8 @@ const pushController = {
       );
     }
 
-    // Upsert on endpoint, not insert. A browser re-subscribing returns the
-    // same endpoint, and re-registering after clearing site data is routine
-    // — an insert would collide on the unique index every time.
-    //
-    // Upserting also re-points an endpoint at whoever is signed in now,
-    // which is what a shared machine needs: the previous user's account
-    // must stop receiving pushes on a browser someone else is using.
+    // Upsert on endpoint: re-subscribing returns the same endpoint, and on a
+    // shared machine it must re-point at whoever is signed in now.
     const subscription = await PushSubscriptionModel.findOneAndUpdate(
       { endpoint },
       {
@@ -93,8 +71,7 @@ const pushController = {
       throw new AppError("An endpoint is required.", "PUSH_ENDPOINT_REQUIRED");
     }
 
-    // Scoped to the caller: knowing someone else's endpoint must not be
-    // enough to unsubscribe them.
+    // Scoped to the caller: knowing an endpoint must not be enough to unsubscribe someone else.
     await PushSubscriptionModel.deleteOne({ endpoint, user: req.user.id });
     res.json({ success: true, message: "Push subscription removed." });
   }, 400),

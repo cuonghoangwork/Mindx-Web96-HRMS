@@ -1,19 +1,9 @@
 /**
- * telegramController.js — account linking and the inbound bot webhook.
- *
- * The linking handshake, which is the only genuinely fiddly part:
- *
- *   1. Settings calls POST /notifications/telegram/link-code.
- *   2. We mint a 6-character code tied to that user, valid 10 minutes,
- *      stored in Mongo (model/TelegramLinkCode.js explains why not memory).
- *   3. The UI shows https://t.me/<bot>?start=<code>.
- *   4. Telegram sends the bot "/start <code>" from the user's chat.
- *   5. handleTelegramUpdate matches the code, writes the chat id onto the
- *      User, burns the code, and replies in the chat.
- *
- * The code is what proves "this Telegram account belongs to that HRMS
- * account". Nothing else in the update can be trusted — chat ids and
- * usernames are supplied by the caller.
+ * Telegram account linking and the inbound webhook. Settings mints a
+ * 10-minute code (POST link-code), the UI shows t.me/<bot>?start=<code>,
+ * Telegram delivers "/start <code>", and handleTelegramUpdate writes the
+ * chat id onto the User and burns the code. The code is the only thing in
+ * the update that can be trusted.
  */
 
 import { timingSafeEqual } from "node:crypto";
@@ -37,19 +27,12 @@ function secretMatches(candidate) {
   if (!expected || !candidate) return false;
   const a = Buffer.from(String(candidate));
   const b = Buffer.from(expected);
-  // timingSafeEqual throws on a length mismatch, which would itself leak the
-  // length — compare sizes first and return the same false either way.
+  // timingSafeEqual throws on a length mismatch; compare sizes first.
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
 
-/**
- * Applies a "/start <code>" update. Shared by the webhook (production) and
- * the polling loop (local dev) so the two cannot drift.
- *
- * Returns a small result object for tests and logs; it never throws, because
- * a malformed update from the internet must not take down the poller.
- */
+/** Applies a "/start <code>" update; shared by the webhook and the dev poller. Never throws. */
 export async function handleTelegramUpdate(update) {
   const message = update?.message;
   const chatId = message?.chat?.id;
@@ -71,8 +54,7 @@ export async function handleTelegramUpdate(update) {
   const code = match[1].toUpperCase();
   const record = await TelegramLinkCodeModel.findOne({ code });
 
-  // Mongo's TTL sweeper runs about once a minute, so an expired document can
-  // still be present. Check explicitly rather than trusting the index.
+  // The TTL sweeper runs about once a minute; check expiry explicitly.
   if (!record || record.expiresAt.getTime() <= Date.now()) {
     if (record) await TelegramLinkCodeModel.deleteOne({ _id: record._id });
     await sendTelegramReply(chatId, "That link code is invalid or has expired. Generate a new one in HRMS.");
@@ -89,7 +71,7 @@ export async function handleTelegramUpdate(update) {
     { _id: user._id },
     { $set: { "notify.telegram": true, "notify.telegramChatId": String(chatId) } },
   );
-  // Single-use: burn it whether or not the reply below succeeds.
+  // Single-use, whether or not the reply succeeds.
   await TelegramLinkCodeModel.deleteOne({ _id: record._id });
 
   await sendTelegramReply(chatId, `✅ Connected to HRMS as <b>${escapeHtml(user.name)}</b>.`);
@@ -103,8 +85,6 @@ const telegramController = {
     res.json({
       success: true,
       data: {
-        // Whether the feature exists at all on this deployment — Settings
-        // shows a "not configured" note rather than a dead button.
         available: telegramEnabled() && Boolean(telegramBotUsername()),
         botUsername: telegramBotUsername(),
         connected: Boolean(user?.notify?.telegramChatId),
@@ -123,8 +103,7 @@ const telegramController = {
       });
     }
 
-    // One live code per user: minting a second should invalidate the first,
-    // or a code shown on a stale tab would still work.
+    // One live code per user, or a code on a stale tab would still work.
     await TelegramLinkCodeModel.deleteMany({ user: req.user.id });
 
     const record = await TelegramLinkCodeModel.create({
@@ -156,12 +135,9 @@ const telegramController = {
   }, 500),
 
   /**
-   * POST /notifications/telegram/webhook/:secret
-   *
-   * Unauthenticated by design — Telegram cannot present a JWT. The secret in
-   * the path IS the credential, which is why it is compared in constant time
-   * and why a mismatch answers 404 rather than 401: an unknown path leaks
-   * less than "wrong secret".
+   * POST /notifications/telegram/webhook/:secret — the path secret is the
+   * credential (Telegram cannot present a JWT); a mismatch answers 404, which
+   * leaks less than "wrong secret".
    */
   webhook: async (req, res) => {
     if (!secretMatches(req.params.secret)) {
@@ -174,8 +150,7 @@ const telegramController = {
       console.error("[telegram] update handling failed:", err.message);
     }
 
-    // Always 200. Anything else makes Telegram retry the same update, and a
-    // message we could not parse will not parse on the retry either.
+    // Always 200 — anything else makes Telegram retry an update that will not parse next time either.
     res.json({ ok: true });
   },
 };

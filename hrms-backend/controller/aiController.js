@@ -1,11 +1,7 @@
 /**
- * aiController.js — Solo Gaps Milestone 2 (AI chat widget).
- *
- * Scoped product-help assistant: every authenticated user, no role
- * restriction (see router/aiRouter.js). Same error-handling convention as
- * performanceController.getAiInsight — the real error.message is returned
- * in the JSON body, and it's the FRONTEND's job to never surface it raw
- * (it can contain config details like "GEMINI_API_KEY is unset").
+ * Product-help chat for every authenticated user. The real error.message is
+ * returned in the body (it can name config details); the frontend never
+ * surfaces it raw.
  */
 
 import { askGemini } from "../utils/geminiClient.js";

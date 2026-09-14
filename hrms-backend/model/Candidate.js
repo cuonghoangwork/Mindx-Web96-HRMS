@@ -13,11 +13,7 @@ const candidateSchema = new mongoose.Schema(
     },
     rating: { type: Number, min: 0, max: 5, default: 0 },
     resumeUrl: { type: String },
-    // Task 5.3 — real PDF CV upload (reuses the Cloudinary + multer pattern
-    // from employee contract uploads, task 1.4). resumeUrl still doubles as
-    // a manually-settable link (see candidateFromClient) for seed/back-compat,
-    // but a real upload additionally stamps this timestamp so the UI can
-    // tell "someone pasted a link" apart from "a file was actually uploaded".
+    // Set only by a real upload, so the UI can tell an uploaded file from a pasted resumeUrl link.
     resumeUploadedAt: { type: Date, default: null },
     notes: { type: String },
     appliedDate: { type: Date, default: Date.now },

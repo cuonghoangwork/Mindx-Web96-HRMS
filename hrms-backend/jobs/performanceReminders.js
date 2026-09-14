@@ -1,13 +1,8 @@
 /**
- * performanceReminders.js — task 5 (scheduled reminders).
- *
- * Runs daily (registered in jobs/index.js). For every Open review cycle
- * whose end date is within REMINDER_WINDOW_DAYS, fires role-aware
- * notifications: the employee (self review still pending), their
- * manager(s) (a pending-reports count), and HR/Admin (aggregate pending
- * count) — replacing the demo's localStorage "have I already notified"
- * hack with a real check against sent Notification records, so this can
- * run daily without re-spamming the same person for the same cycle.
+ * Daily: for every Open cycle ending within REMINDER_WINDOW_DAYS, remind the
+ * employee (self review pending), their managers (pending-reports count) and
+ * HR/Admin (aggregate). Idempotent — checks for an already-sent Notification
+ * before sending.
  */
 
 import EmployeeModel from "../model/Employee.js";

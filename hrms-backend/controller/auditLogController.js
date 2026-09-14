@@ -26,11 +26,7 @@ const auditLogController = {
     res.json({ success: true, items });
   }, 500),
 
-  /**
-   * GET /api/v1/audit-log/recent?limit=10
-   * Shortcut used by Dashboard "Recent Activity" feed.
-   * Returns the last N entries with a category/icon hint the frontend can map.
-   */
+  /** GET /api/v1/audit-log/recent?limit=10 — the Dashboard activity feed, with a category hint per entry. */
   getRecent: asyncHandler(async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 10, 50);
 
@@ -39,9 +35,7 @@ const auditLogController = {
       .sort({ createdAt: -1 })
       .limit(limit);
 
-    // Enrich each entry with a `category` field that matches the
-    // frontend's Notifications.jsx CATEGORY_CONFIG keys so the same
-    // icon chips can be reused on the Dashboard.
+    // `category` matches the frontend's CATEGORY_CONFIG keys so the icon chips are reused.
     const RESOURCE_CATEGORY = {
       employee:     "employee",
       department:   "employee",
@@ -59,7 +53,6 @@ const auditLogController = {
     const enriched = items.map((entry) => {
       const e = entry.toObject();
       e.category = RESOURCE_CATEGORY[e.resource] ?? "system";
-      // Human-readable title for the activity feed
       e.title = buildTitle(e);
       return e;
     });
@@ -85,8 +78,7 @@ function buildTitle({ action, resource, label, actor }) {
     case "login":           return `${who} signed in`;
     case "logout":          return `${who} signed out`;
     case "registered":      return `New account registered: ${who}`;
-    // `label` already reads "<email>: MANAGER -> HR (reason)", so it carries
-    // the whole story — a prefix here would only repeat it.
+    // `label` already carries the whole story.
     case "role_migrated":   return `Role migrated — ${who}`;
     default:                return `${who} — ${action}`;
   }

@@ -36,6 +36,8 @@ import OvertimeRequestModel from "./model/OvertimeRequest.js";
 import NoShowReviewModel from "./model/NoShowReview.js";
 import { resolveDayType, splitDayNight } from "./utils/overtimeRate.js";
 import { buildPayslipRows, insertPayslips } from "./utils/payrollGeneration.js";
+import { autoDeductionVnd, computePayslip } from "./utils/payrollEngine.js";
+import { diffChanges } from "./utils/auditLog.js";
 import ProfileEditRequestModel from "./model/ProfileEditRequest.js";
 import PerformanceCycleModel from "./model/PerformanceCycle.js";
 import PerformanceReviewModel from "./model/PerformanceReview.js";
@@ -676,18 +678,47 @@ function businessDayKeyDaysAhead(n) {
   return toDateKeyUtc(d);
 }
 
-// Two approved shifts inside the job-closed slice (so the OT shows up on
-// real attendance rows and in this month's payroll), one approved and two
-// pending ahead of today (the review queue + "upcoming" state), one
-// rejected with a note. Employees chosen have no leave on these dates.
+// Approved shifts inside the job-closed slice show up on real attendance
+// rows and price onto the current and previous months' payslips; the mix
+// deliberately covers all three day types so a payslip breakdown reads
+// "150% x 4h · 200% x 6h · 300% x 4h". `weeksAgo` picks a Saturday (rest
+// day, 200%); `holidayKey` a seeded public holiday (300%) — skipped unless
+// it falls inside the attendance window. Employees have no leave on these
+// dates. One approved and two pending shifts ahead of today feed the queue.
 const OVERTIME_REQUESTS = [
   { employeeId: "EMP009", daysAgo: 6,   plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Release deployment — production cut-over" },
+  { employeeId: "EMP009", weeksAgo: 2,  plannedStart: "09:00", plannedEnd: "15:00", status: "approved", origin: "assigned", reason: "Saturday data-centre migration (assigned)" },
   { employeeId: "EMP031", daysAgo: 3,   plannedStart: "18:00", plannedEnd: "20:30", status: "approved", origin: "assigned", reason: "Network maintenance window (assigned by IT manager)" },
+  { employeeId: "EMP031", holidayKey: "2026-09-02", plannedStart: "09:00", plannedEnd: "13:00", status: "approved", origin: "assigned", reason: "Holiday on-call — firewall firmware rollout" },
+  { employeeId: "EMP012", daysAgo: 7,   plannedStart: "18:00", plannedEnd: "22:00", status: "approved", origin: "self",     reason: "Regression run before the release" },
+  { employeeId: "EMP014", daysAgo: 17,  plannedStart: "18:00", plannedEnd: "21:30", status: "approved", origin: "self",     reason: "Incident follow-up — API latency" },
+  { employeeId: "EMP023", daysAgo: 13,  plannedStart: "18:00", plannedEnd: "20:00", status: "approved", origin: "self",     reason: "Month-end close" },
+  { employeeId: "EMP026", daysAgo: 11,  plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Late calls with US accounts" },
+  { employeeId: "ADM001", daysAgo: 4,   plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Server patching window" },
   { employeeId: "EMP016", daysAgo: 8,   plannedStart: "18:00", plannedEnd: "22:00", status: "rejected", origin: "self",     reason: "Design review prep", reviewNote: "Not needed — the review moved to next sprint. Please plan this within normal hours." },
   { employeeId: "EMP014", daysAhead: 2, plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Sprint hardening before the client demo" },
   { employeeId: "EMP023", daysAhead: 5, plannedStart: "18:00", plannedEnd: "20:00", status: "pending",  origin: "self",     reason: "Month-end close" },
   { employeeId: "EMP026", daysAhead: 4, plannedStart: "18:00", plannedEnd: "21:00", status: "pending",  origin: "self",     reason: "Quarter-end pipeline calls with US accounts" },
 ];
+
+/** The Saturday `n` weeks back (n=1 is the most recent one). */
+function saturdayKeyWeeksAgo(n) {
+  let d = utcMidnight(toDateKeyUtc(new Date()));
+  d = addUtcDays(d, -((d.getUTCDay() + 1) % 7 || 7)); // most recent Saturday strictly before today
+  return toDateKeyUtc(addUtcDays(d, -7 * (n - 1)));
+}
+
+function overtimeDateKeyFor(spec) {
+  if (spec.daysAgo != null) return businessDayKeyDaysAgo(spec.daysAgo);
+  if (spec.daysAhead != null) return businessDayKeyDaysAhead(spec.daysAhead);
+  if (spec.weeksAgo != null) return saturdayKeyWeeksAgo(spec.weeksAgo);
+  if (spec.holidayKey) {
+    const today = toDateKeyUtc(new Date());
+    const windowStart = toDateKeyUtc(addUtcDays(utcMidnight(today), -365));
+    return spec.holidayKey < today && spec.holidayKey >= windowStart ? spec.holidayKey : null;
+  }
+  return null;
+}
 
 async function seedOvertimeRequests(employees) {
   const byId = new Map(employees.map((e) => [e.employeeId, e]));
@@ -698,7 +729,8 @@ async function seedOvertimeRequests(employees) {
     const emp = byId.get(spec.employeeId);
     if (!emp) continue;
 
-    const dateKey = spec.daysAgo != null ? businessDayKeyDaysAgo(spec.daysAgo) : businessDayKeyDaysAhead(spec.daysAhead);
+    const dateKey = overtimeDateKeyFor(spec);
+    if (!dateKey) continue;
     const date = utcMidnight(dateKey);
 
     const exists = await OvertimeRequestModel.findOne({ employee: emp._id, date });
@@ -819,9 +851,19 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
   let chronicNoShows = 0;
   const otDays = await approvedOvertimeDays(employees);
 
-  for (const dateKey of recentDateKeys) {
+  // A rest day or holiday with an approved shift is closed by the real job
+  // too: only the booked employees check in, and autoCheckOut prices the
+  // whole span as restDay/holiday overtime — exactly what production does.
+  const firstKey = recentDateKeys[0];
+  const offDaysWithOt = [...new Set([...otDays.values()].flatMap((set) => [...set]))]
+    .filter((k) => k >= firstKey && k < toDateKeyUtc(new Date()) && !recentDateKeys.includes(k))
+    .filter((k) => isWeekendUtc(utcMidnight(k)) || HOLIDAY_DATE_KEYS.has(k));
+  const dateKeys = [...recentDateKeys, ...offDaysWithOt].sort();
+
+  for (const dateKey of dateKeys) {
     const date = utcMidnight(dateKey);
     const preSeedDocs = [];
+    const isOffDay = isWeekendUtc(date) || HOLIDAY_DATE_KEYS.has(dateKey);
 
     for (const emp of employees) {
       if (emp.createdAt && date < emp.createdAt) continue;
@@ -838,12 +880,16 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
       }
 
       const bookedLate = otDays.get(emp.employeeId)?.has(dateKey) ?? false;
+      if (isOffDay && !bookedLate) continue; // nobody else works a rest day
       if (!bookedLate && Math.random() < 0.03) continue; // an ordinary occasional no-show, rotates across everyone else
 
       // Left open (no checkOut) — closeAttendanceDay()'s autoCheckOut() step
       // fills that in below, exactly as it would in production (closing at
       // the approved shift's plannedEnd where one exists).
-      const checkIn = !bookedLate && Math.random() < 0.10 ? checkInLate() : checkInOnTime();
+      // On a rest day the shift IS the working span, so check in at plannedStart.
+      const checkIn = isOffDay
+        ? (await OvertimeRequestModel.findOne({ employee: emp._id, date, status: "approved" }, "plannedStart"))?.plannedStart ?? checkInOnTime()
+        : !bookedLate && Math.random() < 0.10 ? checkInLate() : checkInOnTime();
       preSeedDocs.push({ employee: emp._id, date, checkIn, checkOut: null, hours: 0, status: "present" });
     }
 
@@ -1137,6 +1183,117 @@ async function seedLeaveRequests(employees) {
  * month and the pay run doesn't happen until the 10th of the next one).
  * Second-newest → "approved" only. Everything older → fully "paid".
  */
+/* ── Payslip adjustments ────────────────────────────────────────────────
+ * HR's edits to individual payslips — bonus, allowance, an overridden
+ * deduction — so payslips show more than a base salary. Applied to a month
+ * right after its draft is generated (before it is approved or paid), and
+ * again for the current month after refreshCurrentDraftPayrollAfterPromotions()
+ * rebuilds it. Mirrors payrollController.updatePayslip exactly: recompute
+ * autoDeduction, mark the deduction overridden when it differs, run
+ * computePayslip carrying overtime forward, log the edit with a reason.
+ * Amounts are given in USD (the unit salaries are quoted in, and what the
+ * UI renders) and converted at the period's own fxRate when applied, so a
+ * $1,500 bonus reads as $1,500 on the payslip.
+ *
+ * `months` is 1–12 (a calendar-month filter) or "all"; `recent: n` limits
+ * an entry to the last n months of the seeded window, which is how a
+ * salary-advance repayment shows up as a run of consecutive deductions.
+ */
+const PAYSLIP_ADJUSTMENTS = [
+  // Standing allowances
+  { employeeId: "ADM001", months: "all",         allowanceUsd: 400, reason: "Management allowance" },
+  { employeeId: "MGR001", months: "all",         allowanceUsd: 300, reason: "Management allowance" },
+  { employeeId: "MGR002", months: "all",         allowanceUsd: 250, reason: "On-call allowance — Engineering" },
+  { employeeId: "EMP009", months: "all",         allowanceUsd: 250, reason: "On-call allowance — Engineering" },
+  { employeeId: "EMP014", months: "all",         allowanceUsd: 250, reason: "On-call allowance — Engineering" },
+  { employeeId: "EMP031", months: "all",         allowanceUsd: 60,  reason: "Phone allowance — IT" },
+  { employeeId: "EMP015", months: "all",         allowanceUsd: 150, reason: "Transport allowance" },
+  // Sales commission and quarterly bonuses
+  { employeeId: "EMP026", months: "all",         bonusUsd: 450,   reason: "Monthly sales commission" },
+  { employeeId: "EMP027", months: "all",         bonusUsd: 350,   reason: "Monthly sales commission" },
+  { employeeId: "EMP029", months: [3, 6, 9, 12], bonusUsd: 1_500, reason: "Quarterly sales bonus" },
+  { employeeId: "EMP005", months: [3, 6, 9, 12], bonusUsd: 1_200, reason: "Quarterly sales bonus" },
+  // One-off bonuses in the current month (the one the demo opens on)
+  { employeeId: "ADM001", recent: 1,             bonusUsd: 2_000, reason: "Annual performance bonus" },
+  { employeeId: "MGR002", recent: 1,             bonusUsd: 800,   reason: "Release delivery bonus" },
+  { employeeId: "EMP012", recent: 1,             bonusUsd: 400,   reason: "Release delivery bonus" },
+  // Overridden deductions
+  { employeeId: "EMP011", recent: 3,             deductionUsd: 300, reason: "Salary advance repayment (3 instalments)" },
+  { employeeId: "EMP018", recent: 2,             deductionUsd: 120, reason: "Equipment replacement — lost access badge and laptop charger" },
+];
+
+async function applyPayslipAdjustments({ year, month }, { monthIndexFromEnd, hrUser }) {
+  const period = await PayrollPeriodModel.findOne({ year, month });
+  if (!period) return 0;
+  const employees = await EmployeeModel.find({ employeeId: { $in: PAYSLIP_ADJUSTMENTS.map((a) => a.employeeId) } }, "employeeId");
+  const byCode = new Map(employees.map((e) => [e.employeeId, e._id]));
+  let applied = 0;
+
+  for (const spec of PAYSLIP_ADJUSTMENTS) {
+    const inMonth =
+      spec.months === "all" ||
+      (Array.isArray(spec.months) && spec.months.includes(month)) ||
+      (spec.recent != null && monthIndexFromEnd < spec.recent);
+    if (!inMonth) continue;
+    const employeeId = byCode.get(spec.employeeId);
+    if (!employeeId) continue;
+    const payslip = await PayslipModel.findOne({ period: period._id, employee: employeeId });
+    if (!payslip) continue;
+
+    const vnd = (usd) => Math.round(usd * period.fxRate);
+    const before = { baseSalary: payslip.baseSalary, bonus: payslip.bonus, allowance: payslip.allowance, deduction: payslip.deduction };
+    const merged = {
+      baseSalary: payslip.baseSalary,
+      bonus: spec.bonusUsd != null ? vnd(spec.bonusUsd) : payslip.bonus,
+      allowance: spec.allowanceUsd != null ? vnd(spec.allowanceUsd) : payslip.allowance,
+      deduction: spec.deductionUsd != null ? vnd(spec.deductionUsd) : payslip.deduction,
+    };
+    const changes = diffChanges(before, merged);
+    if (!changes) continue; // already applied
+
+    payslip.autoDeduction = autoDeductionVnd({
+      baseSalary: merged.baseSalary,
+      bonus: merged.bonus,
+      allowance: merged.allowance,
+      unpaidLeaveDays: payslip.unpaidLeaveDays,
+      absentDays: payslip.absentDays,
+      standardWorkingDays: period.standardWorkingDays,
+    });
+    payslip.deductionOverridden = merged.deduction !== payslip.autoDeduction;
+    Object.assign(
+      payslip,
+      computePayslip({
+        ...merged,
+        unpaidDays: payslip.unpaidLeaveDays + payslip.absentDays,
+        overtimePay: payslip.overtimePay,
+        overtimeTaxExempt: payslip.overtimeTaxExempt,
+      }),
+    );
+    await payslip.save();
+
+    // The current month's draft is rebuilt on every run, so its edits are
+    // re-applied each time — log each edit once, not once per run.
+    const label = `${payslip.employeeName} — ${year}-${pad2(month)}`;
+    const logged = await mongoose.connection.db
+      .collection("auditlogs")
+      .findOne({ resource: "payroll", action: "updated", label, "changes.reason.to": spec.reason });
+    if (!logged) {
+      await logAction(
+        { user: hrUser ? { id: hrUser._id, name: hrUser.name, role: hrUser.role } : undefined },
+        {
+          action: "updated",
+          resource: "payroll",
+          resourceId: payslip._id,
+          label,
+          changes: { ...changes, reason: { from: null, to: spec.reason } },
+        },
+      );
+    }
+    applied += 1;
+  }
+  return applied;
+}
+
 async function seedPayrollHistory() {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -1152,7 +1309,9 @@ async function seedPayrollHistory() {
   }
 
   const adminUser = await UserModel.findOne({ email: "admin@hrms.com" });
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
   const label = (y, m) => `${y}-${String(m).padStart(2, "0")}`;
+  let adjusted = 0;
 
   for (let idx = 0; idx < months.length; idx++) {
     const { year, month } = months[idx];
@@ -1161,6 +1320,7 @@ async function seedPayrollHistory() {
 
     const draftResult = await generateMonthlyPayrollDraft({ asOf: new Date(year, month - 1, 1) });
     console.log(`✓ Drafted ${label(year, month)}:`, JSON.stringify(draftResult));
+    adjusted += await applyPayslipAdjustments({ year, month }, { monthIndexFromEnd: months.length - 1 - idx, hrUser });
 
     if (isCurrentMonth) continue; // leave as draft
 
@@ -1195,6 +1355,7 @@ async function seedPayrollHistory() {
     const payRunResult = await runMonthlyPayroll({ asOf: new Date(year, month, 1) });
     console.log(`✓ Paid ${label(year, month)}:`, JSON.stringify(payRunResult));
   }
+  console.log(`✓ Applied ${adjusted} payslip adjustments (bonus / allowance / deduction) across the history`);
 }
 
 /* ── Promotion eligibility (Sample Data plan, Phase 5) ────────────────────
@@ -1373,6 +1534,11 @@ async function refreshCurrentDraftPayrollAfterPromotions() {
     `✓ Refreshed ${period.year}-${String(period.month).padStart(2, "0")} draft payroll ` +
       `to reflect post-promotion salaries (${generated} payslips)`,
   );
+
+  // The rebuild dropped this month's adjustments with the old rows; re-apply.
+  const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
+  const reapplied = await applyPayslipAdjustments({ year: period.year, month: period.month }, { monthIndexFromEnd: 0, hrUser });
+  console.log(`✓ Re-applied ${reapplied} payslip adjustments to the refreshed draft`);
 }
 
 /* ── Profile edit requests (Sample Data plan, Phase 6) ────────────────────
@@ -2152,6 +2318,13 @@ async function backdateJobArtifacts() {
   }
   for (const n of await notifications.find({ titleKey: "payrollPaid" }).toArray()) {
     if (n.params?.periodLabel) await stamp(notifications, { _id: n._id }, ictTime(tenthOfNextMonth(n.params.periodLabel), 8));
+  }
+  // Payslip adjustments: between the 1st-of-month draft and the 10th pay run.
+  const currentLabel = `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}`;
+  for (const a of await auditLogs.find({ resource: "payroll", action: "updated", label: / — (\d{4}-\d{2})$/ }).toArray()) {
+    const label = a.label.slice(-7);
+    if (label === currentLabel) continue; // this month's edits happened "today"
+    await stamp(auditLogs, { _id: a._id }, ictTime(tenthOfNextMonth(label).replace(/-10$/, "-06"), 10));
   }
   for (const a of await auditLogs.find({ resource: "payroll", label: /^Payroll (\d{4}-\d{2})/ }).toArray()) {
     const label = a.label.slice(8, 15);

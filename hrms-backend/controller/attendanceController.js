@@ -15,13 +15,11 @@ const attendanceController = {
 
     const condition = {};
 
-    // EMPLOYEE role: can only see their own attendance
     if (req.user.role === "EMPLOYEE") {
       const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
       if (myEmp) {
         condition.employee = myEmp._id;
       } else {
-        // No linked employee — return empty
         return res.json({ success: true, totalItems: 0, totalPages: 0, currentPage: 1, items: [] });
       }
     } else if (req.user.role === "MANAGER") {
@@ -68,7 +66,6 @@ const attendanceController = {
   checkIn: asyncHandler(async (req, res) => {
     let { employeeId, date } = req.body;
 
-    // EMPLOYEE role can only clock in for themselves
     if (req.user.role === "EMPLOYEE") {
       const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
       if (!myEmp) {
@@ -103,7 +100,6 @@ const attendanceController = {
   checkOut: asyncHandler(async (req, res) => {
     let { employeeId, date } = req.body;
 
-    // EMPLOYEE role can only clock out for themselves
     if (req.user.role === "EMPLOYEE") {
       const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
       if (!myEmp) {
@@ -130,19 +126,14 @@ const attendanceController = {
     if (!record) throw new AppError("No check-in record found for this employee/date.", "NO_CHECKIN_RECORD");
 
     record.checkOut = data.checkOut || new Date().toTimeString().slice(0, 5);
-    // The ONE place rawCheckOut is written. It is what makes a late overtime
-    // approval able to credit real hours: the close job overwrites checkOut,
-    // so without this a record auto-closed at 18:00 loses all evidence that
-    // the employee actually stayed until 21:30.
+    // The one place rawCheckOut is written — the clock evidence a late overtime approval reads (D5).
     record.rawCheckOut = record.checkOut;
     if (record.checkIn) {
       const [h1, m1] = record.checkIn.split(":").map(Number);
       const [h2, m2] = record.checkOut.split(":").map(Number);
       record.hours = Math.max(0, (h2 * 60 + m2 - (h1 * 60 + m1)) / 60);
     }
-    // Clocking out is one of the inputs overtime is derived from. With no
-    // approved request this records the span as unapproved overtime; once HR
-    // approves, the same function moves those minutes across.
+    // Derives overtime from the clock times: unapproved now, moved across on approval.
     await recomputeRecordOvertime(record);
     await record.save();
     await record.populate("employee", "name");
@@ -150,13 +141,7 @@ const attendanceController = {
     res.json({ success: true, data: attendanceToClient(record) });
   }, 400),
 
-  /**
-   * Fetch-mutate-save rather than findByIdAndUpdate, because overtime is
-   * recomputed from the record's clock times and the recompute needs a document
-   * to mutate. Editing check-in/check-out by hand is one of the three ways
-   * overtime changes, and it has to go through the same single derivation as
-   * the other two or the numbers drift.
-   */
+  /** Fetch-mutate-save, not findByIdAndUpdate: the overtime recompute needs a document to mutate. */
   update: asyncHandler(async (req, res) => {
     const data = attendanceFromClient(req.body);
 
@@ -179,8 +164,6 @@ const attendanceController = {
     }
 
     Object.assign(record, data);
-    // "manual" tells the approval queue that these hours rest on a human's
-    // edit rather than on a clock-out or an approved plan.
     await recomputeRecordOvertime(record, { evidence: "manual" });
     await record.save();
     await record.populate("employee", "name");

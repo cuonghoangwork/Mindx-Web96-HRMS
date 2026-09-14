@@ -48,16 +48,8 @@ const employeeController = {
       }
     }
 
-    // Deliberately NOT department-scoped for MANAGER: the roster/directory
-    // read has always been company-wide for every authenticated role (see
-    // the router comment — even plain EMPLOYEE sees all names/departments
-    // "for display"). Scoping this would make MANAGER's read visibility
-    // *more* restrictive than EMPLOYEE's, which is backwards. Real
-    // least-privilege for MANAGER lives on the write side (create is
-    // HR/ADMIN-only; update/avatar/contract/promote check
-    // getManagerDepartmentId — see those handlers below) and on the
-    // separate department-scoped views (attendance, payroll, "My
-    // Department" via departmentController.getDetail).
+    // The directory read is company-wide for every role (even EMPLOYEE);
+    // MANAGER's department scoping applies to writes, not to this read.
     if (status && status !== "all") {
       const mapped = employeeFromClient({ status });
       if (mapped.status) condition.status = mapped.status;
@@ -93,7 +85,6 @@ const employeeController = {
     const employee = await EmployeeModel.findById(req.params.id).populate("department", "name");
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // EMPLOYEE role users can only view their own profile
     if (req.user.role === "EMPLOYEE") {
       const myEmp = await EmployeeModel.findOne({ userId: req.user.id });
       if (!myEmp || String(myEmp._id) !== String(employee._id)) {
@@ -101,14 +92,11 @@ const employeeController = {
       }
     }
 
-    // MANAGER can view any employee's basic profile (directory read is
-    // company-wide, see getAll above) — write actions (update/avatar/
-    // contract/promote) still enforce department scoping on their own.
 
     res.json({ success: true, data: employeeToClient(employee) });
   }, 404),
 
-  // GET /api/v1/employees/me — returns the employee profile for the logged-in user
+  // GET /api/v1/employees/me
   getMyProfile: asyncHandler(async (req, res) => {
     const user = await UserModel.findById(req.user.id);
     if (!user) throw new AppError("User not found.", "USER_NOT_FOUND");
@@ -118,7 +106,6 @@ const employeeController = {
       employee = await EmployeeModel.findById(user.employee).populate("department", "name");
     }
     if (!employee) {
-      // Fallback: match by email
       employee = await EmployeeModel.findOne({ email: user.email }).populate("department", "name");
       if (employee && !employee.userId) {
         employee.userId = user._id;
@@ -245,8 +232,7 @@ const employeeController = {
         : null;
     }
 
-    // MANAGER can only update employees currently in their own department,
-    // and can't use this endpoint to move someone into a different one.
+    // MANAGER: own department only, and cannot move someone out of it.
     if (req.user.role === "MANAGER") {
       const deptId = await getManagerDepartmentId(req);
       const existing = await EmployeeModel.findById(req.params.id, "department");
@@ -279,7 +265,6 @@ const employeeController = {
     const employee = await EmployeeModel.findByIdAndDelete(req.params.id);
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // Unlink the user account if one was linked
     if (employee.userId) {
       await UserModel.findByIdAndUpdate(employee.userId, { employee: null });
     }
@@ -306,7 +291,6 @@ const employeeController = {
     const employee = await EmployeeModel.findById(req.params.id);
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // EMPLOYEE role can only upload their own avatar
     if (req.user.role === "EMPLOYEE") {
       if (!employee.userId || String(employee.userId) !== String(req.user.id)) {
         return res.status(403).json({
@@ -317,7 +301,6 @@ const employeeController = {
       }
     }
 
-    // MANAGER can only manage avatars for their own department
     if (req.user.role === "MANAGER") {
       const deptId = await getManagerDepartmentId(req);
       if (!employee.department || String(employee.department) !== String(deptId)) {
@@ -343,11 +326,7 @@ const employeeController = {
     res.json({ success: true, data: employeeToClient(employee) });
   }, 400),
 
-  // Task 1.4 — contract PDF upload. Unlike avatars, HR/Admin-only (see
-  // router/employeeRouter.js's authorize() on this route) — a contract is
-  // an official HR document, not something an employee self-serves.
-  // Employees view it read-only via employeeToClient's contractUrl
-  // (already returned by GET /employees/me and GET /employees/:id).
+  // Contract PDF — HR/Admin-only (router), unlike the self-serve avatar.
   uploadContract: asyncHandler(async (req, res) => {
     if (!isCloudinaryConfigured()) {
       throw new AppError(
@@ -360,7 +339,6 @@ const employeeController = {
     const employee = await EmployeeModel.findById(req.params.id);
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // MANAGER can only manage contracts for their own department
     if (req.user.role === "MANAGER") {
       const deptId = await getManagerDepartmentId(req);
       if (!employee.department || String(employee.department) !== String(deptId)) {
@@ -395,11 +373,7 @@ const employeeController = {
     res.json({ success: true, data: employeeToClient(employee) });
   }, 400),
 
-  // Solo Gaps Milestone 1 — arbitrary multi-document upload. Additive
-  // alongside uploadContract above, not a replacement: each document gets
-  // its own Cloudinary asset (unique public_id) since, unlike a contract,
-  // there's no single "current" document to overwrite. label/type apply to
-  // the whole batch (one upload action, up to 5 files at once).
+  // Multi-document upload: each file gets its own Cloudinary asset; label/type apply to the whole batch.
   uploadDocuments: asyncHandler(async (req, res) => {
     if (!isCloudinaryConfigured()) {
       throw new AppError(
@@ -412,7 +386,6 @@ const employeeController = {
     const employee = await EmployeeModel.findById(req.params.id);
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // MANAGER can only manage documents for their own department
     if (req.user.role === "MANAGER") {
       const deptId = await getManagerDepartmentId(req);
       if (!employee.department || String(employee.department) !== String(deptId)) {
@@ -458,15 +431,11 @@ const employeeController = {
     res.json({ success: true, data: employeeToClient(employee) });
   }, 400),
 
-  // Solo Gaps Milestone 1 — deletes one document from the array. Best-effort
-  // Cloudinary cleanup: a failure there logs but doesn't block the user's
-  // delete, matching logAction's fire-and-forget philosophy — an orphaned
-  // Cloudinary asset is a minor leak, not worth failing the request over.
+  // Best-effort Cloudinary cleanup: an orphaned asset is not worth failing the delete over.
   removeDocument: asyncHandler(async (req, res) => {
     const employee = await EmployeeModel.findById(req.params.id);
     if (!employee) throw new AppError("Employee not found.", "EMPLOYEE_NOT_FOUND");
 
-    // MANAGER can only manage documents for their own department
     if (req.user.role === "MANAGER") {
       const deptId = await getManagerDepartmentId(req);
       if (!employee.department || String(employee.department) !== String(deptId)) {

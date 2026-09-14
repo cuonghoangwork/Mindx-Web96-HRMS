@@ -11,11 +11,7 @@ const promotionRequestSchema = new mongoose.Schema(
     currentDesignation: { type: String, default: null },
     currentDepartmentName: { type: String, default: null },
     currentAnnualSalary: { type: Number, default: null },
-    // Position Ladder (task 2.4/2.5) — separate from designation, which is
-    // free-text job title. currentPositionLevel is captured at proposal
-    // time the same way currentDesignation etc. already are, so the
-    // request stands on its own even if the employee changes level again
-    // before this one is reviewed.
+    // Captured at proposal time, like currentDesignation, so the request stands on its own.
     currentPositionLevel: { type: String, enum: POSITION_LEVELS, default: null },
 
     proposedDesignation: { type: String, default: null, trim: true },

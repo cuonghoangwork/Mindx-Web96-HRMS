@@ -1,12 +1,8 @@
 /**
- * RolePermission.js — Solo Gaps Milestone 3 (permissions matrix).
- *
- * A second, additional gate on top of authorize()'s coarse role-set check —
- * one row per (role, capability), toggleable by ADMIN. Deliberately can
- * only make a role STRICTER than authorize() already allows, never grant
- * anything wider: role's enum is restricted to "MANAGER" only, since
- * ADMIN is always full access and EMPLOYEE/HR are already excluded by
- * authorize() on every capability-gated route (see utils/permissions.js).
+ * One toggleable row per (role, capability) — a second gate after
+ * authorize() that can only make MANAGER stricter, never wider. The role
+ * enum is MANAGER only: ADMIN is always full access, and EMPLOYEE/HR are
+ * already excluded by authorize() on every gated route.
  */
 
 import mongoose from "mongoose";

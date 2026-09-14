@@ -11,9 +11,7 @@ router.get("/:id", verifyToken, candidateController.getDetail);
 router.post("/", verifyToken, authorize("ADMIN", "HR"), validate.candidate.create, candidateController.create);
 router.put("/:id", verifyToken, authorize("ADMIN", "HR"), validate.candidate.update, candidateController.update);
 
-// CV/resume PDF upload (task 5.3) — reuses the same uploadPdf multer config
-// as employee contract uploads (task 1.4). HR/Admin only, same as
-// the other candidate-mutating routes above.
+// CV upload — HR/Admin only, same uploadPdf config as contracts.
 router.post(
   "/:id/cv",
   verifyToken,

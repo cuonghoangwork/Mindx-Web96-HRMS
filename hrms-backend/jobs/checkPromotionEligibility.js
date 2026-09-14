@@ -1,23 +1,9 @@
 /**
- * checkPromotionEligibility.js — scheduled Position Ladder check (task 2.4).
- *
- * Runs daily (registered in jobs/index.js alongside closeAttendanceDay).
- * For every active employee, checks whether they've completed the tenure
- * threshold for their current level (utils/positionLadder.js) and, if so,
- * auto-creates a *pending* PromotionRequest for HR to review.
- *
- * Explicitly NEVER auto-promotes — per HRMS_IMPROVEMENT_TASKS.md 2.4, this
- * changes salary and title, higher stakes than the no-show case (4.7), so
- * it only ever flags for human review, same as the no-show queue will.
- *
- * Dedup rule: an employee is flagged for a given level transition at most
- * once, ever — regardless of whether that flag is still pending or was
- * already approved/rejected. Without this, a rejected flag would re-fire
- * every single day forever, since rejecting a promotion doesn't reset the
- * employee's levelStartDate. If HR's rejection reason no longer applies
- * later, they can propose the promotion manually via the existing
- * HR-initiated flow (promotionRequestController.create) — that path is
- * untouched by this job.
+ * Daily tenure sweep (DECISIONS.md D1, D2): a pending PromotionRequest for
+ * every active employee past their threshold. Never promotes. Flags each
+ * level transition at most once, ever — a rejection does not reset
+ * levelStartDate, so without that rule it would re-fire daily; HR can still
+ * propose manually.
  */
 
 import EmployeeModel from "../model/Employee.js";
@@ -41,8 +27,6 @@ export async function checkPromotionEligibility({ asOf = new Date() } = {}) {
     );
     if (!eligible || !nextLevel) continue;
 
-    // Dedup: skip if this exact transition has ever been auto-flagged for
-    // this employee before, in any status.
     const alreadyFlagged = await PromotionRequestModel.findOne({
       employee: employee._id,
       systemGenerated: true,
@@ -50,9 +34,7 @@ export async function checkPromotionEligibility({ asOf = new Date() } = {}) {
     });
     if (alreadyFlagged) continue;
 
-    // Also skip if there's any other pending proposal in flight (manual or
-    // automated) — matches the dedup rule the manual create endpoint
-    // already enforces, so the two paths never race each other.
+    // Same one-pending rule the manual create endpoint enforces.
     const pendingAny = await PromotionRequestModel.findOne({
       employee: employee._id,
       status: "pending",

@@ -1,13 +1,7 @@
 /**
- * appChatPrompt.js — Solo Gaps Milestone 2 (AI chat widget).
- *
- * A static system prompt describing HRMS's own pages/roles (NOT the WEB96
- * course reference doc — that describes an unrelated backend course, not
- * this app's features). Scoped product-help only: the model has no live
- * data access and is told explicitly not to claim otherwise. Kept as a
- * pure function, separate from the controller and the Gemini network
- * call, so it's testable with plain fixtures — same shape as
- * performanceInsightPrompt.js's buildInsightPrompt.
+ * Static system prompt describing HRMS's own pages and roles. Product-help
+ * only: the model has no live data access and is told not to claim
+ * otherwise. Pure, so it tests on plain fixtures.
  */
 
 import { languageNameFor } from "./language.js";

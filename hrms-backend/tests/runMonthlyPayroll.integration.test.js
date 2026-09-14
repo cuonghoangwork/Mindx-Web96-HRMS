@@ -254,6 +254,41 @@ describe("runMonthlyPayroll", () => {
     expect(after.autoDeduction).not.toBe(after.deduction);
   });
 
+  it("keeps overtime pay when it refreshes a draft's day counts", async (ctx) => {
+    if (!dbAvailable) return ctx.skip();
+    const { runMonthlyPayroll } = await import("../jobs/runMonthlyPayroll.js");
+    const { default: PayslipModel } = await import("../model/Payslip.js");
+    const { default: AttendanceModel } = await import("../model/Attendance.js");
+
+    const employee = await makeEmployee();
+    const period = await makePeriod();
+    // One approved 4h weekday shift, already derived onto the attendance row
+    // the way the close job would have written it.
+    await AttendanceModel.create({
+      employee: employee._id,
+      date: new Date(Date.UTC(YEAR, MONTH - 1, 12)),
+      checkIn: "09:00",
+      checkOut: "22:00",
+      hours: 13,
+      status: "present",
+      otMinutes: 240,
+      otNightMinutes: 0,
+      otDayType: "normal",
+      otEvidence: "planned",
+    });
+    await generateFor(period);
+
+    const before = await PayslipModel.findOne({ employee: employee._id });
+    expect(before.overtimePay).toBeGreaterThan(0);
+
+    await runMonthlyPayroll({ asOf: AS_OF });
+
+    const after = await PayslipModel.findOne({ employee: employee._id });
+    expect(after.overtimePay).toBe(before.overtimePay);
+    expect(after.overtimeTaxExempt).toBe(before.overtimeTaxExempt);
+    expect(after.grossPay).toBe(after.baseSalary + after.overtimePay);
+  });
+
   it("adds a payslip for someone hired after the period was drafted", async (ctx) => {
     if (!dbAvailable) return ctx.skip();
     const { runMonthlyPayroll } = await import("../jobs/runMonthlyPayroll.js");

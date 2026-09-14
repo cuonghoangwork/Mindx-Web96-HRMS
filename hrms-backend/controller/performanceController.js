@@ -236,11 +236,7 @@ const performanceController = {
       language: req.body.language
     });
 
-    // Gemini's forced "thinking" adds ~15-20s of unavoidable latency per
-    // call (see geminiClient.js) — skip it entirely when this exact prompt
-    // was already answered for this review, so re-opening the dialog or a
-    // second HR user checking the same review is instant instead of
-    // paying that cost again for an identical answer.
+    // A Gemini call costs ~15s (geminiClient.js); reuse the answer for an identical prompt.
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     if (review?.aiInsight?.promptHash === promptHash) {
       const { summary, strengths, growthAreas } = review.aiInsight;
@@ -604,15 +600,7 @@ const performanceController = {
     res.json({ success: true, data: reviewToClient(review, access.isAdmin || access.isHR) });
   }, 400),
 
-  // Manual trigger for the daily reminder sweep, matching the ADMIN-only job
-  // triggers in attendanceRouter.js, payrollRouter.js and
-  // promotionRequestRouter.js. Needed because ENABLE_SCHEDULER is false on
-  // Render's free plan (render.yaml).
-  //
-  // Optional asOf shifts the "cycle ends within 7 days" window. Re-running is
-  // safe: the job checks for an existing Notification with the same title
-  // (which embeds the cycle key) before sending, so nobody is reminded twice
-  // for the same cycle.
+  // HTTP trigger for the daily reminder sweep (D11). Optional asOf; idempotent per cycle.
   sendReminders: asyncHandler(async (req, res) => {
     const raw = req.body?.asOf;
     const asOf = raw ? new Date(raw) : new Date();

@@ -69,9 +69,7 @@ const { list, review: factoryReview } = createReviewRequestController({
     }
     if (request.proposedPositionLevel) {
       updates.positionLevel = request.proposedPositionLevel;
-      // Reset the tenure clock — they just started at this level, so the
-      // next eligibility check (task 2.4) should measure from now, not
-      // from whenever they entered the level they're leaving.
+      // Tenure clock restarts at the new level (D1).
       updates.levelStartDate = new Date();
     }
     if (!Object.keys(updates).length) return;
@@ -147,8 +145,7 @@ const promotionRequestController = {
       return res.status(404).json({ success: false, message: "Employee not found.", code: "EMPLOYEE_NOT_FOUND" });
     }
 
-    // MANAGER can only propose promotions for employees in their own
-    // department, and can't use a promotion to move someone to another one.
+    // MANAGER: own department only, and cannot move someone out of it.
     if (req.user.role === "MANAGER") {
       if (!(await hasCapability("MANAGER", "proposePromotions"))) {
         return res.status(403).json({ success: false, message: CAPABILITY_DISABLED_MESSAGE, code: "CAPABILITY_DISABLED" });
@@ -229,9 +226,7 @@ const promotionRequestController = {
     const request = await PromotionRequestModel.create(doc);
     await request.populate(POPULATE.map(([path, select]) => ({ path, select })));
 
-    // ADMIN only, deliberately narrower than the leave/profile-edit set:
-    // router/promotionRequestRouter.js lets only an ADMIN review a promotion,
-    // so telling anyone else would be a notice they cannot act on.
+    // ADMIN only — the router lets only ADMIN review a promotion.
     const admins = await UserModel.find({ role: "ADMIN" }, "_id");
     await emitNotificationEach(admins.map((u) => u._id), {
       category: "employee",
@@ -330,16 +325,8 @@ const promotionRequestController = {
     }
   },
 
-  // Manual triggers for the two scheduled sweeps that create pending
-  // PromotionRequests. ADMIN-only, mirroring attendanceController.closeDay
-  // and payrollController.generateMonthlyDraft/runMonthly: this service runs
-  // with ENABLE_SCHEDULER=false on Render's free plan (render.yaml), which
-  // sleeps when idle, so an external scheduler drives the jobs over HTTP.
-  //
-  // Optional asOf runs the sweep as at another date, to cover a missed day.
-  // Re-running is safe: both jobs flag a given employee at most once per
-  // level transition / anniversary, so a repeat is a no-op rather than a
-  // duplicate request.
+  // HTTP triggers for the two sweeps (D11). Optional asOf replays a missed
+  // day; both are idempotent.
   checkEligibility: asyncHandler(async (req, res) => {
     const raw = req.body?.asOf;
     const asOf = raw ? new Date(raw) : new Date();
@@ -353,9 +340,7 @@ const promotionRequestController = {
     res.json({ success: true, data: result });
   }, 400),
 
-  // Lives here rather than under /payroll because it proposes a raise as a
-  // pending PromotionRequest for HR to review - it never changes salary
-  // directly, so it feeds the same review queue as checkEligibility above.
+  // Here rather than under /payroll: it proposes, it never changes salary.
   annualRaise: asyncHandler(async (req, res) => {
     const raw = req.body?.asOf;
     const asOf = raw ? new Date(raw) : new Date();

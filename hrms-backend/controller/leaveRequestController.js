@@ -26,14 +26,7 @@ function toClientRequest(doc) {
   };
 }
 
-/**
- * list/review reused from the generic review-queue pattern (utils/reviewQueue.js,
- * task 0.2) — same shape as ProfileEditRequest's. Only the approval side effect
- * and notification copy are leave-specific:
- *   - onApprove marks each working day of the range "on-leave" on the
- *     employee's Attendance record, so Attendance.jsx reflects it without a
- *     separate sync step.
- */
+/** list/review from the review-queue pattern (D6); onApprove writes an "on-leave" attendance row per working day. */
 const { list, review } = createReviewRequestController({
   Model: LeaveRequestModel,
   resourceLabel: "leave request",
@@ -73,25 +66,14 @@ const { list, review } = createReviewRequestController({
   }),
   employeeLink: "/dashboard",
   employeeLinkLabel: "View leave balance",
-  // A decision on your own leave is the clearest case for reaching a phone
-  // (utils/notifyPolicy.js). It only qualifies if it is filed under "leave".
   notifyCategory: "leave",
 });
 
 const leaveRequestController = {
   /**
-   * POST /api/v1/leave-requests
-   * Employee applies for leave.
-   *
-   * - `type` is chosen by the employee (annual/sick/parental/bereavement/
-   *   unpaid) and validated here against LEAVE_TYPES and, for capped types,
-   *   against their remaining balance for the request's year — a request
-   *   that would exceed the remaining balance for a capped type is
-   *   rejected rather than silently downgraded to unpaid, since the
-   *   employee explicitly picked the type. "unpaid" has no cap.
-   * - 9AM same-day rule: a request whose startDate is today is only
-   *   accepted before 9:00 AM server time; after that, the employee can
-   *   still apply, just not for today (they can pick a future date).
+   * POST /api/v1/leave-requests — rules in DECISIONS.md D3. A request over a
+   * capped type's balance is rejected, not downgraded to unpaid; same-day
+   * leave is accepted only before 09:00 (host clock — see D3).
    */
   create: asyncHandler(async (req, res) => {
     const employee = await resolveRequestingEmployee(req);
@@ -131,9 +113,6 @@ const leaveRequestController = {
       throw new AppError("The selected range contains no working days.", "NO_WORKING_DAYS_IN_RANGE");
     }
 
-    // Block if there's already a pending request for this employee — same
-    // rule profileEditRequestController.js and promotionRequestController.js
-    // apply for their own request types.
     await assertNoPendingRequest(
       LeaveRequestModel,
       employee._id,
@@ -163,12 +142,7 @@ const leaveRequestController = {
       appliedAt: now,
     });
 
-    // The pending-request pre-check above has the same race: two
-    // concurrent submissions can both pass it before either commits. Re-
-    // verify now that this request is committed — if another pending
-    // request for this employee has an earlier _id, this one lost the
-    // race and must be rolled back (mirrors the balance-cap re-check
-    // below, which closes the identical race for the balance check).
+    // Post-commit re-check of the one-pending rule: an earlier _id wins the race.
     const earlierPending = await LeaveRequestModel.findOne({
       employee: employee._id,
       status: "pending",
@@ -183,14 +157,8 @@ const leaveRequestController = {
       });
     }
 
-    // The pre-check above (getRemainingDays) reads committed state before
-    // this write, so two concurrent requests for the same employee/type
-    // can both pass it before either commits. Re-verify now that this
-    // request is committed: recompute usage across every committed
-    // request of this type/year in insertion order (_id order, which is
-    // deterministic and identical for both racing requests once both have
-    // committed) and roll this one back if it's the one that pushed the
-    // type over its cap.
+    // Post-commit re-check of the balance cap: recompute in _id order (the
+    // same order for both racers) and roll back if this one crossed the line.
     if (type !== "unpaid") {
       const year = start.getFullYear();
       const yearStart = new Date(Date.UTC(year, 0, 1));
@@ -221,22 +189,9 @@ const leaveRequestController = {
 
     await request.populate("employee", "name email employeeId");
 
-    // Addressed one-per-reviewer rather than an "hr" broadcast: MANAGER is
-    // department-scoped and a broadcast carries no department (see
-    // AUDIENCES_BY_ROLE in model/Notification.js).
-    //
-    // The HR half stays ADDRESSED rather than becoming a notifyHR broadcast
-    // like overtime uses, because read state on a broadcast is shared: one
-    // HR person marking it read clears it from every other reviewer's badge.
-    // A request each of them has to act on should not disappear because a
-    // colleague glanced at it.
-    //
-    // The manager half is scoped to the requester's OWN department. It used
-    // to be every MANAGER in the company, so a manager was pinged about leave
-    // in departments they have no authority to approve — the mirror image of
-    // the overtime bug, where the department manager was the one person NOT
-    // told. Excluding the caller stops a reviewer notifying themselves about
-    // their own request.
+    // Addressed notices, not a broadcast (D8): a department manager is never in
+    // the "hr" audience, and broadcast read state is shared. The manager half
+    // is the requester's own department only; the caller is excluded.
     const [hrTier, departmentManagers] = await Promise.all([
       UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } }, "_id"),
       departmentManagerUserIds(employee.department, req.user.id),
@@ -263,16 +218,9 @@ const leaveRequestController = {
   review,
 
   /**
-   * GET /api/v1/leave-requests/balance?year=&employeeId=
-   * Employees always get their own balance regardless of query params.
-   * HR/Admin can pass ?employeeId= to check someone else's; omitting it
-   * falls back to their own (rarely meaningful for non-employees, but
-   * keeps the endpoint safe to call without params).
-   *
-   * Returns a per-type breakdown (`balances`), one row per LEAVE_TYPES
-   * entry, plus a flattened `annual`/`total`/`remaining`/`used` for
-   * backwards-compatible callers that only care about the Annual/PTO pool
-   * (e.g. the self-service dashboard's "PTO Days Remaining" stat).
+   * GET /api/v1/leave-requests/balance?year=&employeeId= — employees always
+   * get their own. Returns per-type `balances` plus a flattened Annual/PTO
+   * shortcut for callers that only need the one number.
    */
   balance: asyncHandler(async (req, res) => {
     const year = Number(req.query.year) || new Date().getFullYear();
@@ -310,8 +258,6 @@ const leaveRequestController = {
       data: {
         year,
         balances,
-        // Flattened Annual/PTO shortcut — kept for callers (dashboard stat
-        // card) that only need the one number, not the full breakdown.
         total: annual?.accrued ?? 0,
         used: annual?.used ?? 0,
         remaining: annual?.remaining ?? 0,
@@ -319,15 +265,7 @@ const leaveRequestController = {
     });
   }, 500),
 
-  /**
-   * GET /api/v1/leave-requests/balances?year= — MANAGER/HR/ADMIN only.
-   * One getAllBalances() row per employee they can see (MANAGER scoped to
-   * their own department, same rule as list/review). Exists so callers
-   * like the Holidays "Leave balances" panel can get every employee's
-   * authoritative per-type balance in one request instead of re-deriving
-   * it client-side from raw leave requests (which misses the late
-   * half-day annual deduction and duplicates LEAVE_TYPE_ALLOWANCES).
-   */
+  /** GET /api/v1/leave-requests/balances?year= — every visible employee's per-type balance in one request (MANAGER: own department). */
   balances: asyncHandler(async (req, res) => {
     const year = Number(req.query.year) || new Date().getFullYear();
     const condition = { status: { $ne: "terminated" } };

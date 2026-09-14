@@ -52,7 +52,6 @@ const candidateController = {
   }, 400),
 
   update: asyncHandler(async (req, res) => {
-    // Snapshot stage before update to detect stage changes
     const before = await CandidateModel.findById(req.params.id);
     const beforeStage = before?.stage;
 
@@ -76,11 +75,7 @@ const candidateController = {
     res.json({ success: true, data: candidateToClient(candidate) });
   }, 400),
 
-  // Task 5.3 — real PDF CV upload for a candidate. Mirrors
-  // employeeController.uploadContract (task 1.4): memoryStorage buffer piped
-  // straight to Cloudinary as a "raw" resource, never written to local disk.
-  // HR/Admin only (same authorize() guard as create/update/remove below) —
-  // there's no candidate-facing self-service portal in this app.
+  // CV upload — HR/Admin only; there is no candidate-facing portal.
   uploadCv: asyncHandler(async (req, res) => {
     if (!isCloudinaryConfigured()) {
       throw new AppError(
