@@ -1,35 +1,9 @@
 /**
- * EmployeeStatusBadge — HRMS Design System v3 "Navy Signal Blue"
- * (No structural changes needed for v3 — fully token-driven via var(--...)
- * references, no hardcoded colors; reskin was a token-value swap only.)
+ * Status badge for employee records (Active | On Leave | Remote | Terminated)
+ * with a status icon, a pulse on Active, and a dot-only mode for table cells.
  *
- * Dedicated status badge for employee records.
- * More opinionated than the generic Badge — includes
- * status-specific icons, pulse animation for Active,
- * and a standalone dot-only mode for table cells.
- *
- * Statuses: Active | On Leave | Remote | Terminated
- *
- * Props:
- *   status   — "Active" | "On Leave" | "Remote" | "Terminated" (required)
- *   size     — "sm" | "md" (default) | "lg"
- *   variant  — "badge" (default) | "dot" | "pill"
- *              badge → icon + label  (standard)
- *              dot   → coloured dot only (compact, e.g. Avatar corner)
- *              pill  → dot + label, no border (lighter weight)
- *   pulse    — boolean, animates dot for Active (default true)
- *   className, style
- *
- * Usage:
- *   <EmployeeStatusBadge status="Active" />
- *   <EmployeeStatusBadge status="On Leave" size="lg" />
- *   <EmployeeStatusBadge status="Remote" variant="pill" />
- *   <EmployeeStatusBadge status="Active" variant="dot" />
- *   <EmployeeStatusBadge status="Terminated" pulse={false} />
- *
- * Drop-in for StatusBadge:
- *   Replace  <StatusBadge status={emp.status} dot />
- *   With     <EmployeeStatusBadge status={emp.status} />
+ * Props: status (required), size "sm"|"md"|"lg", variant "badge" (icon +
+ * label) | "dot" | "pill" (dot + label, no border), pulse (default true).
  */
 
 /* ─── Status config ─── */
@@ -182,7 +156,6 @@ function EmployeeStatusBadge({
         ...style,
       }}
     >
-      {/* Animated dot for Active, icon for others */}
       {isActive ? (
         <span
           aria-hidden="true"

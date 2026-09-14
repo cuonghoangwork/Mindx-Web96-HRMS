@@ -18,9 +18,6 @@ function toTimeInputValue(date) {
   return `${h}:${m}`;
 }
 
-// Task 6.6 — delegates to utils/format.js so these follow the in-app
-// language toggle (LanguageContext) instead of the browser/OS locale, which
-// is what `toLocaleDateString(undefined, ...)` was silently keying off before.
 function formatDisplayDate(date, language) {
   return formatDate(date, language, {
     weekday: "short",

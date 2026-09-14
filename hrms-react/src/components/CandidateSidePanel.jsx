@@ -7,8 +7,7 @@ import { translateApiError } from "../utils/apiError";
 import { StarRating } from "./StarRating";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
-// Task 5.3 — same 10MB cap as employee contract uploads (ViewEmployee.jsx's
-// ContractCard) for consistency; a CV is a comparably-sized PDF.
+// Same cap as contract uploads.
 const MAX_CV_BYTES = 10 * 1024 * 1024;
 
 function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDelete, onUploadCv }) {
@@ -133,9 +132,7 @@ function CandidateSidePanel({ candidate, jobTitle, onClose, onStageChange, onDel
   );
 }
 
-// Task 5.3 — real PDF CV upload, wired the same way as ViewEmployee.jsx's
-// ContractCard (file input hidden behind a Button, 10MB/PDF-only client
-// check before hitting the server, inline error message on failure).
+// CV upload, wired like ContractCard.
 function ResumeField({ candidate, onUploadCv }) {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);

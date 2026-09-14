@@ -33,18 +33,10 @@ const SORTABLE_COLUMNS = [
 function AllEmployees() {
   const { t } = useTranslation();
   const { isAdmin, isHRTier, isManagerTier, isManager } = useAuth();
-  // Plain MANAGER (not HR/Admin) gets this page as a read-only company-wide
-  // "Directory" (see employeeController.getAll — read is unscoped for
-  // everyone; only writes are department-scoped/HR-gated). Bulk actions and
-  // Promote live on "My Department" instead (departmentController.getDetail,
-  // routed via /departments/me), so they're hidden here for this role only.
+  // MANAGER and EMPLOYEE see this page as a read-only company-wide Directory:
+  // bulk actions and Promote live on "My Department" (a manager's Promote
+  // would 403 on most rows here), and Salary is hidden from a colleague's card.
   const isPlainManager = isManager && !isHRTier;
-  // Plain EMPLOYEE (App.jsx now opens this route to every role, matching
-  // the design's company-wide "Directory" for Employee too) gets the same
-  // read-only treatment as isPlainManager, plus Salary is hidden on a
-  // colleague's card — employeeController.getDetail already blocks
-  // EMPLOYEE from fetching another employee's single record, so the list's
-  // in-memory salary field shouldn't be surfaced here either.
   const isPlainEmployee = !isManager && !isHRTier;
   const {
     employees, departments, removeEmployee, updateEmployee,
@@ -59,20 +51,10 @@ function AllEmployees() {
   const [panelEmployee, setPanelEmployee] = useState(null);
   const [promotingEmployee, setPromotingEmployee] = useState(null);
 
-  /* ── Roster / Edit requests tabs — real data via PromotionRequestsAPI /
-     ProfileEditRequestsAPI. Promotion review is ADMIN-only (see
-     promotionRequestRouter.js), so that banner stays isAdmin-gated. Profile
-     edit request review is MANAGER (own department)/HR/ADMIN
-     (profileEditRequestRouter.js), so the Edit-requests tab is gated by
-     isManagerTier instead — Manager sees requests scoped to their own
-     department automatically (utils/reviewQueue.js). ── */
-  // Lets a "Profile edit request" notification deep-link straight to this
-  // tab (/employees?tab=editRequests) instead of just landing on Roster.
-  // activeTab is derived from the query string rather than its own
-  // useState (same reasoning as ViewEmployee.jsx's activeTab): navigating
-  // sidebar link -> sidebar link stays on this same route, so a plain
-  // useState initializer would only resolve on first mount and never pick
-  // up a later ?tab= change.
+  // Promotion review is ADMIN-only; edit-request review is MANAGER (own
+  // department)/HR/ADMIN, so that tab is gated by isManagerTier.
+  // Derived from ?tab= (not useState) so a notification deep-link and a later
+  // sidebar navigation on the same route both land on the right tab.
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "editRequests" ? "editRequests" : "roster";
   const setActiveTab = (key) => {
@@ -88,8 +70,7 @@ function AllEmployees() {
       .catch(() => {});
   }, [isAdmin]);
 
-  // Lightweight count for the tab badge — the panel itself owns the full
-  // filtered/paginated request list once it's open.
+  // Count for the tab badge; the panel owns the full list.
   const loadPendingEditCount = useCallback(() => {
     if (!isManagerTier) return;
     ProfileEditRequestsAPI.list({ status: "pending" })
@@ -178,8 +159,7 @@ function AllEmployees() {
     clearSelection();
   };
 
-  // Salary column is dropped from both exports for a plain EMPLOYEE — same
-  // reasoning as SidePanel's canSeeSalary above.
+  // No Salary column in a plain EMPLOYEE's export.
   const csvHeader = isManagerTier
     ? "Name,Employee ID,Department,Designation,Type,Status,Salary"
     : "Name,Employee ID,Department,Designation,Type,Status";
@@ -311,9 +291,6 @@ function AllEmployees() {
           <table className="data-table">
             <thead>
               <tr>
-                {/* Select-all checkbox — hidden for plain MANAGER (Directory
-                    is read-only for that role; bulk actions live on "My
-                    Department" instead). */}
                 {!isPlainManager && !isPlainEmployee && (
                   <th style={{ width: "40px", textAlign: "center" }}>
                     <input
@@ -344,7 +321,6 @@ function AllEmployees() {
                     onClick={(e) => openPanel(employee, e)}
                     style={{ background: isSelected ? "var(--bg-primary-subtle)" : undefined }}
                   >
-                    {/* Checkbox */}
                     {!isPlainManager && !isPlainEmployee && (
                       <td style={{ textAlign: "center" }} onClick={(e) => toggleOne(employee.id, e)}>
                         <input
@@ -357,7 +333,6 @@ function AllEmployees() {
                       </td>
                     )}
 
-                    {/* Name */}
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <Avatar name={employee.name} src={employee.avatar} size="sm" />
@@ -375,8 +350,6 @@ function AllEmployees() {
                     <td><TypeBadge type={employee.type} /></td>
                     <td><StatusBadge status={employee.status} /></td>
 
-                    {/* Actions — plain text links, matching the mockup's
-                        row-action style (no bordered button boxes). */}
                     <td onClick={(e) => e.stopPropagation()}>
                       <Button
                         variant="link"
@@ -384,11 +357,6 @@ function AllEmployees() {
                       >
                         {t("employees.allEmployees.table.details", { defaultValue: "Details" })}
                       </Button>
-                      {/* Promote is scoped to the reviewer's own department
-                          server-side, so it's hidden here for plain MANAGER
-                          — Directory is unscoped/company-wide, and Promote
-                          would 403 on most rows. Manager proposes promotions
-                          from "My Department" instead. */}
                       {isManagerTier && !isPlainManager && (
                         <Button
                           variant="link"
@@ -498,7 +466,5 @@ function AllEmployees() {
     </>
   );
 }
-
-/* ─── Sortable column header ─── */
 
 export default AllEmployees;

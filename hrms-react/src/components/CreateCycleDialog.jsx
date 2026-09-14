@@ -4,12 +4,8 @@ import { PerformanceReviewsAPI } from "../api";
 import Button from "./Button";
 import { translateApiError } from "../utils/apiError";
 
-// Milestone 4 — ADMIN-only custom cycle creation. Same bespoke
-// .modal-overlay/.modal pattern as PerformanceReviewDialog.jsx and
-// ProposePromotionModal.jsx (no reusable <Modal> wrapper exists in this
-// codebase). Visibility of the button that opens this dialog is gated by
-// Performance.jsx on isAdmin; the real enforcement is the backend's admin
-// middleware on POST /performance/cycles regardless.
+// ADMIN-only custom cycle creation; the button is gated on isAdmin, the
+// backend enforces it.
 function CreateCycleDialog({ onClose, onCreated }) {
   const { t } = useTranslation();
 

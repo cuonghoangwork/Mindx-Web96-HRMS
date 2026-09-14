@@ -7,16 +7,9 @@ import { idsMatch } from "../../utils/id";
 import { translateApiError } from "../../utils/apiError";
 
 /**
- * SalaryTab — full payslip history reused from Payroll (8.0e Day 8).
- *
- * MANAGER/HR/ADMIN get every period they're authorized to see via the
- * payroll API (MANAGER gets back only their own department's payslips —
- * payrollController.js scopes it server-side — HR/ADMIN get everything),
- * filtered client-side to this employee (fine for a small period count). A
- * plain Employee viewing their own profile instead uses the self-service
- * GET /payroll/my-payslips endpoint (10.8), which the backend already
- * resolves to "my own Employee record" and only ever returns
- * approved/paid periods (a draft's numbers are still subject to HR edits).
+ * Payslip history. Manager-tier roles read the payroll API (server-scoped)
+ * filtered to this employee; a plain EMPLOYEE uses /payroll/my-payslips,
+ * which returns approved/paid periods only.
  */
 export function SalaryTab({ employee, isManagerTier }) {
   const { t } = useTranslation();

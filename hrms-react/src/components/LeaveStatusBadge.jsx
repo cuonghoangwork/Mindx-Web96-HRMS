@@ -6,23 +6,9 @@ function capitalizeFirst(s) {
 }
 
 /**
- * Leave-request status badge — pending / approved / rejected.
- *
- * Promoted here from two copies (F7): pages/employee/LeaveTab.jsx and
- * pages/dashboard/SelfServiceDashboard.jsx, which rendered the same leave
- * statuses in the same table shape.
- *
- * The two copies had DIVERGED, and this is the LeaveTab one. The dashboard's
- * copy built its label with `status.charAt(0).toUpperCase() + status.slice(1)`
- * — raw English, never translated — so a Vietnamese user saw "Approved" on the
- * dashboard and "Đã duyệt" on the employee page for the same request. Adopting
- * the translated version fixes that; it is a deliberate behaviour change, not
- * a pure move.
- *
- * The i18n keys live under editRequests.tabs rather than anywhere leave-shaped
- * because both features share the same three status words. That is reuse of a
- * translation, not of a concept — if leave statuses ever diverge from edit
- * request statuses, this needs its own keys.
+ * Leave-request status badge — pending / approved / rejected, translated.
+ * The i18n keys are shared with edit-request statuses (same three words);
+ * if the two ever diverge, this needs its own keys.
  */
 export function LeaveStatusBadge({ status }) {
   const { t } = useTranslation();

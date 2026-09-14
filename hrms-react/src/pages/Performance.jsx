@@ -8,20 +8,9 @@ import Badge from "../components/Badge";
 import CreateCycleDialog from "../components/CreateCycleDialog";
 import PerformanceReviewDialog from "../components/PerformanceReviewDialog";
 
-// Milestones 1-4 (see PERFORMANCE_REVIEWS_TASK_SPLIT.md) — cycles, roster,
-// self/manager review submission, competencies, goals, peer feedback,
-// appeals, cycle management, analytics. The AI insight button lands in a
-// later milestone.
-//
-// Status comes from the roster row's own `status` field (one of
-// meta.reviewStatuses) rather than being re-derived from selfRating/
-// managerRating client-side — the two ratings can be submitted in either
-// order, so "only one rating present" doesn't tell you which one.
-//
-// One map (not two parallel ones) so a status can't drift out of sync with
-// itself; an unrecognized status (a future addition to meta.reviewStatuses
-// this map hasn't been updated for) falls back to a neutral badge with the
-// raw status string instead of a broken i18n key.
+// Status is the roster row's own `status` (the two ratings can be submitted
+// in either order, so it cannot be derived from them). An unrecognised status
+// falls back to a neutral badge with the raw string.
 const STATUS_DISPLAY = {
   "Not started": { key: "notStarted", variant: "danger" },
   "Self submitted": { key: "selfSubmitted", variant: "warning" },
@@ -29,10 +18,7 @@ const STATUS_DISPLAY = {
   Completed: { key: "completed", variant: "success" },
 };
 
-// Reuses Dashboard.jsx's .stat-card-trend/.up/.down CSS classes (global in
-// index.css, otherwise unused on this page) rather than inventing new ones.
-// `invert` flips which sign counts as "good" — a lower appeal rate is the
-// improvement, unlike every rating/completion delta where higher is better.
+// `invert` flips which sign is "good" — a lower appeal rate is the improvement.
 function formatDelta(value, { invert = false, percent = false } = {}) {
   if (value === null || value === undefined) return { text: "—", cls: "" };
   if (value === 0) return { text: percent ? "0%" : "0", cls: "" };
@@ -43,11 +29,7 @@ function formatDelta(value, { invert = false, percent = false } = {}) {
   return { text: `${arrow} ${sign}${shown}${percent ? "%" : ""}`, cls: good ? "up" : "down" };
 }
 
-// isAdmin here only gates button *visibility* — the real enforcement is the
-// backend's admin middleware on POST/PATCH /performance/cycles. Unlike
-// PerformanceReviewDialog's canEdit* flags (which need server-side lookups
-// like the orphan-manager check), "is this user ADMIN" needs no extra data,
-// so there's no guessing risk in reading it from useAuth() here.
+// isAdmin gates visibility only; the backend enforces it.
 
 function Performance() {
   const { t } = useTranslation();
@@ -101,11 +83,8 @@ function Performance() {
 
   useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
 
-  // ADMIN/HR only server-side — a 403 for anyone else just means no
-  // comparison card renders, same silent-to-null handling as loadAnalytics.
-  // Keeps the whole response (not just `.data`, unlike loadAnalytics) since
-  // the previous cycle's label lives at the top level while its stats and
-  // the computed deltas live under `data`.
+  // ADMIN/HR only; a 403 means no comparison card. Keeps the whole response —
+  // the previous cycle's label is top-level, its stats are under `data`.
   const loadComparison = useCallback(() => {
     if (!selectedCycleKey) return;
     PerformanceReviewsAPI.comparison(selectedCycleKey)

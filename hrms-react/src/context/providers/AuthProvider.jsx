@@ -134,7 +134,7 @@ export function AuthProvider({ children }) {
     loading,
     isAdmin,
     isHR,        // true for HR only
-    isManager,   // true for MANAGER only — drives the scoped self-service nav/dashboard (8.0e)
+    isManager,   // true for MANAGER only
     isHRTier,    // true for HR + ADMIN
     isManagerTier, // true for MANAGER + HR + ADMIN
     isEmployee, // true for all authenticated users

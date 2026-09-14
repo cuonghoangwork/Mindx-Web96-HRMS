@@ -6,16 +6,9 @@ import Avatar from "../components/Avatar";
 import Badge from "../components/Badge";
 
 /**
- * OrgChart — read-only manager/report chip clusters, one per department
- * (8.0e Day 9). Built entirely from existing Department + Employee data —
- * Department.managerId already links to a real Employee (model/Department.js),
- * and every Employee already carries its department name, so no schema
- * change or new backend endpoint was needed.
- *
- * This is a two-tier structure (department manager → that department's
- * employees), not a deep multi-level reporting chain — Employee has no
- * manager-of-employee reference today, so anything deeper would need a
- * real schema change. Admin/HR only, matching the nav split from 8.0e.
+ * Read-only two-tier chart: department manager → that department's
+ * employees. Employee has no manager-of-employee reference, so anything
+ * deeper needs a schema change. Admin/HR only.
  */
 function OrgChart() {
   const { t } = useTranslation();

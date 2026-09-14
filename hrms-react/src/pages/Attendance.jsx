@@ -26,9 +26,7 @@ const fmt = (v) => {
 const variantMap = (s) =>
   ({ Present: "success", Late: "warning", "On Leave": "info" })[s] ?? "danger";
 
-// Task 6.2 — status codes ("Present"/"Late"/"On Leave"/"Absent") stay in
-// English everywhere they're used as data (equality checks, variantMap
-// above); this only translates the label actually shown to the user.
+// Status codes stay English as data; only the shown label is translated.
 const STATUS_LABEL_KEY = {
   Present: "attendance.status.present",
   Late: "attendance.status.late",
@@ -52,8 +50,7 @@ function Attendance() {
   const [searchParams] = useSearchParams();
   const linkedEmployeeId = searchParams.get("employee");
 
-  // 8.0e Day 7 — department-scoped roster: Admin sees everyone, Manager is
-  // scoped to their own department, Employee sees only themselves.
+  // Admin sees everyone, MANAGER their department, EMPLOYEE only themselves.
   const [myEmployee, setMyEmployee] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -75,9 +72,6 @@ function Attendance() {
   const today = getAppNow();
   const todayStr = isoOf(today);
 
-  // Admin-only "Roster" / "No-show queue" tabs, matching the mockup's
-  // isAdminRole-gated toggle. The queue itself moved here wholesale from
-  // Settings.jsx (see attendance/NoShowQueueTab.jsx) — mockup never shows it there.
   const [activeTab, setActiveTab] = useState("roster");
 
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -89,8 +83,7 @@ function Attendance() {
   const [showReport, setShowReport] = useState(false);
   const [actionLoadingKey, setActionLoadingKey] = useState(null);
 
-  // Deep link from ViewEmployee (`/attendance?employee=<id>`) — narrow the
-  // roster search to that employee instead of switching views entirely.
+  // Deep link from ViewEmployee: /attendance?employee=<id> narrows the roster search.
   useEffect(() => {
     if (!linkedEmployeeId) return;
     const emp = employees.find((e) => idsMatch(e.id, linkedEmployeeId));
@@ -199,8 +192,7 @@ function Attendance() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedData, search, scopedEmployees, isManagerTier, selectedDay, todayStr]);
 
-  // hhmmOf, not getHours() — see utils/attendance.js. The clock time is
-  // evaluated server-side against company-timezone rules.
+  // hhmmOf, not getHours() — company time, not browser time (utils/attendance.js).
   const handleInlineCheckIn = async (employeeId) => {
     setActionLoadingKey(`${employeeId}-in`);
     try { await clockIn(employeeId, todayStr, hhmmOf(getAppNow())); } catch { /* surfaced via row staying unchanged */ }
@@ -253,10 +245,7 @@ function Attendance() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
-      {/* ── Roster / No-show queue / Overtime tabs ──
-           The tab row is no longer HR-only: every employee needs the Overtime
-           tab to file their own requests. The No-show queue stays HR-tier, so
-           an employee sees two tabs and HR sees three. ── */}
+      {/* ── Tabs: every employee gets Overtime; the No-show queue is HR-tier ── */}
       {(isHRTier || tabs.length > 1) && (
         <div style={{ display: "flex", gap: "var(--sp-1)", padding: "3px", background: "var(--bg-surface-alt)", borderRadius: "var(--radius-sm)", alignSelf: "flex-start" }}>
           {tabs.map(({ key, label }) => (
@@ -413,9 +402,7 @@ function Attendance() {
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                             <Badge variant={variantMap(r.status)} size="sm">{statusLabel(t, r.status)}</Badge>
-                            {/* Paid overtime, with the rate that earned it. The
-                                percentages come from the server so the statutory
-                                multipliers are not duplicated here. */}
+                            {/* Paid overtime; the percentages come from the server. */}
                             {r.otHours > 0 && (
                               <Badge variant="info" size="sm">
                                 {r.otNightHours > 0
@@ -429,8 +416,7 @@ function Attendance() {
                                     })}
                               </Badge>
                             )}
-                            {/* Recorded, never paid — the pattern a labour
-                                inspection actually looks for. */}
+                            {/* Recorded, never paid. */}
                             {r.otUnapprovedHours > 0 && (
                               <Badge variant="warning" size="sm">
                                 {t("attendance.overtime.unapproved", {

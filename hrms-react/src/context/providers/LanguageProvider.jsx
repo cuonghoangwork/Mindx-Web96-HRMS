@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import i18n, { SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, loadLanguage } from '../../i18n'
 import { LanguageContext } from '../LanguageContext'
 
-// Task 6.1 — mirrors ThemeContext.jsx's shape/pattern (localStorage-backed
-// state + an effect that pushes it out to the actual mechanism, here
-// i18next.changeLanguage instead of a body data-attribute) so this reads
-// like a sibling of the existing theme switch rather than a new pattern.
+// Same shape as ThemeProvider: localStorage-backed state pushed to i18next.
 function isSupported(lang) {
   return SUPPORTED_LANGUAGES.includes(lang)
 }

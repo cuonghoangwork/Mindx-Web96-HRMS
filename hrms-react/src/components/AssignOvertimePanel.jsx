@@ -7,21 +7,11 @@ import Avatar from "./Avatar";
 import Button from "./Button";
 
 /**
- * AssignOvertimePanel — HR or a manager schedules overtime for several people
- * at once.
- *
- * The whole design turns on one property of the endpoint: it validates each
- * employee **independently** and returns { created, skipped } rather than
- * failing the batch. That is not a detail to paper over — one person being
- * over their monthly cap must not silently discard the other nine
- * assignments, and the person doing the assigning needs to see exactly who was
- * left out and why. So the result panel below is as much of the feature as the
- * form is.
- *
- * Deliberately not shown: a per-employee caps meter. It would cost one balance
- * request per listed employee on every render of the picker, and the skipped
- * list already names the cap that blocked anyone it blocked — after the fact,
- * but accurately, and without the fan-out.
+ * HR or a manager schedules overtime for several people at once. The
+ * endpoint validates each employee independently and returns
+ * { created, skipped }, so the outcome panel is as much of the feature as
+ * the form. No per-employee caps meter: the skipped list already names the
+ * cap that blocked anyone, without a balance request per row.
  */
 function AssignOvertimePanel({ employees, onAssigned }) {
   const { t } = useTranslation();
@@ -89,14 +79,12 @@ function AssignOvertimePanel({ employees, onAssigned }) {
         employeeIds: [...selectedIds],
       });
       setResult(outcome);
-      // Clear only the people who actually got a request, so a retry after
-      // fixing a cap problem does not re-send the ones that already landed.
+      // Clear only those who got a request, so a retry does not re-send them.
       const createdIds = new Set(outcome.created.map((r) => String(r.employeeId)));
       setSelectedIds((prev) => new Set([...prev].filter((id) => !createdIds.has(String(id)))));
       onAssigned?.(outcome);
     } catch (err) {
-      // A whole-request failure (bad span, nobody selected, not authorised) —
-      // distinct from the per-employee skips, which resolve successfully.
+      // A whole-request failure, distinct from per-employee skips.
       setError(translateApiError(err, t) || t("overtime.assign.failed"));
     } finally {
       setSubmitting(false);
@@ -171,8 +159,7 @@ function AssignOvertimePanel({ employees, onAssigned }) {
               onChange={(ev) => setPlannedEnd(ev.target.value)}
               required
             />
-            {/* Same reason as the apply modal: a native time input cannot
-                express 24:00, and a span may not cross midnight. */}
+            {/* A native time input cannot express 24:00. */}
             <label
               style={{
                 display: "flex", alignItems: "center", gap: "6px", marginTop: "6px",
@@ -319,9 +306,6 @@ function AssignOvertimePanel({ employees, onAssigned }) {
                   <li key={s.employeeId} style={{ fontSize: "var(--fs-xs)", marginBottom: "2px" }}>
                     <strong>{nameOf(s.employeeId)}</strong>
                     {" — "}
-                    {/* The backend's machine-readable code, translated the same
-                        way every other API error is. Falls back to the raw
-                        English message when a code has no key yet. */}
                     {translateApiError({ code: s.code, params: s.params }, t) || s.message}
                   </li>
                 ))}

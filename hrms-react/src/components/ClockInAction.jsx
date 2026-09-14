@@ -6,16 +6,7 @@ import { idsMatch } from "../utils/id";
 import { translateApiError } from "../utils/apiError";
 import { hhmmOf, hhmmToMinutes, isoOf } from "../utils/attendance";
 
-/**
- * ClockInAction — topbar "Clock in" quick action, matching the mockup's
- * button.brand-style Clock in chip. Reuses the exact same clockIn() call
- * ClockInOutWidget (Attendance.jsx) already uses — not a new endpoint,
- * just a shortcut to the same real action from the topbar.
- *
- * Resolves the logged-in user's own employee record by email (same
- * pattern as ClockInOutWidget), so it only ever clocks in the current
- * user, never picks an employee on their behalf.
- */
+/** Topbar "Clock in" chip — the same clockIn() the Attendance widget uses, always for the current user. */
 function ClockInAction() {
   const { t } = useTranslation();
   const { employees, attendance, overtimeRequests, getAppNow, clockIn } = useStore();
@@ -27,9 +18,7 @@ function ClockInAction() {
     (e) => e.email && user?.email && e.email.toLowerCase() === user.email.toLowerCase()
   ) || null;
 
-  // No linked employee record (e.g. a pure admin account) — the mockup
-  // still always shows this chip in the topbar, so render it disabled
-  // with an explanatory title instead of hiding it entirely.
+  // No linked employee record: render disabled with a title rather than hide.
   if (!myEmployee) {
     return (
       <button type="button" className="clock-in-btn" disabled title={t("clockIn.noProfileTitle", { defaultValue: "No employee profile is linked to your account" })}>
@@ -45,13 +34,9 @@ function ClockInAction() {
   );
   const hasCheckedIn = Boolean(todayRecord?.checkIn);
 
-  // Once the employee is inside an approved overtime window, the chip stops
-  // saying when they clocked in and says how late they are approved until —
-  // the more useful fact at 7pm.
-  //
-  // The window comes from the request itself rather than a hardcoded 18:00,
-  // because on a rest day or holiday overtime can start at any hour: there is
-  // no normal shift for it to begin after.
+  // Inside an approved overtime window the chip says how late they are
+  // approved until. The window comes from the request, not a fixed 18:00 —
+  // on a rest day overtime can start at any hour.
   const nowMinutes = hhmmToMinutes(hhmmOf(now));
   const activeOvertime =
     hasCheckedIn && nowMinutes !== null
@@ -68,8 +53,7 @@ function ClockInAction() {
     if (hasCheckedIn || loading) return;
     setLoading(true);
     setError("");
-    // hhmmOf, not getHours(): the server records this against company-timezone
-    // rules, so a browser in another zone must not send its own wall clock.
+    // hhmmOf, not getHours(): company time, not the browser's.
     const currentTimeHHMM = hhmmOf(now);
     try {
       await clockIn(myEmployee.id, todayStr, currentTimeHHMM);

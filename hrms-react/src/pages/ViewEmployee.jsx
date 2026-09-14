@@ -28,10 +28,7 @@ const MAX_AVATAR_BYTES = 5 * 1024 * 1024; // keep in sync with hrms-backend/midd
 
 const ALLOWED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-// Employee Detail tab shell (8.0e Day 6 scaffold — Day 7/8 flesh out Leave,
-// Salary and Activity; Attendance and Documents already have real content
-// today (attendance log, contract upload) so they're relocated here as-is
-// rather than hidden behind a placeholder.
+// Employee detail — the tab shell; each tab lives under pages/employee/.
 const DETAIL_TABS = [
   { key: "profile", label: "Profile" },
   { key: "attendance", label: "Attendance" },
@@ -67,13 +64,8 @@ function ViewEmployee() {
   const [pendingChange, setPendingChange] = useState(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
-  // SideMenu's EMPLOYEE nav deep-links straight into the Salary/Leave tabs
-  // (?tab=salary, ?tab=leave — its "Payroll"/"Leave" shortcuts) instead of
-  // duplicating this page's content on separate routes. activeTab is
-  // derived from the query string rather than its own useState: navigating
-  // sidebar link -> sidebar link (My Profile -> Payroll -> Leave) stays on
-  // this same route, so a plain useState initializer would only resolve on
-  // first mount and never pick up a later ?tab= change.
+  // Derived from ?tab= (not useState): the sidebar's Payroll/Leave links
+  // navigate within this same route, which a useState initializer would miss.
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
   const activeTab = DETAIL_TABS.some((t) => t.key === requestedTab) ? requestedTab : "profile";
@@ -90,11 +82,7 @@ function ViewEmployee() {
     currentUser?.email && employee?.email && currentUser.email.toLowerCase() === employee.email.toLowerCase(),
   );
 
-  // "Request edit" (name/phone/address/age/sex) is self-service only on the
-  // backend — POST /profile-edit-requests always resolves the target from
-  // the calling user's own linked employee record, there's no employeeId
-  // override for HR/Admin to request on someone else's behalf. So the
-  // button below only appears when isOwnRecord is true.
+  // Profile-edit and leave requests always target the caller's own record server-side, so both buttons are own-profile only.
   const loadPendingEditRequest = useCallback(() => {
     if (!isOwnRecord) return;
     ProfileEditRequestsAPI.list()
@@ -104,9 +92,6 @@ function ViewEmployee() {
 
   useEffect(() => { loadPendingEditRequest(); }, [loadPendingEditRequest]);
 
-  // LeaveRequestsAPI.create resolves the request to the calling user's own
-  // linked employee record server-side, so — like Request edit — this is
-  // only meaningful (and only shown) on your own profile.
   const handleApplyLeave = async (payload) => {
     await LeaveRequestsAPI.create(payload);
   };
@@ -278,8 +263,7 @@ function ViewEmployee() {
             >
               {t("common.actions.back", { defaultValue: "Back" })}
             </Button>
-            {/* employeeController.remove is ADMIN-only (employeeRouter.js) —
-                gated on isAdmin here to match, not isHRTier/isManagerTier. */}
+            {/* Delete is ADMIN-only server-side. */}
             {isAdmin && (
               <Button variant="danger" onClick={handleDeleteEmployee}>
                 {t("common.actions.delete", { defaultValue: "Delete" })}
@@ -306,10 +290,7 @@ function ViewEmployee() {
         <div className="detail-tab-panel" role="tabpanel">
           {activeTab === "profile" && (
             <div className="employee-detail-grid">
-              {/* Note: the mockup also shows a "Reports To" field here —
-                  there's no manager/reportsTo concept anywhere in this app's
-                  backend (only a per-department manager, not per-employee),
-                  so it's omitted rather than shown with a fabricated name. */}
+              {/* No "Reports To": the backend has a per-department manager, not a per-employee one. */}
               <InfoItem label={t("common.fieldLabels.employeeId", { defaultValue: "Employee ID" })} value={employee.employeeId} />
               <InfoItem label={t("common.fieldLabels.department", { defaultValue: "Department" })} value={employee.department} />
 

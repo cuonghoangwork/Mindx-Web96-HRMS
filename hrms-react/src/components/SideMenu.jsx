@@ -11,102 +11,45 @@ function SideMenu({ isOpen = false, onNavigate }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Plain MANAGER (not also HR/Admin) gets a distinct "My Info"-style nav
-  // shape matching the design (My Profile / Directory / My Department),
-  // rather than the People-group HR/Admin nav with a couple of items
-  // swapped — see below.
+  // MANAGER and EMPLOYEE get a "My Info" nav (My Profile / Directory / My
+  // Department) with the items they cannot reach swapped or dropped; HR and
+  // ADMIN get the full People nav. Showing an item is discoverability only —
+  // App.jsx's route guards still decide access. Group numbers are assigned
+  // by position after filtering, since EMPLOYEE has no Hiring group.
   const isPlainManager = isManager && !isHRTier;
-
-  // Plain EMPLOYEE (not Manager/HR/Admin) gets the same "My Info" shape as
-  // isPlainManager, plus further trims the design calls for that MANAGER
-  // doesn't need: no Hiring group (Candidates/Jobs are requireHR — MANAGER
-  // passes that gate, EMPLOYEE doesn't), no Holidays in Time & Pay
-  // (requireManager, same reason), and "Payroll"/"Leave" there point into
-  // My Profile's Salary/Leave tabs (?tab=salary / ?tab=leave, see
-  // ViewEmployee.jsx) instead of the admin /payroll page EMPLOYEE can't
-  // reach — that data already lives on those tabs, this just gives it a
-  // direct sidebar shortcut matching the design.
   const isPlainEmployee = !isManager && !isHRTier;
 
-  // Same nav list for every authenticated role by default — restricted
-  // destinations (Payroll, Jobs, Candidates — see App.jsx/
-  // ProtectedRoute.jsx's requireHR/requireManager) still resolve to the
-  // app's existing "Access Denied" screen rather than a broken page, so
-  // showing the item is a pure discoverability choice, not a permissions
-  // change. MANAGER and EMPLOYEE are the exception: their nav items are
-  // swapped/trimmed below to match what each can actually reach, rather
-  // than pointing at pages they'd immediately get denied on.
-  //
-  // Grouping below mirrors the mockup's NAV_RAW — numbered sections
-  // (01 Overview, 02 People, ...) instead of one flat list. Icons are kept
-  // per an explicit product decision (mockup itself is icon-free, but the
-  // current app deliberately keeps its outline-SVG icon system). Group
-  // index numbers are assigned by position after filtering (below), not
-  // hardcoded, since EMPLOYEE drops the Hiring group entirely.
   const rawGroups = [
     { key: "overview", title: t("sideMenu.overview", { defaultValue: "Overview" }), items: [
       { path: "/dashboard", title: t("sideMenu.dashboard", { defaultValue: "Dashboard" }), icon: dashboardIcon },
     ]},
     { key: "people", title: isPlainManager || isPlainEmployee ? t("sideMenu.myInfo", { defaultValue: "My Info" }) : t("sideMenu.people", { defaultValue: "People" }), items: [
-      // "My Profile" — every role's own record (ViewEmployee.jsx's
-      // /employees/:id route is open to any authenticated user, not just
-      // MANAGER). user.employeeId comes straight off the JWT-derived
-      // /auth/me response, no extra fetch needed; every seeded role
-      // (including ADMIN) now has a linked Employee record, see seed.js.
       ...(user?.employeeId
         ? [{ path: `/employees/${user.employeeId}`, title: t("sideMenu.myProfile", { defaultValue: "My Profile" }), icon: employeesIcon }]
         : []),
-      // Directory read is company-wide for every role (see
-      // employeeController.getAll) — only the label changes for MANAGER/
-      // EMPLOYEE, matching the design's "Directory" wording; the page
-      // itself already hides management actions (bulk select, Promote,
-      // Add Employee) for a plain viewer.
+      // The directory read is company-wide; only the label changes.
       { path: "/employees", title: isPlainManager || isPlainEmployee ? t("sideMenu.directory", { defaultValue: "Directory" }) : t("sideMenu.allEmployees", { defaultValue: "All Employees" }), icon: employeesIcon },
-      // Add Employee: HR/Admin only (App.jsx gates employees/add requireHR)
-      // — previously only reachable via the "+ Add Employee" button on the
-      // All Employees page; the design lists it as its own People-group
-      // nav item, so it gets a direct sidebar shortcut too.
       ...(isHRTier ? [{ path: "/employees/add", title: t("sideMenu.addEmployee", { defaultValue: "Add Employee" }), icon: addEmployeeIcon }] : []),
-      // MANAGER/EMPLOYEE get a "My Department" shortcut instead of the
-      // full company Departments list — matches the demo's role model
-      // (neither has a general Departments browser, only their own via
-      // MyDepartmentRedirect.jsx), and App.jsx gates /departments requireHR.
       isPlainManager || isPlainEmployee
         ? { path: "/departments/me", title: t("sideMenu.myDepartment", { defaultValue: "My Department" }), icon: departmentsIcon }
         : { path: "/departments", title: t("sideMenu.allDepartments", { defaultValue: "All Departments" }), icon: departmentsIcon },
-      // Org Chart: HR/Admin only (matches the demo — no such nav item for
-      // MANAGER/EMPLOYEE), so it's omitted from their nav below instead of
-      // just relying on the Access Denied fallback.
       ...(isPlainManager || isPlainEmployee ? [] : [{ path: "/org-chart", title: t("sideMenu.orgChart", { defaultValue: "Org Chart" }), icon: orgChartIcon }]),
     ]},
     { key: "timepay", title: t("sideMenu.timePay", { defaultValue: "Time & Pay" }), items: [
       { path: "/attendance", title: t("sideMenu.attendance", { defaultValue: "Attendance" }), icon: attendanceIcon },
-      // Every role has at least their own review (ADMIN/HR/MANAGER also
-      // review reports) — always present, no isPlainManager/isPlainEmployee
-      // branching needed, matching /attendance above.
       { path: "/performance", title: t("sideMenu.performanceReviews", { defaultValue: "Performance Reviews" }), icon: performanceIcon },
       ...(isPlainEmployee && user?.employeeId
-        // EMPLOYEE: "Payroll"/"Leave" deep-link into My Profile's own tabs
-        // (see ViewEmployee.jsx's ?tab= handling) rather than the
-        // requireManager-gated /payroll or the nonexistent standalone
-        // /leave page — same underlying self-service data, just reachable
-        // directly from the sidebar like the design shows.
+        // EMPLOYEE's Payroll/Leave deep-link into their own profile tabs (?tab=).
         ? [
             { path: `/employees/${user.employeeId}?tab=salary`, title: t("sideMenu.payroll", { defaultValue: "Payroll" }), icon: payrollIcon },
             { path: `/employees/${user.employeeId}?tab=leave`,  title: t("sideMenu.leave", { defaultValue: "Leave" }),   icon: holidaysIcon },
           ]
-        // MANAGER/HR/Admin: both requireManager (App.jsx) — all three pass
-        // that gate, so they keep the full admin pages.
         : isPlainEmployee ? [] : [
             { path: "/payroll",  title: t("sideMenu.payroll", { defaultValue: "Payroll" }),  icon: payrollIcon },
             { path: "/holidays", title: t("sideMenu.holidays", { defaultValue: "Holidays" }), icon: holidaysIcon },
           ]),
     ]},
-    // Hiring: requireHR (App.jsx), so MANAGER hits Access Denied here too
-    // — pre-existing behavior, unchanged, matching both the demo and the
-    // live app's current Manager sidebar (out of scope to revisit here).
-    // Only EMPLOYEE, which never had a Hiring group in the design, drops
-    // it from its own nav.
+    // Hiring is requireHR; MANAGER still sees it (and gets Access Denied), EMPLOYEE does not.
     ...(isPlainEmployee ? [] : [{ key: "hiring", title: t("sideMenu.hiring", { defaultValue: "Hiring" }), items: [
       { path: "/candidates", title: t("sideMenu.candidates", { defaultValue: "Candidates" }), icon: candidatesIcon },
       { path: "/jobs",       title: t("sideMenu.jobOpenings", { defaultValue: "Job Openings" }), icon: jobsIcon },
@@ -142,7 +85,6 @@ function SideMenu({ isOpen = false, onNavigate }) {
           </svg>
         </div>
         <h1>HRMS</h1>
-        {/* codename tag — matches mockup's sidebarCodenameStyle ("/ LEDGER") */}
         <span className="brand-codename">/ LEDGER</span>
       </button>
 
@@ -155,11 +97,8 @@ function SideMenu({ isOpen = false, onNavigate }) {
             </div>
             <nav className="menu-list">
               {group.items.map((item) => {
-                // Exact pathname+query match rather than NavLink's default
-                // fuzzy/prefix matching — needed now that "Payroll" and
-                // "Leave" (EMPLOYEE nav) point at the same /employees/:id
-                // path as "My Profile", distinguished only by ?tab=, which
-                // NavLink's isActive ignores entirely.
+                // Exact pathname+query match: EMPLOYEE's Payroll/Leave share
+                // My Profile's path and differ only by ?tab=, which NavLink ignores.
                 const [itemPathname, itemQuery = ""] = item.path.split("?");
                 const isItemActive =
                   location.pathname === itemPathname &&
@@ -182,7 +121,6 @@ function SideMenu({ isOpen = false, onNavigate }) {
       </div>
 
       <div className="side-menu-footer">
-        {/* Role badge — real-auth indicator (no demo role switcher, per 8.0d) */}
         {isAdmin && (
           <div style={{
             margin: "0 0 var(--sp-4) 0",
@@ -284,9 +222,6 @@ function SideMenu({ isOpen = false, onNavigate }) {
           </button>
         </div>
 
-        {/* User identity chip — moved here from the topbar, matching the
-            mockup's sidebarFooterStyle layout (userChipWrapStyle above
-            signOutStyle). */}
         <button
           type="button"
           className="user-chip"

@@ -1,45 +1,14 @@
 /**
- * FormField — HRMS Design System
+ * Label + hint + error/success wrapper for any input.
  *
- * Universal input wrapper component for HRMS.
- * Standardises label + helper text + error/success message.
- * Replaces 3 scattered patterns: form-group className,
- * inline Field in AddEmployee, and manual span in EmployeeModal.
- *
- * Props:
- *   label       — text label (string, required)
- *   htmlFor     — id of the inner input, used for <label>
- *   required    — shows red * after label
- *   hint        — muted helper text, shown below label
- *   error       — error message (string). If set → red border + message
- *   success     — boolean. If true and no error → green border + "Valid"
- *   touched     — boolean. Shows error/success only after user interaction
- *   disabled    — dims the entire field
- *   className   — extra class on wrapper div
- *   style       — extra style on wrapper div
- *   children    — input/select/textarea element
- *
- * Variants (passed via type prop):
- *   "default"   — label above, input below (default)
- *   "inline"    — label left, input right (for Settings toggle rows)
- *
- * Usage:
- *   // Basic
- *   <FormField label="Full Name" required htmlFor="name">
- *     <input id="name" ... />
- *   </FormField>
- *
- *   // With validation
- *   <FormField label="Email" htmlFor="email"
- *     error={errors.email} touched={touched.email}
- *     hint="Used for system login">
+ *   <FormField label="Email" htmlFor="email" required
+ *     error={errors.email} touched={touched.email} hint="Used for system login">
  *     <input id="email" type="email" ... />
  *   </FormField>
  *
- *   // Inline (Settings page)
- *   <FormField label="Dark Mode" type="inline">
- *     <Toggle ... />
- *   </FormField>
+ * `touched` gates the error/success display until the user has interacted;
+ * `success` shows "Valid" only when there is no error. `type="inline"` puts
+ * the label to the left (Settings toggle rows).
  */
 
 import { useId, cloneElement, isValidElement } from "react";
@@ -87,7 +56,7 @@ function FormField({
   const showError   = !!(error && touched);
   const showSuccess = !!(success && touched && !error);
 
-  /* ── Inject id + aria attrs into child input (ESM-safe cloneElement) ── */
+  /* ── Inject id + aria attrs into the child input ── */
   let child = children;
   if (isValidElement(children) && !children.props?.id) {
     child = cloneElement(children, {
@@ -150,7 +119,6 @@ function FormField({
         ...style,
       }}
     >
-      {/* Label */}
       <label
         htmlFor={fieldId}
         style={{
@@ -164,12 +132,9 @@ function FormField({
         )}
       </label>
 
-      {/* Helper text — always reserves one line of vertical space, even
-          when this field has no hint, so its input stays aligned with a
-          sibling field in the same form-grid row that does have one (e.g.
-          AddEmployee's Email "Used for system login" vs. Address). Hidden
-          rather than omitted so the box height is kept but nothing is
-          announced to screen readers when empty. */}
+      {/* Always reserves one line so inputs in the same grid row stay
+          aligned whether or not they have a hint; hidden, not omitted, so
+          nothing is announced when empty. */}
       <span
         id={hint ? `${fieldId}-hint` : undefined}
         aria-hidden={hint ? undefined : "true"}
@@ -182,10 +147,8 @@ function FormField({
         {hint || " "}
       </span>
 
-      {/* Input slot */}
       {child}
 
-      {/* Error message */}
       {showError && (
         <span
           id={`${fieldId}-msg`}
@@ -201,7 +164,6 @@ function FormField({
         </span>
       )}
 
-      {/* Success message */}
       {showSuccess && (
         <span
           id={`${fieldId}-ok`}

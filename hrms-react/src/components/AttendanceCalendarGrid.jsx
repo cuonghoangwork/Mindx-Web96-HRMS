@@ -1,15 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-/**
- * AttendanceCalendarGrid — month calendar with per-day attendance-rate bars
- * and status dots. Extracted from pages/Attendance.jsx (8.0e Day 7) so the
- * Employee Detail "Attendance" tab can reuse the same component instead of
- * duplicating it, per the sprint plan.
- *
- * Day/month names come from the common.days / common.months i18n arrays
- * (task 6.2) rather than a module-level constant, since they need to be
- * locale-aware.
- */
+/** Month calendar with per-day attendance-rate bars and status dots; shared by Attendance and the employee tab. */
 function AttendanceCalendarGrid({ year, month, dayData, selectedDay, onSelectDay, todayStr, dotOnly = false }) {
   const { t } = useTranslation();
   const days = t("common.days", { returnObjects: true });

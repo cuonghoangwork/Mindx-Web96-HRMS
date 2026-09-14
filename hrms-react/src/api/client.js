@@ -1,6 +1,4 @@
-// API client — talks to the hrms-backend Express API.
-// Handles JWT access/refresh tokens (see hrms-backend/utils/tokens.js +
-// middleware/auth.js for the server side of this contract).
+// API client: JWT access/refresh handling around fetch.
 
 export const API_BASE =
   import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
@@ -9,19 +7,10 @@ const ACCESS_KEY = "hrms-access-token";
 const REFRESH_KEY = "hrms-refresh-token";
 
 /**
- * Demo clock bridge.
- *
- * StoreContext owns the offset as React state (HeaderDateTime lets you move
- * it), but apiFetch is a plain module function with no access to React. Rather
- * than thread a clock through every call site, the store pushes the offset here
- * whenever it changes and apiFetch reads it.
- *
- * The header is only sent when BOTH gates are open: the build has
- * VITE_DEMO_MODE enabled, and the clock has actually been moved. Normal traffic
- * carries no header at all, and a production build carries none regardless —
- * the server ignores it too unless DEMO_MODE is on there (utils/appNow.js).
- * This is a bypass for every date rule in the system, not just the overtime
- * cutoff it was added for, so it is deliberately hard to leave on by accident.
+ * Demo clock bridge: the store pushes its offset here so apiFetch can send
+ * X-App-Now. Sent only when VITE_DEMO_MODE is on AND the clock has been
+ * moved; the server ignores it unless its own DEMO_MODE is on. It bypasses
+ * every date rule in the system, so it is deliberately hard to leave on.
  */
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 let demoClockOffsetMs = 0;
@@ -72,12 +61,7 @@ async function refreshAccessToken() {
   return refreshPromise;
 }
 
-/**
- * apiFetch("/employees", { method: "POST", body: {...} })
- * - Automatically attaches `Authorization: Bearer <access_token>` when auth !== false
- * - On a 401, transparently refreshes the access token once and retries
- * - Unwraps JSON and throws on { success: false } or non-2xx responses
- */
+/** Attaches the Bearer token (unless auth: false), refreshes once on 401, throws on { success: false } or non-2xx. */
 export async function apiFetch(
   path,
   { method = "GET", body, auth = true, retry = true } = {},

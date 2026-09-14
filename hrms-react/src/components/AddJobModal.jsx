@@ -5,20 +5,9 @@ import { isoOf } from "../utils/attendance";
 import Button from "./Button";
 
 /**
- * AddJobModal — Add or edit a job opening
- *
- * Props:
- *   onClose      — close handler
- *   onSave       — (job) => void, called with the new/updated job
- *   job          — optional existing job to edit (presence => edit mode)
- *   departments  — array of department names for the select
- *
- * Task 5.1: expanded beyond title/department/location/type/status to also
- * collect the JD, requirements, benefits, pay range, company info,
- * application instructions and deadline. requirements/benefits are edited
- * as one-per-line textareas and sent to the backend as newline-separated
- * text — jobFromClient() on the server splits them into an array (see
- * hrms-backend/utils/mappers.js toBulletList()).
+ * Add or edit a job opening. Props: onClose, onSave(job), job (presence =
+ * edit mode), departments. requirements/benefits are one-per-line textareas;
+ * the server splits them into arrays.
  */
 function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
   const { t } = useTranslation();
@@ -90,10 +79,7 @@ function AddJobModal({ onClose, onSave, job = null, departments = [] }) {
       companyInfo: formData.companyInfo.trim(),
       applicationInstructions: formData.applicationInstructions.trim(),
       deadline: formData.deadline || null,
-      // isoOf, not toISOString().split("T")[0]: the latter converts to UTC
-      // first, so a job posted before 07:00 Vietnam time was stamped with
-      // yesterday's date. getAppNow() rather than new Date() matches every
-      // other "today" in the app and keeps the demo clock honest.
+      // isoOf + getAppNow(): local date, and the demo clock is respected.
       postedDate: job?.postedDate ?? isoOf(getAppNow()),
     });
     onClose();

@@ -1,14 +1,7 @@
 /**
- * webPush.js — service worker registration and push subscription (Level 3).
- *
- * Push is the only channel that works with the app closed, and the only one
- * that is per-BROWSER rather than per-user: the subscription is minted by
- * this browser, for this origin, and is meaningless anywhere else. That is
- * why the server stores subscriptions in their own collection instead of a
- * flag on User (hrms-backend/model/PushSubscription.js).
- *
- * Requires a secure context. localhost is exempt, so dev works; anything else
- * must be HTTPS, which Render provides.
+ * Service worker registration and push subscription. Push is per-browser,
+ * not per-user — the subscription is minted by this browser for this origin
+ * — and needs a secure context (localhost is exempt).
  */
 
 import { ensurePermission } from "./desktopNotify";
@@ -24,12 +17,7 @@ export function isPushSupported() {
   );
 }
 
-/**
- * The applicationServerKey has to be raw bytes, but VAPID keys travel as
- * base64url text. Browsers reject a plain string with an unhelpful
- * "InvalidCharacterError", which is the single most common way this feature
- * fails to start.
- */
+/** applicationServerKey must be raw bytes; a base64url string fails with an unhelpful InvalidCharacterError. */
 export function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -43,8 +31,7 @@ export function urlBase64ToUint8Array(base64String) {
 export async function registerServiceWorker() {
   if (!isPushSupported()) return null;
   try {
-    // Scope "/" explicitly: a worker can only control pages at or below its
-    // own path, and getting this wrong means pushes silently never arrive.
+    // Scope "/": a worker only controls pages at or below its path.
     return await navigator.serviceWorker.register(SW_URL, { scope: "/" });
   } catch (err) {
     console.warn("[push] service worker registration failed:", err.message);
@@ -64,33 +51,24 @@ export async function currentSubscription() {
   }
 }
 
-/**
- * Subscribe this browser. Must be called from a user gesture — it can raise
- * the OS permission prompt.
- *
- * @returns {{ ok: true, subscription: object } | { ok: false, reason: string }}
- */
+/** Must be called from a user gesture. @returns {{ ok: true, subscription } | { ok: false, reason }} */
 export async function subscribeToPush(publicKey) {
   if (!isPushSupported()) return { ok: false, reason: "unsupported" };
   if (!publicKey) return { ok: false, reason: "no-public-key" };
 
   const permission = await ensurePermission();
-  // Push and desktop toasts share one OS permission, so this is the same
-  // prompt the desktop toggle uses — asking twice would be a bug, not a
-  // second chance.
+  // Push and desktop toasts share one OS permission.
   if (permission !== "granted") return { ok: false, reason: permission };
 
   const registration = (await registerServiceWorker()) ?? null;
   if (!registration) return { ok: false, reason: "no-service-worker" };
 
   try {
-    // The worker may still be installing on a first visit; subscribing before
-    // it is active throws.
+    // Subscribing before the worker is active throws.
     await navigator.serviceWorker.ready;
 
     const subscription = await registration.pushManager.subscribe({
-      // Required to be true by every browser: a push MUST result in something
-      // the user can see. Silent push is not available on the web.
+      // Required by every browser; silent push does not exist on the web.
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     });
@@ -102,10 +80,7 @@ export async function subscribeToPush(publicKey) {
   }
 }
 
-/**
- * Unsubscribe this browser. Returns the endpoint that was removed so the
- * caller can tell the server which row to delete.
- */
+/** Returns the removed endpoint so the caller can delete the server row. */
 export async function unsubscribeFromPush() {
   const subscription = await currentSubscription();
   if (!subscription) return { ok: true, endpoint: null };
@@ -114,8 +89,7 @@ export async function unsubscribeFromPush() {
   try {
     await subscription.unsubscribe();
   } catch {
-    // Even if the browser refuses, the server row should still go — otherwise
-    // it keeps pushing to an endpoint the user has disowned.
+    // Even if the browser refuses, the server row must go.
   }
   return { ok: true, endpoint };
 }

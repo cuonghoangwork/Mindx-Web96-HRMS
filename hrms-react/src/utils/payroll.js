@@ -1,14 +1,7 @@
 /**
- * payroll.js — shared money-formatting helpers.
- *
- * Extracted from pages/Payroll.jsx (8.0e Day 8) so the Employee Detail
- * "Salary" tab (ViewEmployee.jsx) can format figures identically instead of
- * duplicating the VND/USD logic.
- *
- * Task 6.6 — both branches pin an explicit locale ("en-US" for USD, "vi-VN"
- * for VND) rather than a bare `.toLocaleString()`, which would silently
- * inherit whatever locale the browser/OS happens to be set to. Currency
- * grouping follows the currency, not the in-app language toggle.
+ * Money formatting shared by Payroll and the Salary tab. Each branch pins
+ * its locale ("en-US" for USD, "vi-VN" for VND): grouping follows the
+ * currency, not the in-app language.
  */
 export function fmtMoney(vnd, currency, fxRate) {
   const n = Number(vnd) || 0;

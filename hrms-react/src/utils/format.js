@@ -1,20 +1,8 @@
 /**
- * format.js — task 6.6 (locale-aware date/number formatting).
- *
- * Thin wrappers around Intl.DateTimeFormat / Intl.NumberFormat that map the
- * app's `language` value (from LanguageContext — "en" | "vi") to a real BCP
- * 47 locale tag, so date/number grouping actually follows the in-app
- * language toggle instead of whatever the browser/OS happens to be set to
- * (the previous `.toLocaleDateString()` / `.toLocaleString()` calls with no
- * locale argument silently used system locale, which stayed English even
- * after switching the app to Vietnamese).
- *
- * VND amounts are a deliberate exception: they already format with the
- * "vi-VN" locale unconditionally (see Payroll.jsx's fmtMoney/fmtMoneyK) —
- * that's a currency convention (VND is always grouped the Vietnamese way),
- * not a UI-language one, so it's intentionally left alone here. This module
- * covers the USD/generic-number and date formatting that previously ignored
- * the language toggle entirely.
+ * Intl wrappers that map the app's `language` ("en" | "vi") to a BCP 47
+ * locale, so dates and numbers follow the in-app toggle rather than the OS.
+ * VND is the exception: always "vi-VN" grouping (a currency convention, not
+ * a UI-language one) — see Payroll.jsx's fmtMoney.
  */
 
 const LOCALE_MAP = { en: "en-US", vi: "vi-VN" };
@@ -23,18 +11,10 @@ export function localeFor(language) {
   return LOCALE_MAP[language] ?? LOCALE_MAP.en;
 }
 
-// A bare "YYYY-MM-DD" string is parsed as UTC midnight per the ISO spec, then
-// toLocaleDateString() below renders in the viewer's local zone — anyone west
-// of UTC would see it roll back to the previous day. Appending a local-time
-// marker makes the same string parse as local midnight instead.
+// A bare "YYYY-MM-DD" parses as UTC midnight and would roll back a day west of UTC.
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * formatDate — medium-style localized date ("Aug 11, 2026" / "11 thg 8, 2026").
- * @param {Date|string|number} value
- * @param {string} language - "en" | "vi" (from useLanguage())
- * @param {Intl.DateTimeFormatOptions} [options]
- */
+/** "Aug 11, 2026" / "11 thg 8, 2026". */
 export function formatDate(value, language, options) {
   if (!value) return "—";
   const d = value instanceof Date
@@ -46,7 +26,6 @@ export function formatDate(value, language, options) {
   });
 }
 
-/** formatDateTime — same as formatDate but with a time component. */
 export function formatDateTime(value, language, options) {
   if (!value) return "—";
   const d = value instanceof Date ? value : new Date(value);
@@ -56,7 +35,6 @@ export function formatDateTime(value, language, options) {
   });
 }
 
-/** formatTime — locale-aware time-of-day only (used by HeaderDateTime's clock). */
 export function formatTime(value, language, options) {
   if (!value) return "—";
   const d = value instanceof Date ? value : new Date(value);
@@ -66,19 +44,13 @@ export function formatTime(value, language, options) {
   });
 }
 
-/** formatNumber — locale-aware grouping for a plain number (no currency symbol). */
 export function formatNumber(value, language, options) {
   const n = Number(value);
   if (Number.isNaN(n)) return "—";
   return n.toLocaleString(localeFor(language), options);
 }
 
-/**
- * formatUsd — USD-denominated figures (salaries, budgets) with locale-aware
- * grouping. Keeps the plain "$" prefix used throughout the app rather than
- * Intl's currency style (which would print "US$" for vi-VN) to match the
- * existing `$${n.toLocaleString()}` look everywhere else in the UI.
- */
+/** Plain "$" prefix rather than Intl's currency style, which prints "US$" for vi-VN. */
 export function formatUsd(value, language) {
   const n = Number(value);
   if (Number.isNaN(n) || value === null || value === undefined || value === "") return "—";

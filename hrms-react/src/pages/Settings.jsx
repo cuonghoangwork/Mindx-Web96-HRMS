@@ -9,25 +9,7 @@ import { SecurityTab } from './settings/SecurityTab'
 import { AuditLogTab } from './settings/AuditLogTab'
 import { RolesTab } from './settings/RolesTab'
 
-/* ─────────────────────────────────────────────
-   Main Settings page — left-side vertical tab
-   nav matching the mockup's settingsWrapStyle /
-   settingsTabListStyle / settingsContentStyle
-   layout (a new pattern for this app, distinct
-   from the horizontal toggle-tabs used on
-   Attendance/AllEmployees).
-
-   Note: the fuller "Profile edit requests" and
-   "Promotion approval queue" review panels that
-   used to live here were removed — the mockup
-   never shows them under Settings; it puts the
-   equivalent pending-request queues on the
-   Employees page (Roster / Edit requests tabs +
-   Pending Promotions banner), which already
-   exists there. "Company info" tab is omitted —
-   there's no Company entity in the backend to
-   persist it against.
-───────────────────────────────────────────── */
+/* Settings — left-side vertical tab nav; each tab is its own module under settings/. */
 function Settings() {
   const { t } = useTranslation()
   const { isAdmin, isHRTier, user } = useAuth()
@@ -42,7 +24,7 @@ function Settings() {
     ...(isAdmin ? [{ key: 'roles', label: t('settings.tabs.rolesPermissions') }] : []),
   ]
 
-  // Guard against landing on a gated tab after a role change / relogin.
+  // A gated tab can be stale after a role change.
   useEffect(() => {
     if (!tabs.some((tab) => tab.key === activeTab)) setActiveTab('profile')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -53,7 +35,6 @@ function Settings() {
       <h2>{t("settings.title")}</h2>
       <p style={{ color: 'var(--text-muted)', marginTop: '12px' }}>{t("settings.subtitle")}</p>
 
-      {/* Current user info */}
       <div style={{
         marginTop: '24px', padding: '16px 20px',
         background: 'var(--bg-surface-alt)', borderRadius: 'var(--radius)',
@@ -75,7 +56,6 @@ function Settings() {
         <RolePill role={user?.role} />
       </div>
 
-      {/* Tab nav + content */}
       <div style={{ marginTop: '30px', display: 'flex', gap: '28px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{
           display: 'flex', flexDirection: 'column', gap: '2px',

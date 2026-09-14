@@ -26,12 +26,8 @@ function Payroll() {
   const months = t("common.months", { returnObjects: true });
   const { isAdmin, isHRTier, isManager } = useAuth();
 
-  // MANAGER gets a real, backend-enforced department-scoped view here (see
-  // payrollController.js's departmentId filtering) — this client-side
-  // filter is now redundant with what the API already returns for MANAGER,
-  // kept only because it's harmless and matches Attendance's equivalent
-  // "your team" pattern. isHRTier (HR+ADMIN) gates every write action
-  // below (create/regenerate/approve/pay/edit) — MANAGER is read-only.
+  // MANAGER's view is department-scoped by the API; this client filter is
+  // redundant but harmless. isHRTier gates every write — MANAGER is read-only.
   const [myEmployee, setMyEmployee] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -58,12 +54,9 @@ function Payroll() {
     year: now.getFullYear(),
     fxRate: 25000,
   });
-  // Task 3.8: last fetched FX snapshot for the New Period form's "Fetch live
-  // rate" button — cleared whenever the target month/year changes so a
-  // stale rate/source combo is never shown against a different month.
+  // Last fetched FX snapshot; cleared when the target month changes.
   const [fxPreview, setFxPreview] = useState(null);
   const [fxPreviewLoading, setFxPreviewLoading] = useState(false);
-  // Task 3.9: manual trigger for the same job the scheduler runs on the 1st.
   const [draftBusy, setDraftBusy] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -73,9 +66,6 @@ function Payroll() {
   const [sortDir, setSortDir] = useState("desc");
   const [expanded, setExpanded] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  // Currency display preference now lives in the shared topbar toggle
-  // (CurrencyContext) instead of page-local state — single source of
-  // truth, no duplicate in-page control.
   const { currency } = useCurrency();
 
   const fxRate = period?.fxRate ?? 0;
@@ -91,7 +81,6 @@ function Payroll() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  // A fetched preview is only valid for the month/year it was fetched for.
   useEffect(() => {
     setFxPreview(null);
   }, [newPeriod.month, newPeriod.year]);
@@ -277,9 +266,7 @@ function Payroll() {
     setBusy(false);
   };
 
-  // Task 3.8: pulls the get-or-create-once-per-month FX snapshot for the
-  // month/year currently selected in the form and prefills the fxRate
-  // field with it. Does not create a PayrollPeriod.
+  // Prefills fxRate from the month's snapshot; never creates a period.
   const handleFetchLiveRate = async () => {
     setFxPreviewLoading(true);
     try {
@@ -295,9 +282,7 @@ function Payroll() {
     setFxPreviewLoading(false);
   };
 
-  // Task 3.9: same job the scheduler runs on the 1st of the month, exposed
-  // here for demos and for hosts where the scheduler is off. No-op (with a
-  // clear toast) if this month's period already exists.
+  // The 1st-of-month draft job, on demand. No-op if the period exists.
   const handleGenerateMonthlyDraft = async () => {
     setDraftBusy(true);
     try {
@@ -405,11 +390,8 @@ function Payroll() {
 
   const exportCSV = () => {
     if (!period) return;
-    // Overtime sits immediately before Gross: it is an addend to gross pay,
-    // so grouping the three overtime columns there keeps the money columns
-    // reading in the order they actually combine. The PIT-exempt flag is
-    // included because it is the only thing that explains a taxable figure
-    // lower than gross minus insurance and the personal deduction.
+    // Overtime sits before Gross, in the order the money combines; the
+    // PIT-exempt flag explains a taxable figure lower than expected.
     const headers = [
       "Employee", "Employee ID", "Department", "Type",
       "Base Salary (VND)", "Bonus (VND)", "Allowance (VND)", "Deduction (VND)",
@@ -609,17 +591,11 @@ function Payroll() {
 
           {/* ── Stat strip ── */}
           {(() => {
-            // Scoped totals — for Manager these reflect only their own
-            // department's payslips (scopedPayslips), summed client-side
-            // since the backend's period.totals/payslipCount are always
-            // org-wide aggregates. Admin sees the full period as before.
+            // Summed client-side: the backend's period.totals are always org-wide.
             const totalSlips = scopedPayslips.length;
             const grossSum = scopedPayslips.reduce((s, p) => s + p.grossPay, 0);
             const netSum = scopedPayslips.reduce((s, p) => s + p.netPay, 0);
-            // Real backend tracks pay status per PERIOD (draft/approved/paid),
-            // not per payslip — there's no individual "mark this one employee
-            // paid" endpoint like the mockup's demo has. "Paid" below reflects
-            // that: everyone in a paid period, nobody otherwise.
+            // Pay status is per period, not per payslip.
             const paidCount = period?.status === "paid" ? totalSlips : 0;
             const pendingCount = totalSlips - paidCount;
             const pendingTrend = period?.status === "approved" ? t("payroll.stats.awaitingPayment", { defaultValue: "Awaiting payment" }) : period?.status === "paid" ? "—" : t("payroll.stats.awaitingRun", { defaultValue: "Awaiting run" });
@@ -642,8 +618,7 @@ function Payroll() {
             );
           })()}
 
-          {/* ── Pay run history — every period, click a row to select it
-              (replaces the old dropdown selector) ── */}
+          {/* ── Pay run history — click a row to select it ── */}
           <div className="content-card" style={{ marginBottom: "var(--sp-5)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-5)", flexWrap: "wrap" }}>
               <div>
@@ -999,12 +974,7 @@ function Payroll() {
             )}
           </div>
 
-          {/* ── Gross-by-department / contract-type mix — not in the mockup,
-              kept as a real, already-working breakdown of this period's
-              payslips rather than dropped for parity's sake. Dropped for
-              Manager: once the view is scoped to a single department, a
-              "gross pay by department" bar chart with one bar (and a
-              contract-type donut of just their own team) isn't useful. ── */}
+          {/* ── Gross by department / contract mix — pointless for a single-department view ── */}
           {!isManager && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 240px", gap: "var(--sp-5)", marginTop: "var(--sp-5)" }}>
               <div className="content-card">

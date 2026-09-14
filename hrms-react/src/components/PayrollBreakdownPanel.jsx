@@ -5,9 +5,7 @@ import { fmtMoney } from "../utils/payroll";
  * PayrollBreakdownPanel — full payslip line-item breakdown (base salary,
  * bonus, allowance, deductions, insurance, PIT, net pay).
  *
- * Extracted from pages/Payroll.jsx's local BreakdownPanel (8.0e Day 8) so
- * the Employee Detail "Salary" tab can reuse the exact same breakdown UI
- * instead of duplicating it, per the sprint plan.
+ * Shared by the Payroll page and the employee Salary tab.
  */
 function PayrollBreakdownPanel({ slip, currency, fxRate, period }) {
   const { t } = useTranslation();

@@ -5,7 +5,7 @@ import { formatDate } from "../../utils/format";
 import Button from "../../components/Button";
 import { translateApiError } from "../../utils/apiError";
 
-// Task 1.4 — keep in sync with hrms-backend/middleware/upload.js's uploadPdf
+// Keep in sync with hrms-backend/middleware/upload.js's uploadPdf.
 const MAX_CONTRACT_BYTES = 10 * 1024 * 1024;
 
 export function ContractCard({ employee, canManage, uploadEmployeeContract, embedded = false }) {

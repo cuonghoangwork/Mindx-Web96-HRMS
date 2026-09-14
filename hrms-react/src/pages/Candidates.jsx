@@ -11,11 +11,7 @@ import { StarRating } from "../components/StarRating";
 
 const STAGES = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 
-/**
- * KanbanBoard — 8.0e Day 9. Native HTML5 drag-and-drop across the existing
- * STAGES values, no extra library. Dropping a card on a column calls the
- * same handleStageChange(id, stage) the list view's actions already use.
- */
+/** Native HTML5 drag-and-drop across STAGES; a drop calls the same handleStageChange the list view uses. */
 function KanbanBoard({ candidates, getJobById, onStageChange, onSelectCandidate }) {
   const { t } = useTranslation();
   const [dragOverStage, setDragOverStage] = useState(null);
@@ -140,7 +136,6 @@ function Candidates() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
   const [selectedCandidateId, setSelectedCandidateId] = useState(null);
-  // 8.0e Day 9 — Kanban board alongside the existing list view.
   const [viewMode, setViewMode] = useState("list"); // "list" | "kanban"
 
   const jobFilterId = jobIdParam || null;

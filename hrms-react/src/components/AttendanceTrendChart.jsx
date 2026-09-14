@@ -1,22 +1,9 @@
 /**
- * AttendanceTrendChart — HRMS Design System
+ * Last-7-days attendance trend in pure SVG.
  *
- * Displays attendance trend for the last 7 days using pure SVG.
- * No additional libraries required.
- *
- * Props:
- *   attendance  — array from StoreContext (required)
- *   employees   — array from StoreContext (required) — needed (not just a
- *                 count) so gap-filling can reuse buildMonthAttendance's
- *                 per-employee deterministic mock, same as Attendance.jsx
- *                 and ViewEmployee.jsx, instead of a third, different guess.
- *   height      — SVG height, default 160
- *   showLegend  — show legend, default true
- *   showTooltip — show hover tooltip, default true
- *
- * Usage:
- *   import AttendanceTrendChart from "../components/AttendanceTrendChart";
- *   <AttendanceTrendChart attendance={attendance} employees={employees} />
+ * Props: attendance, employees (the full list, so gap-filling reuses
+ * buildMonthAttendance's per-employee mock — the same numbers Attendance.jsx
+ * and ViewEmployee.jsx show), height=160, showLegend, showTooltip.
  */
 
 import { useState, useMemo } from "react";
@@ -34,15 +21,8 @@ function formatDateShort(dateStr, dayLabels) {
   return dayLabels[d.getDay()];
 }
 
-/*
- * Build the last 7 days ending TODAY (not the latest date that happens to
- * have an attendance record — a stray future-dated row used to anchor the
- * whole window on the wrong day). Gaps are filled via the same
- * buildMonthAttendance/buildDayData helpers Attendance.jsx and
- * ViewEmployee.jsx use, so a day without real records yet (e.g. today,
- * before closeAttendanceDay runs) shows the same numbers here as there
- * instead of a second, differently-tuned mock.
- */
+/* The 7 days ending TODAY — anchoring on the latest record let a stray
+ * future-dated row shift the whole window. */
 function buildChartData(attendance, employees, todayKey, dayLabels) {
   const today = new Date(todayKey + "T00:00:00");
   const days = [];
@@ -146,7 +126,6 @@ export default function AttendanceTrendChart({
     [attendance, employees, todayKey, dayLabels]
   );
 
-  /* SVG dimensions */
   const W       = 560;
   const H       = height;
   const padL    = 32;
@@ -156,13 +135,11 @@ export default function AttendanceTrendChart({
   const innerW  = W - padL - padR;
   const innerH  = H - padT - padB;
 
-  /* Y-axis: 0–100% */
   const yTicks = [0, 25, 50, 75, 100];
 
   const xPos = (i) => padL + (i / (data.length - 1)) * innerW;
   const yPos = (pct) => padT + innerH - (pct / 100) * innerH;
 
-  /* Line path */
   const linePts = data.map((d, i) => `${xPos(i).toFixed(1)},${yPos(d.pct).toFixed(1)}`);
   const areaPath = [
     ...linePts,
@@ -170,7 +147,6 @@ export default function AttendanceTrendChart({
     `${padL.toFixed(1)},${(padT + innerH).toFixed(1)}`,
   ].join(" ");
 
-  /* Status bar (stacked) at bottom of each point */
   const barW = Math.min(28, (innerW / data.length) * 0.55);
 
   const legendItems = [
@@ -239,7 +215,6 @@ export default function AttendanceTrendChart({
               style={{ cursor: "pointer" }}
               onMouseEnter={() => showTooltip && setHovered({ ...d, cx, cy: yPos(d.pct) })}
             >
-              {/* Hover hit area */}
               <rect
                 x={cx - (innerW / data.length) * 0.45}
                 y={padT}
@@ -248,7 +223,6 @@ export default function AttendanceTrendChart({
                 fill="transparent"
               />
 
-              {/* Stacked bar */}
               {segs.map((seg, si) => {
                 const segH = Math.round((seg.value / total) * barMaxH);
                 const y    = barY;
@@ -259,7 +233,6 @@ export default function AttendanceTrendChart({
                 ) : null;
               })}
 
-              {/* Day label */}
               <text
                 x={cx} y={padT + innerH + barMaxH + 14}
                 fontSize="10" textAnchor="middle"
@@ -267,7 +240,6 @@ export default function AttendanceTrendChart({
                 fontWeight={d.isToday ? "600" : "400"}
               >{d.label}</text>
 
-              {/* Dot on line */}
               <circle
                 cx={cx} cy={yPos(d.pct)} r={d.isToday ? 5 : 3.5}
                 fill={d.isToday ? "var(--clr-primary-400)" : "var(--bg-surface)"}
@@ -275,7 +247,6 @@ export default function AttendanceTrendChart({
                 strokeWidth={d.isToday ? 0 : 1.5}
               />
 
-              {/* % label on hover or today */}
               {(d.isToday || (hovered && hovered.date === d.date)) && (
                 <g>
                   <rect

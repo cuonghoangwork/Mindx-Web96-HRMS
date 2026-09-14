@@ -10,12 +10,9 @@ import { translateApiError } from "../../utils/apiError";
 import { LeaveStatusBadge } from "../../components/LeaveStatusBadge";
 
 /**
- * LeaveTab — ledger + request history for this employee (8.0e Day 7),
- * reusing the same LeaveRequest data as the self-service dashboard. When a
- * Manager is viewing their own record, also shows a "pending approvals —
- * your team" panel, client-side filtered to department === me.department
- * (same audit constraint as the Dashboard's team strip — no backend scoping
- * exists, so this is a display convenience, not an access boundary).
+ * Leave ledger + request history for this employee. A manager viewing their
+ * own record also sees their team's pending approvals, filtered client-side
+ * to their department — a display convenience, not an access boundary.
  */
 export function LeaveTab({ employee, employees, isManager, isOwnRecord }) {
   const { t } = useTranslation();

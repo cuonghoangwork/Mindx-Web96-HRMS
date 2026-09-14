@@ -1,23 +1,9 @@
 /**
- * notificationStream.js — the live notification feed (Level 1).
- *
- * Wraps EventSource with the three things it does not do for you:
- *
- * 1. **Auth.** EventSource cannot send an Authorization header, so each
- *    connection starts by fetching a single-use ticket over the normal
- *    authenticated fetch and putting that in the query string. See
- *    hrms-backend/utils/tokens.js for why a ticket rather than the access
- *    token itself.
- *
- * 2. **Reconnection.** EventSource retries on its own, but it replays the
- *    SAME url — and the ticket is single-use, so its retry is guaranteed to
- *    401 forever. Every reconnect here has to go back for a fresh ticket,
- *    which means owning the retry loop rather than letting the browser do it.
- *
- * 3. **Catching up.** A stream delivers nothing while it is down. On every
- *    successful RE-connect (not the first connect — the initial page load
- *    already fetched) the caller is told to refetch, which is what makes
- *    "you never miss a notification" actually true rather than nearly true.
+ * EventSource plus the three things it does not do: auth (a single-use
+ * ticket in the query string — EventSource cannot send a header), our own
+ * reconnect loop (the browser's retry replays the same spent ticket and
+ * 401s forever), and a refetch on every RE-connect so nothing delivered
+ * while the stream was down is missed.
  */
 
 import { API_BASE } from "./client";
@@ -33,8 +19,7 @@ const MAX_RETRY_MS = 30000;
  * @returns {{ close: () => void }}
  */
 export function connectNotificationStream({ onNotification, onReconnect } = {}) {
-  // Server-rendered or test environments without EventSource: degrade to
-  // "no live updates" rather than throwing on import.
+  // No EventSource (SSR, tests): no live updates rather than a throw.
   if (typeof EventSource === "undefined") {
     return { close: () => {} };
   }
@@ -46,9 +31,7 @@ export function connectNotificationStream({ onNotification, onReconnect } = {}) 
 
   function scheduleRetry() {
     if (closed || retryTimer) return;
-    // 1s, 2s, 4s … capped at 30s. The cap matters more than the curve: a
-    // backend that is down should not be getting a request per second from
-    // every open tab.
+    // 1s, 2s, 4s … capped at 30s so a down backend is not hammered by every open tab.
     const delay = Math.min(MAX_RETRY_MS, FIRST_RETRY_MS * 2 ** attempt);
     attempt += 1;
     retryTimer = setTimeout(() => {
@@ -73,8 +56,6 @@ export function connectNotificationStream({ onNotification, onReconnect } = {}) 
       const res = await NotificationsAPI.streamTicket();
       ticket = res.data?.ticket;
     } catch {
-      // Includes the 401 path, where apiFetch has already tried a token
-      // refresh and redirected to /login if that failed. Nothing to add.
       scheduleRetry();
       return;
     }
@@ -90,7 +71,7 @@ export function connectNotificationStream({ onNotification, onReconnect } = {}) 
       try {
         onNotification?.(JSON.parse(event.data));
       } catch {
-        // A malformed frame must not kill the connection.
+        // a malformed frame must not kill the connection
       }
     });
 
@@ -101,17 +82,13 @@ export function connectNotificationStream({ onNotification, onReconnect } = {}) 
     };
 
     source.onerror = () => {
-      // Fires for a dropped connection, a 401 on a spent ticket, and the
-      // server's own 15-minute connection cap. All three want the same
-      // thing: drop this source and come back with a new ticket.
+      // Dropped connection, spent ticket, or the server's 15-minute cap: all want a fresh ticket.
       teardownSource();
       scheduleRetry();
     };
   }
 
-  // A laptop waking from sleep leaves a dead socket that fires no error
-  // until something touches it. Reconnect immediately on becoming visible
-  // rather than waiting out a backoff that may already be at 30s.
+  // Waking from sleep leaves a dead socket that fires no error; reconnect on becoming visible.
   function onVisibility() {
     if (closed || document.visibilityState !== "visible" || source) return;
     if (retryTimer) {

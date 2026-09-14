@@ -18,8 +18,6 @@ const HOLIDAY_TYPE_VARIANT = {
   Optional: "info",
 };
 
-// Task 6.6 — was previously pinned to "en-US" regardless of the app's
-// language toggle; now delegates to utils/format.js.
 function formatDate(dateStr, language) {
   return formatDateLocalized(dateStr, language, {
     weekday: "short",
@@ -232,15 +230,8 @@ function Holidays() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const { getAppNow, holidays, addHoliday, updateHoliday, removeHoliday } = useStore();
-  // /holidays is requireManager-gated (App.jsx). Two different scopes live
-  // on this one page:
-  //  - canManageHolidays (HR/ADMIN only): create/edit/delete company
-  //    holidays — holidayRouter.js keeps write routes HR/ADMIN-only.
-  //  - canManageLeave (MANAGER/HR/ADMIN): the leave-requests review queue
-  //    (department-scoped for MANAGER via reviewQueue.js's list handler)
-  //    and the leave-balances table (department-scoped for MANAGER via
-  //    leaveRequestController.balances, which uses getManagerDepartmentId
-  //    the same way — see LeaveRequestsAPI.balances below).
+  // Two scopes on one page: holidays are HR/ADMIN-only to edit; the leave
+  // queue and balances are MANAGER (own department)/HR/ADMIN.
   const { isHRTier, isManagerTier } = useAuth();
   const canManageHolidays = isHRTier;
   const canManageLeave = isManagerTier;
@@ -309,7 +300,6 @@ function Holidays() {
     setReviewingId(null);
   };
 
-  // Pending first, then most recently applied.
   const sortedLeaveRequests = useMemo(
     () => [...leaveRequests].sort((a, b) => {
       if ((a.status === "pending") !== (b.status === "pending")) return a.status === "pending" ? -1 : 1;
@@ -522,9 +512,7 @@ function Holidays() {
         )}
       </div>
 
-      {/* ── Leave requests (admin/manager review queue) — new panel, not
-          previously surfaced anywhere; self-service "apply for leave"
-          stays on the Dashboard's "My Leave" widget. ── */}
+      {/* ── Leave requests review queue (applying stays on the Dashboard) ── */}
       {canManageLeave && (
         <div className="content-card">
           <div style={{ marginBottom: "var(--sp-5)" }}>

@@ -5,16 +5,11 @@ import { formatDate } from "../../utils/format";
 import Button from "../../components/Button";
 import { translateApiError } from "../../utils/apiError";
 
-// Solo Gaps Milestone 1 — keep in sync with
-// hrms-backend/middleware/upload.js's uploadDocuments
+// Keep in sync with hrms-backend/middleware/upload.js's uploadDocuments.
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 const DOCUMENT_TYPES = ["offer_letter", "id_scan", "other"];
 
-// Solo Gaps Milestone 1 — arbitrary multi-document upload (offer letters,
-// ID scans, other), additive alongside ContractCard above. Modeled on it
-// for the upload-state/error handling, but list-shaped since there can be
-// several documents at once, each individually viewable/deletable.
 export function DocumentsList({ employee, canManage, uploadEmployeeDocuments, removeEmployeeDocument, embedded = false }) {
   const { t } = useTranslation();
   const { language } = useLanguage();

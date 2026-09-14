@@ -7,16 +7,10 @@ import { translateApiError } from "../utils/apiError";
 import Badge from "./Badge";
 import Button from "./Button";
 
-// Milestones 1-5 — self/manager rating, competencies, goals, peer feedback,
-// appeals, AI insight. The AI call itself (prompt + LLM) happens entirely
-// server-side (see PERFORMANCE_REVIEWS_API_CONTRACT.md) — this component
-// only triggers it and renders the returned text.
-//
-// All the *can*/canEdit* flags come from the `permissions` object the server
-// returns alongside the review (§2.3 of the contract) rather than being
-// guessed client-side — e.g. canEditManager requires the orphan-manager
-// query, and canFileAppeal requires the 14-day-window math, both of which
-// need data this component never receives.
+// Every can*/canEdit* flag comes from the `permissions` the server returns
+// with the review — canEditManager needs the orphan-manager lookup and
+// canFileAppeal the appeal-window math, neither of which this component has.
+// The AI insight is built and called server-side; this only renders it.
 function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onClose, onSubmitted }) {
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -36,10 +30,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
   const [savingCompetency, setSavingCompetency] = useState(false);
   const [expandedComment, setExpandedComment] = useState(null);
   const [commentDraft, setCommentDraft] = useState({ self: "", manager: "" });
-  // Whether each side is showing its editable textarea vs. its saved-comment
-  // read view — starts on the read view when a comment already exists (see
-  // toggleCompetencyComment), same read-then-edit pattern the self-review
-  // section above already uses (canEditSelf ? <form> : <readonly display>).
+  // Per side: read view when a comment exists, textarea otherwise.
   const [editingSide, setEditingSide] = useState({ self: false, manager: false });
   const [savingCommentFor, setSavingCommentFor] = useState(null);
   const [savingGoalId, setSavingGoalId] = useState(null);
@@ -161,7 +152,6 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setExpandedComment(null);
     } else {
       setCommentDraft({ self: value.selfComment ?? "", manager: value.managerComment ?? "" });
-      // Land on the edit box only when there's nothing saved yet to show instead.
       setEditingSide({ self: !value.selfComment, manager: !value.managerComment });
       setExpandedComment(key);
     }
@@ -281,9 +271,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
       setAiInsightStrengths(res.strengths);
       setAiInsightGrowthAreas(res.growthAreas);
     } catch {
-      // Never surface the raw server error here — it may leak config details
-      // (e.g. "GEMINI_API_KEY is unset"); the UI only ever shows a static,
-      // translated "unavailable" message, matching the original demo.
+      // Never surface the raw server error — it can name config details.
       setAiInsightError(true);
     }
     setAiInsightLoading(false);
@@ -299,10 +287,7 @@ function PerformanceReviewDialog({ cycleKey, employeeId, employeeName, meta, onC
     border: "2px solid " + (filled ? "var(--bg-primary)" : "var(--bdr-default)"),
   });
 
-  // One side (self or manager) of a competency's comment: a saved-comment
-  // read view with an Edit action, or the editable form-group textarea —
-  // never both at once. Mirrors the self-review section's own
-  // canEditSelf ? <form> : <readonly display> split above.
+  // One side of a competency comment: read view with Edit, or the textarea — never both.
   const renderCompetencyCommentSide = (key, side, value) => {
     const canEdit = side === "self" ? canEditCompetencySelf : canEditCompetencyManager;
     const existing = side === "self" ? value.selfComment : value.managerComment;

@@ -1,37 +1,13 @@
 /**
- * Avatar — HRMS Design System v3 "Navy Signal Blue"
- *
- * Variants:
- *   initials  — auto-generates initials from name (default)
- *   image     — displays image from src
- *   icon      — icon fallback when no image
- *
- * Props:
- *   name      — full name, used to generate initials and aria-label
- *   src       — image URL (optional)
- *   size      — xs(24) | sm(32) | md(40, default) | lg(56) | xl(80)
- *   shape     — circle (default) | square
- *   color     — override background color (auto-picked from name if omitted)
- *   status    — "active" | "leave" | "remote" | "terminated" — shows corner dot
- *   className, style
- *
- * Extras:
- *   AvatarGroup  — stacks multiple Avatars together
- *
- * Usage:
- *   <Avatar name="John Doe" />
- *   <Avatar name="Jane Smith" src="/photos/jane.jpg" size="lg" status="active" />
- *   <Avatar name="Bob" size="sm" shape="square" />
- *   <AvatarGroup avatars={employees.slice(0,4)} max={3} />
+ * Props: name (initials + aria-label), src, size xs|sm|md|lg|xl, shape
+ * circle|square, color (auto-picked from name if omitted), status (corner
+ * dot). AvatarGroup stacks several with a +N overflow.
  */
 
 import { useTranslation } from "react-i18next";
 import { getInitials } from "../utils/initials";
 
-/* ─── Color palette (auto-picked by name hash) ───
-   v3 "Navy Signal Blue" — flat 5-color rotation lifted directly from
-   the redesign mockup's avatar-chip palette (no gradients, matches the
-   flat/border-forward aesthetic rather than v2's 10-color gradient set). */
+/* ─── Palette, picked by name hash. Deliberately theme-independent. ─── */
 const PALETTE = [
   ["#0b1f3a"],   // ink navy
   ["#2f6fed"],   // signal blue
@@ -145,14 +121,12 @@ function Avatar({
           alt={name}
           style={imgStyle}
           onError={(e) => {
-            // fallback to initials on image error
             e.currentTarget.style.display = "none";
             e.currentTarget.nextSibling.style.display = "flex";
           }}
         />
       ) : null}
 
-      {/* Initials — shown when no src, or as fallback */}
       <span
         style={{
           ...initialsStyle,

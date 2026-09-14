@@ -1,11 +1,4 @@
-/**
- * Five-star rating with the numeric value beside it.
- *
- * Promoted from two byte-identical copies (F7): pages/Candidates.jsx and
- * components/CandidateSidePanel.jsx. The only difference between them was the
- * star size — 13px in the table, 14px in the side panel — so that is the one
- * prop. Both call sites keep exactly the size they had.
- */
+/** Five-star rating with the numeric value beside it. */
 export function StarRating({ rating, size = 13 }) {
   const full = Math.round(rating);
   return (

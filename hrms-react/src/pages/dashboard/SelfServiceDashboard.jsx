@@ -16,17 +16,8 @@ import { translateApiError } from "../../utils/apiError";
 import { StatCard } from '../../components/charts/StatCard'
 import { LeaveStatusBadge } from "../../components/LeaveStatusBadge";
 
-/* ─────────────────────────────────────────
-   Leave status badge (pending/approved/rejected)
-───────────────────────────────────────── */
-/* ═══════════════════════════════════════════
-   SELF-SERVICE DASHBOARD — Manager + Employee (8.0e)
-   "My Leave" table + upcoming holidays, shared by both.
-   Manager additionally gets a "your team" stat strip,
-   client-side filtered to department === me.department
-   over the existing full-list fetches (no backend
-   department scoping exists yet — see 8.0e's audit).
-═══════════════════════════════════════════ */
+/* Dashboard for MANAGER and EMPLOYEE: My Leave + upcoming holidays; MANAGER
+   also gets a "your team" strip, filtered client-side to their department. */
 export function SelfServiceDashboard() {
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -50,9 +41,7 @@ export function SelfServiceDashboard() {
         EmployeesAPI.myProfile(),
         LeaveRequestsAPI.list(),
         LeaveRequestsAPI.balance(),
-        // Self-service, same endpoint ViewEmployee's Salary tab uses —
-        // returns only approved/paid periods, most recent first. Swallow
-        // errors rather than blocking the rest of the dashboard on it.
+        // Approved/paid periods only; a failure must not block the dashboard.
         PayrollAPI.myPayslips().catch(() => ({ items: [] })),
       ]);
       setMyProfile(profileRes.data ?? null);
@@ -75,9 +64,7 @@ export function SelfServiceDashboard() {
     await loadLeaveData();
   };
 
-  // For MANAGER (and ADMIN) the list endpoint returns everyone's requests,
-  // so narrow down to mine for "My Leave". EMPLOYEE already gets only its
-  // own set from the backend, but the filter is harmless either way.
+  // The list endpoint returns everyone's requests for a MANAGER; narrow to mine.
   const myLeaveRequests = myProfile
     ? [...leaveRequests]
         .filter((r) => idsMatch(r.employeeId, myProfile.id))
@@ -127,9 +114,7 @@ export function SelfServiceDashboard() {
         </Button>
       </div>
 
-      {/* Personal stats — every self-service role (Employee, and Manager as
-          an employee in their own right) gets these three, matching the
-          design's PTO/Pending/Last Payslip row. */}
+      {/* Personal stats */}
       <div className="stat-grid" style={{ marginBottom: "var(--sp-5)" }}>
         <StatCard
           title={t("dashboard.myStats.ptoRemaining", { defaultValue: "PTO Days Remaining" })}
@@ -241,9 +226,7 @@ export function SelfServiceDashboard() {
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-4)" }}>
             <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.holidaysWidget.heading", { defaultValue: "Upcoming company holidays" })}</h3>
-            {/* /holidays is requireManager (App.jsx) — plain Employee has no
-                reachable destination for a full list, so the link is
-                omitted rather than pointing at a dead end. */}
+            {/* /holidays is requireManager, so EMPLOYEE gets no link. */}
             {isManagerTier && (
               <Link
                 to="/holidays"

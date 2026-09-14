@@ -7,12 +7,6 @@ import { isPushSupported, currentSubscription, subscribeToPush, unsubscribeFromP
 import Button from "../../components/Button";
 import { Panel } from './shared'
 
-/* ─────────────────────────────────────────────
-   Notifications tab — no per-category preference
-   storage exists in the backend (Notification
-   model has no per-user prefs), so this is a
-   disclosed gap rather than a fake checkbox table.
-───────────────────────────────────────────── */
 function SettingRow({ label, hint, control }) {
   return (
     <div style={{
@@ -59,13 +53,7 @@ function Switch({ checked, onChange, disabled, label }) {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Web Push. Unlike the email toggle below, this is
-   PER-BROWSER: the subscription is minted by this
-   browser for this origin, so the row is labelled
-   "this device" and turning it on elsewhere does
-   nothing here. See utils/webPush.js.
-───────────────────────────────────────────── */
+/* Web Push is per-browser ("this device"), unlike email — see utils/webPush.js. */
 function PushRow() {
   const { t } = useTranslation()
   const [state, setState] = useState(null)
@@ -96,8 +84,7 @@ function PushRow() {
         await NotificationsAPI.pushSubscribe(result.subscription)
       } else {
         const { endpoint } = await unsubscribeFromPush()
-        // Drop the server row even when the browser had nothing to revoke,
-        // or it would keep pushing to an endpoint the user has disowned.
+        // Drop the server row even if the browser had nothing to revoke.
         if (endpoint) await NotificationsAPI.pushUnsubscribe(endpoint)
       }
       await load()
@@ -130,13 +117,7 @@ function PushRow() {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Email toggle. Server-side preference, unlike the
-   desktop one above: an inbox is not tied to a
-   device, and email is the only channel that can
-   reach a broadcast audience — which is exactly
-   why it defaults to off.
-───────────────────────────────────────────── */
+/* Email is a server-side preference; it can reach broadcasts, which is why it defaults to off. */
 function EmailRow() {
   const { t } = useTranslation()
   const [enabled, setEnabled] = useState(null)
@@ -150,8 +131,7 @@ function EmailRow() {
 
   const toggle = async (next) => {
     setBusy(true)
-    // Optimistic: the switch should not lag behind the tap. Rolled back below
-    // if the write fails, so it can never show "on" while the server says off.
+    // Optimistic; rolled back below if the write fails.
     setEnabled(next)
     try {
       const res = await NotificationsAPI.updatePreferences({ email: next })
@@ -181,18 +161,9 @@ function EmailRow() {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Telegram linking. The code is minted server-side
-   and redeemed by the bot when the user sends
-   "/start <code>" — see hrms-backend/controller/
-   telegramController.js for the full handshake.
-
-   No QR code, deliberately: the only zero-dependency
-   way to render one is a third-party image service,
-   which would mean putting a live link code in a URL
-   owned by someone else. The deep link opens Telegram
-   Desktop and Telegram mobile directly.
-───────────────────────────────────────────── */
+/* Telegram linking — the bot redeems "/start <code>" (telegramController.js).
+   No QR code: the only zero-dependency renderer is a third-party image
+   service, which would put a live link code in someone else's URL. */
 function TelegramRow() {
   const { t } = useTranslation()
   const [status, setStatus] = useState(null)
@@ -213,9 +184,7 @@ function TelegramRow() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // The user completes linking inside Telegram, so this page has no way to
-  // know it happened. Poll while a code is on screen, and stop as soon as it
-  // lands or the code expires — never an unbounded background poll.
+  // Linking completes inside Telegram; poll only while a code is on screen.
   useEffect(() => {
     if (!invite || status?.connected) return undefined
     const timer = setInterval(async () => {
@@ -312,15 +281,9 @@ function TelegramRow() {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Notifications tab — in-app is always on (it is
-   the notification record itself). Desktop toasts
-   are opt-in and deliberately per-device: the
-   browser owns permission, so a preference stored
-   on the User document would claim "on" for a
-   device that never granted it. See
-   utils/desktopNotify.js.
-───────────────────────────────────────────── */
+/* In-app is always on. Desktop toasts are opt-in and per-device (the browser
+   owns the permission) — see utils/desktopNotify.js. There is no
+   per-category preference storage; the gap is disclosed, not faked. */
 export function NotificationsTab() {
   const { t } = useTranslation()
   const [permission, setPermission] = useState(() => permissionState())
@@ -334,9 +297,7 @@ export function NotificationsTab() {
       setWantedState(setWanted(false))
       return
     }
-    // Asking must happen inside this click — a permission prompt raised on
-    // page load gets reflexively blocked, and "denied" cannot be undone
-    // from script.
+    // Must be inside the click: a prompt on load gets reflexively blocked, and "denied" is permanent.
     const result = await ensurePermission()
     setPermission(result)
     setWantedState(setWanted(result === 'granted'))

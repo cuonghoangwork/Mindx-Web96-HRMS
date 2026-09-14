@@ -1,44 +1,22 @@
-/**
- * attendance.js — shared attendance helpers.
- *
- * Extracted from pages/Attendance.jsx (8.0e Day 7) so the Employee Detail
- * "Attendance" tab (ViewEmployee.jsx) can reuse the same month-calendar data
- * shape/mock-fill logic instead of duplicating it, per the sprint plan's
- * "reuse existing calendar component" instruction for that tab.
- */
+/** Attendance helpers shared by the Attendance page and the employee Attendance tab. */
 import { numericSeed, idsMatch } from "./id";
 
 /**
- * Formats a Date as a local YYYY-MM-DD key. Deliberately NOT
- * `date.toISOString().split("T")[0]` — that converts to UTC first, which
- * silently rolls back to the previous calendar day for any local-midnight
- * Date once the local zone is ahead of UTC (e.g. Asia/Ho_Chi_Minh, UTC+7:
- * local midnight is 17:00 UTC the day before). Every attendance date key
- * in the app must go through this so a given calendar day always maps to
- * the same key regardless of time of day or how the Date was constructed.
+ * Local YYYY-MM-DD key. Never `toISOString().slice(0, 10)` — that converts
+ * to UTC first and rolls a local midnight back a day in UTC+7. Every
+ * attendance date key goes through here.
  */
 export function isoOf(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/**
- * The timezone the company operates in. Must match the backend's SCHEDULER_TZ,
- * because the server evaluates the overtime cutoff and every date-key rule in
- * that zone.
- */
+/** Must match the backend's SCHEDULER_TZ — the server evaluates every date rule in this zone. */
 export const APP_TIMEZONE = import.meta.env.VITE_APP_TIMEZONE || "Asia/Ho_Chi_Minh";
 
 /**
- * "HH:MM" wall clock in APP_TIMEZONE.
- *
- * Deliberately NOT `date.getHours()` — that reads the *browser's* zone. A
- * clock-in sent from a laptop in another timezone would record the wrong
- * time against a company-timezone rule; it is the same class of bug as the
- * server-side `new Date().getHours()` the overtime cutoff had to avoid, just
- * one layer up.
- *
- * hourCycle "h23" is explicit: hour12:false renders midnight as "24:00" in
- * some runtimes, and the backend's parseHHMM rejects that.
+ * "HH:MM" in APP_TIMEZONE, not the browser's zone — a clock-in from a
+ * laptop abroad must record company time. hourCycle "h23" because
+ * hour12:false renders midnight as "24:00", which the backend rejects.
  */
 export function hhmmOf(date) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -50,15 +28,9 @@ export function hhmmOf(date) {
 }
 
 /**
- * "HH:MM" to minutes since midnight, or null when unparseable.
- *
- * `allowEndOfDay` accepts "24:00" (1440) — the sentinel an overtime span uses
- * for a shift running to the end of the day. It is opt-in because "24:00" is a
- * legal *end* and never a legal *start*, matching the backend's split between
- * parseHHMM and parseHHMMEnd.
- *
- * Returns null rather than throwing: every caller here is rendering, and a
- * malformed stored time should degrade to "no chip" rather than a blank page.
+ * "HH:MM" → minutes, or null when unparseable (callers are rendering; a bad
+ * stored time should mean "no chip", not a blank page). `allowEndOfDay`
+ * accepts "24:00", a legal overtime *end* but never a start.
  */
 export function hhmmToMinutes(value, { allowEndOfDay = false } = {}) {
   if (allowEndOfDay && value === "24:00") return 24 * 60;
@@ -70,7 +42,7 @@ export function hhmmToMinutes(value, { allowEndOfDay = false } = {}) {
   return h * 60 + min;
 }
 
-/** Derives display status from a raw attendance record — flags "Present" as "Late" past 9am. */
+/** Display status; "Present" past 9am reads as "Late". */
 export function resolveStatus(record) {
   let s = record.status;
   if (record.checkIn && s === "Present") {
@@ -79,11 +51,7 @@ export function resolveStatus(record) {
   return s;
 }
 
-/**
- * Fills a full month's worth of attendance for the given employees with
- * deterministic mock data for any employee/day combination that doesn't
- * already have a real record (weekends are skipped).
- */
+/** Fills the month with deterministic mock rows where no real record exists (weekends skipped). */
 export function buildMonthAttendance(year, month, employees, existing) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const result = [...existing];

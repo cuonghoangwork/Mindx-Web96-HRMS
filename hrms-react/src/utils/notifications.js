@@ -31,11 +31,8 @@ function localizeParams(params, t, language) {
   return out;
 }
 
-// Translates a system-generated Notification's title/message for the active
-// language. Old notifications (created before this milestone) and the
-// free-text HR/Admin "compose a notice" ones never carry titleKey/messageKey
-// — those just render their stored literal text unchanged, in whatever
-// language they were created in.
+// Translates a system-generated notification; composed notices and rows
+// without keys render their stored literal text.
 export function translateNotification(notification, t, language) {
   if (!notification) return { title: "", message: "" };
   const params = localizeParams(notification.params, t, language);

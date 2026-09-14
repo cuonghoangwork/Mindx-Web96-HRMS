@@ -15,9 +15,6 @@ const STATUS_VARIANT = {
   Closed: "neutral",
 };
 
-// Task 6.6 — was previously pinned to "en-US" regardless of the app's
-// language toggle; now delegates to utils/format.js so postings display
-// with the selected language's date convention.
 function formatDate(dateStr, language) {
   return formatDateLocalized(dateStr, language, {
     month: "short",
@@ -26,10 +23,7 @@ function formatDate(dateStr, language) {
   });
 }
 
-// Task 5.1 — pay range shown on the job card / details panel.
-// Task 6.6 — currency grouping follows the posting's own currency (same
-// convention as Payroll.jsx's fmtMoney: VND groups the Vietnamese way,
-// everything else groups the US way), not the UI language toggle.
+// Grouping follows the posting's currency, not the UI language (as in fmtMoney).
 function formatSalaryRange(job) {
   const { salaryMin, salaryMax, salaryCurrency } = job;
   if (!salaryMin && !salaryMax) return null;
@@ -56,7 +50,7 @@ function Jobs() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
-  const [expandedId, setExpandedId] = useState(null); // task 5.1 — details expand/collapse
+  const [expandedId, setExpandedId] = useState(null);
 
   const stats = useMemo(() => {
     const open = jobs.filter((j) => j.status === "Open");

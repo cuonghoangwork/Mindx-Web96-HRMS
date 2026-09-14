@@ -13,27 +13,14 @@ import OvertimeRequestModal from "./OvertimeRequestModal";
 import AssignOvertimePanel from "./AssignOvertimePanel";
 
 /**
- * OvertimeTab — the Attendance page's third tab.
- *
- * Deliberately one tab with two role-gated sections rather than two tabs.
- * "Apply" and "approve" are the same subject seen from two sides, and a
- * manager reviewing their team still has their own overtime to file; splitting
- * them would make that person switch tabs to do one job. The existing tab row
- * is already role-gated the same way (see Attendance.jsx).
- *
- * The approval queue copies NoShowQueueTab's structure — filter chips, inline
- * review with a note, toast — because it backs the same
- * createReviewRequestController API shape on the server.
+ * The Attendance page's Overtime tab: one tab with role-gated sections, since
+ * a manager reviewing their team still has their own overtime to file. The
+ * approval queue mirrors NoShowQueueTab — same review-queue API shape.
  */
 
 const STATUS_VARIANT = { pending: "warning", approved: "success", rejected: "danger" };
 
-/**
- * Why the evidence flag is on every queue row: it is the difference between
- * "we have clock proof for these hours" and "we are trusting the plan because
- * nobody clocked out". Approving the second kind is a judgement call, and a
- * labour inspection asks exactly this question.
- */
+/** Clock proof vs. trusting the plan — a labour inspection asks exactly this. */
 function EvidenceFlag({ evidence, t }) {
   if (!evidence) return null;
   const warn = evidence !== "clocked";
@@ -75,9 +62,7 @@ function OvertimeTab() {
   const [reviewingId, setReviewingId] = useState(null);
   const [note, setNote] = useState("");
   const [actionLoading, setActionLoading] = useState(null);
-  // employeeId -> { monthUsed, monthCap, yearUsed, yearCap }, loaded lazily for
-  // the rows actually on screen so HR can see the person's running totals
-  // before approving more.
+  // employeeId -> { monthUsed, monthCap, yearUsed, yearCap }, for the rows on screen.
   const [balances, setBalances] = useState({});
 
   const myEmployee = useMemo(
@@ -107,9 +92,6 @@ function OvertimeTab() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  // Fetch each listed employee's running totals once. Scoped to what is on
-  // screen rather than every employee, same reasoning as the no-show queue's
-  // scoped flag check.
   useEffect(() => {
     if (!isManagerTier) return;
     const now = getAppNow();
@@ -131,8 +113,7 @@ function OvertimeTab() {
       setBalances((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));
     });
     return () => { cancelled = true; };
-    // `balances` is intentionally excluded: it is what this effect writes, and
-    // including it would re-run on every write. `missing` already guards.
+    // `balances` is what this effect writes; `missing` already guards.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overtimeRequests, isManagerTier, fetchOvertimeBalance, getAppNow]);
 
@@ -166,15 +147,9 @@ function OvertimeTab() {
     [overtimeRequests, myEmployee],
   );
 
-  // Who this user may assign overtime to. The server enforces the same rule
-  // and reports an out-of-department pick in `skipped`, so this is about not
-  // offering a choice that would only be refused — same scoping as the roster.
+  // Who this user may assign to — the server enforces the same rule; this avoids offering a refused pick.
   const assignableEmployees = useMemo(() => {
-    // Terminated staff drop out for the same reason as out-of-department ones:
-    // payroll will not pay them, so the server refuses the assignment with
-    // OT_EMPLOYEE_NOT_EMPLOYED and offering the pick would only produce a skip
-    // line. "On Leave" stays selectable — they are still paid, and a specific
-    // approved-leave date is caught server-side instead.
+    // Terminated staff are refused server-side (OT_EMPLOYEE_NOT_EMPLOYED); "On Leave" stays selectable.
     const employable = employees.filter((e) => e.status !== "Terminated");
     if (isHRTier) return employable;
     if (isManager && myEmployee?.department) {

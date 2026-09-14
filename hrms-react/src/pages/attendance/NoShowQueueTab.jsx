@@ -8,12 +8,7 @@ import Avatar from "../../components/Avatar";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 
-/* ═══════════════════════════════════════════
-   No-show queue — moved here from Settings.jsx (mockup puts this
-   review queue as the Attendance page's second tab, not a Settings
-   section). Same NoShowReviewsAPI the Settings panel used to call —
-   real backend-generated flags (task 4.7), just relocated.
-═══════════════════════════════════════════ */
+/* Review queue for the close job's repeated-no-show flags (DECISIONS.md D2). */
 export function NoShowQueueTab() {
   const { t } = useTranslation();
   const { language } = useLanguage();

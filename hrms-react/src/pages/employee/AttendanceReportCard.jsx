@@ -6,9 +6,7 @@ import Badge from "../../components/Badge";
 import { idsMatch } from "../../utils/id";
 import Button from "../../components/Button";
 
-// Task 4.3: per-employee attendance log/report view. Data already exists in
-// the attendance collection (via StoreContext); this maps each recorded
-// status to the Badge variant used elsewhere (Attendance.jsx's variantMap).
+// Same status → Badge variant map as Attendance.jsx.
 const ATTENDANCE_STATUS_VARIANT = {
   Present: "success",
   Late: "warning",
@@ -49,8 +47,6 @@ export function AttendanceReportCard({ employee, attendance, navigate, getAppNow
   const rate = total > 0 ? Math.round((presentLike / total) * 100) : null;
   const visible = showAll ? records : records.slice(0, 10);
 
-  // 8.0e Day 7 — reuse the same month-calendar component/data helpers as
-  // pages/Attendance.jsx, scoped to just this one employee.
   const monthPrefix = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-`;
   const monthExisting = useMemo(
     () => records.filter((r) => r.date.startsWith(monthPrefix)).map((r) => ({ ...r, status: resolveStatus(r) })),

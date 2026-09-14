@@ -8,14 +8,10 @@ import { translateApiError } from '../../utils/apiError'
 import Button from "../../components/Button";
 import { Panel, RolePill } from './shared'
 
-// All 4 roles are parallel tiers, not a strict ladder (HR and MANAGER
-// aren't "greater/lesser" than each other — different scope, not rank), so
-// role changes below use a plain select instead of a promote/demote ladder.
+// Roles are parallel tiers (HR and MANAGER differ in scope, not rank), hence a select, not a ladder.
 const ASSIGNABLE_ROLES = ['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']
 
-// Solo Gaps Milestone 3 — the 4 MANAGER capabilities the permissions
-// matrix can toggle. Keep in sync with
-// hrms-backend/utils/permissions.js's MANAGER_CAPABILITIES.
+// Keep in sync with hrms-backend/utils/permissions.js's MANAGER_CAPABILITIES.
 const MANAGER_CAPABILITIES = [
   'approveLeaveRequests',
   'reviewProfileEdits',
@@ -23,13 +19,7 @@ const MANAGER_CAPABILITIES = [
   'proposePromotions',
 ]
 
-/* ─────────────────────────────────────────────
-   Roles & permissions tab — Admin-only. Real
-   role changes (EMPLOYEE/MANAGER/ADMIN) via
-   /auth/users/:id/promote, plus (Solo Gaps
-   Milestone 3) a real per-capability toggle for
-   MANAGER below it — see PermissionsMatrix.
-───────────────────────────────────────────── */
+/* Admin-only: role changes via /auth/users/:id/promote, plus the MANAGER capability matrix. */
 function PromoteUsersPanel() {
   const { t } = useTranslation()
   const { user: currentUser } = useAuth()
@@ -146,14 +136,7 @@ function PromoteUsersPanel() {
   )
 }
 
-/* ─────────────────────────────────────────────
-   Permissions matrix (Solo Gaps Milestone 3) —
-   a second, additional gate that can only make
-   MANAGER stricter than authorize() already
-   allows; never grants anything wider. ADMIN and
-   HR are never affected by any toggle here — see
-   hrms-backend/utils/permissions.js.
-───────────────────────────────────────────── */
+/* A second gate that can only make MANAGER stricter; ADMIN and HR are never affected. */
 function PermissionsMatrix() {
   const { t } = useTranslation()
   const [items, setItems] = useState([])

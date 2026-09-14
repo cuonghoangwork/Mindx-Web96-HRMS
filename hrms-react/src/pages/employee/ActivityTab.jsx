@@ -7,15 +7,8 @@ import { idsMatch } from "../../utils/id";
 import { translateApiError } from "../../utils/apiError";
 
 /**
- * ActivityTab — per-employee history pulled from the real AuditLog (8.0e Day
- * 8), not Dashboard's mock activity feed (that array is page-level summary
- * blurbs, not tied to any one employee — nothing there to actually reuse
- * for a scoped tab). AuditLog's `/recent` endpoint is real, already used
- * nowhere in the frontend today, and open to any authenticated user, so it
- * works for Employee viewing their own record too. It has no `resourceId`
- * filter server-side, so this fetches the recent global feed and filters
- * client-side to this employee's entries — a real follow-up would add that
- * query param.
+ * Per-employee history from the AuditLog `/recent` feed, filtered
+ * client-side — the endpoint has no resourceId filter yet.
  */
 export function ActivityTab({ employee }) {
   const { t } = useTranslation();

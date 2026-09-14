@@ -1,34 +1,15 @@
 /**
- * Badge — HRMS Design System v3 "Navy Signal Blue"
- * (No structural changes needed for v3 — fully token/class-driven via
- * .badge/.badge-* in index.css; reskin was a token-value swap only.)
- *
- * Variants (semantic):
- *   status  : active | leave | remote | terminated | pending
- *   type    : full-time | part-time | contract | intern
- *   generic : primary | success | warning | danger | info | neutral
- *
- * Props:
- *   variant   — variant name (default: "neutral")
- *   size      — sm | md (default) | lg
- *   dot       — boolean, shows dot before label
- *   icon      — ReactNode, icon before label
- *   pill      — boolean, fully rounded (default true)
- *   children  — label text
- *
- * Usage:
- *   <Badge variant="active">Active</Badge>
- *   <Badge variant="leave" dot>On Leave</Badge>
- *   <Badge variant="full-time" size="sm">Full-time</Badge>
- *   <StatusBadge status={employee.status} />
- *   <TypeBadge type={employee.type} />
+ * Variants: status (active | leave | remote | terminated | pending), type
+ * (full-time | part-time | contract | intern), generic (primary | success |
+ * warning | danger | info | neutral). Props: variant, size sm|md|lg, dot,
+ * icon, pill (default true), children. StatusBadge / TypeBadge /
+ * CandidateStageBadge below pick the variant from a value.
  */
 
 import { useTranslation } from "react-i18next";
 
 /* ─── Variant → CSS class mapping ─── */
 const VARIANT_CLASS = {
-  // Employee status
   active:      "badge badge-active",
   leave:       "badge badge-leave",
   "on leave":  "badge badge-leave",
@@ -36,16 +17,11 @@ const VARIANT_CLASS = {
   terminated:  "badge badge-terminated",
   pending:     "badge badge-pending",
 
-  // Contract type — matches mockup's typeTagStyleFor exactly: Full-time
-  // = accent tint, Part-time = purple, Contract = teal (same value as
-  // Info in the mockup's own token object), Intern falls into the
-  // neutral tint (its "else" branch).
   "full-time":  "badge badge-primary",
   "part-time":  "badge badge-purple",
   contract:     "badge badge-info",
   intern:       "badge badge-pending",
 
-  // Generic semantic
   primary:  "badge badge-primary",
   success:  "badge badge-active",
   warning:  "badge badge-leave",
@@ -77,9 +53,6 @@ function Badge({
     <span
       className={cls}
       style={{
-        // mockup's status/type tags carry no border-radius at all (flat
-        // rectangular tags); `pill` stays available for any one-off
-        // caller that explicitly wants a rounded dot-style badge.
         borderRadius: pill ? "var(--radius-full)" : "0",
         ...SIZE_STYLE[size],
         ...style,

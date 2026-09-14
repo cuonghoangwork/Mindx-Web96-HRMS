@@ -17,7 +17,6 @@ import { StoreContext } from "../StoreContext";
 
 /* ─── Helper: upsert an attendance record returned by the API into local state ─── */
 function upsertAttendanceRecord(prev, record) {
-  // Match by _id first (API records always have one)
   if (record.id) {
     const idx = prev.findIndex((r) => r.id && idsMatch(r.id, record.id));
     if (idx >= 0) {
@@ -26,7 +25,7 @@ function upsertAttendanceRecord(prev, record) {
       return next;
     }
   }
-  // Fall back to employeeId + date (catches mock-generated rows without ids)
+  // Fall back to employeeId + date for mock rows without an id.
   const idx = prev.findIndex(
     (r) => idsMatch(r.employeeId, record.employeeId) && r.date === record.date,
   );
@@ -77,10 +76,8 @@ export function StoreProvider({ children }) {
   const resetAppDateTime = useCallback(() => setClockOffset(0), []);
   const isClockAdjusted = clockOffset !== 0;
 
-  // Push the offset down to the API client so requests carry X-App-Now while
-  // the clock is moved. Server-side rules (the 13:00 overtime cutoff) run
-  // against server time, so without this the demo clock would move only what
-  // the browser renders and none of what the backend decides.
+  // Requests carry X-App-Now while the demo clock is moved, so server-side
+  // rules (the overtime cutoff) move with it.
   useEffect(() => {
     setDemoClockOffset(clockOffset);
   }, [clockOffset]);
@@ -105,7 +102,6 @@ export function StoreProvider({ children }) {
       setCandidates(cand.items || []);
       setHolidays(hol.items || []);
       setAttendance(att.items || []);
-      // Role-scoped server-side: an employee gets only their own rows.
       setOvertimeRequests(ot.items || []);
     } catch (err) {
       setStoreError(translateApiError(err, t) || "Failed to load data from the backend.");
@@ -157,7 +153,6 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
-  // Task 1.4 — HR/Admin uploads a contract PDF for an employee.
   const uploadEmployeeContract = useCallback(async (id, file) => {
     const res = await EmployeesAPI.uploadContract(id, file);
     setEmployees((prev) =>
@@ -166,7 +161,6 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
-  // Solo Gaps Milestone 1 — arbitrary multi-document upload/removal.
   const uploadEmployeeDocuments = useCallback(async (id, files, options) => {
     const res = await EmployeesAPI.uploadDocuments(id, files, options);
     setEmployees((prev) =>
@@ -220,11 +214,7 @@ export function StoreProvider({ children }) {
     );
   }, []);
 
-  // Backend's manager field is resolved server-side from a plain name
-  // string (case-insensitive match against Employee.name — see
-  // utils/refResolvers.js), not an employeeId, so this takes/sends the
-  // manager's display name even though the caller is picking from a
-  // dropdown of employee objects.
+  // The backend resolves the manager from a display name, not an id.
   const updateDepartmentManager = useCallback(async (id, managerName) => {
     const res = await DepartmentsAPI.update(id, { manager: managerName ?? "" });
     setDepartments((prev) =>
@@ -286,7 +276,6 @@ export function StoreProvider({ children }) {
     const res = await CandidatesAPI.update(id, updates);
     setCandidates((prev) => prev.map((c) => (idsMatch(c.id, id) ? res.data : c)));
   }, []);
-  // Task 5.3 — HR/Admin uploads a real PDF CV/resume for a candidate.
   const uploadCandidateCv = useCallback(async (id, file) => {
     const res = await CandidatesAPI.uploadCv(id, file);
     setCandidates((prev) => prev.map((c) => (idsMatch(c.id, id) ? res.data : c)));
@@ -327,34 +316,20 @@ export function StoreProvider({ children }) {
 
   /* ── Attendance actions ── */
 
-  /**
-   * clockIn — records a check-in for the given employee on the given date.
-   * Sends the current app-clock time so it respects the demo clock (HeaderDateTime).
-   *
-   * @param {string} employeeId  MongoDB ObjectId of the employee
-   * @param {string} date        "YYYY-MM-DD"
-   * @param {string} checkInTime "HH:MM" — derived from getAppNow() by the caller
-   */
+  /** @param checkInTime "HH:MM" from getAppNow(), so the demo clock is respected. */
   const clockIn = useCallback(async (employeeId, date, checkInTime) => {
     const res = await AttendanceAPI.checkIn({ employeeId, date, checkIn: checkInTime });
     setAttendance((prev) => upsertAttendanceRecord(prev, res.data));
     return res.data;
   }, []);
 
-  /**
-   * clockOut — records a check-out for an employee who has already clocked in.
-   *
-   * @param {string} employeeId   MongoDB ObjectId of the employee
-   * @param {string} date         "YYYY-MM-DD"
-   * @param {string} checkOutTime "HH:MM"
-   */
   const clockOut = useCallback(async (employeeId, date, checkOutTime) => {
     const res = await AttendanceAPI.checkOut({ employeeId, date, checkOut: checkOutTime });
     setAttendance((prev) => upsertAttendanceRecord(prev, res.data));
     return res.data;
   }, []);
 
-  /* ── Overtime actions (Attendance Overtime, M4) ── */
+  /* ── Overtime actions ── */
 
   const refreshOvertimeRequests = useCallback(async (params = {}) => {
     const res = await OvertimeRequestsAPI.list(params);
@@ -368,11 +343,7 @@ export function StoreProvider({ children }) {
     return res.data;
   }, []);
 
-  /**
-   * Returns { created, skipped } rather than throwing on a partial failure:
-   * the endpoint validates each employee independently, and the caller needs to
-   * show exactly who was left out and why.
-   */
+  /** Returns { created, skipped } — a partial failure is data, not an error. */
   const assignOvertime = useCallback(async (data) => {
     const res = await OvertimeRequestsAPI.assign(data);
     if (res.created?.length) setOvertimeRequests((prev) => [...res.created, ...prev]);
@@ -467,19 +438,9 @@ export function StoreProvider({ children }) {
     updateHoliday,
     removeHoliday,
       }),
-    // Dependency list computed by react-hooks/exhaustive-deps, not by hand.
-    // The rule is enabled at "warn" and npm run lint runs --max-warnings 0, so
-    // this array cannot silently drift out of date: add a field to the value
-    // above without listing it here and the build fails.
-    //
-    // Scope note: this stops the value's identity changing when StoreProvider
-    // re-renders for a reason unrelated to its own state (an auth flag
-    // flipping, a parent re-render).
-    //
-    // The notification cascade it used to be unable to help with is now gone
-    // for a different reason: notifications no longer live here at all. They
-    // moved to NotificationProvider, so an arriving notification changes that
-    // context and leaves this one's value identical.
+    // Dependency list computed by react-hooks/exhaustive-deps (lint runs with
+    // --max-warnings 0, so it cannot drift). Keeps the value's identity stable
+    // across unrelated StoreProvider re-renders.
     [
       activePage,
       addCandidate,

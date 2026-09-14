@@ -10,11 +10,7 @@ import AttendanceTrendChart from "../../components/AttendanceTrendChart";
 import { ContractMixBar } from '../../components/charts/ContractMixBar'
 import { DeptBars } from '../../components/charts/DeptBars'
 
-/* ─────────────────────────────────────────
-   StripStatCell — bordered-strip stat cell (mockup's cellBase pattern)
-   Used on the admin Dashboard's two stat rows: one 2px-bordered strip
-   of cells divided by internal borders, no per-cell card box.
-───────────────────────────────────────── */
+/* One bordered strip of stat cells divided by internal borders, no per-cell card. */
 function StripStatCell({ label, value, trend, onClick, small }) {
   return (
     <button type="button" className="stat-cell" onClick={onClick}>
@@ -25,9 +21,6 @@ function StripStatCell({ label, value, trend, onClick, small }) {
   );
 }
 
-/* ─────────────────────────────────────────
-   Activity feed item
-───────────────────────────────────────── */
 function ActivityItem({ icon, bg, color, text, time }) {
   return (
     <div style={{
@@ -87,11 +80,7 @@ export function AdminDashboard() {
   }, []);
   const openPipelineCount = candidates.filter((c) => c.stage !== "Hired" && c.stage !== "Rejected").length;
 
-  // Mirrors the mockup's second stat row's fourth cell: completed/total
-  // performance reviews for the current cycle. Best-effort — the backend
-  // endpoints are still landing (see PERFORMANCE_REVIEWS_TASK_SPLIT.md), so
-  // a failed fetch just leaves the counts at 0 rather than erroring the
-  // whole dashboard.
+  // Completed/total reviews this cycle; a failed fetch leaves 0 rather than erroring the dashboard.
   const [performanceStats, setPerformanceStats] = useState({ completed: 0, total: 0 });
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +102,7 @@ export function AdminDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Contract mix data (mockup uses a tiered grayscale, not a rainbow) ──
+  // ── Contract mix ──
   const contractSegs = [
     { label: "Full-time", value: employees.filter((e) => e.type === "Full-time").length, color: "var(--txt-primary-brand)" },
     { label: "Part-time", value: employees.filter((e) => e.type === "Part-time").length, color: "var(--txt-primary)" },
@@ -126,7 +115,7 @@ export function AdminDashboard() {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5);
 
-  // ── Activity feed (mock) ──
+  // ── Activity feed ──
   const iconProps = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
   const activities = [
     {
@@ -187,7 +176,7 @@ export function AdminDashboard() {
         />
       </div>
 
-      {/* ── ROW 2: operational stats (real data — see note above) ── */}
+      {/* ── ROW 2: operational stats ── */}
       <div className="stat-strip" style={{ marginTop: "var(--sp-5)" }}>
         <StripStatCell
           small
@@ -222,7 +211,6 @@ export function AdminDashboard() {
       {/* ── ROW 3: Attendance Trend + Headcount ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--sp-5)", minWidth: 0 }}>
 
-        {/* Attendance trend - last 7 days */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
@@ -236,7 +224,6 @@ export function AdminDashboard() {
             </Link>
           </div>
           <AttendanceTrendChart attendance={attendance} employees={employees} />
-          {/* Legend */}
           <div style={{ display: "flex", gap: "var(--sp-4)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
             {[
               { label: t("dashboard.attendanceTrend.legend.good"), color: "var(--clr-success-400)" },
@@ -251,7 +238,6 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        {/* Headcount by dept */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--sp-5)" }}>
             <div>
@@ -271,7 +257,6 @@ export function AdminDashboard() {
       {/* ── ROW 4: Recent Employees + (Contract Mix / Recent Activity) ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "var(--sp-5)" }}>
 
-        {/* Recent employees table */}
         <div className="content-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--sp-5)" }}>
             <h3 className="section-title" style={{ margin: 0 }}>{t("dashboard.recentEmployees.title")}</h3>
@@ -315,16 +300,13 @@ export function AdminDashboard() {
           </table>
         </div>
 
-        {/* Right col: Contract Mix + Activity */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
 
-          {/* Contract mix */}
           <div className="content-card">
             <h3 className="section-title" style={{ marginBottom: "var(--sp-5)" }}>{t("dashboard.contractTypes.title")}</h3>
             <ContractMixBar segments={contractSegs} total={totalEmployees} />
           </div>
 
-          {/* Activity feed */}
           <div className="content-card" style={{ flex: 1 }}>
             <h3 className="section-title" style={{ marginBottom: "var(--sp-4)" }}>{t("dashboard.recentActivity.title")}</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>

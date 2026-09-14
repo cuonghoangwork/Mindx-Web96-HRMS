@@ -4,13 +4,8 @@ import { AiAPI } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 import Button from "./Button";
 
-// Solo Gaps Milestone 2 — scoped product-help chat widget. Mounted once in
-// Layout.jsx so it persists across route changes. No existing floating-
-// bubble component to copy in this codebase — built fresh, following
-// GlobalSearch.jsx's local open/close useState idiom and
-// CandidateSidePanel.jsx's position:fixed + inline-CSS-variable styling.
-// No portal (nothing in this app uses one) and no persistence (resets on
-// refresh, per the source plan's explicit v1 scope).
+// Product-help chat bubble. Mounted once in Layout.jsx so it persists across
+// routes; no persistence across refreshes.
 
 const MAX_HISTORY_TURNS = 6;
 

@@ -1,23 +1,12 @@
 /**
- * notificationCategories.jsx — the per-category label, colour and icon used by
- * the Notifications page, plus the filter tabs derived from it.
+ * Per-category label, colour and icon for the Notifications page, plus the
+ * filter tabs derived from it. Its own module so tests import it without the
+ * page (a non-component export from a page trips react-refresh).
  *
- * Its own module for two reasons. It has to be importable by a test without
- * dragging in the whole page, and exporting a non-component from
- * pages/Notifications.jsx would trip the react-refresh lint rule that this
- * codebase runs at --max-warnings 0.
- *
- * KEYS ARE CLIENT-SIDE CATEGORY VALUES, which are not quite the database's:
- * hrms-backend/utils/mappers.js bridges db "hiring" <-> client "interview".
- * Every other value passes through unchanged.
- *
- * Missing an entry is silent, not loud — the page falls back to the `system`
- * styling, so the category renders as a grey "System" row with a gear icon and
- * gets no filter tab of its own. `performance` sat in exactly that state from
- * the day it was added until 2026-09-07. tests/notificationCategories.test.jsx
- * ties these keys to the i18n labels, and the backend's notifyI18n test ties
- * those labels to the model enum, so the chain from database value to rendered
- * tab is now covered end to end.
+ * Keys are CLIENT category values (db "hiring" is client "interview"). A
+ * missing entry silently falls back to the `system` styling and gets no
+ * tab; tests/notificationCategories.test.jsx ties these keys to the i18n
+ * labels, and the backend's notifyI18n test ties those to the model enum.
  */
 
 export const CATEGORY_CONFIG = {
@@ -31,11 +20,7 @@ export const CATEGORY_CONFIG = {
       </svg>
     ),
   },
-  // Its own category rather than folding into `leave`: the two are tuned
-  // separately in the backend's utils/notifyPolicy.js, and this object also
-  // drives FILTERS below — so sharing a key would hide overtime behind a tab
-  // labelled "Leave". Purple is the one semantic pair not already spoken for
-  // here, and unlike `danger` it does not read as "something went wrong".
+  // Its own key, or overtime would hide behind a tab labelled "Leave".
   overtime: {
     labelKey: "notifications.categories.overtime", color: "var(--txt-purple)", bg: "var(--bg-purple-subtle)",
     icon: (
@@ -45,16 +30,7 @@ export const CATEGORY_CONFIG = {
       </svg>
     ),
   },
-  // In the model enum and in notifyPolicy with all three out-of-app channels
-  // since the day performance reviews shipped, but never listed here — so
-  // every review notice rendered as a grey "System" row with a gear icon and
-  // there was no Performance tab to filter by. Nothing errored; the
-  // `?? CATEGORY_CONFIG.system` fallback below made it look deliberate.
-  //
-  // Green is already payroll's, and this is the second reuse in the map (info
-  // serves both hiring and holiday). With six colour families and nine
-  // categories the icon has to carry the difference — a star reads as a
-  // rating, which no other row here could be mistaken for.
+  // Shares payroll's green; the star icon carries the difference.
   performance: {
     labelKey: "notifications.categories.performance", color: "var(--clr-success-500)", bg: "var(--bg-success-subtle)",
     icon: (

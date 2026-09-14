@@ -9,10 +9,7 @@ import Badge from "../../components/Badge";
 
 function StatusBadge({ status }) {
   const { t } = useTranslation()
-  // Profile-edit-request status (pending/approved/rejected) — a different
-  // domain from components/Badge.jsx's StatusBadge, which models EMPLOYEE
-  // status (Active/On Leave/...). Only the presentation was duplicated, so
-  // this keeps the status->variant mapping and hands the rendering to Badge.
+  // Request status (pending/approved/rejected) — a different domain from Badge.jsx's employee StatusBadge.
   const cfg = {
     pending:  { variant: 'warning', label: t('settings.status.pending') },
     approved: { variant: 'success', label: t('settings.status.approved') },
@@ -44,11 +41,7 @@ const FIELD_LABEL_KEYS = {
 }
 const fieldLabel = (t, field) => t(FIELD_LABEL_KEYS[field] ?? field, { defaultValue: field })
 
-/* ─────────────────────────────────────────────
-   Avatar upload — real, self-serve (all roles
-   may upload their own avatar; see
-   employeeRouter.js /:id/avatar).
-───────────────────────────────────────────── */
+/* Self-serve avatar upload — any role, own avatar only. */
 function AvatarUploader({ profile, onUploaded }) {
   const { t } = useTranslation()
   const fileRef = useRef(null)
@@ -96,9 +89,6 @@ function AvatarUploader({ profile, onUploaded }) {
   )
 }
 
-/* ─────────────────────────────────────────────
-   My Profile tab
-───────────────────────────────────────────── */
 export function MyProfileEditSection() {
   const { t } = useTranslation()
   const { language, setLanguage } = useLanguage()
@@ -128,7 +118,7 @@ export function MyProfileEditSection() {
         })
       }
     } catch {
-      /* profile fetch best-effort; UI shows its own loading/empty states */
+      // best-effort; the UI has its own empty state
     }
     setLoadingP(false)
   }, [])
@@ -141,7 +131,7 @@ export function MyProfileEditSection() {
       setMyRequests(reqs)
       setPending(reqs.find((r) => r.status === 'pending') ?? null)
     } catch {
-      /* requests fetch best-effort; UI shows its own loading/empty states */
+      // best-effort; the UI has its own empty state
     }
     setLoadingR(false)
   }, [])
@@ -162,7 +152,6 @@ export function MyProfileEditSection() {
     setSuccess('')
     if (!profile) { setError(t('settings.myProfile.noLinkedProfile')); return }
 
-    // Build the diff (only changed fields)
     const changes = {}
     if (editForm.name    !== (profile.name    ?? ''))      changes.name    = editForm.name
     if (editForm.phone   !== (profile.phone   ?? ''))      changes.phone   = editForm.phone
@@ -212,10 +201,8 @@ export function MyProfileEditSection() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
 
-      {/* Avatar — real, self-serve upload */}
       <AvatarUploader profile={profile} onUploaded={(data) => setProfile((p) => ({ ...p, ...data }))} />
 
-      {/* Current info read-only display */}
       <div style={{
         padding: 'var(--sp-5)',
         background: 'var(--bg-surface-alt)',
@@ -265,8 +252,7 @@ export function MyProfileEditSection() {
         </p>
       </div>
 
-      {/* Language — instant, client-side preference (not part of the
-          HR-approved profile fields above). */}
+      {/* Language — instant, client-side; not an HR-approved field. */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--sp-3)',
         padding: 'var(--sp-5)', background: 'var(--bg-surface-alt)',
@@ -298,8 +284,7 @@ export function MyProfileEditSection() {
         </div>
       </div>
 
-      {/* Task 1.4 — My Contract. Read-only here: only HR/Admin can upload
-          (see ContractCard in ViewEmployee.jsx). */}
+      {/* My Contract — read-only; only HR/Admin upload. */}
       <div style={{
         padding: 'var(--sp-5)',
         background: 'var(--bg-surface-alt)',

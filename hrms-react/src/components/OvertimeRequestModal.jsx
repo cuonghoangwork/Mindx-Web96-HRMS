@@ -6,18 +6,10 @@ import { translateApiError } from "../utils/apiError";
 import { hhmmToMinutes, isoOf } from "../utils/attendance";
 
 /**
- * OvertimeRequestModal — apply for overtime on a given date.
- *
- * The caps meter is the reason this modal exists rather than a plain form.
- * At 4h/day an employee reaches the 40h monthly ceiling on their tenth
- * overtime day, so the monthly cap binds long before the daily one. Without a
- * running total in front of them, people hit a wall they had no way to see
- * coming — and the server-side rejection arrives only after they have filled
- * the whole form in.
- *
- * Everything shown here is a hint, never a gate. The backend re-validates the
- * cutoff, the day type, and all three caps on submit, so a stale meter can
- * only ever look momentarily out of date; it cannot let a bad request through.
+ * Apply for overtime. The live caps meter is the point: at 4h/day the 40h
+ * monthly cap arrives on the tenth shift, and without a running total people
+ * hit it only after filling in the form. Everything here is a hint — the
+ * server re-validates the cutoff, day type and caps on submit.
  */
 function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
   const { t } = useTranslation();
@@ -32,7 +24,6 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
   const [submitting, setSubmitting] = useState(false);
   const [balance, setBalance] = useState(null);
 
-  // Re-fetched per month, because the monthly figure is the one that binds.
   const [year, month] = useMemo(() => {
     const [y, m] = date.split("-");
     return [Number(y), Number(m)];
@@ -57,8 +48,7 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
 
   const requestedHours = requestedMinutes === null ? null : requestedMinutes / 60;
 
-  // Projected month total if this request were approved. Shown alongside the
-  // cap so the wall is visible before the employee walks into it.
+  // Projected month total if approved.
   const projectedMonth =
     balance && requestedHours !== null
       ? Math.round((balance.monthUsed + requestedHours) * 100) / 100
@@ -161,9 +151,7 @@ function OvertimeRequestModal({ onClose, onSubmitted, defaultDate }) {
                 onChange={(e) => setPlannedEnd(e.target.value)}
                 required
               />
-              {/* A native <input type="time"> cannot express 24:00, and a span
-                  may not cross midnight — so the end-of-day case gets its own
-                  control rather than a value the picker would silently mangle. */}
+              {/* A native time input cannot express 24:00, so end-of-day is its own control. */}
               <label
                 style={{
                   display: "flex", alignItems: "center", gap: "6px", marginTop: "6px",

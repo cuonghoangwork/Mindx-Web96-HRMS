@@ -1,12 +1,10 @@
-// Resource-specific helpers built on top of apiFetch(). One namespace per
-// hrms-backend router (see hrms-backend/router/).
+// One namespace per hrms-backend router, built on apiFetch().
 import { apiFetch, qs } from "./client";
 
 export const AuthAPI = {
   config: () => apiFetch("/auth/config", { auth: false }),
   login: (email, password) =>
     apiFetch("/auth/login", { method: "POST", body: { email, password }, auth: false }),
-  // No role field — all self-registered accounts are EMPLOYEE
   register: ({ name, email, password }) =>
     apiFetch("/auth/register", { method: "POST", body: { name, email, password }, auth: false }),
   me: () => apiFetch("/auth/me"),
@@ -16,14 +14,12 @@ export const AuthAPI = {
       method: "POST",
       body: { currentPassword, newPassword },
     }),
-  // Admin-only
   listUsers: () => apiFetch("/auth/users"),
   promoteUser: (id, role) =>
     apiFetch(`/auth/users/${id}/promote`, { method: "PATCH", body: { role } }),
 };
 
-// Large page size so the existing client-side filter/sort/paginate logic in
-// AllEmployees.jsx / Jobs.jsx / Candidates.jsx keeps working unchanged.
+// Large page size: filtering/sorting/paging is client-side.
 const ALL = 1000;
 
 export const EmployeesAPI = {
@@ -37,15 +33,11 @@ export const EmployeesAPI = {
     form.append("avatar", file);
     return apiFetch(`/employees/${id}/avatar`, { method: "POST", body: form });
   },
-  // Task 1.4 — HR/Admin uploads a contract PDF for an employee (unlike
-  // avatars, this is not self-serve — see router/employeeRouter.js).
   uploadContract: (id, file) => {
     const form = new FormData();
     form.append("contract", file);
     return apiFetch(`/employees/${id}/contract`, { method: "POST", body: form });
   },
-  // Solo Gaps Milestone 1 — arbitrary multi-document upload (offer
-  // letters, ID scans, other), additive alongside uploadContract above.
   // label/type apply to the whole batch.
   uploadDocuments: (id, files, { label, type } = {}) => {
     const form = new FormData();
@@ -58,14 +50,7 @@ export const EmployeesAPI = {
     apiFetch(`/employees/${id}/documents/${docId}`, { method: "DELETE" }),
 };
 
-/**
- * Attendance Overtime. Mirrors hrms-backend/router/overtimeRequestRouter.js.
- *
- * `assign` resolves even when some employees were skipped — the endpoint
- * reports per-employee outcomes in { created, skipped } rather than failing the
- * whole batch, so one person being over their monthly cap does not discard
- * everyone else's assignment. Callers must read `skipped`.
- */
+/** `assign` resolves even when some employees were skipped — callers must read `skipped`. */
 export const OvertimeRequestsAPI = {
   list: (params = {}) => apiFetch(`/overtime-requests${qs(params)}`),
   create: (data) => apiFetch("/overtime-requests", { method: "POST", body: data }),
@@ -98,8 +83,6 @@ export const CandidatesAPI = {
   create: (data) => apiFetch("/candidates", { method: "POST", body: data }),
   update: (id, data) => apiFetch(`/candidates/${id}`, { method: "PUT", body: data }),
   remove: (id) => apiFetch(`/candidates/${id}`, { method: "DELETE" }),
-  // Task 5.3 — HR/Admin uploads a real PDF CV/resume for a candidate
-  // (mirrors EmployeesAPI.uploadContract's shape).
   uploadCv: (id, file) => {
     const form = new FormData();
     form.append("cv", file);
@@ -125,22 +108,17 @@ export const NotificationsAPI = {
   list: () => apiFetch("/notifications"),
   /** Single-use, 60-second credential for the SSE feed — see api/notificationStream.js. */
   streamTicket: () => apiFetch("/notifications/stream-ticket"),
-  // Out-of-app channel preferences. Desktop is NOT here — it is per-device
-  // and lives in localStorage (see utils/desktopNotify.js).
+  // Out-of-app preferences; desktop is per-device (utils/desktopNotify.js).
   preferences: () => apiFetch("/notifications/preferences"),
   updatePreferences: (body) =>
     apiFetch("/notifications/preferences", { method: "PATCH", body }),
-  // Web Push. Per-device, so status is asked about a specific endpoint. The
-  // server also returns the VAPID public key, so a frontend built against the
-  // wrong key pair can be caught without a redeploy.
+  // Per-device: status is asked about a specific endpoint. The response carries the VAPID public key.
   pushStatus: (endpoint) => apiFetch(`/notifications/push${qs({ endpoint })}`),
   pushSubscribe: (subscription) =>
     apiFetch("/notifications/push/subscribe", { method: "POST", body: subscription }),
   pushUnsubscribe: (endpoint) =>
     apiFetch("/notifications/push/subscribe", { method: "DELETE", body: { endpoint } }),
-  // Telegram linking. `available` reports whether the server has a bot
-  // configured at all, so Settings can say "not set up" rather than showing
-  // a button that always fails.
+  // `available` says whether the server has a bot configured at all.
   telegramStatus: () => apiFetch("/notifications/telegram"),
   telegramLinkCode: () => apiFetch("/notifications/telegram/link-code", { method: "POST" }),
   telegramDisconnect: () => apiFetch("/notifications/telegram", { method: "DELETE" }),
@@ -170,8 +148,7 @@ export const PromotionRequestsAPI = {
 };
 
 export const PayrollAPI = {
-  // Self-service — any authenticated user, resolved server-side to their own
-  // Employee link. Only returns payslips from approved/paid periods.
+  // Own payslips, approved/paid periods only.
   myPayslips: () => apiFetch("/payroll/my-payslips"),
   listPeriods: (params = {}) => apiFetch(`/payroll/periods${qs(params)}`),
   createPeriod: (body) => apiFetch("/payroll/periods", { method: "POST", body }),
@@ -183,9 +160,6 @@ export const PayrollAPI = {
   updatePayslip: (id, body) => apiFetch(`/payroll/payslips/${id}`, { method: "PATCH", body }),
   recomputeDeduction: (id) =>
     apiFetch(`/payroll/payslips/${id}/recompute-deduction`, { method: "POST" }),
-  // Tasks 3.8/3.9: manual trigger for the start-of-month FX snapshot + draft
-  // generation job, and a read-only preview of the live FX rate for a given
-  // year/month used by the "New period" form's "Fetch live rate" button.
   generateMonthlyDraft: () => apiFetch("/payroll/generate-monthly-draft", { method: "POST" }),
   runMonthly: () => apiFetch("/payroll/run-monthly", { method: "POST" }),
   fxRatePreview: (year, month) => apiFetch(`/payroll/fx-rate/${year}/${month}`),
@@ -232,11 +206,8 @@ export const ProfileEditRequestsAPI = {
     }),
 };
 
-// Milestones 1-5 (see PERFORMANCE_REVIEWS_API_CONTRACT.md) — core review
-// loop, competencies/goals, peer feedback/appeals, cycle management +
-// analytics, AI insight.
 export const PerformanceReviewsAPI = {
-  /** Rating scale + competency keys — single source of truth, see the contract's §1 note on the frontend not hardcoding a second copy */
+  /** Rating scale + competency keys — the frontend never hardcodes a second copy */
   meta: () => apiFetch("/performance/meta"),
   /** Every cycle (2 closed + 1 open standard, plus any custom ones), effective status applied */
   cycles: () => apiFetch("/performance/cycles"),
@@ -282,14 +253,12 @@ export const PerformanceReviewsAPI = {
     apiFetch(`/performance/reviews/${cycleKey}/${employeeId}/ai-insight`, { method: "POST", body: { language } }),
 };
 
-// Solo Gaps Milestone 2 — scoped product-help chat widget, no live data
-// access (see hrms-backend/utils/appChatPrompt.js).
+// Product-help chat; no live data access.
 export const AiAPI = {
   chat: (message, history, language) => apiFetch("/ai/chat", { method: "POST", body: { message, history, language } }),
 };
 
-// Solo Gaps Milestone 3 — permissions matrix. ADMIN-only both ways; can
-// only make MANAGER stricter than authorize() already allows.
+// Permissions matrix — ADMIN only; can only make MANAGER stricter.
 export const PermissionsAPI = {
   list: () => apiFetch("/permissions"),
   toggle: (role, capability, enabled) =>

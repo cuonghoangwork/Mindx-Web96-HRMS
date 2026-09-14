@@ -57,7 +57,6 @@ function AddEmployee() {
   /* ── navigation ── */
   const goNext = () => {
     const stepErrors = validateStep(step, form, t);
-    // Touch all fields in current step so errors show
     const stepTouched = {};
     (STEP_FIELDS[step] || []).forEach((f) => { stepTouched[f] = true; });
     setTouched((prev) => ({ ...prev, ...stepTouched }));
@@ -153,7 +152,6 @@ function AddEmployee() {
               {t("employees.addEmployee.header.stepProgress", { defaultValue: "Step {{step}}/{{total}} · {{desc}}", step, total: STEPS.length, desc: currentStepDesc })}
             </p>
           </div>
-          {/* Step completion mini indicator */}
           {step < 4 && (
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--txt-secondary)", marginBottom: "4px" }}>
@@ -262,7 +260,6 @@ function AddEmployee() {
             </Button>
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
-              {/* Dot indicator */}
               <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
                 {STEPS.map((s) => (
                   <div key={s.id} style={{

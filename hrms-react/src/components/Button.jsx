@@ -1,25 +1,7 @@
 /**
- * Button — HRMS Design System v3 "Navy Signal Blue"
- * (No structural changes needed for v3 — this component is 100% token-driven
- * via .btn/.btn-* classes in index.css, so the reskin was a token-value swap.)
- *
- * Variants : primary | secondary | ghost | danger | success | brand-outline
- * Sizes    : xs | sm | md (default) | lg | xl
- * States   : disabled, loading
- * Layout   : iconOnly, fullWidth
- * Extras   : leftIcon, rightIcon, ButtonGroup, as (polymorphic)
- *
- * Usage:
- *   <Button variant="primary" onClick={fn}>Save</Button>
- *   <Button variant="danger" size="sm" leftIcon="🗑">Delete</Button>
- *   <Button variant="primary" loading>Processing...</Button>
- *   <Button as={Link} to="/employees" variant="primary">List</Button>
- *   <Button variant="ghost" iconOnly aria-label="Delete">🗑</Button>
- *
- *   <ButtonGroup>
- *     <Button variant="secondary">Cancel</Button>
- *     <Button variant="primary">Save</Button>
- *   </ButtonGroup>
+ * Variants: primary | secondary | ghost | danger | success | brand-outline |
+ * link. Sizes xs–xl. States: disabled, loading. Layout: iconOnly, fullWidth.
+ * leftIcon/rightIcon, polymorphic `as` (e.g. Link), and ButtonGroup.
  */
 
 import { forwardRef } from "react";
@@ -47,9 +29,7 @@ const VARIANT_CLASS = {
   danger:         "btn btn-danger",
   success:        "btn btn-success",
   "brand-outline":"btn btn-brand-outline",
-  // Plain-text row/card action link (View/Details/Edit/Promote/Delete) —
-  // pair with className="btn-link-emphasis" or "btn-link-muted" for the
-  // Promote/Delete color variants; default is the accent "View" color.
+  // Plain-text row action; pair with btn-link-emphasis / btn-link-muted for the Promote / Delete colours.
   link:           "btn btn-link",
 };
 
