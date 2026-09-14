@@ -53,11 +53,7 @@ function hashPassword(plain) {
   return bcrypt.hashSync(plain, salt);
 }
 
-/* ── Admin account (ADMIN role — seed only) ──
- * Also gets a linked Employee record (same pattern as upsertHRUser/
- * upsertManagerUser below) so the sidebar's "My Profile" link — now shown
- * to every role — resolves to a real page instead of a dead link.
- */
+/* ── Admin account ── with a linked Employee so "My Profile" resolves. */
 async function upsertAdmin(deptByName) {
   const email = "admin@hrms.com";
   let user = await UserModel.findOne({ email });
@@ -78,10 +74,8 @@ async function upsertAdmin(deptByName) {
     : await EmployeeModel.findOne({ email });
   if (!employee) {
     const dept = deptByName["Management"];
-    // startDate backdated (and mirrored onto createdAt below) so this
-    // account is included in every month of historical payroll —
-    // buildPayslipRows (utils/payrollGeneration.js) selects payable
-    // employees by createdAt, not startDate, so both need to agree.
+    // createdAt mirrors startDate: buildPayslipRows selects payable
+    // employees by createdAt, so history phases need it backdated too.
     const startDate = new Date("2021-01-04");
     employee = await EmployeeModel.create({
       employeeId: "ADM001",
@@ -109,13 +103,9 @@ async function upsertAdmin(deptByName) {
   return user;
 }
 
-/* ── Demo HR account (company-wide, unscoped — see utils/managerScope.js
- * and HRMS_IMPROVEMENT_TASKS.md's HR/MANAGER role split) ──
- * Every "manager-tier" account needs a linked Employee record with a
- * department or it's locked out of manager-only actions — HR isn't
- * department-scoped, but the same User.employee -> Employee lookup still
- * resolves it, so it still needs the link.
- */
+/* ── HR account (company-wide, DECISIONS.md D12) ── every manager-tier
+ * account needs a linked Employee with a department or manager-only
+ * actions are locked out. */
 async function upsertHRUser(deptByName) {
   const email = "hr@hrms.com";
   let user = await UserModel.findOne({ email });
@@ -168,10 +158,7 @@ async function upsertHRUser(deptByName) {
   return user;
 }
 
-/* ── Demo MANAGER account — department-scoped line manager. Real backend
- * scoping (utils/managerScope.js) means this account only ever sees/acts
- * on Engineering, unlike the HR account above.
- */
+/* ── MANAGER account ── scoped to Engineering by utils/managerScope.js. */
 async function upsertManagerUser(deptByName) {
   const email = "manager@hrms.com";
   let user = await UserModel.findOne({ email });
@@ -242,16 +229,10 @@ async function seedDepartments() {
   return byName;
 }
 
-/* ── Tenure for the original 8 ──
- * positionLevel + the date they entered it (used as startDate,
- * levelStartDate and createdAt alike). Every non-Manager here is kept
- * under their ELIGIBILITY_THRESHOLD_MONTHS (utils/positionLadder.js:
- * Full-time 48mo, Senior 60mo) with at least a year of margin, so the
- * promotion queue stays limited to the two deliberate cases (EMP010,
- * EMP013) no matter when the seed next runs. EMP003/EMP005 are Managers
- * because their designations already said so; Manager is the top rung, so
- * their long tenure never flags anything.
- */
+/* ── Tenure for the original 8 ── used as startDate, levelStartDate and
+ * createdAt. Non-Managers sit at least a year under their promotion
+ * threshold (DECISIONS.md D1) so the queue holds only the deliberate
+ * EMP010/EMP013 cases whenever the seed runs. */
 const ORIGINAL_ROSTER_TENURE = {
   EMP001: { positionLevel: "Full-time", startDate: "2023-03-06" },
   EMP002: { positionLevel: "Full-time", startDate: "2023-07-03" },
@@ -265,12 +246,8 @@ const ORIGINAL_ROSTER_TENURE = {
 
 /* ── Employees — each gets a linked User account (EMPLOYEE role) ── */
 async function seedEmployees(deptByName) {
-  // The original 8 carry a startDate too (see ORIGINAL_ROSTER_TENURE for
-  // the values and why). Without one, Employee.js defaults levelStartDate
-  // to "now" and createdAt lands at seed time — which every history phase
-  // below reads as "not hired yet", so these eight got no attendance, no
-  // historical payslips, and had their leave requests silently skipped.
-  // Spreading the tenure entry keeps the two definitions in one place.
+  // Without a startDate the original 8 read as "not hired yet" to every
+  // history phase below.
   const defs = [
     { employeeId: "EMP001", name: "John Doe",      email: "john.doe@hrms.com",      department: "Engineering",  designation: "Software Engineer",  contractType: "full-time", status: "active",    age: 28, gender: "male",   address: "123 Main St, New York, NY",        annualSalary: 85000,  ...ORIGINAL_ROSTER_TENURE.EMP001 },
     { employeeId: "EMP002", name: "Jane Smith",    email: "jane.smith@hrms.com",    department: "Design",       designation: "UI Designer",        contractType: "full-time", status: "active",    age: 32, gender: "female", address: "456 Oak Ave, Los Angeles, CA",     annualSalary: 75000,  ...ORIGINAL_ROSTER_TENURE.EMP002 },
@@ -281,21 +258,11 @@ async function seedEmployees(deptByName) {
     { employeeId: "EMP007", name: "Tom Davis",     email: "tom.davis@hrms.com",     department: "Management",   designation: "Product Manager",    contractType: "full-time", status: "active",    age: 42, gender: "male",   address: "147 Birch Blvd, Boston, MA",       annualSalary: 110000, ...ORIGINAL_ROSTER_TENURE.EMP007 },
     { employeeId: "EMP008", name: "Lisa Chen",     email: "lisa.chen@hrms.com",     department: "Design",       designation: "UX Designer",        contractType: "contract",  status: "on-leave",  age: 31, gender: "female", address: "258 Spruce Way, San Francisco, CA", annualSalary: 90000,  ...ORIGINAL_ROSTER_TENURE.EMP008 },
 
-    // ── Extended roster (Sample Data plan, Phase 1) — 26 more employees so
-    // every department has a real team instead of ~1 person, OrgChart has
-    // something to actually chart, and 12 months of payroll/attendance
-    // history has a believable headcount to run against. startDate doubles
-    // as levelStartDate (via Employee.js's pre("validate") default) and is
-    // mirrored onto createdAt below, since buildPayslipRows
-    // (utils/payrollGeneration.js) selects payable employees by createdAt,
-    // not startDate.
-    //
-    // Two entries are deliberately tenured past their ELIGIBILITY_THRESHOLD_MONTHS
-    // (utils/positionLadder.js) so a later `checkPromotionEligibility` run
-    // has real, non-fabricated candidates to auto-flag: EMP010 (Full-time
-    // since 2021-12, threshold 48mo) and EMP013 (Intern since 2025-11,
-    // threshold 2mo). Everyone else is kept safely under their threshold on
-    // purpose, so the promotion queue doesn't fill up with noise.
+    // Extended roster. startDate doubles as levelStartDate and createdAt.
+    // EMP010 (Full-time since 2021-12) and EMP013 (Intern since 2025-11)
+    // are deliberately past their promotion threshold so
+    // checkPromotionEligibility has real candidates; everyone else is
+    // kept under it.
 
     // Engineering (+6 — manager already covered by MGR002)
     { employeeId: "EMP009", name: "Nguyen Van Hai",   email: "hai.nguyen@hrms.com",   department: "Engineering", designation: "Senior Software Engineer", contractType: "full-time", status: "active", age: 33, gender: "male",   address: "12 Tran Duy Hung, Hanoi",             annualSalary: 98000,  positionLevel: "Senior",    startDate: new Date("2022-06-01") },
@@ -342,10 +309,8 @@ async function seedEmployees(deptByName) {
   for (const def of defs) {
     let emp = await EmployeeModel.findOne({ employeeId: def.employeeId });
 
-    // Ensure a linked User account exists for each employee
     let userAcc = await UserModel.findOne({ email: def.email });
     if (!userAcc) {
-      // Derive a simple demo password from the employee ID
       userAcc = await UserModel.create({
         email: def.email,
         password: hashPassword(`${def.employeeId.toLowerCase()}pass`),
@@ -361,15 +326,11 @@ async function seedEmployees(deptByName) {
         ...def,
         department: dept ? dept._id : undefined,
         userId: userAcc._id,
-        // Mirror startDate onto createdAt (undefined for the original 8,
-        // where it's a no-op) — see the extended-roster comment above for
-        // why this matters for historical payroll generation.
         createdAt: def.startDate,
       });
       console.log("✓ Created employee:", def.employeeId, def.name);
     }
 
-    // Link user → employee if not already set
     if (!userAcc.employee) {
       userAcc.employee = emp._id;
       await userAcc.save();
@@ -380,14 +341,8 @@ async function seedEmployees(deptByName) {
   return created;
 }
 
-/**
- * Backfills positionLevel / levelStartDate / startDate / createdAt for the
- * original 8 on a database seeded before ORIGINAL_ROSTER_TENURE existed
- * (they were created with none of these, so they defaulted to "Full-time"
- * as of whenever the seed first ran). A fresh database never needs this —
- * seedEmployees() already spreads the same table into each definition —
- * so it's a no-op there. Idempotent: skips any record that already matches.
- */
+/** Upgrades a database seeded before ORIGINAL_ROSTER_TENURE existed; a
+ * no-op on a fresh one. */
 async function backfillOriginalRosterTenure() {
   for (const [employeeId, tenure] of Object.entries(ORIGINAL_ROSTER_TENURE)) {
     const emp = await EmployeeModel.findOne({ employeeId });
@@ -411,14 +366,8 @@ async function backfillOriginalRosterTenure() {
   }
 }
 
-/**
- * Links each Department's `manager` field to a real Employee (fixes a real
- * gap: seedDepartments() only ever set the free-text managerName, so
- * OrgChart.jsx's DepartmentCluster — which resolves the manager via
- * department.managerId — rendered every department with no manager found).
- * Also syncs managerName to the linked employee's real name so the two
- * fields don't drift apart. Safe to re-run.
- */
+/** Points Department.manager at a real Employee (OrgChart resolves the
+ * manager by id, not managerName) and keeps managerName in sync. */
 async function linkDepartmentManagers(deptByName) {
   const managerByDept = {
     Engineering: "MGR002",
@@ -474,24 +423,18 @@ async function seedJobs(deptByName) {
 async function seedCandidates(jobs) {
   const byTitle = Object.fromEntries(jobs.map((j) => [j.title, j]));
   const defs = [
-    // Candidate names deliberately don't collide with anyone on the
-    // roster — "Mike Wilson" and "Sarah Lee" used to be both a candidate and
-    // an employee, which reads as a data bug on a projector.
+    // Names never collide with the roster; a shared name reads as a data bug.
     { name: "Michael Foster",  jobTitle: "Senior Software Engineer", stage: "interview", rating: 4.5, email: "michael.foster@example.com",  phone: "+84 90 123 4567", notes: "Strong backend experience." },
     { name: "Sara Lindqvist",  jobTitle: "UI/UX Designer",           stage: "screening", rating: 4.0, email: "sara.lindqvist@example.com",  phone: "+84 91 234 5678", notes: "Great portfolio."           },
     { name: "Tom Brown",       jobTitle: "DevOps Engineer",          stage: "offer",     rating: 4.8, email: "tom.brown@example.com",       phone: "+84 92 345 6789", notes: "Offer extended."            },
     { name: "Emily Davis",     jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.8, email: "emily.davis@example.com",     phone: "+84 93 456 7890", notes: ""                           },
-    // Hired → the same person exists as EMP020 in seedEmployees, so the
-    // recruiting funnel and the roster tell one story.
+    // Hired: the same person is EMP020, so funnel and roster agree.
     { name: "Noah Fischer",    jobTitle: "Marketing Intern",         stage: "hired",     rating: 4.2, email: "noah.fischer.cand@example.com", phone: "+84 94 567 8901", notes: "Hired — started 15 Jul 2026 as EMP020." },
-    // Closed / filled roles keep their outcome on record instead of
-    // showing an empty pipeline.
+    // Closed/filled roles keep their outcome on record.
     { name: "Pham Van Duc",    jobTitle: "Sales Associate",          stage: "hired",     rating: 4.4, email: "duc.pham.sales@example.com",   phone: "+84 90 222 8811", notes: "Hired — role closed." },
     { name: "Lena Hoffmann",   jobTitle: "Sales Associate",          stage: "rejected",  rating: 3.1, email: "lena.hoffmann@example.com",    phone: "+84 91 333 9922", notes: "Went with a candidate with more B2B experience." },
     { name: "Arjun Mehta",     jobTitle: "Product Manager",          stage: "hired",     rating: 4.6, email: "arjun.mehta@example.com",      phone: "+84 92 444 0033", notes: "Hired — role filled." },
     { name: "Claire Dubois",   jobTitle: "Product Manager",          stage: "rejected",  rating: 3.7, email: "claire.dubois@example.com",    phone: "+84 93 555 1144", notes: "Strong, but looking for a more senior scope than this role." },
-    // ── Sample Data plan, Phase 8 — more candidates per open pipeline so
-    // the Jobs/Candidates pages show a real funnel instead of one name per role.
     { name: "Daniel Park",  jobTitle: "Senior Software Engineer", stage: "applied",   rating: 3.5, email: "daniel.park@example.com",      phone: "+84 90 111 2233", notes: ""                                     },
     { name: "Priya Sharma", jobTitle: "Senior Software Engineer", stage: "screening", rating: 4.1, email: "priya.sharma@example.com",     phone: "+84 91 222 3344", notes: "Solid systems design background."   },
     { name: "Kevin Tran",   jobTitle: "Senior Software Engineer", stage: "rejected",  rating: 2.5, email: "kevin.tran@example.com",       phone: "+84 92 333 4455", notes: "Didn't pass the technical screen."   },
@@ -514,20 +457,12 @@ async function seedCandidates(jobs) {
   }
 }
 
-/* ── Holidays ──
- * One list, two consumers: seedHolidays() writes it to the Holiday
- * collection, and collectBusinessDayKeys() below skips these dates when
- * generating attendance. Deriving the attendance skip-set from this list
- * (rather than a second hand-copied set) is what keeps the two from
- * drifting — a hand-copied set once stopped at June and left National Day
- * (Sep 2) with a full day of check-ins, which the real close job then
- * closed as 9 hours of holiday overtime for everyone.
- *
- * Every Holiday type counts as a day off to utils/holidayLookup.js, so
- * "company"/"optional" entries here are real non-working days. The list
- * runs a few months past "now" on purpose: the dashboard's "Upcoming
- * company holidays" widget is empty otherwise.
- */
+/* ── Holidays ── one list, two consumers: seedHolidays() writes it and
+ * collectBusinessDayKeys() skips these dates. A separately hand-copied
+ * skip-set once stopped at June and turned National Day into 9 hours of
+ * holiday overtime for everyone. Every type is a day off
+ * (utils/holidayLookup.js). The list runs past "now" so the dashboard's
+ * upcoming-holidays widget isn't empty. */
 const HOLIDAY_DEFS = [
   { name: "National Day",                    date: "2025-09-02", type: "public"   },
   { name: "New Year's Day",                  date: "2026-01-01", type: "public"   },
@@ -556,34 +491,14 @@ async function seedHolidays() {
   }
 }
 
-/* ── Attendance history (Sample Data plan, Phase 2) ──────────────────────
- * Replaces the old single stale day with a real trailing-12-month window,
- * built two different ways depending on how recent the day is:
- *
- *   - Older business days: inserted directly with a plausible
- *     present/late/on-leave/no-show mix. Running the real end-of-day
- *     closer for ~230 individual days would be a lot of slow, sequential
- *     writes for no extra realism this far back — nobody is going to open
- *     a payroll deduction from 9 months ago and check whether it was
- *     computed by the live job or backfilled.
- *   - The most recent RECENT_SLICE_BUSINESS_DAYS: seeded as check-ins only
- *     (open, no checkOut — exactly what a real day looks like mid-close),
- *     then actually closed via the real closeAttendanceDay() job
- *     (jobs/closeAttendanceDay.js) so late-flagging, no-show detection,
- *     and the auto NoShowReview flag are real business logic, not
- *     hand-faked. One deliberately-new hire (EMP028) is left uncovered
- *     often enough to cross the real 5-no-show threshold.
- *   - "Today" is left as in-progress check-ins with no checkOut. The
- *     in-process scheduler is off (ENABLE_SCHEDULER=false), but
- *     .github/workflows/scheduled-jobs.yml closes each day at 23:00 ICT —
- *     and nobody clocks in on a demo system, so every business day AFTER
- *     the seed run becomes a full-roster no-show day and the 5th one flags
- *     everyone for review. For a demo, run the seed the same morning.
- *
- * All dates are handled in UTC calendar terms throughout (matching
- * utils/workday.js's utcMidnight/utcDateKey convention that the real job
- * already stores dates in) so bulk-inserted and job-closed records are
- * byte-consistent with each other.
+/* ── Attendance history ── a trailing-12-month window built two ways:
+ * older business days are bulk-inserted with a plausible status mix; the
+ * last RECENT_SLICE_BUSINESS_DAYS are seeded as open check-ins and closed
+ * by the real closeAttendanceDay(), so late/no-show/NoShowReview come
+ * from production logic. "Today" is left open for the 23:00 ICT cron
+ * (DECISIONS.md D11). Nobody clocks in on a demo system, so every
+ * business day after the seed is a full-roster no-show — run the seed the
+ * morning of a demo. All dates are UTC calendar days (utils/workday.js).
  */
 
 const RECENT_SLICE_BUSINESS_DAYS = 20; // ~4 weeks, closed via the real job
@@ -615,9 +530,8 @@ const checkInOnTime = () => randomHHMM(8 * 60 + 40, 9 * 60 + 12); // 08:40–09:
 const checkInLate = () => randomHHMM(9 * 60 + 20, 9 * 60 + 55); // 09:20–09:55, past it
 const checkOutNormal = () => randomHHMM(17 * 60 + 25, 18 * 60 + 20); // 17:25–18:20
 
-// Same "insert, tolerate duplicate-key errors" pattern jobs/closeAttendanceDay.js's
-// markNoShow() already uses — makes bulk seeding idempotent on re-run without a
-// slow per-record existence check first.
+// Insert and tolerate duplicate keys (as markNoShow() does): idempotent
+// re-runs without a per-row existence check.
 async function insertAttendanceTolerantly(docs) {
   if (!docs.length) return 0;
   try {
@@ -644,21 +558,11 @@ function collectBusinessDayKeys(startUtc, endUtcInclusive) {
   return keys;
 }
 
-/* ── Overtime requests ──────────────────────────────────────────────────
- * Runs BEFORE seedAttendanceHistory() on purpose. The recent-slice days are
- * closed by the real closeAttendanceDay() job, and that job is where an
- * approved shift becomes overtime on the attendance record (autoCheckOut
- * closes at plannedEnd instead of WORKDAY_END and applyOvertimeToRecord
- * derives the paid/night minutes). Seeding the approved shifts first means
- * those attendance rows are produced by the same code path production
- * uses, not hand-written.
- *
- * plannedMinutes/dayType are computed with the same helpers
- * overtimeRequestController.js's create uses (splitDayNight, resolveDayType),
- * so the caps/multipliers the UI shows are the real ones. Every date is a
- * business day: past ones are counted back over the same holiday list
- * attendance skips, future ones roll forward off a weekend.
- */
+/* ── Overtime requests ── seeded BEFORE attendance so the real close job
+ * sees approved shifts and produces the overtime rows itself (autoCheckOut
+ * at plannedEnd, applyOvertimeToRecord). plannedMinutes/dayType use the
+ * controller's own helpers. Past dates count back over business days;
+ * future ones roll forward off weekends. */
 function businessDayKeyDaysAgo(n) {
   let d = utcMidnight(toDateKeyUtc(new Date()));
   let remaining = n;
@@ -678,13 +582,10 @@ function businessDayKeyDaysAhead(n) {
   return toDateKeyUtc(d);
 }
 
-// Approved shifts inside the job-closed slice show up on real attendance
-// rows and price onto the current and previous months' payslips; the mix
-// deliberately covers all three day types so a payslip breakdown reads
-// "150% x 4h · 200% x 6h · 300% x 4h". `weeksAgo` picks a Saturday (rest
-// day, 200%); `holidayKey` a seeded public holiday (300%) — skipped unless
-// it falls inside the attendance window. Employees have no leave on these
-// dates. One approved and two pending shifts ahead of today feed the queue.
+// The mix covers all three day types (DECISIONS.md D5) so a payslip reads
+// "150% x 4h · 200% x 6h · 300% x 4h": `weeksAgo` is a Saturday, `holidayKey`
+// a seeded holiday (skipped outside the attendance window). One approved
+// and two pending shifts ahead of today feed the queue.
 const OVERTIME_REQUESTS = [
   { employeeId: "EMP009", daysAgo: 6,   plannedStart: "18:00", plannedEnd: "21:00", status: "approved", origin: "self",     reason: "Release deployment — production cut-over" },
   { employeeId: "EMP009", weeksAgo: 2,  plannedStart: "09:00", plannedEnd: "15:00", status: "approved", origin: "assigned", reason: "Saturday data-centre migration (assigned)" },
@@ -762,9 +663,8 @@ async function seedOvertimeRequests(employees) {
   console.log(`✓ Seeded ${created} overtime requests`);
 }
 
-/** {employeeId → Set<dateKey>} of approved shifts, so the recent-slice
- * generator never rolls a random no-show on a day someone is booked to
- * stay late — that would leave an approved shift with no attendance row. */
+/** {employeeId → Set<dateKey>} of approved shifts: the recent-slice
+ * generator never rolls a no-show on a booked day. */
 async function approvedOvertimeDays(employees) {
   const rows = await OvertimeRequestModel.find({ status: "approved" }, "employee date");
   const idByObjectId = new Map(employees.map((e) => [String(e._id), e.employeeId]));
@@ -796,14 +696,9 @@ async function seedBulkAttendance(employees, bulkDateKeys) {
         continue;
       }
 
-      // no-show is deliberately rare here (unlike the recent-slice phase
-      // below): bulk days never run the real closeAttendanceDay job, so an
-      // employee who racked up 5+ of these by chance alone would never
-      // trigger a real NoShowReview flag — a silent inconsistency if
-      // anyone dug into their attendance history. Kept low enough
-      // (~1 expected per employee over the whole bulk window) that only
-      // the deliberate EMP028 case (handled via the real job, below)
-      // realistically crosses the threshold.
+      // no-show is rare here: bulk days never run the real close job, so
+      // 5+ by chance would never produce a NoShowReview flag. Only EMP028
+      // (via the real job) crosses the threshold.
       const roll = Math.random();
       if (roll < 0.03) {
         docs.push({ employee: emp._id, date, checkIn: null, checkOut: null, hours: 0, status: "on-leave" });
@@ -851,9 +746,8 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
   let chronicNoShows = 0;
   const otDays = await approvedOvertimeDays(employees);
 
-  // A rest day or holiday with an approved shift is closed by the real job
-  // too: only the booked employees check in, and autoCheckOut prices the
-  // whole span as restDay/holiday overtime — exactly what production does.
+  // Off days with an approved shift are closed by the real job too; only
+  // the booked employees check in.
   const firstKey = recentDateKeys[0];
   const offDaysWithOt = [...new Set([...otDays.values()].flatMap((set) => [...set]))]
     .filter((k) => k >= firstKey && k < toDateKeyUtc(new Date()) && !recentDateKeys.includes(k))
@@ -876,17 +770,15 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
 
       if (emp.employeeId === CHRONIC_NO_SHOW_EMPLOYEE_ID && chronicNoShows < 6) {
         chronicNoShows += 1;
-        continue; // no attendance record at all — the real markNoShow() below will catch it
+        continue; // no row at all — the real markNoShow() catches it
       }
 
       const bookedLate = otDays.get(emp.employeeId)?.has(dateKey) ?? false;
       if (isOffDay && !bookedLate) continue; // nobody else works a rest day
-      if (!bookedLate && Math.random() < 0.03) continue; // an ordinary occasional no-show, rotates across everyone else
+      if (!bookedLate && Math.random() < 0.03) continue; // occasional no-show
 
-      // Left open (no checkOut) — closeAttendanceDay()'s autoCheckOut() step
-      // fills that in below, exactly as it would in production (closing at
-      // the approved shift's plannedEnd where one exists).
-      // On a rest day the shift IS the working span, so check in at plannedStart.
+      // Left open; autoCheckOut fills checkOut below. On an off day the
+      // shift is the whole span, so check in at plannedStart.
       const checkIn = isOffDay
         ? (await OvertimeRequestModel.findOne({ employee: emp._id, date, status: "approved" }, "plannedStart"))?.plannedStart ?? checkInOnTime()
         : !bookedLate && Math.random() < 0.10 ? checkInLate() : checkInOnTime();
@@ -895,10 +787,8 @@ async function seedRecentAttendanceViaRealJob(employees, recentDateKeys) {
 
     await insertAttendanceTolerantly(preSeedDocs);
 
-    // The real job — late-flagging, no-show detection, and the 5-no-show
-    // NoShowReview auto-flag all run for real here, in chronological order
-    // (required: flagRepeatedNoShows checks an all-time cumulative count,
-    // so it must fire on the actual day the 5th no-show happens).
+    // Chronological order is required: flagRepeatedNoShows counts all-time
+    // no-shows, so it must fire on the day of the 5th one.
     const result = await closeAttendanceDay({ dateKey });
     console.log(`✓ Closed ${dateKey} via the real job:`, JSON.stringify(result));
   }
@@ -952,18 +842,11 @@ async function seedAttendanceHistory(employees) {
   await seedTodayInProgress(employees, now);
 }
 
-/* ── Leave requests (Sample Data plan, Phase 3) ──────────────────────────
- * A spread of historical (already-reviewed) requests, one ongoing approved
- * parental-leave block per currently-on-leave employee (explains the
- * attendance streak Phase 2 already seeded for them), and a handful of
- * fresh pending requests so the approval queue isn't empty on first login.
- *
- * Approved requests replicate leaveRequestController.js's onApprove hook
- * exactly (upsert matching Attendance "on-leave" records for each weekday
- * in range) — reusing that effect means Attendance and Leave Requests
- * agree with each other for every employee seeded here, closing the gap
- * Phase 2 left for its randomly-seeded on-leave days.
- */
+/* ── Leave requests ── reviewed history, one ongoing parental block per
+ * on-leave employee (explains their attendance streak), and pending
+ * requests so the queue isn't empty. Approved ones replay the
+ * controller's onApprove (upsert "on-leave" attendance per weekday) so
+ * Attendance and Leave Requests agree. */
 
 function nextWeekdayOnOrAfter(date) {
   let d = new Date(date);
@@ -985,9 +868,7 @@ function endDateForWorkingDays(startDate, workingDays) {
   return last;
 }
 
-// Mirrors leaveRequestController.js's onApprove hook exactly (same upsert,
-// same weekday-only loop) so approved requests seeded here actually show
-// up as "on-leave" on the Attendance page too, not just on Leave Requests.
+// Mirrors leaveRequestController.js's onApprove (same upsert, weekdays only).
 async function syncApprovedLeaveToAttendance(employeeId, startDate, endDate) {
   let cur = new Date(startDate);
   const last = new Date(endDate);
@@ -1004,8 +885,7 @@ async function syncApprovedLeaveToAttendance(employeeId, startDate, endDate) {
   }
 }
 
-// Fixed literal dates — idempotent on re-run by construction (same
-// employee/type/startDate every time).
+// Fixed dates: idempotent by construction.
 const HISTORICAL_LEAVE_REQUESTS = [
   { employeeId: "EMP002", type: "annual",      startKey: "2025-11-10", workingDays: 3, status: "approved", reason: "Family trip to visit parents" },
   { employeeId: "EMP003", type: "sick",        startKey: "2026-03-02", workingDays: 2, status: "approved", reason: "Recovering from flu" },
@@ -1032,19 +912,11 @@ const HISTORICAL_LEAVE_REQUESTS = [
   { employeeId: "EMP033", type: "annual",      startKey: "2026-03-09", workingDays: 2, status: "approved", reason: "Personal time off" }, // terminated later — safely before TERMINATED_CUTOFF_KEY
 ];
 
-// The three currently on-leave employees (Employee.status "on-leave",
-// Phase 2's ON_LEAVE_STREAK_EMPLOYEE_IDS) get one big ongoing *parental*
-// leave request each instead of several short ones — parental's 90-day
-// allowance comfortably covers the ~33 business days their Phase 2
-// attendance streak already spans (12 bulk-tail days + the full 20-day
-// recent slice + today), and a single long block is a more realistic
-// reason for that shape of absence than several short annual/sick
-// requests stacked back to back would be.
+// One long parental block (90-day allowance) covers the ~33 business days
+// their attendance streak spans.
 const ONGOING_PARENTAL_LEAVE_EMPLOYEE_IDS = ["EMP008", "EMP019", "EMP032"];
 
-// Relative to "now" at run time — recomputed fresh on every run, so these
-// stay "a few days ago" / "a couple weeks out" regardless of when this
-// script actually runs.
+// Relative to run time.
 const PENDING_LEAVE_REQUESTS = [
   { employeeId: "EMP001", type: "annual", appliedDaysAgo: 2, startDaysFromNow: 10, workingDays: 3, reason: "Family trip" },
   { employeeId: "EMP005", type: "annual", appliedDaysAgo: 1, startDaysFromNow: 14, workingDays: 2, reason: "Long weekend" },
@@ -1067,12 +939,8 @@ async function seedLeaveRequests(employees) {
   let created = 0;
   let skipped = 0;
 
-  // dedupeQuery is caller-supplied rather than always {employee, startDate,
-  // type}: the pending/parental blocks compute startDate relative to "now"
-  // at run time, so a literal-date dedupe key would never match across two
-  // runs on different days and would insert a duplicate on every re-run.
-  // Deduping on {employee, type, status} instead for those keeps the
-  // script safe to re-run regardless of when it's next invoked.
+  // dedupeQuery is caller-supplied: the relative-date blocks dedupe on
+  // {type, status}, since their startDate differs on every run.
   async function upsertRequest({ employeeId, type, startDate, endDate, status, reason, reviewNote, appliedAt, dedupeQuery }) {
     const emp = byId.get(employeeId);
     if (!emp) { skipped += 1; return; }
@@ -1158,47 +1026,19 @@ async function seedLeaveRequests(employees) {
   console.log(`✓ Seeded ${created} leave requests` + (skipped ? ` (skipped ${skipped})` : ""));
 }
 
-/* ── Payroll history (Sample Data plan, Phase 4) ─────────────────────────
- * Walks the real payroll jobs forward across the trailing 12 months so
- * periods land in believable, varied states instead of an empty Payroll
- * page. Every number here — FX rate, BHXH/BHYT/BHTN, deductions — comes
- * from the actual payroll engine (utils/payrollEngine.js via
- * utils/payrollGeneration.js), not hand-typed figures, since Phase 2/3
- * already seeded real attendance and leave data for these jobs to read.
- *
- * generateMonthlyPayrollDraft({asOf}) drafts the month asOf falls in.
- * runMonthlyPayroll({asOf}) always targets *asOf's previous month* (it
- * mirrors the real 10th-of-month cron, which pays out last month's
- * period) and — important — always drives a period straight through to
- * "paid" in one call; it has no "stop at approved" mode. So the one
- * period we want left at "approved" (not yet paid) is moved there with a
- * direct, minimal field update instead, mirroring exactly what
- * payrollController.js's setPeriodStatus does for that same transition
- * (set status/approvedBy/approvedAt, log it) — that handler is
- * Express-only (needs a real req/res), so replicating its few lines
- * directly here is simpler and more transparent than mocking one.
- *
- * Newest month → left as "draft" (freshly generated, awaiting HR review —
- * matches a real deploy, where the draft job runs at the start of the
- * month and the pay run doesn't happen until the 10th of the next one).
- * Second-newest → "approved" only. Everything older → fully "paid".
- */
-/* ── Payslip adjustments ────────────────────────────────────────────────
- * HR's edits to individual payslips — bonus, allowance, an overridden
- * deduction — so payslips show more than a base salary. Applied to a month
- * right after its draft is generated (before it is approved or paid), and
- * again for the current month after refreshCurrentDraftPayrollAfterPromotions()
- * rebuilds it. Mirrors payrollController.updatePayslip exactly: recompute
- * autoDeduction, mark the deduction overridden when it differs, run
- * computePayslip carrying overtime forward, log the edit with a reason.
- * Amounts are given in USD (the unit salaries are quoted in, and what the
- * UI renders) and converted at the period's own fxRate when applied, so a
- * $1,500 bonus reads as $1,500 on the payslip.
- *
- * `months` is 1–12 (a calendar-month filter) or "all"; `recent: n` limits
- * an entry to the last n months of the seeded window, which is how a
- * salary-advance repayment shows up as a run of consecutive deductions.
- */
+/* ── Payroll history ── walks the real payroll jobs across the trailing
+ * 12 months, so every figure comes from the engine reading the seeded
+ * attendance and leave. Newest month stays "draft", the one before is
+ * "approved", older ones are "paid" (DECISIONS.md D9).
+ * runMonthlyPayroll({asOf}) targets asOf's PREVIOUS month and always runs
+ * through to "paid", so the "approved" period is set with the same minimal
+ * field update payrollController.setPeriodStatus makes. */
+/* ── Payslip adjustments ── HR edits (bonus, allowance, overridden
+ * deduction) applied right after each month's draft, and again after
+ * refreshCurrentDraftPayrollAfterPromotions() rebuilds the current one.
+ * Mirrors payrollController.updatePayslip. Amounts are USD, converted at
+ * the period's fxRate. `months` is 1–12 or "all"; `recent: n` is the last
+ * n months of the window. */
 const PAYSLIP_ADJUSTMENTS = [
   // Standing allowances
   { employeeId: "ADM001", months: "all",         allowanceUsd: 400, reason: "Management allowance" },
@@ -1271,8 +1111,7 @@ async function applyPayslipAdjustments({ year, month }, { monthIndexFromEnd, hrU
     );
     await payslip.save();
 
-    // The current month's draft is rebuilt on every run, so its edits are
-    // re-applied each time — log each edit once, not once per run.
+    // Log each edit once, not once per run (the current draft is rebuilt each run).
     const label = `${payslip.employeeName} — ${year}-${pad2(month)}`;
     const logged = await mongoose.connection.db
       .collection("auditlogs")
@@ -1299,9 +1138,7 @@ async function seedPayrollHistory() {
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1–12
 
-  // Trailing 12 months ending at the current one, oldest first. Built via
-  // Date's own month-overflow normalization (new Date(y, -4, 1) rolls back
-  // into the previous year correctly) rather than hand-rolled carry logic.
+  // Trailing 12 months, oldest first; Date normalizes negative month indexes.
   const months = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(currentYear, currentMonth - 1 - i, 1);
@@ -1348,30 +1185,17 @@ async function seedPayrollHistory() {
       continue;
     }
 
-    // asOf = the 1st of the *following* month, since runMonthlyPayroll
-    // always targets "asOf's previous month". (year, month) here is
-    // already 1-indexed, so new Date(year, month, 1) — no "-1" — lands
-    // exactly on next month's 1st in JS's 0-indexed Date constructor.
+    // `month` is 1-indexed, so new Date(year, month, 1) is next month's 1st.
     const payRunResult = await runMonthlyPayroll({ asOf: new Date(year, month, 1) });
     console.log(`✓ Paid ${label(year, month)}:`, JSON.stringify(payRunResult));
   }
   console.log(`✓ Applied ${adjusted} payslip adjustments (bonus / allowance / deduction) across the history`);
 }
 
-/* ── Promotion eligibility (Sample Data plan, Phase 5) ────────────────────
- * Calls the real checkPromotionEligibility job once — Phase 1 already
- * planted two employees (EMP010, EMP013) with levelStartDate safely past
- * their tenure threshold specifically so this job has genuine candidates
- * to flag, rather than fabricating PromotionRequest documents directly.
- * Every other active employee was deliberately kept under threshold, so
- * only those two should come out of this.
- *
- * Two more are added by hand afterward — one approved, one rejected — for
- * full status coverage. HR-initiated promotions don't require the tenure
- * threshold the auto-check enforces, so these represent the "manager
- * proposes early based on performance" path instead, not a second flavor
- * of the same auto-flagging logic.
- */
+/* ── Promotions ── runs the real checkPromotionEligibility (EMP010/EMP013
+ * are the planted candidates), then adds one approved and one rejected
+ * HR-initiated proposal. Those skip the tenure threshold, standing for
+ * the "propose early on performance" path. */
 async function seedPromotionRequests(employees) {
   const byId = new Map(employees.map((e) => [e.employeeId, e]));
 
@@ -1418,9 +1242,7 @@ async function seedPromotionRequests(employees) {
     await PromotionRequestModel.create(doc);
 
     if (status === "approved") {
-      // Mirrors promotionRequestController.js's onApprove hook: apply the
-      // proposed level/salary to the employee and restart their tenure
-      // clock, exactly as approving this through the real UI would.
+      // Mirrors promotionRequestController.js's onApprove.
       await EmployeeModel.findByIdAndUpdate(emp._id, {
         positionLevel: proposedPositionLevel,
         annualSalary: proposedAnnualSalary,
@@ -1450,22 +1272,11 @@ async function seedPromotionRequests(employees) {
   console.log("✓ Seeded 2 manually-proposed promotion requests (1 approved, 1 rejected)");
 }
 
-/* ── Annual raises ────────────────────────────────────────────────────────
- * jobs/annualSalaryRaise.js proposes a 10% raise for every active employee
- * on each anniversary of their createdAt. Because this seed back-dates
- * createdAt by years, the job's FIRST real run (the 04:00 ICT cron) finds
- * every anniversary already passed and floods the promotion queue with
- * ~18 proposals at once. Running it here and resolving all but the most
- * recent PENDING_ANNUAL_RAISES leaves a queue that looks like it has been
- * worked, and the cron's later runs dedup against these rows.
- *
- * Approval mirrors promotionRequestController.js's onApprove (only the
- * salary changes; no level, so levelStartDate is untouched). The current
- * month's draft is regenerated afterwards by
- * refreshCurrentDraftPayrollAfterPromotions() — older, already-paid
- * months keep their pre-raise figures, which is what a real payroll
- * history looks like.
- */
+/* ── Annual raises ── backdated createdAt means the cron's first real run
+ * would flood the queue with ~18 anniversary proposals at once. Run it
+ * here and resolve all but PENDING_ANNUAL_RAISES; the cron dedups against
+ * these rows. Approval mirrors the controller (salary only; level and
+ * levelStartDate untouched). Paid months keep their pre-raise figures. */
 const PENDING_ANNUAL_RAISES = 2;
 
 async function seedAnnualRaises() {
@@ -1496,19 +1307,9 @@ async function seedAnnualRaises() {
   console.log(`✓ Annual raises: ${approved} approved, ${Math.min(pending.length, PENDING_ANNUAL_RAISES)} left pending for review`);
 }
 
-/* ── Post-promotion payroll refresh (cross-phase audit fix) ───────────────
- * Phase 4 (payroll) runs before Phase 5 (promotions) in main(), so the
- * current calendar month's draft period was already built from
- * pre-promotion salaries — most visibly, EMP029's approved bump to
- * Manager/$130,000 happens *after* her August draft was generated from
- * her old Senior/$93,000 figures. The real system has this exact same
- * limitation (a draft doesn't auto-refresh when a salary changes after
- * the fact) — payrollController.js's regenerate endpoint is HR's real
- * fix for it: delete the draft's payslips and rebuild them from current
- * employee data. Replicating that here, unconditionally, picks up any
- * promotion-driven salary change against whichever period is still in
- * draft — not narrowly hardcoded to one employee.
- */
+/* ── Post-promotion payroll refresh ── the current draft was built before
+ * promotions and raises changed salaries. A real draft doesn't refresh
+ * either; this replays payrollController's regenerate endpoint. */
 async function refreshCurrentDraftPayrollAfterPromotions() {
   const now = new Date();
   const period = await PayrollPeriodModel.findOne({
@@ -1541,14 +1342,9 @@ async function refreshCurrentDraftPayrollAfterPromotions() {
   console.log(`✓ Re-applied ${reapplied} payslip adjustments to the refreshed draft`);
 }
 
-/* ── Profile edit requests (Sample Data plan, Phase 6) ────────────────────
- * One pending, one approved, one rejected, for the Admin "Edit requests"
- * tab. The approved one replicates profileEditRequestController.js's
- * onApprove hook exactly (apply the diff's "to" values to the Employee
- * record), so it actually changes the employee's data, not just its own
- * status — and each "from" value is read off the employee's real current
- * field at seed time, not hand-typed, so the diff is never stale.
- */
+/* ── Profile edit requests ── one each of pending/approved/rejected. The
+ * approved one applies its "to" values to the Employee (the controller's
+ * onApprove); "from" values are read off the record at seed time. */
 const PROFILE_EDIT_CLIENT_TO_DB = { name: "name", phone: "phone", address: "address", age: "age", sex: "gender" };
 
 const PROFILE_EDIT_REQUESTS = [
@@ -1622,21 +1418,12 @@ async function seedProfileEditRequests(employees) {
   console.log(`✓ Seeded ${created} profile edit requests`);
 }
 
-/* ── Performance reviews + appeals (Sample Data plan, Phase 7) ────────────
- * Cycles come from the real ensureStandardCycles() (utils/performanceCycles.js)
- * — it self-manages a rolling window of half-year cycles (2 closed, 1 open)
- * dated off "now", the same way listCycles/loadCycleOrThrow already trigger
- * it in production. No cycle dates are hand-typed here.
- *
- * Reviews are written as one $set per employee rather than replaying the
- * real submitSelf/submitManager/setCompetency/addGoal call sequence one
- * HTTP call at a time — slower for no benefit here, since the schema has
- * no cross-field validation that sequence would exercise differently.
- * managerReviewedBy follows the same authorization rule the real
- * performanceScope.js enforces: only Engineering has an actual
- * role:"MANAGER" user (MGR002), so every other department is "orphan" and
- * HR is who'd really be allowed to submit those manager reviews.
- */
+/* ── Performance reviews + appeals ── cycles come from the real
+ * ensureStandardCycles() (rolling 2 closed + 1 open). Reviews are one
+ * $set per employee rather than a replay of the submit endpoints; the
+ * schema has no cross-field validation that sequence would exercise.
+ * managerReviewedBy follows performanceScope.js: only Engineering has a
+ * MANAGER user, so HR reviews every other department. */
 
 const PERFORMANCE_TIER = {
   EMP009: "star", EMP015: "star", EMP022: "star", EMP030: "star",
@@ -1703,9 +1490,8 @@ function buildGoals(count, createdBy) {
   return goals;
 }
 
-// EMP008/019/032 (on-leave), EMP033 (terminated), EMP028 (chronic no-show,
-// consistent with their disengaged pattern elsewhere), EMP020 (hired too
-// recently to have been part of the closed cycle) are deliberately excluded.
+// Excludes on-leave (EMP008/019/032), terminated (EMP033), chronic no-show
+// (EMP028) and EMP020 (hired after the closed cycle).
 const CLOSED_CYCLE_ROSTER = [
   "ADM001", "MGR001", "MGR002",
   "EMP001", "EMP002", "EMP003", "EMP004", "EMP005", "EMP006", "EMP007",
@@ -1729,15 +1515,9 @@ async function seedPerformanceReviews(employees) {
       const dept = await DepartmentModel.findById(emp.department, "name");
       if (dept?.name === "Engineering") candidateId = engManagerUser?._id ?? hrUser?._id ?? null;
     }
-    // Self-review isn't possible in the real system — assertCanRateAsManager
-    // blocks isSelf unconditionally, even for ADMIN (performanceScope.js).
-    // That matters here specifically for MGR001 (HR, so the "HR reviews
-    // orphan departments" rule would otherwise assign them to review
-    // themselves) and MGR002 (Engineering's own department manager, same
-    // problem via the "Engineering manager reviews Engineering" rule).
-    // Admin is the only person who can legitimately review either of them,
-    // since isAdmin is an unconditional branch independent of department/
-    // orphan status — the same reason it's the fallback here.
+    // assertCanRateAsManager blocks self-review even for ADMIN, which the
+    // rules above would produce for MGR001 (HR) and MGR002 (Engineering
+    // manager). Admin is the only valid reviewer for either.
     if (candidateId && emp.userId && String(candidateId) === String(emp.userId)) {
       return adminUser?._id ?? null;
     }
@@ -1791,7 +1571,7 @@ async function seedPerformanceReviews(employees) {
 
     if (employeeId === RESOLVED_APPEAL_EMPLOYEE_ID) {
       const adjustedRating = clampRating(managerBase + 1);
-      doc.managerRating = adjustedRating; // reflects the post-resolution value, same as the real resolveAppeal effect
+      doc.managerRating = adjustedRating; // post-resolution value, as resolveAppeal writes it
       doc.appeal = {
         reasonCategory: "rating_low",
         detail: "I believe this cycle's rating doesn't reflect the scope of work I took on, particularly the finance close automation project.",
@@ -1815,12 +1595,8 @@ async function seedPerformanceReviews(employees) {
   }
   console.log(`✓ Seeded ${closedCount} completed reviews for ${closedCycle.key} (closed)`);
 
-  // Correction pass, not just forward-looking logic: if this ran before
-  // the managerReviewerForDept fix above existed, MGR001/MGR002's review
-  // is already sitting in the database self-reviewed — the exists-check
-  // at the top of the loop would otherwise skip them forever on re-run
-  // since a record already exists. Retarget to Admin if still self-set;
-  // a no-op once corrected.
+  // Databases seeded before the self-review guard have MGR001/MGR002
+  // self-reviewed, and the exists-check above would keep them that way.
   for (const employeeId of ["MGR001", "MGR002"]) {
     const emp = byId.get(employeeId);
     if (!emp?.userId) continue;
@@ -1833,9 +1609,8 @@ async function seedPerformanceReviews(employees) {
     }
   }
 
-  // Open cycle: a deliberate mid-cycle mix, not full coverage — most of the
-  // roster genuinely hasn't started yet, which is realistic and needs no
-  // seeding (no review doc at all = "Not started").
+  // Open cycle: a mid-cycle mix. No review doc = "Not started", so most of
+  // the roster needs nothing.
   const selfOnly = ["EMP002", "EMP011", "EMP024", "EMP031"];
   const managerOnly = ["EMP016"];
   const completed = ["EMP015", "EMP022", "EMP030"];
@@ -1939,11 +1714,9 @@ async function seedPerformanceReviews(employees) {
   console.log(`✓ Seeded ${openCount} in-progress reviews for ${openCycle.key} (open)`);
 }
 
-/* ── Position Ladder (tasks 0.3 / 2.1 / 2.2) ── */
+/* ── Position ladder ── */
 async function seedPositionLevels() {
-  // level -> order, baseSalary (USD, same scale as seedEmployees' annualSalary
-  // above). HR can adjust baseSalary later via PATCH /position-levels/:level;
-  // order and level are structural and aren't meant to change at runtime.
+  // baseSalary is USD like annualSalary; HR can PATCH it, order/level are structural.
   const defs = [
     { level: "Intern", order: 0, baseSalary: 20000 },
     { level: "Full-time", order: 1, baseSalary: 60000 },
@@ -1964,13 +1737,9 @@ async function seedPositionLevels() {
   }
 }
 
-/**
- * One-time backfill for employees created before positionLevel/levelStartDate
- * existed on the schema. New employees get these defaulted automatically by
- * Employee.js's pre("validate") hook, but that hook only fires on document
- * creation — it can't retroactively fill in already-existing documents.
- * Safe to re-run: only touches documents where the field is still unset.
- */
+/** Backfills positionLevel/levelStartDate on employees that predate those
+ * fields (the pre("validate") default only fires on create). Only touches
+ * unset fields. */
 async function backfillEmployeePositionLadder() {
   const missingLevel = await EmployeeModel.updateMany(
     { positionLevel: { $exists: false } },
@@ -1980,10 +1749,7 @@ async function backfillEmployeePositionLadder() {
     console.log(`✓ Backfilled positionLevel on ${missingLevel.modifiedCount} existing employee(s)`);
   }
 
-  // levelStartDate: prefer the employee's own startDate (best available proxy
-  // for "when they entered their current level") over "now", since defaulting
-  // to now would reset every existing employee's promotion-eligibility clock
-  // to zero and delay real promotions that should already be due.
+  // startDate over "now": defaulting to now would reset every promotion clock.
   const employeesMissingDate = await EmployeeModel.find({
     $or: [{ levelStartDate: { $exists: false } }, { levelStartDate: null }],
   });
@@ -1998,14 +1764,10 @@ async function backfillEmployeePositionLadder() {
   }
 }
 
-/* ── Broadcast notifications (user: null → everyone) ──
- * Each message is read off the data seeded above rather than typed, so
- * it can't go stale: the newest hire, the next holiday, the candidate
- * actually at "interview" stage. (Payroll and attendance notices come from
- * the real jobs Phases 2/4 run, not from here.) (An earlier
- * hand-typed set announced "May payroll" and a "Sarah Smith" who never
- * existed, months after the fact.) Deduped by title.
- */
+/* ── Broadcast notifications (user: null) ── each message is read off the
+ * seeded data (newest hire, next holiday, interviewing candidate) so it
+ * can't go stale. Payroll/attendance notices come from the real jobs.
+ * Deduped by title. */
 async function seedNotifications() {
   const now = new Date();
 
@@ -2041,18 +1803,10 @@ async function seedNotifications() {
   }
 }
 
-/* ── Targeted notifications (Sample Data plan, Phase 8) ───────────────────
- * Writing directly to Mongoose in Phases 3/5/6/7 skipped the real
- * controllers' own NotificationModel.create() side effects entirely (no
- * HTTP request ever happened, so those never fired) — this backfills a
- * representative sample of them, matching the exact copy/titleKey shape
- * each real controller already uses (leaveRequestController.js,
- * promotionRequestController.js, profileEditRequestController.js,
- * performanceController.js). Dates are read back from the records
- * themselves rather than re-typed, so they can't drift out of sync with
- * what was actually seeded. Older (already-acted-on) ones are marked
- * read; the two freshest performance/leave items are left unread.
- */
+/* ── Targeted notifications ── the direct Mongoose writes above skipped
+ * the controllers' notification side effects; this backfills a sample in
+ * each controller's exact copy/titleKey shape, dated off the records.
+ * Older ones are marked read; the freshest two stay unread. */
 async function seedTargetedNotifications(employees) {
   const byId = new Map(employees.map((e) => [e.employeeId, e]));
   const hrUser = await UserModel.findOne({ email: "hr@hrms.com" });
@@ -2255,26 +2009,14 @@ async function seedTargetedNotifications(employees) {
   console.log(`✓ Seeded ${created} targeted notifications`);
 }
 
-/* ── Backdate what the real jobs wrote ────────────────────────────────────
- * Phases 2/4/5 run the real close-day, payroll and raise jobs, and each of
- * those emits its own HR notification and audit entry — with createdAt =
- * the moment the seed ran. Left alone that is ~80 broadcast notifications
- * and a page of audit entries all stamped "just now", which is the first
- * thing anyone sees after logging in. Every one of them names the day or
- * period it describes, so the timestamp can be recovered from the record
- * itself and moved to when that event would really have happened:
- *
- *   attendance closed for D          → D 23:00 ICT (the cron's slot)
- *   payroll draft for Y-M            → 1st of Y-M, 08:00 ICT
- *   payroll paid for Y-M             → 10th of the following month, 08:00 ICT
- *   no-show flag                     → the day of that employee's 5th no-show
- *   annual raise proposals           → the anniversary they're for; the ones
- *                                      seedAnnualRaises() approved are cleared
- *
- * Anything older than a few days is also marked read, so the unread badge
- * reflects the last week, not the last year. Mongoose `timestamps` would
- * re-stamp updatedAt on save, so these are raw updateOne calls.
- */
+/* ── Backdate what the real jobs wrote ── the close-day, payroll and raise
+ * jobs stamp their notifications and audit entries "just now". Each names
+ * the day or period it describes, so the timestamp is recovered from the
+ * record: attendance close → D 23:00 ICT; draft → 1st 08:00; paid → 10th
+ * of the next month; no-show flag → the 5th no-show's day; raise proposal
+ * → its anniversary (approved ones deleted). Anything older than a few
+ * days is marked read. Raw updateOne calls, since `timestamps` would
+ * re-stamp updatedAt. */
 const ICT_OFFSET_MS = 7 * 3600 * 1000;
 function ictTime(dateKey, hour) {
   return new Date(utcMidnight(dateKey).getTime() + hour * 3600 * 1000 - ICT_OFFSET_MS);
@@ -2367,11 +2109,8 @@ async function main() {
   await upsertAdmin(deptByName);
   await upsertHRUser(deptByName);
   await upsertManagerUser(deptByName);
-  // The three seed-only accounts (ADM001/MGR001/MGR002) are created by the
-  // upserts above, not by seedEmployees(), so they were missing from every
-  // history phase: no check-ins pre-seeded → the real close job marked them
-  // no-show daily and flagged all three for review by the 5th day, and
-  // their closed-cycle performance reviews were silently skipped.
+  // ADM001/MGR001/MGR002 come from the upserts, not seedEmployees(); add
+  // them here or every history phase skips them.
   const employees = [
     ...(await seedEmployees(deptByName)),
     ...(await EmployeeModel.find({ employeeId: { $in: ["ADM001", "MGR001", "MGR002"] } })),
