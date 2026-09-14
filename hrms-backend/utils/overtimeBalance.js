@@ -1,16 +1,7 @@
 /**
- * overtimeBalance.js — Attendance Overtime, milestone M2.
- *
- * Cumulative overtime usage against the monthly (40h) and annual (200h)
- * statutory caps. Same role utils/leaveBalance.js plays for leave, and the
- * same counting rule: pending *and* approved requests both consume the
- * allowance, so an employee cannot queue up several requests that are each
- * individually under the cap and collectively over it. Rejected requests
- * release what they had reserved.
- *
- * Everything here is in whole minutes (OvertimeRequest.plannedMinutes) and
- * only converts to hours at the edges — caps are compared across many
- * accumulated rows, and fractional hours drift.
+ * Overtime usage against the monthly/annual caps (DECISIONS.md D5). As with
+ * leaveBalance.js, pending *and* approved requests consume the allowance so
+ * several individually-valid requests cannot collectively exceed it.
  */
 
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
@@ -49,12 +40,7 @@ export async function usedMinutesInWindow(employeeId, { lo, hi }, { excludeId } 
   return rows.reduce((sum, r) => sum + (r.plannedMinutes ?? 0), 0);
 }
 
-/**
- * The payload behind GET /overtime-requests/balance and the request modal's
- * live caps meter. The meter is load-bearing UX rather than decoration: at
- * 4h/day an employee reaches the 40h monthly cap on their tenth overtime day,
- * so without a visible running total they hit a wall they could not see coming.
- */
+/** GET /overtime-requests/balance and the request modal's caps meter (at 4h/day the monthly cap arrives on the tenth shift). */
 export async function getOvertimeBalance(employeeId, { year, month } = {}) {
   const [monthMinutes, yearMinutes] = await Promise.all([
     usedMinutesInWindow(employeeId, monthBoundsUtc(year, month)),

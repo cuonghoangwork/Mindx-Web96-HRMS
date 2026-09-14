@@ -1,17 +1,10 @@
 /**
- * overtimeRequestController.js — Attendance Overtime, milestone M2.
- *
- * list/review come from the generic review-queue pattern
- * (utils/reviewQueue.js), same as leave/profile-edit/promotion/no-show.
- * Everything below that is bespoke, because *what* is being requested has
- * rules none of the others share: a timezone-aware application cutoff, a day
- * type that decides the pay multiplier, and three cumulative statutory caps.
- *
- * The validation order in buildRequestPayload() is deliberate and matches
- * HRMS_OVERTIME_PLAN.md §7.4 — cheap identity/date checks first, then the
- * two database lookups, then the arithmetic. It also means the error the
- * employee sees is the *first* thing wrong with their request rather than
- * whichever check happened to run first.
+ * Overtime requests (DECISIONS.md D5). list/review come from the review-queue
+ * pattern (D6); create/assign are bespoke because the rules are — a
+ * time-zone-aware cutoff, a day type that sets the multiplier, three
+ * cumulative caps. buildRequestPayload() checks cheap things first, then the
+ * database, then the arithmetic, so the employee sees the first thing wrong
+ * with the request rather than whichever check happened to run first.
  */
 
 import OvertimeRequestModel, { OT_LIVE_STATUSES } from "../model/OvertimeRequest.js";
@@ -63,7 +56,6 @@ function toClientRequest(doc) {
     plannedStart: o.plannedStart,
     plannedEnd: o.plannedEnd,
     plannedMinutes: o.plannedMinutes,
-    // Derived, never stored — see the plannedMinutes note in model/OvertimeRequest.js.
     plannedHours: minutesToHours(o.plannedMinutes ?? 0),
     origin: o.origin,
     dayType: o.dayType,
@@ -73,19 +65,9 @@ function toClientRequest(doc) {
 }
 
 /**
- * Overtime may only be scheduled for someone payroll will actually pay.
- *
- * Without this the two halves of the system disagreed in silence: the request
- * was accepted, approval wrote otMinutes onto the attendance record, the
- * roster showed the hours — and then payroll skipped the employee entirely
- * (utils/payrollGeneration.js filters on PAYABLE_EMPLOYEE_STATUSES), so the
- * hours were recorded and never paid. Nothing errored; the numbers just did
- * not add up. Reusing payroll's own constant is the fix, not merely a tidy
- * one: the check and the exclusion cannot drift apart.
- *
- * Deliberately fails closed when `status` is absent. Every caller must load
- * the field explicitly, and a narrow projection that forgets it should block
- * overtime loudly rather than silently reopen the gap this exists to close.
+ * Overtime may only be scheduled for someone payroll will pay — the same
+ * PAYABLE_EMPLOYEE_STATUSES payrollGeneration.js filters on, so the two cannot
+ * drift. Fails closed when `status` was not loaded.
  */
 function assertEmployable(employee) {
   if (PAYABLE_EMPLOYEE_STATUSES.includes(employee?.status)) return;
@@ -98,14 +80,10 @@ function assertEmployable(employee) {
 }
 
 /**
- * Steps 2-10 of §7.4's validation, shared by create() (one employee) and
- * assign() (many). Throws an AppError with a specific code on the first
- * failure; returns the document payload on success.
- *
- * Step 1 (resolving *which* employee) is the caller's job, because it
- * differs: create() always uses the requester's own record, assign() takes
- * a list and checks departmental scope. Step 1b below is the employment
- * check on whatever that resolved to.
+ * Validation shared by create() and assign(); throws an AppError with a
+ * specific code on the first failure. Resolving *which* employee is the
+ * caller's job — create() uses the requester's own record, assign() checks
+ * departmental scope over a list.
  */
 async function buildRequestPayload({
   employee,
@@ -117,14 +95,10 @@ async function buildRequestPayload({
   now,
   skipCutoff,
 }) {
-  // 1b. Still on the payroll. Lettered rather than renumbering §7.4's steps,
-  //     same as 7b below. Cheapest check in the function — the document is
-  //     already in hand — so it runs before anything touches the database.
   assertEmployable(employee);
 
-  // 2. A valid, non-past date. Compared as date *keys* in the scheduler's
-  //    timezone — never via getHours()/getDate(), which read the container's
-  //    clock (UTC on Render) and would shift the boundary by 7 hours.
+  // A valid, non-past date — compared as date keys in APP_TIMEZONE, never via
+  // getDate(), which reads the container's UTC clock.
   if (!dateKey || !DATE_KEY_RE.test(String(dateKey))) {
     throw new AppError("date must be a YYYY-MM-DD date.", "OT_INVALID_DATE", undefined, 400);
   }
@@ -139,9 +113,7 @@ async function buildRequestPayload({
     );
   }
 
-  // 3. The 13:00 cutoff on the overtime date itself. Skipped for HR/Admin
-  //    and for assignments — the rule exists to stop employees from
-  //    retroactively claiming a shift, not to stop management scheduling one.
+  // The 13:00 cutoff exists to stop employees back-filling a shift, not to stop management scheduling one.
   if (!skipCutoff && isPastCutoff(now, dateKey)) {
     throw new AppError(
       "Overtime applications close at 13:00 on the overtime date.",
@@ -151,9 +123,7 @@ async function buildRequestPayload({
     );
   }
 
-  // 4. One live request per employee per date. Backed by a partial unique
-  //    index (model/OvertimeRequest.js) — this pre-check only exists to turn
-  //    a duplicate-key error into a readable message.
+  // The partial unique index is what enforces this; the pre-check gives a readable message.
   await assertNoPendingRequest(
     OvertimeRequestModel,
     employee._id,
@@ -163,7 +133,6 @@ async function buildRequestPayload({
     { date, status: { $in: OT_LIVE_STATUSES } },
   );
 
-  // 5. Not a day the employee is already on approved leave.
   const onLeave = await LeaveRequestModel.findOne(
     { employee: employee._id, status: "approved", startDate: { $lte: date }, endDate: { $gte: date } },
     "_id",
@@ -177,22 +146,15 @@ async function buildRequestPayload({
     );
   }
 
-  // 6. Day type decides both the multiplier and the daily cap. Snapshotted
-  //    onto the request so a Holiday row added later cannot silently
-  //    reprice an already-approved shift.
+  // Snapshotted onto the request so a Holiday row added later cannot reprice an approved shift.
   const dayType = resolveDayType(dateKey, { isHoliday: await isHolidayOn(date) });
 
-  // 7. Span must not cross midnight — splitDayNight throws OT_CROSSES_MIDNIGHT
-  //    rather than letting hoursBetween's Math.max(0, ...) quietly return 0.
   const { dayMinutes, nightMinutes } = splitDayNight(plannedStart, plannedEnd);
   const plannedMinutes = dayMinutes + nightMinutes;
 
-  // 7b. On a working day, overtime cannot start before the normal shift ends.
-  //     Without this a request for 17:00-20:00 is accepted as 3h (it clears the
-  //     4h cap) but only ever pays 2h, because utils/overtimeRecompute.js
-  //     correctly clamps the credited span to the 18:00 boundary. The clamp is
-  //     right; accepting a request it will silently shorten is not. Rest days
-  //     and holidays have no normal shift, so the rule does not apply to them.
+  // On a working day overtime cannot start before the shift ends: a 17:00–20:00
+  // request would be accepted as 3h but paid as 2h, since the recompute clamps
+  // to 18:00. Rest days and holidays have no normal shift.
   if (dayType === "normal" && parseHHMM(plannedStart) < parseHHMM(OT_WORKDAY_START)) {
     throw new AppError(
       `Overtime on a working day cannot start before ${OT_WORKDAY_START}.`,
@@ -202,8 +164,6 @@ async function buildRequestPayload({
     );
   }
 
-  // 8. Daily cap — 4h of overtime on a working day, 12h of total work on a
-  //    rest day or public holiday (where the whole span is overtime).
   const dailyCapHours = dailyCapHoursFor(dayType);
   if (plannedMinutes > dailyCapHours * 60) {
     throw new AppError(
@@ -214,9 +174,7 @@ async function buildRequestPayload({
     );
   }
 
-  // 9/10. Cumulative caps. Pending requests count too — otherwise an
-  //       employee could queue several individually-legal requests that are
-  //       collectively over the ceiling.
+  // Cumulative caps; pending requests count too (see overtimeBalance.js).
   const year = Number(dateKey.slice(0, 4));
   const month = Number(dateKey.slice(5, 7));
 
@@ -254,15 +212,10 @@ async function buildRequestPayload({
 }
 
 /**
- * The caps checks above read committed state *before* this request commits,
- * so two concurrent submissions for different dates in the same month can
- * both pass. Re-verify once committed: walk every live request in the window
- * in _id order (deterministic, and identical for both racers once both have
- * landed) and roll this one back if it is the row that crossed the line.
- *
- * Exactly the pattern leaveRequestController.create uses for its balance
- * cap, and for the same reason. The per-date duplicate rule needs no
- * equivalent — a partial unique index settles that one atomically.
+ * Two concurrent submissions can both pass the pre-commit caps check. Once
+ * committed, walk the window's live requests in _id order (the same order for
+ * both racers) and roll this one back if it is the row that crossed the line.
+ * Same pattern as leaveRequestController.create's balance cap.
  */
 async function assertCapsAfterCommit(request, dateKey) {
   const year = Number(dateKey.slice(0, 4));
@@ -313,41 +266,19 @@ function asDuplicateError(err, dateKey) {
 }
 
 /**
- * list/review from the shared pattern; onApprove is the overtime-specific side
- * effect (M3).
- *
- * Approval writes the derived hours onto that day's attendance record. It is
- * safe to run late — the day after the close job already wrote the record — and
- * safe to run twice, because applyOvertimeToRecord derives every field from
- * scratch rather than incrementing.
- *
- * The late case is the one that matters: with nothing approved at close time
- * the record was shut at 18:00 and `checkOut` no longer shows when the
- * employee left. `rawCheckOut` does, so an approval tomorrow still credits
- * the hours actually clocked and marks them `otEvidence: "clocked"`. When
- * there is no clock evidence it falls back to the planned span and marks it
- * `"planned"`, which is what the queue shows a warning against.
+ * Approval writes the derived hours onto that day's attendance record. Safe
+ * to run late (the close job may already have shut the row at 18:00 —
+ * rawCheckOut still shows when they left) and safe to run twice
+ * (applyOvertimeToRecord derives, never increments).
  */
 const { list, review } = createReviewRequestController({
   Model: OvertimeRequestModel,
   resourceLabel: "overtime request",
   capability: "approveOvertimeRequests",
-  // Without this the decision notice falls back to reviewQueue.js's
-  // "employee" default, which utils/notifyPolicy.js keeps in-app only — so the
-  // employee learned their shift was approved or rejected from the bell alone,
-  // for a shift that may be the same evening. leaveRequestController sets its
-  // own for exactly this reason.
+  // The default "employee" category is in-app only (D7); a decision about tonight's shift must reach a phone.
   notifyCategory: "overtime",
   toClient: toClientRequest,
-  /**
-   * The queue's warning triangle needs otEvidence, which lives on Attendance,
-   * not on the request — the request records what was *asked for*, the
-   * attendance record what actually happened. Without this the flag silently
-   * renders nothing, because the field is simply not in the payload.
-   *
-   * One query for the whole page rather than one per row: the pairs are
-   * {employee, date} and Attendance is indexed on exactly that.
-   */
+  // The queue's warning triangle needs otEvidence, which lives on Attendance, not the request. One query per page.
   enrichItems: async (items) => {
     if (!items.length) return items;
     const records = await AttendanceModel.find(
@@ -374,21 +305,14 @@ const { list, review } = createReviewRequestController({
   onApprove: async (request) => {
     const employeeId = request.employee?._id ?? request.employee;
 
-    // Checked again here, not only at application time: an employee can be
-    // terminated in the days between applying and being reviewed, and there is
-    // no cutoff on how late a review may happen. Throwing leaves the request
-    // "pending" rather than approved-with-no-effect (see the ordering note in
-    // utils/reviewQueue.js), so the reviewer rejects it explicitly and the
-    // employee gets a decision instead of a request that quietly does nothing.
+    // Re-checked at review time: they may have been terminated since applying.
+    // Throwing leaves the request pending (D6) so the reviewer rejects it explicitly.
     assertEmployable(await EmployeeModel.findById(employeeId, "status"));
 
     const record = await AttendanceModel.findOne({ employee: employeeId, date: request.date });
-    // No attendance row yet — approved ahead of the day, or the employee never
-    // clocked in. Nothing to derive; the close job applies it at day's end.
-    if (!record) return;
+    if (!record) return; // approved ahead of the day — the close job applies it
 
-    // Pass the request explicitly: reviewQueue sets status = "approved" on this
-    // in-memory document before calling us, and it has not been saved yet.
+    // Pass the request: reviewQueue set status = "approved" in memory but has not saved yet.
     await recomputeRecordOvertime(record, { request });
     await record.save();
   },
@@ -418,12 +342,8 @@ const { list, review } = createReviewRequestController({
 
 const overtimeRequestController = {
   /**
-   * POST /api/v1/overtime-requests — apply for overtime.
-   *
-   * EMPLOYEE always applies for themselves; an employeeId in the body is
-   * ignored rather than rejected, matching attendanceController.checkIn's
-   * "override whatever was sent" rule. HR/Admin bypass the 13:00 cutoff so
-   * they can still record same-day overtime; use /assign for someone else.
+   * POST /api/v1/overtime-requests — apply for oneself. A body employeeId is
+   * ignored (as in attendanceController.checkIn). HR/Admin bypass the cutoff.
    */
   create: async (req, res) => {
     const dateKey = req.body?.date;
@@ -474,24 +394,10 @@ const overtimeRequestController = {
         },
       };
 
-      // Two tiers, one addressed notice each — the same split
-      // leaveRequestController.create and profileEditRequestController use.
-      //
-      // The department's manager approves overtime for their own team
-      // (router/overtimeRequestRouter.js) but is NOT in the "hr" broadcast
-      // audience: MANAGER is department-scoped and a broadcast carries no
-      // department (see AUDIENCES_BY_ROLE in model/Notification.js). So the
-      // one person who had to act was the one person never told.
-      //
-      // The HR half was a notifyHR() broadcast until 2026-09-07. Broadcast
-      // read state is SHARED — one reviewer opening it cleared it from every
-      // other reviewer's badge — so a request each of them may need to act on
-      // could vanish because a colleague glanced at it. Addressed documents
-      // keep read state per person.
-      //
-      // Excluding the caller covers a reviewer applying for their own
-      // overtime: the other tier still gets it, and so does a second manager
-      // in the same department.
+      // Addressed notices, not a broadcast (D8): a department manager is never
+      // in the "hr" audience, and broadcast read state is shared — one reviewer
+      // opening it would clear every other reviewer's badge. Excluding the
+      // caller covers a reviewer applying for their own overtime.
       const [hrTier, departmentManagers] = await Promise.all([
         UserModel.find({ role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } }, "_id"),
         departmentManagerUserIds(employee.department, req.user.id),
@@ -512,16 +418,10 @@ const overtimeRequestController = {
 
   /**
    * POST /api/v1/overtime-requests/assign — MANAGER (own department) / HR /
-   * ADMIN assign overtime to several employees at once.
-   *
-   * Partial success is the point: one employee being over their monthly cap
-   * must not silently discard the other nine assignments. Each employee is
-   * validated independently and reported in `created` or `skipped`, so the
-   * caller can show exactly who was left out and why.
-   *
-   * Assigned requests are created *pending*, not pre-approved: the approval
-   * queue stays the single place overtime becomes real, and the
-   * approveOvertimeRequests capability keeps meaning what it says.
+   * ADMIN assign overtime to several employees. Partial success by design:
+   * each employee is validated independently and reported in `created` or
+   * `skipped`. Assigned requests are created pending — the approval queue
+   * stays the only place overtime becomes real.
    */
   assign: asyncHandler(async (req, res) => {
     const { date: dateKey, plannedStart, plannedEnd, reason } = req.body ?? {};
@@ -559,10 +459,7 @@ const overtimeRequestController = {
           reason,
           origin: "assigned",
           now,
-          // Assignment is a management action — the cutoff exists to stop
-          // employees back-filling their own shifts, not to stop a manager
-          // scheduling one.
-          skipCutoff: true,
+          skipCutoff: true, // a management action; the cutoff is for employees back-filling
         });
 
         let request;
@@ -578,21 +475,14 @@ const overtimeRequestController = {
         skipped.push({
           employeeId: String(employeeId),
           code: err.code ?? "OT_ASSIGN_FAILED",
-          // params travels with the code so the client can interpolate the
-          // translated message ("...the {{cap}}-hour monthly cap") rather
-          // than rendering the placeholder.
-          params: err.params,
+          params: err.params, // the client interpolates the translated message
           message: err.message,
         });
       }
     }
 
     if (created.length) {
-      // Addressed rather than broadcast for the same read-state reason as
-      // the apply path above. This one is an FYI rather than an action item,
-      // but "one colleague opened it so it left your badge" is just as
-      // surprising for an FYI, and having two notice shapes in one file
-      // invites the next reader to copy the wrong one.
+      // Addressed for the same read-state reason as the apply path above.
       const hrTier = await UserModel.find(
         { role: { $in: ["HR", "ADMIN"] }, _id: { $ne: req.user.id } },
         "_id",
@@ -609,13 +499,8 @@ const overtimeRequestController = {
       });
     }
 
-    // Always a success when the batch itself was well-formed, even if every
-    // employee was skipped. The per-employee outcomes are DATA, not errors:
-    // success:false makes apiFetch throw, and the client then discards
-    // `skipped` — the only place the reasons live, and the whole point of
-    // the partial-success contract. A genuinely bad request (nothing
-    // selected, bad span, wrong role) still throws above and returns 4xx.
-    // 201 when something was created, 200 when the answer is just a report.
+    // success:true even if everyone was skipped — success:false makes apiFetch
+    // throw and the client would discard `skipped`, the only place the reasons live.
     res.status(created.length ? 201 : 200).json({ success: true, created, skipped });
   }, 400),
 
@@ -626,11 +511,8 @@ const overtimeRequestController = {
   review,
 
   /**
-   * GET /api/v1/overtime-requests/balance?year=&month=&employeeId=
-   *
-   * Employees always get their own totals regardless of query params; a
-   * MANAGER may pass ?employeeId= for someone in their own department. Same
-   * scoping rule as leaveRequestController.balance.
+   * GET /api/v1/overtime-requests/balance?year=&month=&employeeId= — employees
+   * always get their own; a MANAGER may ask about their own department.
    */
   balance: asyncHandler(async (req, res) => {
     const now = serverNow(req);
@@ -661,14 +543,9 @@ const overtimeRequestController = {
   }, 500),
 
   /**
-   * DELETE /api/v1/overtime-requests/:id — an employee withdraws their own
-   * still-pending request, before the cutoff.
-   *
-   * Deleted rather than marked "rejected": a rejection is a decision someone
-   * made about the request, and conflating the two would put the employee's
-   * own withdrawals in HR's rejected list. Deleting also frees the date for
-   * a corrected resubmission, which the partial unique index would otherwise
-   * still block.
+   * DELETE /api/v1/overtime-requests/:id — withdraw one's own pending request
+   * before the cutoff. Deleted, not marked rejected: a withdrawal is not HR's
+   * decision, and deleting frees the date for a corrected resubmission.
    */
   remove: asyncHandler(async (req, res) => {
     const request = await OvertimeRequestModel.findById(req.params.id);

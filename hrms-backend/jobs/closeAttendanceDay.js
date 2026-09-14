@@ -21,19 +21,10 @@ import { hoursBetweenEnd, resolveDayType } from "../utils/overtimeRate.js";
 import { applyOvertimeToRecord } from "../utils/overtimeRecompute.js";
 
 /**
- * One Holiday lookup per run, answering two different questions.
- *
- * They resolve a Saturday-holiday in opposite directions, on purpose:
- *
- *   - skipReason keeps its original precedence (weekend first), so late/no-show
- *     marking behaves exactly as it did before overtime existed.
- *   - dayType puts holiday first, because a public holiday pays 300% and does
- *     not stop being a holiday because it landed on a weekend.
- *
- * The lookup itself goes through utils/holidayLookup.js so attendance and
- * overtime cannot drift onto different holiday-matching idioms (the codebase
- * has an exact-Date match here and a range match in payrollGeneration; they
- * agree only while every Holiday row sits at exactly UTC midnight).
+ * One Holiday lookup per run, answering two questions that rank a
+ * Saturday-holiday in opposite directions on purpose: skipReason says
+ * "weekend" (late/no-show marking unchanged), dayType says "holiday" (it
+ * pays 300% regardless of the weekday).
  */
 async function resolveDayContext(dateKey, date) {
   const isHoliday = await isHolidayOn(date);
@@ -44,20 +35,9 @@ async function resolveDayContext(dateKey, date) {
 }
 
 /**
- * Closes every still-open record for the day.
- *
- * An employee with an approved overtime request is closed at their planned
- * end (up to 22:00 on a working day, up to 24:00 on a rest day) rather than
- * at 18:00 — otherwise the close job would erase the overtime it is supposed
- * to record.
- *
- * The approved requests are fetched in one query for the whole batch, not one
- * per record: this runs over every open attendance row in the company, and the
- * late-day handler below already documents the same N+1 concern.
- *
- * Note what is NOT set here: rawCheckOut. It records a *genuine* employee
- * clock-out, so the job must leave it null — that null is exactly what tells a
- * late approval tomorrow that these hours are planned rather than clocked.
+ * Closes every still-open record at WORKDAY_END, or at the approved overtime
+ * shift's plannedEnd. Never sets rawCheckOut — that null is what tells a late
+ * approval tomorrow these hours were planned, not clocked.
  */
 async function autoCheckOut(date, dayType) {
   const open = await AttendanceModel.find({
@@ -81,15 +61,12 @@ async function autoCheckOut(date, dayType) {
     const closeAt = request ? request.plannedEnd : WORKDAY_END;
     try {
       record.checkOut = closeAt;
-      // hoursBetweenEnd, not hoursBetween: on a rest day an approved
-      // plannedEnd can legitimately be "24:00", which parseHHMM rejects.
       record.hours = hoursBetweenEnd(record.checkIn, closeAt);
       applyOvertimeToRecord(record, request, { dayType });
       await record.save();
       closed += 1;
     } catch (err) {
-      // One malformed record must not abort the nightly close for everyone
-      // else. Logged loudly rather than swallowed, so it can be fixed.
+      // One malformed record must not abort the close for everyone else.
       console.error(
         `[closeAttendanceDay] could not auto-close attendance ${record._id} ` +
           `(employee ${record.employee}): ${err.message}`,
@@ -100,20 +77,10 @@ async function autoCheckOut(date, dayType) {
 }
 
 /**
- * Task 4.2: "late count as half-day Annual/PTO leave or half-day unpaid
- * leave". For each employee whose check-in is after WORKDAY_LATE_AFTER, mark
- * the day "late" and decide whether it draws from their Annual/PTO balance
- * (if they have >= 0.5 remaining for the year) or is unpaid (once exhausted).
- *
- * Grouped by employee and processed one employee at a time within each
- * group, but the groups themselves run in parallel: when the SAME employee
- * has multiple late days queued in one run, each of THEIR checks must see
- * the previous one's deduction already applied via getRemainingDays —
- * otherwise two late days in the same batch could both read the same
- * "before" balance and both get marked "annual" even though only one
- * 0.5-day slice was actually left. Different employees have no such
- * dependency (the common case is one late record each), so serializing the
- * whole batch behind that per-employee ordering wastes N-1 round trips.
+ * Check-in after WORKDAY_LATE_AFTER marks the day "late" and costs half a
+ * day of annual leave, or is unpaid once the balance is below 0.5
+ * (DECISIONS.md D4). Records are processed sequentially per employee (each
+ * check must see the previous deduction) but employees run in parallel.
  */
 async function markLate(date) {
   const candidates = await AttendanceModel.find({
@@ -160,14 +127,10 @@ async function markLate(date) {
 }
 
 /**
- * Task 4.6: employees who are neither checked in nor covered by a
- * pending/approved LeaveRequest for this date are "no-shows", not generic
- * "absent" — "absent" stays available for manual HR entry. A pending
- * (not-yet-reviewed) request still counts as "covered": the employee did
- * file something, and it would be unfair to flag them before HR has acted
- * on it. Approved requests are already reflected as "on-leave" attendance
- * records by leaveRequestController's onApprove hook, so they're excluded
- * here via the `covered` (existing attendance) check, same as before.
+ * Employees with no attendance row and no pending/approved leave for the
+ * date are "no-show" — distinct from "absent", which HR enters by hand (D4).
+ * A pending request counts as covered: they filed something, and HR has not
+ * acted on it yet.
  */
 async function markNoShow(dateKey, date) {
   const employees = await EmployeeModel.find(
@@ -214,10 +177,8 @@ async function markNoShow(dateKey, date) {
 
   if (!toInsert.length) return { count: 0, employeeIds: [] };
 
-  // Captured before the insert (not derived from its result) so task 4.7's
-  // flag check still runs for an employee even if their own insert hit the
-  // duplicate-key race handled below — worst case it's a harmless no-op
-  // re-check, not a missed flag.
+  // Captured before the insert so the flag check still runs for an employee
+  // whose insert lost the duplicate-key race below.
   const employeeIds = toInsert.map((r) => r.employee);
 
   try {
@@ -235,22 +196,10 @@ async function markNoShow(dateKey, date) {
 }
 
 /**
- * Task 4.7: "5 no-shows -> flag for HR review (not auto-terminate)". After
- * today's no-show records are written, check whether any of those
- * employees have now accumulated a new multiple of 5 no-show days
- * *all-time* and, if so, auto-create a pending NoShowReview (task 0.2's
- * review-queue pattern — see model/NoShowReview.js) plus notify HR (task
- * 4.8, via the same notifyHR() every other scheduled job already uses).
- *
- * Deliberately never touches Employee.status — flagging is the entire
- * effect. Any consequence beyond that is a human decision made through the
- * review queue (controller/noShowReviewController.js), not this job.
- *
- * Dedup: only scoped to employees marked no-show *today* (cheap — avoids a
- * full-collection scan every run) and only re-flags once the employee's
- * all-time count has grown by >= 5 since their last flag (pending or
- * already reviewed), the same "flag once per threshold, don't refire every
- * day the count sits still" rule checkPromotionEligibility.js uses.
+ * Flags a pending NoShowReview each time an employee's all-time no-show count
+ * grows by another 5 since their last flag (D2). Flagging is the entire
+ * effect — Employee.status is never touched. Scoped to today's no-shows so
+ * it is not a full-collection scan.
  */
 async function flagRepeatedNoShows(employeeIds) {
   if (!employeeIds.length) return 0;
@@ -299,9 +248,7 @@ export async function closeAttendanceDay({ dateKey } = {}) {
   const date = utcMidnight(dateKey);
   const { skipReason: reason, dayType } = await resolveDayContext(dateKey, date);
 
-  // Deliberately outside the skip guard below: a rest day or holiday has no
-  // late/no-show marking to do, but it is exactly when rest-day overtime needs
-  // closing.
+  // Outside the skip guard: a rest day has no late/no-show marking, but it is when rest-day overtime closes.
   const autoCheckedOut = await autoCheckOut(date, dayType);
 
   let markedLate = 0;
@@ -315,9 +262,6 @@ export async function closeAttendanceDay({ dateKey } = {}) {
 
     const noShowResult = await markNoShow(dateKey, date);
     markedNoShow = noShowResult.count;
-    // Task 4.7/4.8 — only worth checking employees actually marked no-show
-    // today (see flagRepeatedNoShows() header for why this is scoped, not
-    // a full-collection sweep).
     flaggedForReview = await flagRepeatedNoShows(noShowResult.employeeIds);
   }
 

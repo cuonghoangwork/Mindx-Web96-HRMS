@@ -1,20 +1,10 @@
 /**
- * overtimePay.js — Attendance Overtime, milestone M5. Payroll aggregation.
+ * A month of attendance rows → the overtime figure payroll needs plus the
+ * payslip breakdown. Pure; the caller loads rows once for the whole company.
  *
- * Turns a month of attendance records into the one number payroll needs, plus
- * the breakdown a payslip has to show. Pure: the caller supplies the rows, so
- * this stays unit-testable and payrollGeneration can load them once for the
- * whole company rather than once per employee.
- *
- * Two rules encoded here that are easy to get wrong:
- *
- *   - **Only otMinutes is paid.** otUnapprovedMinutes is deliberately ignored:
- *     time worked with nobody signing off is recorded and flagged, never paid.
- *     Reading the wrong field would quietly pay for exactly the hours the
- *     approval queue exists to withhold.
- *   - **Each day is rounded, then summed.** Not summed then rounded — that way
- *     the breakdown buckets are integers that add up to the total exactly, so
- *     a payslip's sub-line can never disagree with its own headline figure.
+ * Only `otMinutes` is paid — `otUnapprovedMinutes` is exactly what the
+ * approval queue exists to withhold (DECISIONS.md D5). Each day is rounded
+ * then summed, so the breakdown buckets add up to the headline exactly.
  */
 
 import { OT_MULTIPLIERS, overtimeHourlyRateVnd, overtimePayFromMinutesVnd } from "./overtimeRate.js";
@@ -27,13 +17,8 @@ const emptyBreakdown = () =>
   Object.fromEntries(DAY_TYPES.map((k) => [k, emptyBucket()]));
 
 /**
- * @param {object} args
- * @param {number} args.baseSalary  Monthly VND base for the employee.
- * @param {number} args.year
- * @param {number} args.month       1-12.
- * @param {Array}  args.attendanceRows  That employee's Attendance rows for the
- *   month. Rows with no paid overtime are ignored, so the caller can pass the
- *   whole month without filtering.
+ * @param {number} args.baseSalary  Monthly VND base.
+ * @param {Array}  args.attendanceRows  The employee's rows for the month; rows without paid overtime are ignored.
  * @returns {{hours, nightHours, minutes, nightMinutes, pay, hourlyRate, breakdown}}
  */
 export function computeOvertimePay({ baseSalary, year, month, attendanceRows = [] } = {}) {
@@ -48,9 +33,7 @@ export function computeOvertimePay({ baseSalary, year, month, attendanceRows = [
     const otMinutes = Number(row?.otMinutes) || 0;
     if (otMinutes <= 0) continue;
 
-    // An overtime record without a day type cannot be priced — there is no
-    // multiplier to apply. Skip it rather than guessing "normal", which would
-    // underpay a rest day by a third and do it silently.
+    // No day type → no multiplier. Skip rather than guess "normal", which would silently underpay a rest day.
     const dayType = row?.otDayType;
     if (!DAY_TYPES.includes(dayType)) continue;
 
@@ -84,14 +67,7 @@ export function computeOvertimePay({ baseSalary, year, month, attendanceRows = [
   };
 }
 
-/**
- * Flattens a breakdown into the segments a payslip line renders, e.g.
- * `150% x 4h · 200% x 10h · 270% x 2h`.
- *
- * Built here rather than in the client so the statutory multipliers stay in
- * one place (OT_MULTIPLIERS). The frontend receives finished numbers and only
- * has to format them.
- */
+/** Payslip line segments, e.g. `150% x 4h · 200% x 10h` — built server-side so OT_MULTIPLIERS stays the only copy. */
 export function overtimeSegments(breakdown) {
   if (!breakdown) return [];
   const segments = [];
